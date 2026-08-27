@@ -1315,62 +1315,77 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
             }
             receipt = release_receipt()
 
-            with (
-                mock.patch.object(provision, "CONTAINER_SOURCE", repo),
-                mock.patch.object(provision, "CONTAINER_MIRRORS", mirrors),
-                mock.patch.object(provision, "CONTAINER_RELEASE", release),
-                mock.patch.object(
-                    provision, "CONTAINER_RELEASE_SOURCE", release_source
-                ),
-                mock.patch.object(
-                    provision, "CONTAINER_RELEASE_BUILD", release_build
-                ),
-                mock.patch.object(provision, "CONTAINER_SCRATCH", scratch),
-                mock.patch.object(provision, "CM", aliases["cmake"]),
-                mock.patch.object(provision, "NINJA", aliases["ninja"]),
-                mock.patch.object(
-                    provision, "C_COMPILER", aliases["clang"]
-                ),
-                mock.patch.object(
-                    provision, "CXX_COMPILER", aliases["clang++"]
-                ),
-                mock.patch.object(
-                    provision,
-                    "_load_release_inputs",
-                    return_value=({}, workload, project),
-                ),
-                mock.patch.object(
-                    provision.realworld, "load_manifest", return_value=manifest
-                ),
-                mock.patch.object(
-                    provision.realworld,
-                    "load_mirror_authority",
-                    return_value=({}, mirrors),
-                ),
-                mock.patch.object(
-                    provision.realworld,
-                    "_bounded_shard_workspace",
-                    return_value=contextlib.nullcontext(private),
-                ),
-                mock.patch.object(
-                    provision.realworld,
-                    "_materialize_offline_repositories",
-                    return_value={project["repository"]: offline},
-                ),
-                mock.patch.object(
-                    provision.determinism, "prepare_release_candidate"
-                ) as prepare,
-                mock.patch.object(provision, "_normalize_release_payload_modes"),
-                mock.patch.object(
-                    provision, "_release_projection", return_value=receipt
-                ),
-                mock.patch.object(provision, "_write_release_receipt"),
-                mock.patch.object(
-                    provision,
-                    "verify_release_authority_in_current_runtime",
-                    return_value=receipt,
-                ),
-            ):
+            with contextlib.ExitStack() as stack:
+                for name, value in (
+                    ("CONTAINER_SOURCE", repo),
+                    ("CONTAINER_MIRRORS", mirrors),
+                    ("CONTAINER_RELEASE", release),
+                    ("CONTAINER_RELEASE_SOURCE", release_source),
+                    ("CONTAINER_RELEASE_BUILD", release_build),
+                    ("CONTAINER_SCRATCH", scratch),
+                    ("CM", aliases["cmake"]),
+                    ("NINJA", aliases["ninja"]),
+                    ("C_COMPILER", aliases["clang"]),
+                    ("CXX_COMPILER", aliases["clang++"]),
+                ):
+                    stack.enter_context(mock.patch.object(provision, name, value))
+                stack.enter_context(
+                    mock.patch.object(
+                        provision,
+                        "_load_release_inputs",
+                        return_value=({}, workload, project),
+                    )
+                )
+                stack.enter_context(
+                    mock.patch.object(
+                        provision.realworld,
+                        "load_manifest",
+                        return_value=manifest,
+                    )
+                )
+                stack.enter_context(
+                    mock.patch.object(
+                        provision.realworld,
+                        "load_mirror_authority",
+                        return_value=({}, mirrors),
+                    )
+                )
+                stack.enter_context(
+                    mock.patch.object(
+                        provision.realworld,
+                        "_bounded_shard_workspace",
+                        return_value=contextlib.nullcontext(private),
+                    )
+                )
+                stack.enter_context(
+                    mock.patch.object(
+                        provision.realworld,
+                        "_materialize_offline_repositories",
+                        return_value={project["repository"]: offline},
+                    )
+                )
+                prepare = stack.enter_context(
+                    mock.patch.object(
+                        provision.determinism, "prepare_release_candidate"
+                    )
+                )
+                for name in (
+                    "_normalize_release_payload_modes",
+                    "_write_release_receipt",
+                ):
+                    stack.enter_context(mock.patch.object(provision, name))
+                stack.enter_context(
+                    mock.patch.object(
+                        provision, "_release_projection", return_value=receipt
+                    )
+                )
+                stack.enter_context(
+                    mock.patch.object(
+                        provision,
+                        "verify_release_authority_in_current_runtime",
+                        return_value=receipt,
+                    )
+                )
                 provision._inner_populate_release(REVISION)
 
             arguments = prepare.call_args.args
