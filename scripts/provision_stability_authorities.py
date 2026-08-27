@@ -862,49 +862,89 @@ def _workspace_allocation(roots: tuple[Path, ...]) -> tuple[int, int]:
             ) from error
         if not stat.S_ISDIR(root_metadata.st_mode) or root.resolve() != root:
             raise ProvisionError("writable container workspace identity drift")
-        root_device = root_metadata.st_dev
-        stack = [root]
-        while stack:
-            directory = stack.pop()
-            try:
-                with os.scandir(directory) as entries:
-                    for entry in entries:
-                        try:
-                            metadata = entry.stat(follow_symlinks=False)
-                        except FileNotFoundError:
-                            # Compilers atomically publish and unlink temporary
-                            # object files while this periodic budget scan is
-                            # walking the mutable bind.  A vanished entry no
-                            # longer consumes blocks or an inode; the next scan
-                            # observes the current tree.
-                            continue
-                        if metadata.st_dev != root_device:
-                            raise ProvisionError(
-                                "writable container workspace crosses a filesystem"
+        flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+        flags |= getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+        try:
+            root_descriptor = os.open(root, flags)
+        except OSError as error:
+            raise ProvisionError(
+                f"cannot inspect writable container workspace: {error}"
+            ) from error
+        try:
+            opened_root = os.fstat(root_descriptor)
+            if (
+                not stat.S_ISDIR(opened_root.st_mode)
+                or (opened_root.st_dev, opened_root.st_ino)
+                != (root_metadata.st_dev, root_metadata.st_ino)
+            ):
+                raise ProvisionError("writable container workspace identity drift")
+
+            def revalidate_root() -> None:
+                try:
+                    final_root = root.lstat()
+                except OSError as error:
+                    raise ProvisionError(
+                        f"cannot inspect writable container workspace: {error}"
+                    ) from error
+                if (
+                    not stat.S_ISDIR(final_root.st_mode)
+                    or (final_root.st_dev, final_root.st_ino)
+                    != (opened_root.st_dev, opened_root.st_ino)
+                ):
+                    raise ProvisionError(
+                        "writable container workspace identity drift"
+                    )
+
+            root_device = opened_root.st_dev
+            stack = [root]
+            while stack:
+                directory = stack.pop()
+                try:
+                    with os.scandir(directory) as entries:
+                        for entry in entries:
+                            try:
+                                metadata = entry.stat(follow_symlinks=False)
+                            except FileNotFoundError:
+                                # Compilers atomically publish and unlink temporary
+                                # object files while this periodic budget scan is
+                                # walking the mutable bind.  A vanished entry no
+                                # longer consumes blocks or an inode; the next scan
+                                # observes the current tree.
+                                continue
+                            if metadata.st_dev != root_device:
+                                raise ProvisionError(
+                                    "writable container workspace crosses a filesystem"
+                                )
+                            inodes += 1
+                            allocated += max(
+                                metadata.st_size, metadata.st_blocks * 512
                             )
-                        inodes += 1
-                        allocated += max(metadata.st_size, metadata.st_blocks * 512)
-                        if inodes > MAX_CONTAINER_WRITABLE_INODES:
-                            return allocated, inodes
-                        if allocated > MAX_CONTAINER_WRITABLE_BYTES:
-                            return allocated, inodes
-                        if stat.S_ISDIR(metadata.st_mode):
-                            stack.append(Path(entry.path))
-            except ProvisionError:
-                raise
-            except FileNotFoundError as error:
-                if directory != root:
-                    # A queued build directory may be atomically replaced or
-                    # removed after its parent DirEntry was accounted.  The
-                    # authority root itself remains an identity requirement.
-                    continue
-                raise ProvisionError(
-                    f"cannot inventory writable container workspace: {error}"
-                ) from error
-            except OSError as error:
-                raise ProvisionError(
-                    f"cannot inventory writable container workspace: {error}"
-                ) from error
+                            if inodes > MAX_CONTAINER_WRITABLE_INODES:
+                                revalidate_root()
+                                return allocated, inodes
+                            if allocated > MAX_CONTAINER_WRITABLE_BYTES:
+                                revalidate_root()
+                                return allocated, inodes
+                            if stat.S_ISDIR(metadata.st_mode):
+                                stack.append(Path(entry.path))
+                except ProvisionError:
+                    raise
+                except FileNotFoundError as error:
+                    if directory != root:
+                        # A queued build directory may be atomically replaced or
+                        # removed after its parent DirEntry was accounted.  The
+                        # authority root itself remains an identity requirement.
+                        continue
+                    raise ProvisionError(
+                        f"cannot inventory writable container workspace: {error}"
+                    ) from error
+                except OSError as error:
+                    raise ProvisionError(
+                        f"cannot inventory writable container workspace: {error}"
+                    ) from error
+            revalidate_root()
+        finally:
+            os.close(root_descriptor)
     return allocated, inodes
 
 

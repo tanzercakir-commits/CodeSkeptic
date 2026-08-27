@@ -691,6 +691,50 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
             ):
                 provision._workspace_allocation((root,))
 
+    def test_workspace_scan_revalidates_root_identity_after_entry_races(self) -> None:
+        for replacement in (False, True):
+            with self.subTest(replacement=replacement):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary) / "workspace"
+                    root.mkdir()
+                    transient = root / "object.cpp-deadbeef.o.tmp"
+                    transient.write_bytes(b"temporary object\n")
+                    real_scandir = provision.os.scandir
+
+                    class ReplacingRootStream:
+                        def __init__(self, path: Path) -> None:
+                            self.stream = real_scandir(path)
+
+                        def __enter__(self):
+                            entries = list(self.stream)
+                            transient.unlink()
+                            root.rmdir()
+                            if replacement:
+                                root.mkdir()
+                            return iter(entries)
+
+                        def __exit__(self, *arguments: object) -> None:
+                            self.stream.close()
+
+                    def replace_after_capture(path: Path):
+                        if Path(path) == root:
+                            return ReplacingRootStream(Path(path))
+                        return real_scandir(path)
+
+                    with (
+                        mock.patch.object(
+                            provision.os,
+                            "scandir",
+                            side_effect=replace_after_capture,
+                        ),
+                        self.assertRaisesRegex(
+                            provision.ProvisionError,
+                            "writable container workspace identity drift|"
+                            "cannot inspect writable container workspace",
+                        ),
+                    ):
+                        provision._workspace_allocation((root,))
+
     def test_writable_workspace_monitor_rejects_byte_and_inode_breaches(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
