@@ -6222,6 +6222,7 @@ def _run_bounded_process(
                 )
         process: subprocess.Popen[bytes] | None = None
         failure: str | None = None
+        cleanup_exhausted = False
         try:
             process = subprocess.Popen(
                 command, stdout=stdout_stream, stderr=stderr_stream,
@@ -6251,14 +6252,22 @@ def _run_bounded_process(
                         break
                 time.sleep(0.025)
             if failure:
-                _terminate_process_group(process, failure)
+                try:
+                    _terminate_process_group(process, failure)
+                except QualificationError:
+                    cleanup_exhausted = True
+                    raise
             else:
                 process.wait()
                 if os.name == "posix" and _process_group_exists(process.pid):
                     failure = "qualification process left live descendants"
-                    _terminate_process_group(process, failure)
+                    try:
+                        _terminate_process_group(process, failure)
+                    except QualificationError:
+                        cleanup_exhausted = True
+                        raise
         except BaseException as error:
-            if process is not None:
+            if process is not None and not cleanup_exhausted:
                 try:
                     _terminate_process_group(
                         process, "qualification process interrupted"

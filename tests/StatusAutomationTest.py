@@ -357,6 +357,12 @@ class ProgressStatusTest(unittest.TestCase):
             environment["GIT_ALLOW_PROTOCOL"] = "file"
             environment["GIT_TERMINAL_PROMPT"] = "0"
             environment["GIT_TRACE2_EVENT"] = str(trace)
+            # This test verifies the guard's offline command surface, not the
+            # caller's ambient symbolic-ref state.  The production authority
+            # intentionally stages a detached exact-HEAD source snapshot.
+            for name in ("GITHUB_ACTIONS", "GITHUB_EVENT_NAME", "GITHUB_HEAD_REF"):
+                environment.pop(name, None)
+            environment["GITHUB_REF_NAME"] = "main"
             completed = subprocess.run(
                 [bash_executable(), "scripts/check_docs_sync.sh"],
                 cwd=ROOT,

@@ -338,20 +338,48 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
                     self.assertNotIn("$SCRATCH:/work:rw", argv)
 
     def test_container_file_and_supported_tmpfs_limits_are_exact(self) -> None:
-        tmpfs = "/tmp:rw,size=4g,mode=1777"
+        self.assertGreaterEqual(
+            provision.SANITIZER_CONTAINER_FILE_BYTES,
+            provision.realworld.MAX_PROCESS_FILE_BYTES,
+        )
+        self.assertGreaterEqual(
+            provision.SANITIZER_CONTAINER_FILE_BYTES,
+            provision.staging.MAX_FILE_BYTES,
+        )
+        self.assertGreater(
+            provision.SANITIZER_CONTAINER_TMPFS_BYTES,
+            provision.staging.LARGE_TEMPORARY_RESERVE_BYTES,
+        )
+        for capacity, mount in (
+            (
+                provision.SANITIZER_CONTAINER_TMPFS_BYTES,
+                provision.SANITIZER_CONTAINER_TMPFS,
+            ),
+            (
+                provision.RELEASE_CONTAINER_TMPFS_BYTES,
+                provision.RELEASE_CONTAINER_TMPFS,
+            ),
+        ):
+            self.assertEqual(capacity % (1 << 30), 0)
+            self.assertEqual(
+                mount,
+                f"/tmp:rw,size={capacity >> 30}g,mode=1777",
+            )
         commands = (
             (
                 provision._normalized_container_argv(
                     "sanitizer-produce", "address"
                 ),
-                provision.MAX_TREE_FILE_BYTES,
+                provision.SANITIZER_CONTAINER_FILE_BYTES,
+                provision.SANITIZER_CONTAINER_TMPFS,
             ),
             (
                 provision._normalized_container_argv("release-produce"),
-                provision.realworld.SHARD_EMERGENCY_RESERVE_BYTES,
+                provision.RELEASE_CONTAINER_FILE_BYTES,
+                provision.RELEASE_CONTAINER_TMPFS,
             ),
         )
-        for command, file_limit in commands:
+        for command, file_limit, tmpfs in commands:
             with self.subTest(command=command[-4]):
                 fsize = f"--ulimit=fsize={file_limit}:{file_limit}"
                 self.assertEqual(command.count(fsize), 1)

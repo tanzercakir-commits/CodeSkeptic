@@ -72,10 +72,17 @@ CONTAINER_CPUS = 4
 CONTAINER_PIDS = 512
 CONTAINER_NOFILE = 4096
 CONTAINER_FILE_BYTES = MAX_TREE_FILE_BYTES
+SANITIZER_CONTAINER_FILE_BYTES = max(
+    CONTAINER_FILE_BYTES,
+    realworld.MAX_PROCESS_FILE_BYTES,
+    staging.MAX_FILE_BYTES,
+)
 RELEASE_CONTAINER_FILE_BYTES = max(
     CONTAINER_FILE_BYTES,
     realworld.SHARD_EMERGENCY_RESERVE_BYTES,
 )
+RELEASE_CONTAINER_TMPFS_BYTES = staging.LARGE_TEMPORARY_RESERVE_BYTES
+SANITIZER_CONTAINER_TMPFS_BYTES = RELEASE_CONTAINER_TMPFS_BYTES + (1 << 30)
 MAX_CONTAINER_WRITABLE_BYTES = MAX_TREE_BYTES
 MAX_CONTAINER_WRITABLE_INODES = MAX_TREE_FILES + MAX_TREE_DIRECTORIES
 MINIMUM_HOST_FREE_BYTES = 4 * 1024 * 1024 * 1024
@@ -110,6 +117,17 @@ KNOWN_AUTHORITY_ENTRIES = {
 
 class ProvisionError(RuntimeError):
     """A create-new authority could not be produced or verified."""
+
+
+def _tmpfs_mount(capacity_bytes: int) -> str:
+    gibibyte = 1 << 30
+    if capacity_bytes <= 0 or capacity_bytes % gibibyte != 0:
+        raise ProvisionError("container tmpfs capacity is not exact whole GiB")
+    return f"/tmp:rw,size={capacity_bytes // gibibyte}g,mode=1777"
+
+
+RELEASE_CONTAINER_TMPFS = _tmpfs_mount(RELEASE_CONTAINER_TMPFS_BYTES)
+SANITIZER_CONTAINER_TMPFS = _tmpfs_mount(SANITIZER_CONTAINER_TMPFS_BYTES)
 
 
 def canonical_json(value: Any) -> bytes:
@@ -482,7 +500,13 @@ def _lifecycle_lock(staging_root: Path) -> Iterable[None]:
             os.close(parent_descriptor)
 
 
-def _common_container_argv() -> list[str]:
+def _common_container_argv(mode: str) -> list[str]:
+    if mode.startswith("sanitizer-"):
+        temporary_mount = SANITIZER_CONTAINER_TMPFS
+    elif mode.startswith("release-"):
+        temporary_mount = RELEASE_CONTAINER_TMPFS
+    else:
+        raise ProvisionError("container resource mode is unsupported")
     return [
         "$PODMAN",
         "--cgroup-manager=cgroupfs",
@@ -504,7 +528,7 @@ def _common_container_argv() -> list[str]:
         "--security-opt",
         "no-new-privileges",
         "--tmpfs",
-        "/tmp:rw,size=4g,mode=1777",
+        temporary_mount,
         "--workdir",
         os.fspath(CONTAINER_SOURCE),
         "-e",
@@ -537,7 +561,7 @@ def _common_container_argv() -> list[str]:
 def _resource_container_argv(mode: str) -> list[str]:
     if mode.startswith("sanitizer-"):
         memory = SANITIZER_MEMORY_BYTES
-        file_bytes = CONTAINER_FILE_BYTES
+        file_bytes = SANITIZER_CONTAINER_FILE_BYTES
     elif mode.startswith("release-"):
         memory = RELEASE_MEMORY_BYTES
         file_bytes = RELEASE_CONTAINER_FILE_BYTES
@@ -554,7 +578,7 @@ def _resource_container_argv(mode: str) -> list[str]:
 
 
 def _normalized_container_argv(mode: str, profile: str | None = None) -> list[str]:
-    command = _common_container_argv()
+    command = _common_container_argv(mode)
     command.extend(_resource_container_argv(mode))
     script = CONTAINER_SOURCE / "scripts/provision_stability_authorities.py"
     if mode in {"sanitizer-produce", "sanitizer-verify"}:

@@ -5714,6 +5714,90 @@ class DeterminismQualificationTest(unittest.TestCase):
                     os.environ.copy(), 5, stdout, stderr, [], 128,
                 )
 
+    def test_bounded_process_does_not_repeat_failed_cleanup(self) -> None:
+        class RunningProcess:
+            pid = 424245
+            returncode: int | None = None
+
+            def poll(self) -> int | None:
+                return self.returncode
+
+        process = RunningProcess()
+        cleanup_error = qualification.QualificationError(
+            "qualification process timed out; process-group cleanup failed"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            stdout = root / "stdout.log"
+            stderr = root / "stderr.log"
+            with (
+                mock.patch.object(
+                    qualification.subprocess, "Popen", return_value=process
+                ),
+                mock.patch.object(
+                    qualification.time, "monotonic", side_effect=(0.0, 2.0)
+                ),
+                mock.patch.object(
+                    qualification,
+                    "_terminate_process_group",
+                    side_effect=cleanup_error,
+                ) as terminate,
+                self.assertRaisesRegex(
+                    qualification.QualificationError,
+                    "process-group cleanup failed",
+                ),
+            ):
+                qualification._run_bounded_process(
+                    [sys.executable, "-c", "raise AssertionError"],
+                    os.environ.copy(),
+                    1.0,
+                    stdout,
+                    stderr,
+                    [],
+                    1024,
+                )
+
+        self.assertEqual(terminate.call_count, 1)
+
+    def test_bounded_process_retries_unexpected_cleanup_error(self) -> None:
+        class RunningProcess:
+            pid = 424246
+            returncode: int | None = None
+
+            def poll(self) -> int | None:
+                return self.returncode
+
+        process = RunningProcess()
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            stdout = root / "stdout.log"
+            stderr = root / "stderr.log"
+            with (
+                mock.patch.object(
+                    qualification.subprocess, "Popen", return_value=process
+                ),
+                mock.patch.object(
+                    qualification.time, "monotonic", side_effect=(0.0, 2.0)
+                ),
+                mock.patch.object(
+                    qualification,
+                    "_terminate_process_group",
+                    side_effect=(OSError("unexpected cleanup error"), None),
+                ) as terminate,
+                self.assertRaisesRegex(OSError, "unexpected cleanup error"),
+            ):
+                qualification._run_bounded_process(
+                    [sys.executable, "-c", "raise AssertionError"],
+                    os.environ.copy(),
+                    1.0,
+                    stdout,
+                    stderr,
+                    [],
+                    1024,
+                )
+
+        self.assertEqual(terminate.call_count, 2)
+
     def test_bounded_process_default_enforces_output_and_file_limits(
         self,
     ) -> None:
