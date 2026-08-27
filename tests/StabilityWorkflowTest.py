@@ -136,6 +136,59 @@ class StabilityWorkflowTest(unittest.TestCase):
         self.operator = OPERATOR.read_text(encoding="utf-8")
         self.readme = README.read_text(encoding="utf-8")
 
+    def test_staging_readme_documents_authority_population_before_configure(
+        self,
+    ) -> None:
+        mirror_command = (
+            "python3 scripts/seal_realworld_mirror.py --manifest "
+            "STAGING/authority/source/scripts/realworld_manifest.json"
+        )
+        release_command = (
+            "python3 scripts/provision_stability_authorities.py "
+            "populate-release \\\n"
+            "  --staging STAGING --revision EXPECTED_40_HEX"
+        )
+        sanitizer_command = (
+            "python3 scripts/provision_stability_authorities.py "
+            "populate-sanitizers \\\n"
+            "  --staging STAGING --revision EXPECTED_40_HEX"
+        )
+        configure_command = (
+            "python3 scripts/stage_stability_campaign.py configure "
+            "--staging STAGING"
+        )
+
+        positions: dict[str, int] = {}
+        for command in (
+            mirror_command,
+            release_command,
+            sanitizer_command,
+            configure_command,
+        ):
+            with self.subTest(command=command):
+                positions[command] = self.readme.find(command)
+                self.assertNotEqual(
+                    positions[command],
+                    -1,
+                    f"missing documented staging command: {command}",
+                )
+
+        if any(position == -1 for position in positions.values()):
+            return
+
+        self.assertLess(
+            positions[mirror_command],
+            positions[release_command],
+        )
+        self.assertLess(
+            positions[release_command],
+            positions[configure_command],
+        )
+        self.assertLess(
+            positions[sanitizer_command],
+            positions[configure_command],
+        )
+
     def test_service_is_gui_safe_and_survives_the_runner_isolate(self) -> None:
         self.assertNotIn("ConditionKernelCommandLine=", self.unit)
         self.assertNotIn("[Install]", self.unit)

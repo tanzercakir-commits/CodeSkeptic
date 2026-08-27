@@ -131,6 +131,42 @@ an atomic no-replace rename. `verify` rederives the complete inventory and
 executes the retained image and static-authority checks in bounded, networkless
 containers.
 
+### Authority population order
+
+`prepare` is not an end-to-end authority producer. Before `configure`, the
+mutable staging layout must be populated create-new at the exact revision. The
+analyzer build authority precedes the quality-floor authority; the sealed
+real-world mirror precedes the release-candidate authority; the sanitizer
+authority producer also supplies the provenance-bound fault binary. Hosted
+exact-head authority is captured only after that same revision is published
+and all required hosted gates pass. The two public provisioner operations are
+therefore explicit rather than hidden inside `configure`.
+
+The release-candidate lane runs in this order (the online mirror form is shown;
+an explicitly supplied offline source set is also supported):
+
+```text
+python3 scripts/seal_realworld_mirror.py --manifest STAGING/authority/source/scripts/realworld_manifest.json \
+  --tier release-candidate --output STAGING/authority/mirrors --fetch-online
+python3 scripts/provision_stability_authorities.py populate-release \
+  --staging STAGING --revision EXPECTED_40_HEX
+```
+
+The sanitizer lane may run independently after `prepare`, but it must finish
+before `configure` and must use the same exact revision:
+
+```text
+python3 scripts/provision_stability_authorities.py populate-sanitizers \
+  --staging STAGING --revision EXPECTED_40_HEX
+```
+
+Both provisioner operations serialize mutation with the staging lifecycle
+lock. Do not run either operation concurrently with another staging writer or
+reuse a partially populated output. `configure` may run only after build,
+quality-floor, mirror, release-candidate, sanitizer/fault-binary, determinism,
+and hosted exact-head authorities are all present and independently
+verifiable.
+
 `install` first copies the user-supplied bundle through no-follow directory
 descriptors into a private snapshot. It performs the full archive/runtime
 verification there before touching fixed host paths. A fresh installation is
