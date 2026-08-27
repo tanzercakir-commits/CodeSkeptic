@@ -168,6 +168,18 @@ def _require_missing(path: Path, label: str) -> None:
         raise ProvisionError(f"{label} must be absent")
 
 
+def _canonical_release_tool(path: Path, label: str) -> Path:
+    """Match the determinism runner's canonical executable spelling."""
+
+    try:
+        resolved = path.resolve(strict=True)
+    except (OSError, RuntimeError) as error:
+        raise ProvisionError(f"cannot resolve release {label}: {error}") from error
+    if _kind(resolved) != "regular":
+        raise ProvisionError(f"release {label} is not a regular file")
+    return resolved
+
+
 def _tree_identity(root: Path, label: str) -> dict[str, Any]:
     """Bind every regular file and directory without following links."""
 
@@ -1402,6 +1414,10 @@ def _inner_populate_release(revision: str) -> dict[str, Any]:
         expected_project_ids=campaign["projects"],
     )
     log_path = CONTAINER_SCRATCH / "mirror-materialization.log"
+    cmake = _canonical_release_tool(CM, "CMake")
+    ninja = _canonical_release_tool(NINJA, "Ninja")
+    c_compiler = _canonical_release_tool(C_COMPILER, "C compiler")
+    cxx_compiler = _canonical_release_tool(CXX_COMPILER, "C++ compiler")
     try:
         with realworld._bounded_shard_workspace(CONTAINER_SCRATCH) as private:
             repositories = realworld._materialize_offline_repositories(
@@ -1418,10 +1434,10 @@ def _inner_populate_release(revision: str) -> dict[str, Any]:
                 workload,
                 None,
                 2,
-                CM,
-                NINJA,
-                C_COMPILER,
-                CXX_COMPILER,
+                cmake,
+                ninja,
+                c_compiler,
+                cxx_compiler,
                 release_source=CONTAINER_RELEASE_SOURCE,
                 release_build=CONTAINER_RELEASE_BUILD,
                 checkout_repository=checkout_repository,

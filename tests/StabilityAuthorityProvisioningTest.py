@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import contextlib
 import hashlib
 import json
 from pathlib import Path
@@ -1262,6 +1263,121 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
                 )
             runner.assert_called_once()
             self.assertEqual(log.read_bytes(), b"release output\n")
+
+    def test_inner_release_canonicalizes_tool_paths_before_preparation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repo = root / "repo"
+            mirrors = root / "mirrors"
+            release = root / "release"
+            release_source = release / "source"
+            release_build = release / "build"
+            scratch = root / "scratch"
+            offline = root / "offline.git"
+            private = root / "private"
+            for path in (
+                repo,
+                mirrors,
+                release_source,
+                release_build,
+                scratch,
+                offline,
+                private,
+            ):
+                path.mkdir(parents=True)
+
+            tools = root / "tools"
+            tools.mkdir()
+            aliases: dict[str, Path] = {}
+            resolved: dict[str, Path] = {}
+            for name in ("cmake", "ninja", "clang", "clang++"):
+                target = tools / f"real-{name}"
+                target.write_text("tool\n", encoding="utf-8")
+                target.chmod(0o700)
+                alias = tools / name
+                alias.symlink_to(target.name)
+                aliases[name] = alias
+                resolved[name] = target.resolve()
+
+            workload = {
+                "input": {
+                    "realworld_manifest": "scripts/realworld_manifest.json",
+                },
+            }
+            project = {
+                "id": "llama-cpp",
+                "repository": "https://example.test/llama.cpp.git",
+            }
+            manifest = {
+                "campaigns": {
+                    "release-candidate": {"projects": ["llama-cpp"]},
+                },
+            }
+            receipt = release_receipt()
+
+            with (
+                mock.patch.object(provision, "CONTAINER_SOURCE", repo),
+                mock.patch.object(provision, "CONTAINER_MIRRORS", mirrors),
+                mock.patch.object(provision, "CONTAINER_RELEASE", release),
+                mock.patch.object(
+                    provision, "CONTAINER_RELEASE_SOURCE", release_source
+                ),
+                mock.patch.object(
+                    provision, "CONTAINER_RELEASE_BUILD", release_build
+                ),
+                mock.patch.object(provision, "CONTAINER_SCRATCH", scratch),
+                mock.patch.object(provision, "CM", aliases["cmake"]),
+                mock.patch.object(provision, "NINJA", aliases["ninja"]),
+                mock.patch.object(
+                    provision, "C_COMPILER", aliases["clang"]
+                ),
+                mock.patch.object(
+                    provision, "CXX_COMPILER", aliases["clang++"]
+                ),
+                mock.patch.object(
+                    provision,
+                    "_load_release_inputs",
+                    return_value=({}, workload, project),
+                ),
+                mock.patch.object(
+                    provision.realworld, "load_manifest", return_value=manifest
+                ),
+                mock.patch.object(
+                    provision.realworld,
+                    "load_mirror_authority",
+                    return_value=({}, mirrors),
+                ),
+                mock.patch.object(
+                    provision.realworld,
+                    "_bounded_shard_workspace",
+                    return_value=contextlib.nullcontext(private),
+                ),
+                mock.patch.object(
+                    provision.realworld,
+                    "_materialize_offline_repositories",
+                    return_value={project["repository"]: offline},
+                ),
+                mock.patch.object(
+                    provision.determinism, "prepare_release_candidate"
+                ) as prepare,
+                mock.patch.object(provision, "_normalize_release_payload_modes"),
+                mock.patch.object(
+                    provision, "_release_projection", return_value=receipt
+                ),
+                mock.patch.object(provision, "_write_release_receipt"),
+                mock.patch.object(
+                    provision,
+                    "verify_release_authority_in_current_runtime",
+                    return_value=receipt,
+                ),
+            ):
+                provision._inner_populate_release(REVISION)
+
+            arguments = prepare.call_args.args
+            self.assertEqual(arguments[4], resolved["cmake"])
+            self.assertEqual(arguments[5], resolved["ninja"])
+            self.assertEqual(arguments[6], resolved["clang"])
+            self.assertEqual(arguments[7], resolved["clang++"])
 
     def test_release_modes_are_normalized_before_inventory_is_sealed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
