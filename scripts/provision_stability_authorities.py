@@ -83,6 +83,7 @@ RELEASE_CONTAINER_FILE_BYTES = max(
 )
 RELEASE_CONTAINER_TMPFS_BYTES = staging.LARGE_TEMPORARY_RESERVE_BYTES
 SANITIZER_CONTAINER_TMPFS_BYTES = RELEASE_CONTAINER_TMPFS_BYTES + (1 << 30)
+SANITIZER_VERIFIER_CTEST_TMPFS_BYTES = 16 * 1024 * 1024
 MAX_CONTAINER_WRITABLE_BYTES = MAX_TREE_BYTES
 MAX_CONTAINER_WRITABLE_INODES = MAX_TREE_FILES + MAX_TREE_DIRECTORIES
 MINIMUM_HOST_FREE_BYTES = 4 * 1024 * 1024 * 1024
@@ -128,6 +129,22 @@ def _tmpfs_mount(capacity_bytes: int) -> str:
 
 RELEASE_CONTAINER_TMPFS = _tmpfs_mount(RELEASE_CONTAINER_TMPFS_BYTES)
 SANITIZER_CONTAINER_TMPFS = _tmpfs_mount(SANITIZER_CONTAINER_TMPFS_BYTES)
+
+
+def _sanitizer_verifier_ctest_tmpfs(profile: str) -> str:
+    if profile not in PROFILES:
+        raise ProvisionError("sanitizer verifier profile is unsupported")
+    mebibyte = 1 << 20
+    if SANITIZER_VERIFIER_CTEST_TMPFS_BYTES % mebibyte != 0:
+        raise ProvisionError("sanitizer verifier CTest tmpfs is not exact MiB")
+    target = (
+        CONTAINER_SANITIZER_WORK
+        / f"{profile}-tests/Testing/Temporary"
+    )
+    return (
+        f"{target}:rw,nosuid,nodev,"
+        f"size={SANITIZER_VERIFIER_CTEST_TMPFS_BYTES // mebibyte}m,mode=1777"
+    )
 
 
 def canonical_json(value: Any) -> bytes:
@@ -588,6 +605,13 @@ def _normalized_container_argv(mode: str, profile: str | None = None) -> list[st
         fuzz_build = CONTAINER_SANITIZER_WORK / f"{profile}-fuzz"
         output = CONTAINER_SANITIZERS / profile
         writable = mode == "sanitizer-produce"
+        if not writable:
+            # CTest show-only discovery still creates LastTest.log.  Keep the
+            # authority build read-only while giving that single verifier-only
+            # scratch directory an ephemeral, bounded write target.
+            command.extend([
+                "--tmpfs", _sanitizer_verifier_ctest_tmpfs(profile)
+            ])
         command.extend([
             "-v", f"$SOURCE:{CONTAINER_SOURCE}:ro",
             "-v", f"$TEST_BUILD:{test_build}:{'rw' if writable else 'ro'}",

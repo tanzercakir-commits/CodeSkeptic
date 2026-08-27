@@ -386,6 +386,105 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
                 self.assertEqual(command.count(tmpfs), 1)
                 self.assertEqual(command[command.index("--tmpfs") + 1], tmpfs)
 
+    def test_sanitizer_verifier_has_only_ephemeral_ctest_write_mount(self) -> None:
+        for profile in provision.PROFILES:
+            with self.subTest(profile=profile):
+                producer = provision._normalized_container_argv(
+                    "sanitizer-produce", profile
+                )
+                verifier = provision._normalized_container_argv(
+                    "sanitizer-verify", profile
+                )
+                temporary = (
+                    f"{provision.CONTAINER_SANITIZER_WORK}/{profile}-tests/"
+                    "Testing/Temporary:rw,nosuid,nodev,size=16m,mode=1777"
+                )
+                self.assertNotIn(temporary, producer)
+                self.assertIn(temporary, verifier)
+                self.assertEqual(producer.count("--tmpfs"), 1)
+                self.assertEqual(verifier.count("--tmpfs"), 2)
+                self.assertIn(
+                    f"$TEST_BUILD:{provision.CONTAINER_SANITIZER_WORK}/"
+                    f"{profile}-tests:ro",
+                    verifier,
+                )
+                self.assertNotIn(
+                    f"$TEST_BUILD:{provision.CONTAINER_SANITIZER_WORK}/"
+                    f"{profile}-tests:rw",
+                    verifier,
+                )
+
+    def test_ephemeral_ctest_mount_preserves_readonly_host_build(self) -> None:
+        podman = "/usr/bin/podman"
+        environment = provision.build_authority._podman_environment()
+        try:
+            image_exists = provision.staging._bounded_command(
+                [
+                    podman,
+                    "--events-backend=none",
+                    "image",
+                    "exists",
+                    provision.build_authority.PINNED_IMAGE,
+                ],
+                environment=environment,
+                cwd=None,
+                maximum_output=4096,
+                timeout_seconds=15,
+            )
+        except Exception as error:
+            self.skipTest(f"local container runtime unavailable: {error}")
+        if image_exists.returncode != 0:
+            self.skipTest("pinned local container image is unavailable")
+
+        with tempfile.TemporaryDirectory(
+            prefix="codeskeptic-ctest-readonly-probe-",
+            dir=ROOT.parent,
+        ) as temporary:
+            build = Path(temporary) / "build"
+            ctest_temporary = build / "Testing/Temporary"
+            ctest_temporary.mkdir(parents=True)
+            (build / "CTestTestfile.cmake").write_text(
+                'add_test(ephemeral-write-probe "/bin/true")\n',
+                encoding="utf-8",
+            )
+            completed = provision.staging._bounded_command(
+                [
+                    podman,
+                    "--events-backend=none",
+                    "run",
+                    "--rm",
+                    "--pull=never",
+                    "--network=none",
+                    "--read-only",
+                    "--cap-drop=all",
+                    "--security-opt",
+                    "label=disable",
+                    "-v",
+                    f"{build}:/probe:ro",
+                    "--tmpfs",
+                    "/probe/Testing/Temporary:rw,nosuid,nodev,"
+                    "size=16m,mode=1777",
+                    provision.build_authority.PINNED_IMAGE,
+                    "/usr/bin/ctest",
+                    "--test-dir",
+                    "/probe",
+                    "-N",
+                ],
+                environment=environment,
+                cwd=None,
+                maximum_output=1 << 20,
+                timeout_seconds=30,
+            )
+            output = completed.stdout + completed.stderr
+            self.assertEqual(
+                completed.returncode,
+                0,
+                output.decode(errors="replace"),
+            )
+            self.assertIn(b"ephemeral-write-probe", output)
+            self.assertIn(b"Total Tests: 1", output)
+            self.assertEqual(list(ctest_temporary.iterdir()), [])
+
     def test_cleanup_accepts_exact_unframed_podman_cidfile(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             cidfile = Path(temporary) / "container.cid"
