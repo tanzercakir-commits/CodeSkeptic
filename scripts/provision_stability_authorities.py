@@ -72,6 +72,10 @@ CONTAINER_CPUS = 4
 CONTAINER_PIDS = 512
 CONTAINER_NOFILE = 4096
 CONTAINER_FILE_BYTES = MAX_TREE_FILE_BYTES
+RELEASE_CONTAINER_FILE_BYTES = max(
+    CONTAINER_FILE_BYTES,
+    realworld.SHARD_EMERGENCY_RESERVE_BYTES,
+)
 MAX_CONTAINER_WRITABLE_BYTES = MAX_TREE_BYTES
 MAX_CONTAINER_WRITABLE_INODES = MAX_TREE_FILES + MAX_TREE_DIRECTORIES
 MINIMUM_HOST_FREE_BYTES = 4 * 1024 * 1024 * 1024
@@ -521,8 +525,10 @@ def _common_container_argv() -> list[str]:
 def _resource_container_argv(mode: str) -> list[str]:
     if mode.startswith("sanitizer-"):
         memory = SANITIZER_MEMORY_BYTES
+        file_bytes = CONTAINER_FILE_BYTES
     elif mode.startswith("release-"):
         memory = RELEASE_MEMORY_BYTES
+        file_bytes = RELEASE_CONTAINER_FILE_BYTES
     else:
         raise ProvisionError("container resource mode is unsupported")
     return [
@@ -531,7 +537,7 @@ def _resource_container_argv(mode: str) -> list[str]:
         f"--cpus={CONTAINER_CPUS}",
         f"--pids-limit={CONTAINER_PIDS}",
         f"--ulimit=nofile={CONTAINER_NOFILE}:{CONTAINER_NOFILE}",
-        f"--ulimit=fsize={CONTAINER_FILE_BYTES}:{CONTAINER_FILE_BYTES}",
+        f"--ulimit=fsize={file_bytes}:{file_bytes}",
     ]
 
 
@@ -775,9 +781,9 @@ def _cleanup_container_cidfile(
             text = raw.decode("ascii")
         except Exception as error:
             raise ProvisionError(f"container ID file is malformed: {error}") from error
-        if not text.endswith("\n") or CONTAINER_ID.fullmatch(text[:-1]) is None:
+        if CONTAINER_ID.fullmatch(text) is None:
             raise ProvisionError("container ID file is malformed")
-        expected_cid = text[:-1]
+        expected_cid = text
     _cleanup_named_container(name, podman, token, expected_cid)
     if metadata is not None:
         try:

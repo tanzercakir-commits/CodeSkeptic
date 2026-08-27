@@ -63,7 +63,7 @@ class PodmanContainerDouble:
         }
         if self.create_cidfile:
             cidfile = Path(argv[argv.index("--cidfile") + 1])
-            cidfile.write_text(self.container_id + "\n", encoding="ascii")
+            cidfile.write_text(self.container_id, encoding="ascii")
 
     def __call__(
         self, argv: list[str], **unused: object
@@ -338,19 +338,67 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
 
     def test_container_file_and_supported_tmpfs_limits_are_exact(self) -> None:
         tmpfs = "/tmp:rw,size=4g,mode=1777"
-        fsize = (
-            f"--ulimit=fsize={provision.CONTAINER_FILE_BYTES}:"
-            f"{provision.CONTAINER_FILE_BYTES}"
-        )
         commands = (
-            provision._normalized_container_argv("sanitizer-produce", "address"),
-            provision._normalized_container_argv("release-produce"),
+            (
+                provision._normalized_container_argv(
+                    "sanitizer-produce", "address"
+                ),
+                provision.MAX_TREE_FILE_BYTES,
+            ),
+            (
+                provision._normalized_container_argv("release-produce"),
+                provision.realworld.SHARD_EMERGENCY_RESERVE_BYTES,
+            ),
         )
-        for command in commands:
+        for command, file_limit in commands:
             with self.subTest(command=command[-4]):
+                fsize = f"--ulimit=fsize={file_limit}:{file_limit}"
                 self.assertEqual(command.count(fsize), 1)
                 self.assertEqual(command.count(tmpfs), 1)
                 self.assertEqual(command[command.index("--tmpfs") + 1], tmpfs)
+
+    def test_cleanup_accepts_exact_unframed_podman_cidfile(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            cidfile = Path(temporary) / "container.cid"
+            container_id = "c" * 64
+            cidfile.write_bytes(container_id.encode("ascii"))
+
+            with mock.patch.object(
+                provision, "_cleanup_named_container"
+            ) as cleanup:
+                provision._cleanup_container_cidfile(
+                    cidfile,
+                    "/usr/bin/podman",
+                    "fixture-container",
+                    "d" * 64,
+                )
+
+            cleanup.assert_called_once_with(
+                "fixture-container",
+                "/usr/bin/podman",
+                "d" * 64,
+                container_id,
+            )
+            self.assertFalse(cidfile.exists())
+
+            cidfile.write_bytes((container_id + "\n").encode("ascii"))
+            with (
+                mock.patch.object(
+                    provision, "_cleanup_named_container"
+                ) as framed_cleanup,
+                self.assertRaisesRegex(
+                    provision.ProvisionError,
+                    "container ID file is malformed",
+                ),
+            ):
+                provision._cleanup_container_cidfile(
+                    cidfile,
+                    "/usr/bin/podman",
+                    "fixture-container",
+                    "d" * 64,
+                )
+            framed_cleanup.assert_not_called()
+            self.assertTrue(cidfile.exists())
 
     def test_pinned_container_can_write_past_log_cap_through_rw_bind(self) -> None:
         podman = "/usr/bin/podman"
@@ -400,6 +448,7 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
             writer = (
                 "from pathlib import Path\n"
                 "import os\n"
+                "import resource\n"
                 "path = Path('/probe/payload.bin')\n"
                 "block = b'x' * (1 << 20)\n"
                 "with path.open('wb') as stream:\n"
@@ -407,7 +456,8 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
                 "        stream.write(block)\n"
                 "    stream.flush()\n"
                 "    os.fsync(stream.fileno())\n"
-                "print(path.stat().st_size)\n"
+                "soft, hard = resource.getrlimit(resource.RLIMIT_FSIZE)\n"
+                "print(path.stat().st_size, soft, hard, sep='|')\n"
             )
             command = [
                 podman,
@@ -421,7 +471,7 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
                 "label=disable",
                 "--tmpfs",
                 "/tmp:rw,size=4g,mode=1777",
-                *provision._resource_container_argv("sanitizer-produce"),
+                *provision._resource_container_argv("release-produce"),
                 "--cidfile",
                 str(cidfile),
                 "--name",
@@ -463,7 +513,11 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
 
             self.assertEqual(cleanup.returncode, 0)
             self.assertEqual(completed.returncode, 0, completed.stderr.decode())
-            self.assertEqual(completed.stdout.strip(), str(payload_bytes).encode())
+            expected = (
+                f"{payload_bytes}|{provision.RELEASE_CONTAINER_FILE_BYTES}|"
+                f"{provision.RELEASE_CONTAINER_FILE_BYTES}"
+            ).encode("ascii")
+            self.assertEqual(completed.stdout.strip(), expected)
             self.assertEqual((workspace / "payload.bin").stat().st_size, payload_bytes)
 
     def test_writable_bind_parser_deduplicates_rw_roots_and_ignores_ro(self) -> None:
