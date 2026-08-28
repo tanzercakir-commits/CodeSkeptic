@@ -1662,7 +1662,7 @@ class BaselineAuthorityContractTest(unittest.TestCase):
         with (
             mock.patch.object(
                 stability, "directory_identity", return_value=bundle
-            ),
+            ) as identity_verifier,
             mock.patch.object(
                 stability,
                 "verify_determinism_baseline_authority",
@@ -1676,6 +1676,23 @@ class BaselineAuthorityContractTest(unittest.TestCase):
         ):
             stability.verify_runtime_static_authority_identities(config, static)
         baseline_verifier.assert_called_once()
+        mirror_rechecks = [
+            call
+            for call in identity_verifier.call_args_list
+            if call.args[1] == "runtime realworld_mirror authority"
+        ]
+        self.assertEqual(
+            mirror_rechecks,
+            [
+                mock.call(
+                    Path("/authority/mirrors"),
+                    "runtime realworld_mirror authority",
+                    maximum_file_bytes=(
+                        stability.realworld.MAX_MIRROR_BUNDLE_BYTES
+                    ),
+                )
+            ],
+        )
 
         with (
             mock.patch.object(

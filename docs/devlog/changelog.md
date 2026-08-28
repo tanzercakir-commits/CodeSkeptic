@@ -128,10 +128,11 @@
   checksums, inventories, or exact-head identities. A round-trip regression
   passes the producer's real sealed output directly to the runtime verifier.
 - Kept the generic per-artifact snapshot ceiling at 512 MiB while allowing the
-  real-world mirror snapshot to use the mirror consumer's explicit bounded
-  bundle limit. This admits the checksum-pinned 1.16 GiB release-candidate Git
-  bundle without weakening the aggregate 16 GiB evidence ceiling or any other
-  authority's default file-size guard.
+  real-world mirror's initial verification and end-of-session identity recheck
+  to use the mirror consumer's explicit bounded bundle limit. This admits the
+  checksum-pinned 1.16 GiB release-candidate Git bundle without weakening the
+  aggregate 16 GiB evidence ceiling or any other authority's default file-size
+  guard.
 
 ## 2026-08-22 — Phase 10.8 cumulative quality-floor audit (in progress)
 

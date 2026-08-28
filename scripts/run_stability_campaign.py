@@ -8295,7 +8295,18 @@ def verify_runtime_static_authority_identities(
         result = expected[name]
         if not isinstance(result, dict) or "bundle" not in result:
             raise StabilityError(f"runtime {name} authority result is malformed")
-        if directory_identity(root, f"runtime {name} authority") != result["bundle"]:
+        identity_options = (
+            {
+                "maximum_file_bytes": (
+                    realworld.MAX_MIRROR_BUNDLE_BYTES
+                )
+            }
+            if name == "realworld_mirror"
+            else {}
+        )
+        if directory_identity(
+            root, f"runtime {name} authority", **identity_options
+        ) != result["bundle"]:
             raise StabilityError(f"runtime {name} authority changed after verification")
     baseline = verify_determinism_baseline_authority(
         Path(value["qualification"]["baseline_authority"]["root"]),
