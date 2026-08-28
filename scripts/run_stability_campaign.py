@@ -7020,7 +7020,21 @@ def _atomic_create(path: Path, data: bytes) -> None:
         raise StabilityError(f"cannot atomically create evidence file {path}: {error}") from error
 
 
-def _regular_files(root: Path) -> list[str]:
+def _artifact_file_limit(maximum_file_bytes: int | None) -> int:
+    limit = (
+        MAX_ARTIFACT_FILE_BYTES
+        if maximum_file_bytes is None
+        else maximum_file_bytes
+    )
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+        raise StabilityError("artifact file size limit is invalid")
+    return limit
+
+
+def _regular_files(
+    root: Path, *, maximum_file_bytes: int | None = None,
+) -> list[str]:
+    file_limit = _artifact_file_limit(maximum_file_bytes)
     try:
         metadata = root.lstat()
     except OSError as error:
@@ -7060,7 +7074,7 @@ def _regular_files(root: Path) -> list[str]:
                     raise StabilityError(
                         f"evidence path is not a regular file: {path}"
                     )
-                if metadata.st_size > MAX_ARTIFACT_FILE_BYTES:
+                if metadata.st_size > file_limit:
                     raise StabilityError(
                         f"evidence file exceeds the fixed size limit: {path}"
                     )
@@ -7077,13 +7091,24 @@ def _regular_files(root: Path) -> list[str]:
     return sorted(result)
 
 
-def directory_identity(root: Path, label: str) -> dict[str, Any]:
-    paths = _regular_files(root)
+def directory_identity(
+    root: Path,
+    label: str,
+    *,
+    maximum_file_bytes: int | None = None,
+) -> dict[str, Any]:
+    file_limit = _artifact_file_limit(maximum_file_bytes)
+    paths = _regular_files(root, maximum_file_bytes=file_limit)
     if not paths:
         raise StabilityError(f"{label} directory is empty")
     if len(paths) > MAX_ARTIFACTS:
         raise StabilityError(f"{label} file count exceeds the fixed limit")
-    entries = [_artifact_entry(root, relative) for relative in paths]
+    entries = [
+        _artifact_entry(
+            root, relative, maximum_file_bytes=file_limit
+        )
+        for relative in paths
+    ]
     total_size = sum(entry["size"] for entry in entries)
     if total_size > MAX_ARTIFACT_BYTES:
         raise StabilityError(f"{label} byte count exceeds the fixed limit")
@@ -7439,7 +7464,11 @@ def verify_realworld_mirror_authority(
     """Verify every exact release-candidate bundle without a network fallback."""
 
     root = authority_path.parent
-    before = directory_identity(root, "real-world mirror authority")
+    before = directory_identity(
+        root,
+        "real-world mirror authority",
+        maximum_file_bytes=realworld.MAX_MIRROR_BUNDLE_BYTES,
+    )
     try:
         manifest = realworld.validate_manifest(realworld.load_manifest(manifest_path))
         campaign = manifest["campaigns"].get("release-candidate")
@@ -7468,7 +7497,11 @@ def verify_realworld_mirror_authority(
         raise StabilityError(
             f"real-world mirror authority verification failed: {error}"
         ) from error
-    after = directory_identity(root, "real-world mirror authority")
+    after = directory_identity(
+        root,
+        "real-world mirror authority",
+        maximum_file_bytes=realworld.MAX_MIRROR_BUNDLE_BYTES,
+    )
     if after != before:
         raise StabilityError("real-world mirror authority changed during verification")
     return {
@@ -8471,17 +8504,27 @@ def _load_document(path: Path, label: str) -> dict[str, Any]:
     return value
 
 
-def _artifact_entry(root: Path, relative: str) -> dict[str, Any]:
+def _artifact_entry(
+    root: Path,
+    relative: str,
+    *,
+    maximum_file_bytes: int | None = None,
+) -> dict[str, Any]:
+    file_limit = _artifact_file_limit(maximum_file_bytes)
     path = root / relative
     try:
         size = path.lstat().st_size
     except OSError as error:
         raise StabilityError(f"cannot inspect artifact {relative}: {error}") from error
-    if size > MAX_ARTIFACT_FILE_BYTES:
+    if size > file_limit:
         raise StabilityError(
             f"artifact exceeds the fixed size limit: {relative}"
         )
-    return {"path": relative, "sha256": sha256_file(path), "size": size}
+    return {
+        "path": relative,
+        "sha256": sha256_file(path, maximum_size=file_limit),
+        "size": size,
+    }
 
 
 def finalize_evidence(root: Path, base_receipt: Any) -> dict[str, Any]:

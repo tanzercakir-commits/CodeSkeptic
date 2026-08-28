@@ -3864,7 +3864,7 @@ class InnerAuthorityProjectionContractTest(unittest.TestCase):
         with (
             mock.patch.object(
                 stability, "directory_identity", return_value=identity
-            ),
+            ) as identity_verifier,
             mock.patch.object(
                 stability.realworld, "load_manifest", return_value=manifest
             ),
@@ -3891,6 +3891,42 @@ class InnerAuthorityProjectionContractTest(unittest.TestCase):
             ],
         )
         self.assertEqual(result["bundle"], identity)
+        self.assertEqual(
+            identity_verifier.call_args_list,
+            [
+                mock.call(
+                    authority.parent,
+                    "real-world mirror authority",
+                    maximum_file_bytes=(
+                        stability.realworld.MAX_MIRROR_BUNDLE_BYTES
+                    ),
+                ),
+                mock.call(
+                    authority.parent,
+                    "real-world mirror authority",
+                    maximum_file_bytes=(
+                        stability.realworld.MAX_MIRROR_BUNDLE_BYTES
+                    ),
+                ),
+            ],
+        )
+
+    def test_directory_identity_keeps_an_explicit_mirror_file_limit(self) -> None:
+        root = self.root / "large-mirror-identity"
+        root.mkdir()
+        (root / "bundle").write_bytes(b"ab")
+        with mock.patch.object(stability, "MAX_ARTIFACT_FILE_BYTES", 1):
+            with self.assertRaisesRegex(
+                stability.StabilityError, "file exceeds"
+            ):
+                stability.directory_identity(root, "ordinary evidence")
+            identity = stability.directory_identity(
+                root,
+                "mirror evidence",
+                maximum_file_bytes=2,
+            )
+        self.assertEqual(identity["file_count"], 1)
+        self.assertEqual(identity["byte_count"], 2)
 
     def test_prerequisite_wrappers_reverify_semantics_and_stable_bundles(self) -> None:
         quality_source = (
