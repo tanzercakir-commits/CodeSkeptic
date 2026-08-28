@@ -9,7 +9,7 @@
 <!-- cs:state-begin -->
 ```
 base          = 7dfd375
-in_flight     = phase-cumulative-quality-floor-audit phase-determinism-exclusive-cgroup-authority phase-determinism-exclusive-cgroup-authority-v2 phase-determinism-kernel-bound-authority phase-p10-09-runtime-lifecycle-prep phase-v1-field-validation-policy
+in_flight     = phase-cache-checkpoint-correctness phase-determinism-exclusive-cgroup-authority phase-determinism-exclusive-cgroup-authority-v2 phase-determinism-performance-qualification phase-frontend-cfg-stress phase-p10-09-runtime-lifecycle-prep phase-per-tu-resource-budgets phase-realworld-release-candidate-factory phase-robustness-input-validation phase-seventy-two-hour-stability-gate phase-upstream-validation
 verified_main = 7dfd375
 progress      = sha256:1b6edc7f100977936a6d77b2c3f357f67e42e975dcb1ba8d0faa0b40571cabdb
 ```

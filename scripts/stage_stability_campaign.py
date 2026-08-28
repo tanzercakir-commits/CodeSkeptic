@@ -8,7 +8,6 @@ import copy
 import contextlib
 import ctypes
 import errno
-import fcntl
 import hashlib
 import json
 import os
@@ -25,6 +24,11 @@ import time
 import types
 from pathlib import Path, PurePosixPath
 from typing import Any
+
+try:
+    import fcntl
+except ModuleNotFoundError:  # Windows can inspect portable source contracts.
+    fcntl = None
 
 
 TOOL_VERSION = "4"
@@ -2292,6 +2296,11 @@ def _fsync_directory(path: Path) -> None:
 @contextlib.contextmanager
 def _authority_lifecycle_lock(staging_root: Path):
     """Exclude authority recovery/production while configuring or sealing."""
+
+    if fcntl is None:
+        raise StagingError(
+            "authority lifecycle lock requires POSIX fcntl support"
+        )
 
     root = staging_root.absolute()
     parent = root.parent

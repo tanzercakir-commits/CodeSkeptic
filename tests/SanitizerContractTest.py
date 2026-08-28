@@ -293,6 +293,19 @@ class SanitizerContractTest(unittest.TestCase):
                 staging_manifest,
             )
 
+    def test_stability_lifecycle_lock_fails_closed_without_fcntl(self) -> None:
+        staging = load_staging()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve() / "staging"
+            root.mkdir()
+            with mock.patch.object(
+                staging, "fcntl", None
+            ), self.assertRaisesRegex(
+                staging.StagingError, "requires POSIX fcntl"
+            ):
+                with staging._authority_lifecycle_lock(root):
+                    self.fail("unsupported lifecycle lock unexpectedly opened")
+
     def test_runtime_environment_is_hermetic_and_receipted(self) -> None:
         runner = load_runner()
         hostile = {

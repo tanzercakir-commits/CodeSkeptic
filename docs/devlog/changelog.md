@@ -105,6 +105,16 @@
   identity, is semantically re-derived before execution, is copied into the
   establishment record, and must remain byte- and directory-identical through
   final evidence verification.
+- Reconciled the generated TODO state against a clean protected-remote branch
+  inventory and made the new campaign-interruption tests honor their actual
+  platform boundary. Linux still exercises the real subreaper, procfs, and
+  `renameat2` cleanup contracts; macOS and Windows retain the portable command,
+  environment, and error-reporting checks without passing or failing for an
+  unrelated Linux prerequisite.
+- Made the staging module's `fcntl` dependency explicit at the lifecycle-lock
+  boundary. Non-POSIX hosts can now load and compare the portable source
+  manifest contract, while any attempt to acquire the Linux authority lock is
+  still rejected immediately with a controlled fail-closed error.
 
 ## 2026-08-22 — Phase 10.8 cumulative quality-floor audit (in progress)
 

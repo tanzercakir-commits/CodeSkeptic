@@ -15,7 +15,7 @@ import sys
 import tempfile
 import time
 import unittest
-from contextlib import redirect_stderr
+from contextlib import nullcontext, redirect_stderr
 from pathlib import Path
 from unittest import mock
 
@@ -2072,9 +2072,14 @@ class QualityFloorCampaignTest(unittest.TestCase):
             stderr = io.StringIO()
             with mock.patch.object(sys, "argv", argv), mock.patch.object(
                 campaign, "assemble_campaign", side_effect=error
-            ), redirect_stderr(stderr):
+            ), mock.patch.object(
+                campaign, "_campaign_signal_guard", return_value=nullcontext()
+            ) as signal_guard, redirect_stderr(stderr):
                 self.assertEqual(campaign.main(), 2)
-            self.assertIn("QUALITY_FLOOR_CAMPAIGN_UNAVAILABLE", stderr.getvalue())
+            signal_guard.assert_called_once_with(enabled=True)
+            detail = stderr.getvalue()
+            self.assertIn("QUALITY_FLOOR_CAMPAIGN_UNAVAILABLE", detail)
+            self.assertIn(str(error), detail)
 
     def test_main_reports_interruption_and_recovery_workspace(self) -> None:
         argv = [
@@ -2090,8 +2095,11 @@ class QualityFloorCampaignTest(unittest.TestCase):
         stderr = io.StringIO()
         with mock.patch.object(
             campaign, "assemble_campaign", side_effect=interrupted
-        ), redirect_stderr(stderr):
+        ), mock.patch.object(
+            campaign, "_campaign_signal_guard", return_value=nullcontext()
+        ) as signal_guard, redirect_stderr(stderr):
             self.assertEqual(campaign.main(argv), 128 + signal.SIGTERM)
+        signal_guard.assert_called_once_with(enabled=True)
         detail = stderr.getvalue()
         self.assertIn("QUALITY_FLOOR_CAMPAIGN_INTERRUPTED signal=15", detail)
         self.assertIn("recovery=/tmp/private-recovery", detail)
@@ -3020,6 +3028,10 @@ class QualityFloorCampaignTest(unittest.TestCase):
                     )
                 cleanup.assert_called_once()
 
+    @unittest.skipUnless(
+        sys.platform.startswith("linux"),
+        "exact campaign CID cleanup requires Linux renameat2",
+    )
     def test_interrupted_container_removes_exact_owned_podman_object(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = temporary_root(directory)
@@ -3482,6 +3494,10 @@ class QualityFloorCampaignTest(unittest.TestCase):
             ):
                 campaign._campaign_cidfile(symlink)
 
+    @unittest.skipUnless(
+        os.name == "posix",
+        "campaign CID identity pinning requires POSIX descriptor-relative I/O",
+    )
     def test_cidfile_in_place_mutation_prevents_unlink(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             cidfile = temporary_root(directory) / "container.cid"
@@ -3496,6 +3512,10 @@ class QualityFloorCampaignTest(unittest.TestCase):
                 )
             self.assertTrue(cidfile.is_file())
 
+    @unittest.skipUnless(
+        sys.platform.startswith("linux"),
+        "exact campaign CID cleanup requires Linux renameat2",
+    )
     def test_cidfile_quarantine_preserves_concurrent_foreign_replacement(
         self,
     ) -> None:
@@ -3547,9 +3567,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
                 quarantines[0].read_text(encoding="ascii"), "a" * 64
             )
 
-    def test_cleanup_podman_control_uses_closed_environment_and_hard_bound(
-        self,
-    ) -> None:
+    def test_cleanup_podman_control_uses_closed_environment(self) -> None:
         environment = {"CLOSED_PODMAN_ENV": "1"}
         completed = subprocess.CompletedProcess([], 0, b"{}", b"")
         with mock.patch.object(
@@ -3579,6 +3597,11 @@ class QualityFloorCampaignTest(unittest.TestCase):
             ],
         )
 
+    @unittest.skipUnless(
+        sys.platform.startswith("linux"),
+        "bounded campaign control requires Linux subreaper and procfs",
+    )
+    def test_cleanup_podman_control_enforces_hard_output_bound(self) -> None:
         with mock.patch.object(
             campaign, "CAMPAIGN_CONTAINER_CONTROL_OUTPUT_BYTES", 64
         ), self.assertRaisesRegex(
@@ -3990,6 +4013,8 @@ class QualityFloorCampaignTest(unittest.TestCase):
             interrupted = campaign.CampaignInterrupted(signal.SIGTERM)
             with mock.patch.object(
                 campaign, "_outer_snapshot", return_value=snapshot
+            ), mock.patch.object(
+                campaign, "_campaign_container_command", return_value=["fixture"]
             ), mock.patch.object(
                 campaign,
                 "_execute_campaign_container",
