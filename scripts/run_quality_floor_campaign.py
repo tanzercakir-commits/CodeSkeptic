@@ -25,10 +25,13 @@ from __future__ import annotations
 import argparse
 import ctypes
 import datetime as dt
+import errno
 import hashlib
 import json
 import os
 import re
+import secrets
+import selectors
 import shlex
 import shutil
 import signal
@@ -41,6 +44,7 @@ import time
 import uuid
 from collections import Counter
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Sequence
 
@@ -75,6 +79,7 @@ FIXED_COMPILER = "/usr/bin/clang-20"
 MAX_CAMPAIGN_LOG_BYTES = 64 << 20
 MAX_CAMPAIGN_FAILURE_DETAIL_CHARS = 2048
 AT_FDCWD = -100
+RENAME_NOREPLACE = 1
 RENAME_EXCHANGE = 2
 
 MUTATION_PATH = SCRIPT_DIR / "quality_floor_resource_mutations.json"
@@ -157,6 +162,9 @@ BUILD_AUTHORITY_RAW_DIR = "build-authority"
 CAMPAIGN_CONTAINER_LAYOUTS = ("legacy", "p10-09")
 PUBLIC_ACTIONS = frozenset({"run", "assemble", "verify"})
 CAMPAIGN_CHILD_GRACE_SECONDS = 2.0
+CAMPAIGN_CONTAINER_CONTROL_TIMEOUT_SECONDS = 60.0
+CAMPAIGN_CONTAINER_CONTROL_OUTPUT_BYTES = 1 << 20
+CAMPAIGN_CONTAINER_TOKEN_LABEL = "codeskeptic.quality.token"
 
 
 class CampaignError(RuntimeError):
@@ -171,6 +179,24 @@ class CampaignInterrupted(BaseException):
         self.signum = signum
         self.recovery_paths: list[Path] = []
         self.cleanup_failures: list[str] = []
+
+
+@dataclass(frozen=True)
+class CampaignContainerAuthority:
+    cidfile: Path
+    name: str
+    token: str
+
+
+class CampaignRecoveryRequired(CampaignError):
+    """Exact container cleanup failed; retain private recovery evidence."""
+
+    def __init__(
+        self, message: str, authority: CampaignContainerAuthority
+    ) -> None:
+        super().__init__(message)
+        self.authority = authority
+        self.recovery_paths: list[Path] = []
 
 
 def _campaign_children() -> dict[int, int]:
@@ -3422,6 +3448,9 @@ def _normalized_campaign_argv(
         "--hooks-dir=/usr/share/empty",
         "--runtime=/usr/bin/crun",
         "run",
+        "--cidfile", "$CONTAINER_CIDFILE",
+        "--name", "$CONTAINER_NAME",
+        "--label", f"{CAMPAIGN_CONTAINER_TOKEN_LABEL}=$CONTAINER_TOKEN",
         "--rm",
         "--pull=never",
         "--network=none",
@@ -3976,6 +4005,7 @@ def _campaign_container_command(
     jobs: int | None,
     launch_sha256: str,
     *,
+    container_authority: CampaignContainerAuthority,
     source: Path,
     build_dir: Path,
     build_authority_dir: Path,
@@ -3991,6 +4021,13 @@ def _campaign_container_command(
 ) -> list[str]:
     if SHA256.fullmatch(launch_sha256) is None:
         raise CampaignError("campaign launch SHA-256 is malformed")
+    if (
+        container_authority.name
+        != _campaign_container_name(container_authority.token, action)
+        or container_authority.cidfile.exists()
+        or container_authority.cidfile.is_symlink()
+    ):
+        raise CampaignError("campaign container execution authority is stale")
     container_layout = (
         "legacy"
         if build_record is None
@@ -4004,6 +4041,11 @@ def _campaign_container_command(
     )
     bindings = {
         "$PODMAN": str(build_authority.DEFAULT_PODMAN),
+        "$CONTAINER_CIDFILE": _mount_path(
+            container_authority.cidfile, "container ID file"
+        ),
+        "$CONTAINER_NAME": container_authority.name,
+        "$CONTAINER_TOKEN": container_authority.token,
         "$LAUNCH_SHA256": launch_sha256,
         "$SOURCE": _mount_path(source, "source"),
         "$BUILD": _mount_path(build_dir, "build"),
@@ -4041,6 +4083,66 @@ def _campaign_container_command(
             launch_dir, "campaign launch directory"
         )
     return _expand_campaign_argv(normalized, bindings)
+
+
+def _campaign_container_name(token: str, action: str) -> str:
+    if SHA256.fullmatch(token) is None or action not in PUBLIC_ACTIONS:
+        raise CampaignError("campaign container identity is malformed")
+    return f"codeskeptic-quality-{token[:16]}-{action}"
+
+
+def _new_campaign_container_authority(
+    log: Path,
+    action: str,
+    *,
+    invocation_token: str | None = None,
+) -> CampaignContainerAuthority:
+    token = (
+        secrets.token_hex(32)
+        if invocation_token is None
+        else invocation_token
+    )
+    name = _campaign_container_name(token, action)
+    cidfile = log.with_suffix(log.suffix + ".cid")
+    if cidfile.exists() or cidfile.is_symlink():
+        raise CampaignError("campaign container ID file must be absent")
+    return CampaignContainerAuthority(cidfile=cidfile, name=name, token=token)
+
+
+def _validate_campaign_container_invocation(
+    command: Sequence[str],
+    authority: CampaignContainerAuthority,
+    *,
+    action: str,
+    log: Path,
+) -> list[str]:
+    command = list(command)
+    if (
+        authority.name != _campaign_container_name(authority.token, action)
+        or authority.cidfile != log.with_suffix(log.suffix + ".cid")
+    ):
+        raise CampaignError("campaign container execution authority drift")
+    if not command or command[0] != os.fspath(build_authority.DEFAULT_PODMAN):
+        raise CampaignError("campaign command does not use the pinned Podman path")
+    try:
+        run_index = command.index("run")
+    except ValueError as error:
+        raise CampaignError("campaign command omits podman run") from error
+    expected = [
+        "--cidfile", os.fspath(authority.cidfile),
+        "--name", authority.name,
+        "--label", f"{CAMPAIGN_CONTAINER_TOKEN_LABEL}={authority.token}",
+        "--rm",
+    ]
+    if (
+        command[run_index + 1:run_index + 1 + len(expected)] != expected
+        or any(
+            command.count(option) != 1
+            for option in ("--cidfile", "--name", "--label")
+        )
+    ):
+        raise CampaignError("campaign container execution authority drift")
+    return command
 
 
 def _run_campaign_container_process(
@@ -4088,28 +4190,469 @@ def _run_campaign_container_process(
     return returncode
 
 
-def _execute_campaign_container(
-    command: Sequence[str], log: Path, action: str
-) -> str:
+def _run_bounded_campaign_control(
+    command: Sequence[str], environment: dict[str, str]
+) -> subprocess.CompletedProcess[bytes]:
+    command = list(command)
+    if not command:
+        raise CampaignError("campaign Podman control command is empty")
+    if not realworld._enable_subreaper():
+        raise CampaignError("campaign control could not establish subreaper authority")
+    try:
+        realworld._require_empty_child_table()
+    except realworld.EvidenceError as error:
+        raise CampaignError(str(error)) from error
+
+    process: subprocess.Popen[bytes] | None = None
+    selector = selectors.DefaultSelector()
+    output = bytearray()
+    started = time.monotonic()
+    try:
+        process = subprocess.Popen(
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            env=environment,
+            start_new_session=True,
+            bufsize=0,
+        )
+        if process.stdout is None:
+            raise CampaignError("campaign Podman control pipe is unavailable")
+        selector.register(process.stdout, selectors.EVENT_READ)
+        failure: str | None = None
+        while selector.get_map():
+            remaining = (
+                CAMPAIGN_CONTAINER_CONTROL_TIMEOUT_SECONDS
+                - (time.monotonic() - started)
+            )
+            if remaining <= 0:
+                failure = "campaign Podman control timed out"
+                break
+            events = selector.select(min(0.05, remaining))
+            for key, _mask in events:
+                admitted = CAMPAIGN_CONTAINER_CONTROL_OUTPUT_BYTES - len(output)
+                block = os.read(key.fd, min(65536, admitted + 1))
+                if not block:
+                    selector.unregister(key.fileobj)
+                    key.fileobj.close()
+                    continue
+                if len(block) > admitted:
+                    failure = "campaign Podman control output is oversized"
+                    break
+                output.extend(block)
+            if failure is not None:
+                break
+
+        if failure is None:
+            remaining = (
+                CAMPAIGN_CONTAINER_CONTROL_TIMEOUT_SECONDS
+                - (time.monotonic() - started)
+            )
+            try:
+                returncode = process.wait(timeout=max(0.0, remaining))
+            except subprocess.TimeoutExpired:
+                failure = "campaign Podman control timed out"
+        else:
+            returncode = None
+        if failure is None and not _wait_for_campaign_children(
+            CAMPAIGN_CHILD_GRACE_SECONDS
+        ):
+            failure = "campaign Podman control left a detached descendant alive"
+        if failure is not None:
+            try:
+                _terminate_campaign_children()
+            except CampaignError as cleanup_error:
+                raise CampaignError(
+                    f"{failure}; cleanup failed: {cleanup_error}"
+                ) from cleanup_error
+            raise CampaignError(failure)
+        if returncode is None:
+            raise CampaignError("campaign Podman control produced no result")
+        return subprocess.CompletedProcess(
+            command, returncode, bytes(output), b""
+        )
+    except BaseException as error:
+        try:
+            _terminate_campaign_children()
+        except CampaignError as cleanup_error:
+            if isinstance(error, CampaignInterrupted):
+                error.cleanup_failures.append(str(cleanup_error))
+                raise error
+            raise CampaignError(
+                f"campaign Podman control failed: {error}; "
+                f"cleanup failed: {cleanup_error}"
+            ) from error
+        if isinstance(error, (CampaignInterrupted, CampaignError)):
+            raise
+        raise CampaignError(
+            f"campaign Podman control failed: {error}"
+        ) from error
+    finally:
+        selector.close()
+        if process is not None:
+            if process.returncode is None:
+                try:
+                    process.wait(timeout=0)
+                except subprocess.TimeoutExpired:
+                    pass
+            if process.stdout is not None:
+                process.stdout.close()
+
+
+def _campaign_podman_control(
+    podman: str, arguments: Sequence[str]
+) -> subprocess.CompletedProcess[bytes]:
     try:
         environment = build_authority._podman_environment()
     except (build_authority.BuildAuthorityError, OSError) as error:
         raise CampaignError(
-            f"cannot establish closed Podman environment: {error}"
+            f"cannot establish cleanup Podman environment: {error}"
         ) from error
-    try:
-        with log.open("xb") as stream:
-            returncode = _run_campaign_container_process(
-                command, stream, environment
-            )
-    except OSError as error:
-        raise CampaignError(f"cannot launch pinned campaign container: {error}") from error
-    if returncode != 0:
-        detail = _campaign_failure_detail(log)
-        raise CampaignError(
-            f"pinned campaign container failed with exit {returncode}; "
-            f"last diagnostic: {detail}"
+    return _run_bounded_campaign_control(
+        [podman, "--events-backend=none", *arguments], environment
+    )
+
+
+def _inspect_campaign_container(
+    podman: str, reference: str
+) -> dict[str, Any] | None:
+    completed = _campaign_podman_control(
+        podman,
+        ["container", "inspect", "--format", "{{json .}}", reference],
+    )
+    if completed.returncode != 0:
+        exists = _campaign_podman_control(
+            podman, ["container", "exists", reference]
         )
+        if exists.returncode == 1:
+            return None
+        detail = completed.stdout[-4000:].decode("utf-8", errors="replace")
+        raise CampaignError(f"cannot inspect campaign container: {detail}")
+    try:
+        value = json.loads(
+            completed.stdout.decode("utf-8"),
+            object_pairs_hook=_unique_object,
+            parse_constant=_bad_constant,
+        )
+    except (UnicodeDecodeError, ValueError) as error:
+        raise CampaignError(
+            f"campaign container inspection is malformed: {error}"
+        ) from error
+    if not isinstance(value, dict):
+        raise CampaignError("campaign container inspection is malformed")
+    return value
+
+
+def _campaign_container_identity(
+    value: dict[str, Any], *, name: str, token: str
+) -> str:
+    container_id = value.get("Id")
+    inspected_name = value.get("Name")
+    config = value.get("Config")
+    labels = config.get("Labels") if isinstance(config, dict) else None
+    if (
+        not isinstance(container_id, str)
+        or SHA256.fullmatch(container_id) is None
+        or not isinstance(inspected_name, str)
+        or inspected_name.removeprefix("/") != name
+        or not isinstance(labels, dict)
+        or labels.get(CAMPAIGN_CONTAINER_TOKEN_LABEL) != token
+    ):
+        raise CampaignError("campaign container ownership drift")
+    return container_id
+
+
+def _campaign_cidfile(
+    cidfile: Path,
+) -> tuple[str | None, os.stat_result | None]:
+    if not cidfile.exists() and not cidfile.is_symlink():
+        return None, None
+    try:
+        metadata = cidfile.lstat()
+        raw = build_authority._read_regular(cidfile, 128)
+        value = raw.decode("ascii")
+    except Exception as error:
+        raise CampaignError(
+            f"campaign container ID file is malformed: {error}"
+        ) from error
+    if SHA256.fullmatch(value) is None:
+        raise CampaignError("campaign container ID file is malformed")
+    return value, metadata
+
+
+def _campaign_cid_quarantine_identity(
+    metadata: os.stat_result,
+) -> tuple[int, ...]:
+    return (
+        int(metadata.st_dev),
+        int(metadata.st_ino),
+        int(metadata.st_mode),
+        int(metadata.st_nlink),
+        int(metadata.st_size),
+        build_authority._stat_time_ns(metadata, "st_mtime"),
+    )
+
+
+def _unlink_campaign_cidfile(
+    cidfile: Path,
+    metadata: os.stat_result | None,
+    expected_cid: str | None,
+) -> None:
+    if metadata is None:
+        return
+    if expected_cid is None:
+        raise CampaignError("campaign container ID file authority is incomplete")
+    parent_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    parent_flags |= getattr(os, "O_DIRECTORY", 0)
+    parent_flags |= getattr(os, "O_NOFOLLOW", 0)
+    file_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    file_flags |= getattr(os, "O_NOFOLLOW", 0)
+    parent_descriptor: int | None = None
+    descriptor: int | None = None
+    quarantine_name: str | None = None
+    try:
+        parent_descriptor = os.open(cidfile.parent, parent_flags)
+        descriptor = os.open(
+            cidfile.name, file_flags, dir_fd=parent_descriptor
+        )
+        pinned_before = os.fstat(descriptor)
+        raw = os.read(descriptor, 129)
+        pinned_after = os.fstat(descriptor)
+        if (
+            build_authority._stat_fingerprint(pinned_before)
+            != build_authority._stat_fingerprint(metadata)
+            or build_authority._stat_fingerprint(pinned_after)
+            != build_authority._stat_fingerprint(metadata)
+            or raw != expected_cid.encode("ascii")
+        ):
+            raise CampaignError("campaign container ID file identity drift")
+
+        for _attempt in range(128):
+            candidate = (
+                ".codeskeptic-quality-cid-cleanup-"
+                + secrets.token_hex(16)
+            )
+            quarantine_name = candidate
+            try:
+                _rename_noreplace_at(
+                    parent_descriptor,
+                    cidfile.name,
+                    parent_descriptor,
+                    candidate,
+                )
+            except FileExistsError:
+                quarantine_name = None
+                continue
+            break
+        if quarantine_name is None:
+            raise CampaignError("campaign CID cleanup quarantine budget exhausted")
+        os.fsync(parent_descriptor)
+
+        quarantined = os.stat(
+            quarantine_name,
+            dir_fd=parent_descriptor,
+            follow_symlinks=False,
+        )
+        pinned = os.fstat(descriptor)
+        if (
+            _campaign_cid_quarantine_identity(quarantined)
+            != _campaign_cid_quarantine_identity(metadata)
+            or _campaign_cid_quarantine_identity(pinned)
+            != _campaign_cid_quarantine_identity(metadata)
+        ):
+            raise CampaignError("campaign container ID quarantine identity drift")
+        try:
+            os.stat(
+                cidfile.name,
+                dir_fd=parent_descriptor,
+                follow_symlinks=False,
+            )
+        except FileNotFoundError:
+            pass
+        else:
+            raise CampaignError(
+                "campaign container ID file was replaced during cleanup"
+            )
+        os.unlink(quarantine_name, dir_fd=parent_descriptor)
+        quarantine_name = None
+        os.fsync(parent_descriptor)
+        try:
+            os.stat(
+                cidfile.name,
+                dir_fd=parent_descriptor,
+                follow_symlinks=False,
+            )
+        except FileNotFoundError:
+            pass
+        else:
+            raise CampaignError(
+                "campaign container ID file was replaced during cleanup"
+            )
+    except BaseException as error:
+        recovery_error: BaseException | None = None
+        if parent_descriptor is not None and quarantine_name is not None:
+            try:
+                os.stat(
+                    quarantine_name,
+                    dir_fd=parent_descriptor,
+                    follow_symlinks=False,
+                )
+            except FileNotFoundError:
+                quarantine_name = None
+            except BaseException as restore_error:
+                recovery_error = restore_error
+            if quarantine_name is not None and recovery_error is None:
+                try:
+                    os.stat(
+                        cidfile.name,
+                        dir_fd=parent_descriptor,
+                        follow_symlinks=False,
+                    )
+                except FileNotFoundError:
+                    try:
+                        _rename_noreplace_at(
+                            parent_descriptor,
+                            quarantine_name,
+                            parent_descriptor,
+                            cidfile.name,
+                        )
+                        quarantine_name = None
+                        os.fsync(parent_descriptor)
+                    except BaseException as restore_error:
+                        recovery_error = restore_error
+                except BaseException as restore_error:
+                    recovery_error = restore_error
+                else:
+                    recovery_error = CampaignError(
+                        "campaign CID cleanup found a foreign replacement"
+                    )
+        retained = (
+            os.fspath(cidfile.parent / quarantine_name)
+            if quarantine_name is not None
+            else "none"
+        )
+        if isinstance(error, CampaignInterrupted):
+            if recovery_error is not None:
+                error.cleanup_failures.append(
+                    "CID cleanup recovery failed; retained quarantine: "
+                    f"{retained}; {recovery_error}"
+                )
+            raise error
+        if recovery_error is not None:
+            raise CampaignError(
+                "campaign CID cleanup failed; retained quarantine: "
+                f"{retained}; primary failure: {error}; "
+                f"recovery failure: {recovery_error}"
+            ) from error
+        if isinstance(error, CampaignError):
+            raise
+        if not isinstance(error, OSError):
+            raise
+        raise CampaignError(
+            f"cannot remove campaign container ID file: {error}"
+        ) from error
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
+
+
+def _rename_noreplace_at(
+    source_directory: int,
+    source: str,
+    destination_directory: int,
+    destination: str,
+) -> None:
+    if os.name != "posix":
+        raise OSError(
+            errno.ENOSYS,
+            "atomic no-replace cleanup is unavailable",
+            destination,
+        )
+    libc = ctypes.CDLL(None, use_errno=True)
+    renameat2 = getattr(libc, "renameat2", None)
+    if renameat2 is None:
+        raise OSError(
+            errno.ENOSYS,
+            "atomic no-replace cleanup is unavailable",
+            destination,
+        )
+    renameat2.argtypes = [
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    ]
+    renameat2.restype = ctypes.c_int
+    if renameat2(
+        source_directory,
+        os.fsencode(source),
+        destination_directory,
+        os.fsencode(destination),
+        RENAME_NOREPLACE,
+    ) == 0:
+        return
+    error_number = ctypes.get_errno()
+    if error_number == errno.EEXIST:
+        raise FileExistsError(
+            error_number, os.strerror(error_number), destination
+        )
+    raise OSError(error_number, os.strerror(error_number), destination)
+
+
+def _cleanup_campaign_container_exact(
+    *, cidfile: Path, podman: str, name: str, token: str
+) -> None:
+    expected_cid, metadata = _campaign_cidfile(cidfile)
+    reference = expected_cid if expected_cid is not None else name
+    inspected = _inspect_campaign_container(podman, reference)
+    if inspected is not None:
+        container_id = _campaign_container_identity(
+            inspected, name=name, token=token
+        )
+        if expected_cid is not None and container_id != expected_cid:
+            raise CampaignError("campaign container ID file identity drift")
+        completed = _campaign_podman_control(
+            podman, ["rm", "--force", "--ignore", container_id]
+        )
+        if completed.returncode != 0:
+            detail = completed.stdout[-4000:].decode(
+                "utf-8", errors="replace"
+            )
+            raise CampaignError(f"cannot clean campaign container: {detail}")
+        if _inspect_campaign_container(podman, container_id) is not None:
+            raise CampaignError("campaign container survived cleanup")
+    replacement = _inspect_campaign_container(podman, name)
+    if replacement is not None:
+        _campaign_container_identity(replacement, name=name, token=token)
+        raise CampaignError("campaign container name survived or was replaced")
+    _unlink_campaign_cidfile(cidfile, metadata, expected_cid)
+
+
+def _cleanup_campaign_container(
+    *, cidfile: Path, podman: str, name: str, token: str
+) -> None:
+    """Clean an exact owned object and normalize every ordinary failure."""
+
+    try:
+        _cleanup_campaign_container_exact(
+            cidfile=cidfile,
+            podman=podman,
+            name=name,
+            token=token,
+        )
+    except (CampaignInterrupted, CampaignError):
+        raise
+    except Exception as error:
+        raise CampaignError(
+            f"campaign container cleanup failed: {error}"
+        ) from error
+
+
+def _campaign_completion_marker(log: Path, action: str) -> str:
     if not log.is_file() or not 0 < log.stat().st_size <= MAX_CAMPAIGN_LOG_BYTES:
         raise CampaignError("campaign container completion log is empty or oversized")
     try:
@@ -4122,6 +4665,142 @@ def _execute_campaign_container(
     if re.fullmatch(pattern, marker) is None:
         raise CampaignError("campaign container completion marker is malformed")
     return marker.rsplit(" ", 1)[1]
+
+
+def _campaign_cleanup_failure_detail(
+    error: CampaignError, authority: CampaignContainerAuthority
+) -> str:
+    return (
+        f"{error}; recovery authority: cidfile={authority.cidfile}, "
+        f"name={authority.name}, token={authority.token}"
+    )
+
+
+def _execute_campaign_container(
+    command: Sequence[str],
+    log: Path,
+    action: str,
+    container_authority: CampaignContainerAuthority,
+) -> str:
+    command = _validate_campaign_container_invocation(
+        command, container_authority, action=action, log=log
+    )
+    try:
+        environment = build_authority._podman_environment()
+    except (build_authority.BuildAuthorityError, OSError) as error:
+        raise CampaignError(
+            f"cannot establish closed Podman environment: {error}"
+        ) from error
+    primary: BaseException | None = None
+    returncode: int | None = None
+    launch_attempted = False
+    try:
+        with log.open("xb") as stream:
+            if (
+                container_authority.cidfile.exists()
+                or container_authority.cidfile.is_symlink()
+            ):
+                raise CampaignError(
+                    "campaign container ID file appeared before launch"
+                )
+            launch_attempted = True
+            returncode = _run_campaign_container_process(
+                command, stream, environment
+            )
+    except OSError as error:
+        primary = CampaignError(
+            f"cannot launch pinned campaign container: {error}"
+        )
+        primary.__cause__ = error
+    except BaseException as error:
+        primary = error
+
+    marker: str | None = None
+    if primary is None:
+        try:
+            if returncode is None:
+                raise CampaignError(
+                    "campaign container execution produced no result"
+                )
+            if returncode != 0:
+                detail = _campaign_failure_detail(log)
+                raise CampaignError(
+                    f"pinned campaign container failed with exit {returncode}; "
+                    f"last diagnostic: {detail}"
+                )
+            marker = _campaign_completion_marker(log, action)
+        except BaseException as error:
+            primary = error
+
+    cleanup_error: CampaignError | None = None
+    cleanup_interruption: CampaignInterrupted | None = None
+    if launch_attempted:
+        try:
+            _cleanup_campaign_container(
+                cidfile=container_authority.cidfile,
+                podman=command[0],
+                name=container_authority.name,
+                token=container_authority.token,
+            )
+        except CampaignInterrupted as error:
+            cleanup_interruption = error
+            try:
+                _cleanup_campaign_container(
+                    cidfile=container_authority.cidfile,
+                    podman=command[0],
+                    name=container_authority.name,
+                    token=container_authority.token,
+                )
+            except CampaignError as retry_error:
+                error.cleanup_failures.append(
+                    _campaign_cleanup_failure_detail(
+                        retry_error, container_authority
+                    )
+                )
+            except CampaignInterrupted as retry_interruption:
+                error.cleanup_failures.append(
+                    "cleanup retry was interrupted by signal "
+                    f"{retry_interruption.signum}"
+                )
+        except CampaignError as error:
+            cleanup_error = error
+
+    if cleanup_interruption is not None:
+        if primary is not None:
+            cleanup_interruption.cleanup_failures.append(
+                f"pre-interruption execution failure: {primary}"
+            )
+        raise cleanup_interruption
+    if primary is not None:
+        if isinstance(primary, CampaignInterrupted):
+            if cleanup_error is not None:
+                primary.cleanup_failures.append(
+                    _campaign_cleanup_failure_detail(
+                        cleanup_error, container_authority
+                    )
+                )
+            raise primary
+        if cleanup_error is not None:
+            raise CampaignRecoveryRequired(
+                f"campaign container execution failed: {primary}; "
+                "cleanup failed: "
+                + _campaign_cleanup_failure_detail(
+                    cleanup_error, container_authority
+                ),
+                container_authority,
+            ) from primary
+        raise primary
+    if cleanup_error is not None:
+        raise CampaignRecoveryRequired(
+            "campaign container cleanup failed: "
+            + _campaign_cleanup_failure_detail(
+                cleanup_error, container_authority
+            ),
+            container_authority,
+        ) from cleanup_error
+    if marker is None:
+        raise CampaignError("campaign container completion marker is unavailable")
+    return marker
 
 
 def _campaign_failure_detail(log: Path) -> str:
@@ -4314,7 +4993,7 @@ def _cleanup_workspace(workspace: Path) -> None:
 
 def _finish_campaign_workspace(workspace: Path) -> None:
     active = sys.exc_info()[1]
-    if isinstance(active, CampaignInterrupted):
+    if isinstance(active, (CampaignInterrupted, CampaignRecoveryRequired)):
         if workspace.is_dir() and not workspace.is_symlink():
             active.recovery_paths.append(workspace)
         return
@@ -4943,10 +5622,13 @@ def _launch_independent_verify(
     )
     launch_path = launch_dir / CAMPAIGN_LAUNCH_NAME
     launch_sha = _write_launch_authority(launch_path, launch)
+    log = workspace / "verify-container.log"
+    container_authority = _new_campaign_container_authority(log, "verify")
     command = _campaign_container_command(
         "verify",
         None,
         launch_sha,
+        container_authority=container_authority,
         source=snapshot["source"],
         build_dir=snapshot["build_dir"],
         build_authority_dir=snapshot["build_authority_dir"],
@@ -4957,7 +5639,7 @@ def _launch_independent_verify(
         build_record=snapshot["build_record"],
     )
     marker = _execute_campaign_container(
-        command, workspace / "verify-container.log", "verify"
+        command, log, "verify", container_authority
     )
     _validate_sealed_package_shape(package)
     receipt_path = _regular(package / "receipt.json", "campaign receipt")
@@ -5020,10 +5702,13 @@ def run_campaign(
         scratch.mkdir()
         launch_path = stage / CAMPAIGN_LAUNCH_NAME
         launch_sha = _write_launch_authority(launch_path, snapshot["launch"])
+        log = staging / "run-container.log"
+        container_authority = _new_campaign_container_authority(log, "run")
         command = _campaign_container_command(
             "run",
             jobs,
             launch_sha,
+            container_authority=container_authority,
             source=snapshot["source"],
             build_dir=snapshot["build_dir"],
             build_authority_dir=snapshot["build_authority_dir"],
@@ -5035,7 +5720,7 @@ def run_campaign(
             build_record=snapshot["build_record"],
         )
         marker = _execute_campaign_container(
-            command, staging / "run-container.log", "run"
+            command, log, "run", container_authority
         )
         staged_package = _directory(
             stage / "package", "staged campaign package"
@@ -5110,10 +5795,15 @@ def assemble_campaign(
         )
         launch_path = stage / CAMPAIGN_LAUNCH_NAME
         launch_sha = _write_launch_authority(launch_path, snapshot["launch"])
+        log = staging / "assemble-container.log"
+        container_authority = _new_campaign_container_authority(
+            log, "assemble"
+        )
         command = _campaign_container_command(
             "assemble",
             None,
             launch_sha,
+            container_authority=container_authority,
             source=snapshot["source"],
             build_dir=snapshot["build_dir"],
             build_authority_dir=snapshot["build_authority_dir"],
@@ -5122,7 +5812,7 @@ def assemble_campaign(
             build_record=snapshot["build_record"],
         )
         marker = _execute_campaign_container(
-            command, staging / "assemble-container.log", "assemble"
+            command, log, "assemble", container_authority
         )
         _validate_sealed_package_shape(staged_package)
         if marker != sha256_file(
@@ -5371,7 +6061,15 @@ def main(argv: list[str] | None = None) -> int:
         print(" ".join(details), file=sys.stderr)
         return 128 + error.signum
     except (CampaignError, quality.QualityFloorError, OSError) as error:
-        print(f"QUALITY_FLOOR_CAMPAIGN_UNAVAILABLE {error}", file=sys.stderr)
+        detail = f"QUALITY_FLOOR_CAMPAIGN_UNAVAILABLE {error}"
+        if (
+            isinstance(error, CampaignRecoveryRequired)
+            and error.recovery_paths
+        ):
+            detail += " recovery=" + ",".join(
+                map(str, error.recovery_paths)
+            )
+        print(detail, file=sys.stderr)
         return 2
 
 

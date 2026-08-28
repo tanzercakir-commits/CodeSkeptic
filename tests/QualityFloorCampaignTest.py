@@ -33,6 +33,25 @@ def temporary_root(value: str) -> Path:
     return Path(value).resolve(strict=True)
 
 
+def owned_container_command(
+    authority: campaign.CampaignContainerAuthority,
+) -> list[str]:
+    """Return the smallest executor-valid Podman command for unit tests."""
+
+    return [
+        os.fspath(campaign.build_authority.DEFAULT_PODMAN),
+        "run",
+        "--cidfile",
+        os.fspath(authority.cidfile),
+        "--name",
+        authority.name,
+        "--label",
+        f"{campaign.CAMPAIGN_CONTAINER_TOKEN_LABEL}={authority.token}",
+        "--rm",
+        "fixture-image",
+    ]
+
+
 def _coverage(attempted: int = 1, analyzed: int = 1,
               broken: int = 0) -> dict[str, int]:
     return {
@@ -2114,6 +2133,22 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_container_contract_is_offline_read_only_and_git_closed(self) -> None:
         normalized = campaign._normalized_campaign_argv("run", 4)
+        run_index = normalized.index("run")
+        self.assertEqual(
+            normalized[run_index + 1:run_index + 8],
+            [
+                "--cidfile",
+                "$CONTAINER_CIDFILE",
+                "--name",
+                "$CONTAINER_NAME",
+                "--label",
+                (
+                    f"{campaign.CAMPAIGN_CONTAINER_TOKEN_LABEL}="
+                    "$CONTAINER_TOKEN"
+                ),
+                "--rm",
+            ],
+        )
         environment = [
             normalized[index + 1]
             for index, token in enumerate(normalized[:-1])
@@ -2178,10 +2213,18 @@ class QualityFloorCampaignTest(unittest.TestCase):
         if os.name == "posix":
             with tempfile.TemporaryDirectory() as directory:
                 root = temporary_root(directory)
+                container_authority = (
+                    campaign._new_campaign_container_authority(
+                        root / "container.log",
+                        "run",
+                        invocation_token="f" * 64,
+                    )
+                )
                 command = campaign._campaign_container_command(
                     "run",
                     4,
                     "0" * 64,
+                    container_authority=container_authority,
                     source=root / "source",
                     build_dir=root / "build",
                     build_authority_dir=root / "build-authority",
@@ -2309,10 +2352,18 @@ class QualityFloorCampaignTest(unittest.TestCase):
             )
 
             if os.name == "posix":
+                container_authority = (
+                    campaign._new_campaign_container_authority(
+                        root / "container.log",
+                        "verify",
+                        invocation_token="f" * 64,
+                    )
+                )
                 command = campaign._campaign_container_command(
                     "verify",
                     None,
                     "0" * 64,
+                    container_authority=container_authority,
                     source=root / "source",
                     build_dir=root / "build",
                     build_authority_dir=root / "build-authority",
@@ -2792,6 +2843,13 @@ class QualityFloorCampaignTest(unittest.TestCase):
                 ("non-UTF-8", 0, b"\xff", "unreadable"),
             ):
                 log = root / f"{label}.log"
+                container_authority = (
+                    campaign._new_campaign_container_authority(
+                        log,
+                        "run",
+                        invocation_token="f" * 64,
+                    )
+                )
 
                 def fake_run(_command, stream, _environment):
                     stream.write(output)
@@ -2803,10 +2861,591 @@ class QualityFloorCampaignTest(unittest.TestCase):
                     return_value={},
                 ), mock.patch.object(
                     campaign, "_run_campaign_container_process", side_effect=fake_run
-                ), self.assertRaisesRegex(campaign.CampaignError, error):
+                ), mock.patch.object(
+                    campaign, "_cleanup_campaign_container"
+                ) as cleanup, self.assertRaisesRegex(
+                    campaign.CampaignError, error
+                ):
                     campaign._execute_campaign_container(
-                        ["/usr/bin/podman"], log, "run"
+                        owned_container_command(container_authority),
+                        log,
+                        "run",
+                        container_authority,
                     )
+                cleanup.assert_called_once()
+
+    def test_interrupted_container_removes_exact_owned_podman_object(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            log = root / "container.log"
+            container_id = "a" * 64
+            token = "b" * 64
+            container_authority = campaign._new_campaign_container_authority(
+                log, "run", invocation_token=token
+            )
+            containers: dict[str, dict[str, object]] = {}
+            control_calls: list[list[str]] = []
+            launched: list[str] = []
+            interrupted = campaign.CampaignInterrupted(signal.SIGTERM)
+
+            def fake_run(command, _stream, _environment):
+                launched.extend(command)
+                name = command[command.index("--name") + 1]
+                label = command[command.index("--label") + 1]
+                cidfile = Path(command[command.index("--cidfile") + 1])
+                self.assertEqual(
+                    label, f"{campaign.CAMPAIGN_CONTAINER_TOKEN_LABEL}={token}"
+                )
+                cidfile.write_text(container_id, encoding="ascii")
+                containers[container_id] = {
+                    "Id": container_id,
+                    "Name": name,
+                    "Config": {
+                        "Labels": {
+                            campaign.CAMPAIGN_CONTAINER_TOKEN_LABEL: token,
+                        }
+                    },
+                }
+                raise interrupted
+
+            def fake_control(_podman, arguments):
+                arguments = list(arguments)
+                control_calls.append(arguments)
+                reference = arguments[-1]
+                value = next(
+                    (
+                        entry
+                        for entry in containers.values()
+                        if entry["Id"] == reference or entry["Name"] == reference
+                    ),
+                    None,
+                )
+                if arguments[:3] == ["container", "inspect", "--format"]:
+                    if value is None:
+                        return subprocess.CompletedProcess(arguments, 125, b"", b"")
+                    return subprocess.CompletedProcess(
+                        arguments,
+                        0,
+                        campaign.canonical_json(value),
+                        b"",
+                    )
+                if arguments[:2] == ["container", "exists"]:
+                    return subprocess.CompletedProcess(
+                        arguments, 0 if value is not None else 1, b"", b""
+                    )
+                if arguments[:3] == ["rm", "--force", "--ignore"]:
+                    containers.pop(reference, None)
+                    return subprocess.CompletedProcess(arguments, 0, b"", b"")
+                raise AssertionError(arguments)
+
+            with mock.patch.object(
+                campaign.build_authority, "_podman_environment", return_value={}
+            ), mock.patch.object(
+                campaign, "_run_campaign_container_process", side_effect=fake_run
+            ), mock.patch.object(
+                campaign, "_campaign_podman_control", side_effect=fake_control
+            ), self.assertRaises(campaign.CampaignInterrupted) as raised:
+                campaign._execute_campaign_container(
+                    owned_container_command(container_authority),
+                    log,
+                    "run",
+                    container_authority,
+                )
+            self.assertIs(raised.exception, interrupted)
+            self.assertFalse(containers)
+            self.assertFalse(log.with_suffix(".log.cid").exists())
+            self.assertIn("--cidfile", launched)
+            self.assertIn("--name", launched)
+            self.assertIn("--label", launched)
+            removal = next(
+                call for call in control_calls
+                if call[:3] == ["rm", "--force", "--ignore"]
+            )
+            self.assertEqual(removal[-1], container_id)
+
+    def test_malformed_interrupted_cidfile_is_retained_and_fails_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            log = root / "container.log"
+            token = "b" * 64
+            container_authority = campaign._new_campaign_container_authority(
+                log, "run", invocation_token=token
+            )
+            interrupted = campaign.CampaignInterrupted(signal.SIGTERM)
+
+            def fake_run(command, _stream, _environment):
+                cidfile = Path(command[command.index("--cidfile") + 1])
+                cidfile.write_text("not-a-container-id", encoding="ascii")
+                raise interrupted
+
+            with mock.patch.object(
+                campaign.build_authority, "_podman_environment", return_value={}
+            ), mock.patch.object(
+                campaign, "_run_campaign_container_process", side_effect=fake_run
+            ), mock.patch.object(
+                campaign, "_campaign_podman_control"
+            ) as control, self.assertRaises(campaign.CampaignInterrupted) as raised:
+                campaign._execute_campaign_container(
+                    owned_container_command(container_authority),
+                    log,
+                    "run",
+                    container_authority,
+                )
+            self.assertIs(raised.exception, interrupted)
+            self.assertTrue(log.with_suffix(".log.cid").is_file())
+            self.assertTrue(
+                any("container ID file is malformed" in item
+                    for item in interrupted.cleanup_failures)
+            )
+            control.assert_not_called()
+
+    def test_missing_cidfile_uses_owned_name_fallback_and_removes_exact_id(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            log = root / "container.log"
+            authority = campaign._new_campaign_container_authority(
+                log, "run", invocation_token="b" * 64
+            )
+            container_id = "a" * 64
+            owned = {
+                "Id": container_id,
+                "Name": authority.name,
+                "Config": {
+                    "Labels": {
+                        campaign.CAMPAIGN_CONTAINER_TOKEN_LABEL: authority.token,
+                    }
+                },
+            }
+            removed = subprocess.CompletedProcess([], 0, b"", b"")
+            with mock.patch.object(
+                campaign,
+                "_inspect_campaign_container",
+                side_effect=[owned, None, None],
+            ) as inspect, mock.patch.object(
+                campaign, "_campaign_podman_control", return_value=removed
+            ) as control:
+                campaign._cleanup_campaign_container(
+                    cidfile=authority.cidfile,
+                    podman=os.fspath(campaign.build_authority.DEFAULT_PODMAN),
+                    name=authority.name,
+                    token=authority.token,
+                )
+            self.assertEqual(
+                [call.args[1] for call in inspect.call_args_list],
+                [authority.name, container_id, authority.name],
+            )
+            self.assertEqual(
+                control.call_args.args[1],
+                ["rm", "--force", "--ignore", container_id],
+            )
+
+    def test_foreign_same_name_replacement_is_preserved_and_fails_cleanup(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            log = root / "container.log"
+            authority = campaign._new_campaign_container_authority(
+                log, "run", invocation_token="b" * 64
+            )
+            container_id = "a" * 64
+            authority.cidfile.write_text(container_id, encoding="ascii")
+            owned = {
+                "Id": container_id,
+                "Name": authority.name,
+                "Config": {
+                    "Labels": {
+                        campaign.CAMPAIGN_CONTAINER_TOKEN_LABEL: authority.token,
+                    }
+                },
+            }
+            replacement = {
+                "Id": "c" * 64,
+                "Name": authority.name,
+                "Config": {
+                    "Labels": {
+                        campaign.CAMPAIGN_CONTAINER_TOKEN_LABEL: "d" * 64,
+                    }
+                },
+            }
+            removed = subprocess.CompletedProcess([], 0, b"", b"")
+            with mock.patch.object(
+                campaign,
+                "_inspect_campaign_container",
+                side_effect=[owned, None, replacement],
+            ), mock.patch.object(
+                campaign, "_campaign_podman_control", return_value=removed
+            ) as control, self.assertRaisesRegex(
+                campaign.CampaignError, "ownership drift"
+            ):
+                campaign._cleanup_campaign_container(
+                    cidfile=authority.cidfile,
+                    podman=os.fspath(campaign.build_authority.DEFAULT_PODMAN),
+                    name=authority.name,
+                    token=authority.token,
+                )
+            self.assertEqual(control.call_count, 1)
+            self.assertEqual(control.call_args.args[1][-1], container_id)
+            self.assertTrue(authority.cidfile.is_file())
+
+    def test_container_remove_failure_retains_cidfile_and_fails_closed(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            log = root / "container.log"
+            authority = campaign._new_campaign_container_authority(
+                log, "run", invocation_token="b" * 64
+            )
+            container_id = "a" * 64
+            authority.cidfile.write_text(container_id, encoding="ascii")
+            owned = {
+                "Id": container_id,
+                "Name": authority.name,
+                "Config": {
+                    "Labels": {
+                        campaign.CAMPAIGN_CONTAINER_TOKEN_LABEL: authority.token,
+                    }
+                },
+            }
+            denied = subprocess.CompletedProcess([], 125, b"denied", b"")
+            with mock.patch.object(
+                campaign, "_inspect_campaign_container", return_value=owned
+            ), mock.patch.object(
+                campaign, "_campaign_podman_control", return_value=denied
+            ), self.assertRaisesRegex(
+                campaign.CampaignError, "cannot clean.*denied"
+            ):
+                campaign._cleanup_campaign_container(
+                    cidfile=authority.cidfile,
+                    podman=os.fspath(campaign.build_authority.DEFAULT_PODMAN),
+                    name=authority.name,
+                    token=authority.token,
+                )
+            self.assertTrue(authority.cidfile.is_file())
+
+    def test_spawn_failure_still_attempts_owned_container_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            log = root / "container.log"
+            authority = campaign._new_campaign_container_authority(
+                log, "run", invocation_token="b" * 64
+            )
+            with mock.patch.object(
+                campaign.build_authority, "_podman_environment", return_value={}
+            ), mock.patch.object(
+                campaign,
+                "_run_campaign_container_process",
+                side_effect=OSError("spawn failed"),
+            ), mock.patch.object(
+                campaign, "_cleanup_campaign_container"
+            ) as cleanup, self.assertRaisesRegex(
+                campaign.CampaignError, "cannot launch.*spawn failed"
+            ):
+                campaign._execute_campaign_container(
+                    owned_container_command(authority),
+                    log,
+                    "run",
+                    authority,
+                )
+            cleanup.assert_called_once()
+
+    def test_cleanup_oserror_preserves_same_interruption_and_authority(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            log = root / "container.log"
+            authority = campaign._new_campaign_container_authority(
+                log, "run", invocation_token="b" * 64
+            )
+            interrupted = campaign.CampaignInterrupted(signal.SIGTERM)
+            with mock.patch.object(
+                campaign.build_authority, "_podman_environment", return_value={}
+            ), mock.patch.object(
+                campaign,
+                "_run_campaign_container_process",
+                side_effect=interrupted,
+            ), mock.patch.object(
+                campaign,
+                "_inspect_campaign_container",
+                side_effect=OSError("inspect failed"),
+            ), self.assertRaises(campaign.CampaignInterrupted) as raised:
+                campaign._execute_campaign_container(
+                    owned_container_command(authority),
+                    log,
+                    "run",
+                    authority,
+                )
+            self.assertIs(raised.exception, interrupted)
+            self.assertTrue(
+                any("inspect failed" in item for item in interrupted.cleanup_failures)
+            )
+            self.assertTrue(
+                any(authority.token in item for item in interrupted.cleanup_failures)
+            )
+
+    def test_nonzero_and_cleanup_failure_retain_exact_recovery_workspace(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            workspace = root / "workspace"
+            workspace.mkdir()
+            log = workspace / "container.log"
+            authority = campaign._new_campaign_container_authority(
+                log, "run", invocation_token="b" * 64
+            )
+
+            def failed(_command, stream, _environment):
+                stream.write(b"operator failed\n")
+                return 2
+
+            try:
+                try:
+                    with mock.patch.object(
+                        campaign.build_authority,
+                        "_podman_environment",
+                        return_value={},
+                    ), mock.patch.object(
+                        campaign,
+                        "_run_campaign_container_process",
+                        side_effect=failed,
+                    ), mock.patch.object(
+                        campaign,
+                        "_cleanup_campaign_container",
+                        side_effect=campaign.CampaignError("rm failed"),
+                    ):
+                        campaign._execute_campaign_container(
+                            owned_container_command(authority),
+                            log,
+                            "run",
+                            authority,
+                        )
+                finally:
+                    campaign._finish_campaign_workspace(workspace)
+            except campaign.CampaignRecoveryRequired as error:
+                recovery = error
+            else:
+                self.fail("cleanup failure did not require recovery")
+            self.assertIn("exit 2", str(recovery))
+            self.assertIn("operator failed", str(recovery))
+            self.assertIn("rm failed", str(recovery))
+            self.assertIn(authority.token, str(recovery))
+            self.assertEqual(recovery.recovery_paths, [workspace])
+            self.assertTrue(workspace.is_dir())
+
+    def test_valid_marker_cannot_mask_cleanup_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            log = root / "container.log"
+            authority = campaign._new_campaign_container_authority(
+                log, "verify", invocation_token="b" * 64
+            )
+            digest = "a" * 64
+
+            def succeeded(_command, stream, _environment):
+                stream.write(
+                    f"CODESKEPTIC_QUALITY_FLOOR_INNER_VERIFY {digest}\n".encode()
+                )
+                return 0
+
+            with mock.patch.object(
+                campaign.build_authority, "_podman_environment", return_value={}
+            ), mock.patch.object(
+                campaign,
+                "_run_campaign_container_process",
+                side_effect=succeeded,
+            ), mock.patch.object(
+                campaign,
+                "_cleanup_campaign_container",
+                side_effect=campaign.CampaignError("rm failed"),
+            ), self.assertRaisesRegex(
+                campaign.CampaignRecoveryRequired, "rm failed"
+            ):
+                campaign._execute_campaign_container(
+                    owned_container_command(authority),
+                    log,
+                    "verify",
+                    authority,
+                )
+
+    def test_container_execution_rejects_stale_or_duplicate_authority(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            for label in ("stale", "duplicate"):
+                with self.subTest(label=label):
+                    log = root / f"{label}.log"
+                    authority = campaign._new_campaign_container_authority(
+                        log,
+                        "run",
+                        invocation_token=(
+                            "a" if label == "stale" else "b"
+                        ) * 64,
+                    )
+                    command = owned_container_command(authority)
+                    if label == "stale":
+                        authority.cidfile.write_text("c" * 64, encoding="ascii")
+                        expected = "appeared before launch"
+                    else:
+                        command.extend(["--name", "foreign"])
+                        expected = "authority drift"
+                    with mock.patch.object(
+                        campaign.build_authority,
+                        "_podman_environment",
+                        return_value={},
+                    ), mock.patch.object(
+                        campaign, "_run_campaign_container_process"
+                    ) as invoked, self.assertRaisesRegex(
+                        campaign.CampaignError, expected
+                    ):
+                        campaign._execute_campaign_container(
+                            command, log, "run", authority
+                        )
+                    invoked.assert_not_called()
+
+    def test_cidfile_framing_and_identity_are_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            exact = root / "exact.cid"
+            exact.write_text("a" * 64, encoding="ascii")
+            value, metadata = campaign._campaign_cidfile(exact)
+            self.assertEqual(value, "a" * 64)
+            self.assertIsNotNone(metadata)
+
+            newline = root / "newline.cid"
+            newline.write_text("b" * 64 + "\n", encoding="ascii")
+            with self.assertRaisesRegex(
+                campaign.CampaignError, "malformed"
+            ):
+                campaign._campaign_cidfile(newline)
+
+            linked = root / "linked.cid"
+            os.link(exact, linked)
+            with self.assertRaisesRegex(
+                campaign.CampaignError, "malformed"
+            ):
+                campaign._campaign_cidfile(exact)
+
+            symlink = root / "symlink.cid"
+            symlink.symlink_to(newline.name)
+            with self.assertRaisesRegex(
+                campaign.CampaignError, "malformed"
+            ):
+                campaign._campaign_cidfile(symlink)
+
+    def test_cidfile_in_place_mutation_prevents_unlink(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            cidfile = temporary_root(directory) / "container.cid"
+            cidfile.write_text("a" * 64, encoding="ascii")
+            expected, metadata = campaign._campaign_cidfile(cidfile)
+            cidfile.write_text("b" * 64, encoding="ascii")
+            with self.assertRaisesRegex(
+                campaign.CampaignError, "identity drift"
+            ):
+                campaign._unlink_campaign_cidfile(
+                    cidfile, metadata, expected
+                )
+            self.assertTrue(cidfile.is_file())
+
+    def test_cidfile_quarantine_preserves_concurrent_foreign_replacement(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            cidfile = root / "container.cid"
+            cidfile.write_text("a" * 64, encoding="ascii")
+            expected, metadata = campaign._campaign_cidfile(cidfile)
+            real_rename = campaign._rename_noreplace_at
+            injected = False
+
+            def rename_then_replace(
+                source_directory,
+                source,
+                destination_directory,
+                destination,
+            ):
+                nonlocal injected
+                real_rename(
+                    source_directory,
+                    source,
+                    destination_directory,
+                    destination,
+                )
+                if not injected and destination.startswith(
+                    ".codeskeptic-quality-cid-cleanup-"
+                ):
+                    injected = True
+                    cidfile.write_text("foreign", encoding="ascii")
+
+            with mock.patch.object(
+                campaign,
+                "_rename_noreplace_at",
+                side_effect=rename_then_replace,
+            ), self.assertRaisesRegex(
+                campaign.CampaignError, "foreign replacement|was replaced"
+            ):
+                campaign._unlink_campaign_cidfile(
+                    cidfile, metadata, expected
+                )
+            self.assertEqual(
+                cidfile.read_text(encoding="ascii"), "foreign"
+            )
+            quarantines = list(
+                root.glob(".codeskeptic-quality-cid-cleanup-*")
+            )
+            self.assertEqual(len(quarantines), 1)
+            self.assertEqual(
+                quarantines[0].read_text(encoding="ascii"), "a" * 64
+            )
+
+    def test_cleanup_podman_control_uses_closed_environment_and_hard_bound(
+        self,
+    ) -> None:
+        environment = {"CLOSED_PODMAN_ENV": "1"}
+        completed = subprocess.CompletedProcess([], 0, b"{}", b"")
+        with mock.patch.object(
+            campaign.build_authority,
+            "_podman_environment",
+            return_value=environment,
+        ), mock.patch.object(
+            campaign,
+            "_run_bounded_campaign_control",
+            return_value=completed,
+        ) as bounded:
+            self.assertIs(
+                campaign._campaign_podman_control(
+                    "/usr/bin/podman", ["container", "exists", "fixture"]
+                ),
+                completed,
+            )
+        self.assertIs(bounded.call_args.args[1], environment)
+        self.assertEqual(
+            bounded.call_args.args[0],
+            [
+                "/usr/bin/podman",
+                "--events-backend=none",
+                "container",
+                "exists",
+                "fixture",
+            ],
+        )
+
+        with mock.patch.object(
+            campaign, "CAMPAIGN_CONTAINER_CONTROL_OUTPUT_BYTES", 64
+        ), self.assertRaisesRegex(
+            campaign.CampaignError, "output is oversized"
+        ):
+            campaign._run_bounded_campaign_control(
+                [
+                    sys.executable,
+                    "-c",
+                    "import sys; sys.stdout.buffer.write(b'x' * 65)",
+                ],
+                {},
+            )
 
     @unittest.skipUnless(
         hasattr(os, "fork") and Path("/proc").is_dir(),
@@ -2836,9 +3475,10 @@ class QualityFloorCampaignTest(unittest.TestCase):
             if controller == 0:  # pragma: no cover - result is checked by parent.
                 try:
                     with campaign._campaign_signal_guard(enabled=True):
-                        campaign._execute_campaign_container(
-                            [str(launcher)], log, "run"
-                        )
+                        with log.open("xb") as stream:
+                            campaign._run_campaign_container_process(
+                                [str(launcher)], stream, {}
+                            )
                 except campaign.CampaignInterrupted as error:
                     os._exit(128 + error.signum)
                 except BaseException:
@@ -2866,6 +3506,132 @@ class QualityFloorCampaignTest(unittest.TestCase):
                 self.assertFalse(Path(f"/proc/{pid}").exists())
 
     @unittest.skipUnless(
+        os.environ.get("CODESKEPTIC_REAL_PODMAN_TEST") == "1"
+        and hasattr(os, "fork")
+        and Path("/proc").is_dir(),
+        "real Podman interruption regression is opt-in",
+    )
+    def test_real_podman_sigterm_removes_exact_cid_and_name(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            log = root / "container.log"
+            authority = campaign._new_campaign_container_authority(
+                log, "run"
+            )
+            command = [
+                os.fspath(campaign.build_authority.DEFAULT_PODMAN),
+                "--cgroup-manager=cgroupfs",
+                "--conmon=/usr/bin/conmon",
+                "--events-backend=none",
+                "--hooks-dir=/usr/share/empty",
+                "--runtime=/usr/bin/crun",
+                "run",
+                "--cidfile",
+                os.fspath(authority.cidfile),
+                "--name",
+                authority.name,
+                "--label",
+                (
+                    f"{campaign.CAMPAIGN_CONTAINER_TOKEN_LABEL}="
+                    f"{authority.token}"
+                ),
+                "--rm",
+                "--pull=never",
+                "--network=none",
+                "--http-proxy=false",
+                "--env-host=false",
+                "--image-volume=ignore",
+                "--read-only",
+                "--cap-drop=all",
+                "--security-opt",
+                "label=disable",
+                "--security-opt",
+                "no-new-privileges",
+                campaign.build_authority.PINNED_IMAGE,
+                "/usr/bin/python3",
+                "-c",
+                "import time; time.sleep(30)",
+            ]
+            controller = os.fork()
+            if controller == 0:  # pragma: no cover - checked by parent.
+                try:
+                    campaign.CAMPAIGN_CONTAINER_CONTROL_TIMEOUT_SECONDS = 10.0
+                    with campaign._campaign_signal_guard(enabled=True):
+                        campaign._execute_campaign_container(
+                            command, log, "run", authority
+                        )
+                except campaign.CampaignInterrupted as error:
+                    os._exit(128 + error.signum)
+                except BaseException:
+                    os._exit(250)
+                os._exit(0)
+
+            container_id: str | None = None
+            try:
+                deadline = time.monotonic() + 20
+                while time.monotonic() < deadline:
+                    if authority.cidfile.is_file():
+                        container_id, _metadata = campaign._campaign_cidfile(
+                            authority.cidfile
+                        )
+                        break
+                    waited, status = os.waitpid(controller, os.WNOHANG)
+                    if waited == controller:
+                        self.fail(
+                            "real Podman controller exited before creating a CID "
+                            f"(status={status})"
+                        )
+                    time.sleep(0.05)
+                self.assertIsNotNone(container_id)
+                os.kill(controller, signal.SIGTERM)
+                deadline = time.monotonic() + 30
+                while True:
+                    waited, status = os.waitpid(controller, os.WNOHANG)
+                    if waited == controller:
+                        break
+                    if time.monotonic() >= deadline:
+                        os.kill(controller, signal.SIGKILL)
+                        os.waitpid(controller, 0)
+                        self.fail("real Podman interruption cleanup timed out")
+                    time.sleep(0.05)
+                self.assertTrue(os.WIFEXITED(status))
+                self.assertEqual(
+                    os.WEXITSTATUS(status), 128 + signal.SIGTERM
+                )
+                self.assertFalse(authority.cidfile.exists())
+                self.assertIsNone(
+                    campaign._inspect_campaign_container(
+                        os.fspath(campaign.build_authority.DEFAULT_PODMAN),
+                        container_id,
+                    )
+                )
+                self.assertIsNone(
+                    campaign._inspect_campaign_container(
+                        os.fspath(campaign.build_authority.DEFAULT_PODMAN),
+                        authority.name,
+                    )
+                )
+            finally:
+                try:
+                    waited, _status = os.waitpid(controller, os.WNOHANG)
+                except ChildProcessError:
+                    waited = controller
+                if waited == 0:
+                    os.kill(controller, signal.SIGKILL)
+                    os.waitpid(controller, 0)
+                try:
+                    campaign._cleanup_campaign_container(
+                        cidfile=authority.cidfile,
+                        podman=os.fspath(
+                            campaign.build_authority.DEFAULT_PODMAN
+                        ),
+                        name=authority.name,
+                        token=authority.token,
+                    )
+                except campaign.CampaignError:
+                    pass
+
+    @unittest.skipUnless(
         hasattr(os, "fork") and Path("/proc").is_dir(),
         "descendant containment requires Linux fork and procfs",
     )
@@ -2890,7 +3656,10 @@ class QualityFloorCampaignTest(unittest.TestCase):
             with self.assertRaisesRegex(
                 campaign.CampaignError, "detached descendant"
             ):
-                campaign._execute_campaign_container([str(launcher)], log, "run")
+                with log.open("xb") as stream:
+                    campaign._run_campaign_container_process(
+                        [str(launcher)], stream, {}
+                    )
             self.assertTrue(detached_path.is_file())
             detached = int(detached_path.read_text(encoding="ascii"))
             self.assertFalse(Path(f"/proc/{detached}").exists())
@@ -2907,9 +3676,10 @@ class QualityFloorCampaignTest(unittest.TestCase):
                 with self.assertRaisesRegex(
                     campaign.CampaignError, "pre-existing child"
                 ):
-                    campaign._execute_campaign_container(
-                        ["/usr/bin/false"], log, "run"
-                    )
+                    with log.open("xb") as stream:
+                        campaign._run_campaign_container_process(
+                            ["/usr/bin/false"], stream, {}
+                        )
                 self.assertIsNone(child.poll())
         finally:
             child.terminate()
@@ -2940,6 +3710,9 @@ class QualityFloorCampaignTest(unittest.TestCase):
             log = temporary_root(directory) / "container.log"
             digest = "1" * 64
             environment = {"CLOSED_PODMAN_ENV": "1"}
+            container_authority = campaign._new_campaign_container_authority(
+                log, "verify", invocation_token="f" * 64
+            )
 
             def fake_run(_command, stream, _environment):
                 stream.write(
@@ -2961,10 +3734,15 @@ class QualityFloorCampaignTest(unittest.TestCase):
                 return_value=environment,
             ), mock.patch.object(
                 campaign, "_run_campaign_container_process", side_effect=fake_run
-            ) as invoked:
+            ) as invoked, mock.patch.object(
+                campaign, "_cleanup_campaign_container"
+            ):
                 self.assertEqual(
                     campaign._execute_campaign_container(
-                        ["/usr/bin/podman"], log, "verify"
+                        owned_container_command(container_authority),
+                        log,
+                        "verify",
+                        container_authority,
                     ),
                     digest,
                 )
@@ -3122,8 +3900,12 @@ class QualityFloorCampaignTest(unittest.TestCase):
             receipt = {"status": "accepted"}
             order: list[str] = []
 
-            def execute(command, _log, action):
+            def execute(command, _log, action, container_authority):
                 self.assertEqual(action, "run")
+                self.assertEqual(
+                    command[command.index("--name") + 1],
+                    container_authority.name,
+                )
                 stage_mount = next(
                     command[index + 1]
                     for index, token in enumerate(command[:-1])
