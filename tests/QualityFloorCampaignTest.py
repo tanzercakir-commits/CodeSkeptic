@@ -8,9 +8,12 @@ import hashlib
 import io
 import json
 import os
+import signal
 import shutil
+import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from contextlib import redirect_stderr
 from pathlib import Path
@@ -2054,6 +2057,27 @@ class QualityFloorCampaignTest(unittest.TestCase):
                 self.assertEqual(campaign.main(), 2)
             self.assertIn("QUALITY_FLOOR_CAMPAIGN_UNAVAILABLE", stderr.getvalue())
 
+    def test_main_reports_interruption_and_recovery_workspace(self) -> None:
+        argv = [
+            "assemble",
+            "--source", "/does/not/matter",
+            "--build-authority", "/does/not/matter",
+            "--build-dir", "/does/not/matter",
+            "--package", "/does/not/matter",
+        ]
+        interrupted = campaign.CampaignInterrupted(signal.SIGTERM)
+        interrupted.recovery_paths.append(Path("/tmp/private-recovery"))
+        interrupted.cleanup_failures.append("descendant cleanup incomplete")
+        stderr = io.StringIO()
+        with mock.patch.object(
+            campaign, "assemble_campaign", side_effect=interrupted
+        ), redirect_stderr(stderr):
+            self.assertEqual(campaign.main(argv), 128 + signal.SIGTERM)
+        detail = stderr.getvalue()
+        self.assertIn("QUALITY_FLOOR_CAMPAIGN_INTERRUPTED signal=15", detail)
+        self.assertIn("recovery=/tmp/private-recovery", detail)
+        self.assertIn("cleanup_failed=descendant cleanup incomplete", detail)
+
     def test_cli_requires_build_authority_and_build_directory_arguments(self) -> None:
         commands = (
             [
@@ -2769,20 +2793,127 @@ class QualityFloorCampaignTest(unittest.TestCase):
             ):
                 log = root / f"{label}.log"
 
-                def fake_run(_command, **kwargs):
-                    kwargs["stdout"].write(output)
-                    return mock.Mock(returncode=returncode)
+                def fake_run(_command, stream, _environment):
+                    stream.write(output)
+                    return returncode
 
                 with self.subTest(label=label), mock.patch.object(
                     campaign.build_authority,
                     "_podman_environment",
                     return_value={},
                 ), mock.patch.object(
-                    campaign.subprocess, "run", side_effect=fake_run
+                    campaign, "_run_campaign_container_process", side_effect=fake_run
                 ), self.assertRaisesRegex(campaign.CampaignError, error):
                     campaign._execute_campaign_container(
                         ["/usr/bin/podman"], log, "run"
                     )
+
+    @unittest.skipUnless(
+        hasattr(os, "fork") and Path("/proc").is_dir(),
+        "SIGTERM containment requires Linux fork and procfs",
+    )
+    def test_sigterm_cleans_detached_campaign_container_descendants(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            leader_path = root / "leader.pid"
+            detached_path = root / "detached.pid"
+            launcher = root / "launcher.py"
+            launcher.write_text(
+                "#!/usr/bin/python3\n"
+                "import os,time\n"
+                f"open({str(leader_path)!r},'w').write(str(os.getpid()))\n"
+                "child=os.fork()\n"
+                "if child == 0:\n"
+                " os.setsid()\n"
+                f" open({str(detached_path)!r},'w').write(str(os.getpid()))\n"
+                " time.sleep(30)\n"
+                "time.sleep(30)\n",
+                encoding="utf-8",
+            )
+            launcher.chmod(0o755)
+            log = root / "container.log"
+            controller = os.fork()
+            if controller == 0:  # pragma: no cover - result is checked by parent.
+                try:
+                    with campaign._campaign_signal_guard(enabled=True):
+                        campaign._execute_campaign_container(
+                            [str(launcher)], log, "run"
+                        )
+                except campaign.CampaignInterrupted as error:
+                    os._exit(128 + error.signum)
+                except BaseException:
+                    os._exit(250)
+                os._exit(0)
+
+            deadline = time.monotonic() + 3
+            while (
+                not leader_path.is_file() or not detached_path.is_file()
+            ) and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertTrue(leader_path.is_file())
+            self.assertTrue(detached_path.is_file())
+            os.kill(controller, signal.SIGTERM)
+            waited, status = os.waitpid(controller, 0)
+            self.assertEqual(waited, controller)
+            self.assertTrue(os.WIFEXITED(status))
+            self.assertEqual(os.WEXITSTATUS(status), 128 + signal.SIGTERM)
+            for path in (leader_path, detached_path):
+                pid = int(path.read_text(encoding="ascii"))
+                for _attempt in range(100):
+                    if not Path(f"/proc/{pid}").exists():
+                        break
+                    time.sleep(0.01)
+                self.assertFalse(Path(f"/proc/{pid}").exists())
+
+    @unittest.skipUnless(
+        hasattr(os, "fork") and Path("/proc").is_dir(),
+        "descendant containment requires Linux fork and procfs",
+    )
+    def test_success_marker_with_detached_descendant_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            detached_path = root / "detached.pid"
+            launcher = root / "launcher.py"
+            launcher.write_text(
+                "#!/usr/bin/python3\n"
+                "import os,time\n"
+                "child=os.fork()\n"
+                "if child == 0:\n"
+                " os.setsid()\n"
+                f" open({str(detached_path)!r},'w').write(str(os.getpid()))\n"
+                " time.sleep(30)\n"
+                "os._exit(0)\n",
+                encoding="utf-8",
+            )
+            launcher.chmod(0o755)
+            log = root / "container.log"
+            with self.assertRaisesRegex(
+                campaign.CampaignError, "detached descendant"
+            ):
+                campaign._execute_campaign_container([str(launcher)], log, "run")
+            self.assertTrue(detached_path.is_file())
+            detached = int(detached_path.read_text(encoding="ascii"))
+            self.assertFalse(Path(f"/proc/{detached}").exists())
+
+    @unittest.skipUnless(
+        os.name == "posix" and Path("/proc").is_dir(),
+        "child authority requires Linux procfs",
+    )
+    def test_preexisting_child_is_rejected_without_being_killed(self) -> None:
+        child = subprocess.Popen(["/usr/bin/sleep", "30"])
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                log = temporary_root(directory) / "container.log"
+                with self.assertRaisesRegex(
+                    campaign.CampaignError, "pre-existing child"
+                ):
+                    campaign._execute_campaign_container(
+                        ["/usr/bin/false"], log, "run"
+                    )
+                self.assertIsNone(child.poll())
+        finally:
+            child.terminate()
+            child.wait(timeout=3)
 
     def test_container_failure_detail_is_bounded_escaped_and_last_line_only(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -2810,11 +2941,11 @@ class QualityFloorCampaignTest(unittest.TestCase):
             digest = "1" * 64
             environment = {"CLOSED_PODMAN_ENV": "1"}
 
-            def fake_run(_command, **kwargs):
-                kwargs["stdout"].write(
+            def fake_run(_command, stream, _environment):
+                stream.write(
                     f"CODESKEPTIC_QUALITY_FLOOR_INNER_VERIFY {digest}\n".encode()
                 )
-                return mock.Mock(returncode=0)
+                return 0
 
             with mock.patch.dict(
                 campaign.os.environ,
@@ -2829,7 +2960,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
                 "_podman_environment",
                 return_value=environment,
             ), mock.patch.object(
-                campaign.subprocess, "run", side_effect=fake_run
+                campaign, "_run_campaign_container_process", side_effect=fake_run
             ) as invoked:
                 self.assertEqual(
                     campaign._execute_campaign_container(
@@ -2837,7 +2968,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
                     ),
                     digest,
                 )
-            self.assertIs(invoked.call_args.kwargs["env"], environment)
+            self.assertIs(invoked.call_args.args[2], environment)
 
     @unittest.skipUnless(
         os.name == "posix", "Podman bind mounts require POSIX"
@@ -2903,6 +3034,58 @@ class QualityFloorCampaignTest(unittest.TestCase):
             for mount in writable_mounts:
                 host = Path(mount.split(":", 1)[0])
                 self.assertIn(root, host.parents)
+
+    def test_interrupted_public_run_retains_private_recovery_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            source = root / "source"
+            build_dir = root / "build"
+            authority = root / "authority"
+            juliet = root / "juliet"
+            libarchive = root / "libarchive"
+            for path in (source, build_dir, authority, juliet, libarchive):
+                path.mkdir()
+            archive = root / "juliet.zip"
+            archive.write_bytes(b"archive")
+            output = root / "campaign"
+            snapshot = {
+                "source": source,
+                "build_dir": build_dir,
+                "build_authority_dir": authority,
+                "build_record": {
+                    "runtime": {
+                        "normalized_argv": (
+                            campaign.build_authority._normalized_container_argv(
+                                "produce"
+                            )
+                        )
+                    }
+                },
+                "launch": {"schema": "test-launch"},
+            }
+            interrupted = campaign.CampaignInterrupted(signal.SIGTERM)
+            with mock.patch.object(
+                campaign, "_outer_snapshot", return_value=snapshot
+            ), mock.patch.object(
+                campaign,
+                "_execute_campaign_container",
+                side_effect=interrupted,
+            ), self.assertRaises(campaign.CampaignInterrupted):
+                campaign.run_campaign(
+                    source,
+                    authority,
+                    build_dir,
+                    juliet,
+                    archive,
+                    libarchive,
+                    output,
+                    jobs=1,
+                )
+            self.assertFalse(output.exists())
+            retained = list(root.glob(".campaign.campaign-*"))
+            self.assertEqual(retained, interrupted.recovery_paths)
+            self.assertEqual(len(retained), 1)
+            self.assertTrue(retained[0].is_dir())
 
     @unittest.skipUnless(
         os.name == "posix", "Podman bind mounts require POSIX"

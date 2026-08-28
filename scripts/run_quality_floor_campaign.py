@@ -31,12 +31,16 @@ import os
 import re
 import shlex
 import shutil
+import signal
 import stat
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import uuid
 from collections import Counter
+from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Sequence
 
@@ -151,10 +155,135 @@ AUTHORITY_INPUT_PATHS = (
 CAPABILITY_REGISTRY_RELATIVE = "src/core/RuleCapabilities.def"
 BUILD_AUTHORITY_RAW_DIR = "build-authority"
 CAMPAIGN_CONTAINER_LAYOUTS = ("legacy", "p10-09")
+PUBLIC_ACTIONS = frozenset({"run", "assemble", "verify"})
+CAMPAIGN_CHILD_GRACE_SECONDS = 2.0
 
 
 class CampaignError(RuntimeError):
     """Raw evidence is absent, ambiguous, stale, or internally inconsistent."""
+
+
+class CampaignInterrupted(BaseException):
+    """A public campaign action was interrupted after controlled cleanup."""
+
+    def __init__(self, signum: int) -> None:
+        super().__init__(f"campaign interrupted by signal {signum}")
+        self.signum = signum
+        self.recovery_paths: list[Path] = []
+        self.cleanup_failures: list[str] = []
+
+
+def _campaign_children() -> dict[int, int]:
+    known: dict[int, int] = {}
+    realworld._refresh_descendants(os.getpid(), known)
+    return known
+
+
+def _campaign_children_quiescent() -> bool:
+    known = _campaign_children()
+    alive = any(
+        realworld._pid_matches(pid, started)
+        for pid, started in known.items()
+    )
+    return realworld._child_table_empty() and not alive
+
+
+def _wait_for_campaign_children(timeout_seconds: float) -> bool:
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        if _campaign_children_quiescent():
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.01)
+
+
+def _terminate_campaign_children() -> None:
+    known = _campaign_children()
+    controller_group = os.getpgrp()
+    for signal_number, timeout_seconds in (
+        (signal.SIGTERM, 0.25),
+        (signal.SIGKILL, 1.0),
+    ):
+        deadline = time.monotonic() + timeout_seconds
+        while True:
+            realworld._refresh_descendants(os.getpid(), known)
+            groups: set[int] = set()
+            for pid, started in list(known.items()):
+                record = realworld._proc_record(pid)
+                if record is None or record[2] != started:
+                    continue
+                if record[1] != controller_group:
+                    groups.add(record[1])
+            for group in groups:
+                try:
+                    os.killpg(group, signal_number)
+                except ProcessLookupError:
+                    pass
+            for pid, started in list(known.items()):
+                if realworld._pid_matches(pid, started):
+                    try:
+                        os.kill(pid, signal_number)
+                    except ProcessLookupError:
+                        pass
+            realworld._child_table_empty()
+            if _campaign_children_quiescent():
+                return
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(0.01)
+    survivors = sorted(
+        pid
+        for pid, started in known.items()
+        if realworld._pid_matches(pid, started)
+    )
+    if survivors or not realworld._child_table_empty():
+        raise CampaignError("campaign descendant cleanup was incomplete")
+
+
+@contextmanager
+def _campaign_signal_guard(*, enabled: bool):
+    if not enabled:
+        yield
+        return
+    if (
+        os.name != "posix"
+        or not Path("/proc").is_dir()
+        or threading.current_thread() is not threading.main_thread()
+    ):
+        raise CampaignError(
+            "public campaign interruption containment requires a Linux main thread"
+        )
+    if not realworld._enable_subreaper():
+        raise CampaignError("public campaign could not establish subreaper authority")
+    try:
+        realworld._require_empty_child_table()
+    except realworld.EvidenceError as error:
+        raise CampaignError(str(error)) from error
+    handled = (signal.SIGTERM, signal.SIGHUP)
+    previous = {number: signal.getsignal(number) for number in handled}
+
+    def interrupt(signum: int, _frame: object) -> None:
+        for number in handled:
+            signal.signal(number, signal.SIG_IGN)
+        raise CampaignInterrupted(signum)
+
+    for number in handled:
+        signal.signal(number, interrupt)
+    try:
+        yield
+        if not _wait_for_campaign_children(CAMPAIGN_CHILD_GRACE_SECONDS):
+            _terminate_campaign_children()
+            raise CampaignError("public campaign action left a descendant alive")
+    except CampaignInterrupted as error:
+        try:
+            _terminate_campaign_children()
+        except CampaignError as cleanup_error:
+            error.cleanup_failures.append(str(cleanup_error))
+        raise
+    finally:
+        for number, handler in previous.items():
+            signal.signal(number, handler)
 
 
 def canonical_json(value: Any) -> bytes:
@@ -3914,6 +4043,51 @@ def _campaign_container_command(
     return _expand_campaign_argv(normalized, bindings)
 
 
+def _run_campaign_container_process(
+    command: Sequence[str], stream: Any, environment: dict[str, str]
+) -> int:
+    if not realworld._enable_subreaper():
+        raise CampaignError("campaign container could not establish subreaper authority")
+    try:
+        realworld._require_empty_child_table()
+    except realworld.EvidenceError as error:
+        raise CampaignError(str(error)) from error
+    process: subprocess.Popen[bytes] | None = None
+    try:
+        process = subprocess.Popen(
+            list(command),
+            stdin=subprocess.DEVNULL,
+            stdout=stream,
+            stderr=subprocess.STDOUT,
+            env=environment,
+            start_new_session=True,
+        )
+        returncode = process.wait()
+    except BaseException as error:
+        try:
+            _terminate_campaign_children()
+        except CampaignError as cleanup_error:
+            if isinstance(error, CampaignInterrupted):
+                error.cleanup_failures.append(str(cleanup_error))
+                raise error
+            raise CampaignError(
+                f"campaign container execution failed: {error}; "
+                f"cleanup failed: {cleanup_error}"
+            ) from error
+        raise
+    if not _wait_for_campaign_children(CAMPAIGN_CHILD_GRACE_SECONDS):
+        cleanup_error: CampaignError | None = None
+        try:
+            _terminate_campaign_children()
+        except CampaignError as error:
+            cleanup_error = error
+        detail = "campaign container left a detached descendant alive"
+        if cleanup_error is not None:
+            detail += f"; cleanup failed: {cleanup_error}"
+        raise CampaignError(detail)
+    return returncode
+
+
 def _execute_campaign_container(
     command: Sequence[str], log: Path, action: str
 ) -> str:
@@ -3925,19 +4099,15 @@ def _execute_campaign_container(
         ) from error
     try:
         with log.open("xb") as stream:
-            completed = subprocess.run(
-                list(command),
-                check=False,
-                stdout=stream,
-                stderr=subprocess.STDOUT,
-                env=environment,
+            returncode = _run_campaign_container_process(
+                command, stream, environment
             )
     except OSError as error:
         raise CampaignError(f"cannot launch pinned campaign container: {error}") from error
-    if completed.returncode != 0:
+    if returncode != 0:
         detail = _campaign_failure_detail(log)
         raise CampaignError(
-            f"pinned campaign container failed with exit {completed.returncode}; "
+            f"pinned campaign container failed with exit {returncode}; "
             f"last diagnostic: {detail}"
         )
     if not log.is_file() or not 0 < log.stat().st_size <= MAX_CAMPAIGN_LOG_BYTES:
@@ -4140,6 +4310,15 @@ def _cleanup_workspace(workspace: Path) -> None:
             # Promotion, when it occurred, was already atomic.  A private residue
             # must not turn a complete published package into a reported failure.
             pass
+
+
+def _finish_campaign_workspace(workspace: Path) -> None:
+    active = sys.exc_info()[1]
+    if isinstance(active, CampaignInterrupted):
+        if workspace.is_dir() and not workspace.is_symlink():
+            active.recovery_paths.append(workspace)
+        return
+    _cleanup_workspace(workspace)
 
 
 def _inner_environment(
@@ -4896,7 +5075,7 @@ def run_campaign(
         )
         return verified
     finally:
-        _cleanup_workspace(staging)
+        _finish_campaign_workspace(staging)
 
 
 def assemble_campaign(
@@ -4979,7 +5158,7 @@ def assemble_campaign(
         )
         return verified
     finally:
-        _cleanup_workspace(staging)
+        _finish_campaign_workspace(staging)
 
 
 def verify_campaign(
@@ -5023,7 +5202,7 @@ def verify_campaign(
             raise CampaignError("campaign package changed after public verification")
         return receipt
     finally:
-        _cleanup_workspace(staging)
+        _finish_campaign_workspace(staging)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -5091,87 +5270,106 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _dispatch(args: argparse.Namespace) -> int:
+    if args.action == "run":
+        receipt = run_campaign(
+            args.source,
+            args.build_authority,
+            args.build_dir,
+            args.juliet_dir,
+            args.juliet_archive,
+            args.libarchive_checkout,
+            args.output,
+            jobs=args.jobs,
+        )
+    elif args.action == "assemble":
+        receipt = assemble_campaign(
+            args.source,
+            args.build_authority,
+            args.build_dir,
+            args.package,
+        )
+    elif args.action == "verify":
+        receipt = verify_campaign(
+            args.source,
+            args.build_authority,
+            args.build_dir,
+            args.package,
+            require_accepted=not args.allow_rejected,
+        )
+    elif args.action == "_inner-run":
+        _inner_run(
+            args.source,
+            args.build_authority,
+            args.build_dir,
+            args.juliet_dir,
+            args.juliet_archive,
+            args.libarchive_checkout,
+            args.output,
+            args.launch_authority,
+            args.jobs,
+        )
+        print(
+            "CODESKEPTIC_QUALITY_FLOOR_INNER_RUN "
+            + sha256_file(args.output / "receipt.json")
+        )
+        return 0
+    elif args.action == "_inner-assemble":
+        _inner_assemble(
+            args.source,
+            args.build_authority,
+            args.build_dir,
+            args.package,
+            args.launch_authority,
+        )
+        print(
+            "CODESKEPTIC_QUALITY_FLOOR_INNER_ASSEMBLE "
+            + sha256_file(args.package / "receipt.json")
+        )
+        return 0
+    else:
+        _inner_verify(
+            args.source,
+            args.build_authority,
+            args.build_dir,
+            args.package,
+            args.launch_authority,
+            require_accepted=not args.allow_rejected,
+        )
+        print(
+            "CODESKEPTIC_QUALITY_FLOOR_INNER_VERIFY "
+            + sha256_file(args.package / "receipt.json")
+        )
+        return 0
+    if receipt["status"] != "accepted":
+        print(
+            "QUALITY_FLOOR_CAMPAIGN_REJECTED " + "; ".join(receipt["failures"]),
+            file=sys.stderr,
+        )
+        return 2
+    print("QUALITY_FLOOR_CAMPAIGN_ACCEPTED")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        if args.action == "run":
-            receipt = run_campaign(
-                args.source,
-                args.build_authority,
-                args.build_dir,
-                args.juliet_dir,
-                args.juliet_archive,
-                args.libarchive_checkout,
-                args.output,
-                jobs=args.jobs,
+        with _campaign_signal_guard(enabled=args.action in PUBLIC_ACTIONS):
+            return _dispatch(args)
+    except CampaignInterrupted as error:
+        details = [
+            f"QUALITY_FLOOR_CAMPAIGN_INTERRUPTED signal={error.signum}"
+        ]
+        if error.recovery_paths:
+            details.append(
+                "recovery=" + ",".join(map(str, error.recovery_paths))
             )
-        elif args.action == "assemble":
-            receipt = assemble_campaign(
-                args.source,
-                args.build_authority,
-                args.build_dir,
-                args.package,
+        if error.cleanup_failures:
+            details.append(
+                "cleanup_failed=" + "; ".join(error.cleanup_failures)
             )
-        elif args.action == "verify":
-            receipt = verify_campaign(
-                args.source,
-                args.build_authority,
-                args.build_dir,
-                args.package,
-                require_accepted=not args.allow_rejected,
-            )
-        elif args.action == "_inner-run":
-            receipt = _inner_run(
-                args.source,
-                args.build_authority,
-                args.build_dir,
-                args.juliet_dir,
-                args.juliet_archive,
-                args.libarchive_checkout,
-                args.output,
-                args.launch_authority,
-                args.jobs,
-            )
-            print(
-                "CODESKEPTIC_QUALITY_FLOOR_INNER_RUN "
-                + sha256_file(args.output / "receipt.json")
-            )
-            return 0
-        elif args.action == "_inner-assemble":
-            receipt = _inner_assemble(
-                args.source,
-                args.build_authority,
-                args.build_dir,
-                args.package,
-                args.launch_authority,
-            )
-            print(
-                "CODESKEPTIC_QUALITY_FLOOR_INNER_ASSEMBLE "
-                + sha256_file(args.package / "receipt.json")
-            )
-            return 0
-        else:
-            receipt = _inner_verify(
-                args.source,
-                args.build_authority,
-                args.build_dir,
-                args.package,
-                args.launch_authority,
-                require_accepted=not args.allow_rejected,
-            )
-            print(
-                "CODESKEPTIC_QUALITY_FLOOR_INNER_VERIFY "
-                + sha256_file(args.package / "receipt.json")
-            )
-            return 0
-        if receipt["status"] != "accepted":
-            print(
-                "QUALITY_FLOOR_CAMPAIGN_REJECTED " + "; ".join(receipt["failures"]),
-                file=sys.stderr,
-            )
-            return 2
-        print("QUALITY_FLOOR_CAMPAIGN_ACCEPTED")
-        return 0
+        print(" ".join(details), file=sys.stderr)
+        return 128 + error.signum
     except (CampaignError, quality.QualityFloorError, OSError) as error:
         print(f"QUALITY_FLOOR_CAMPAIGN_UNAVAILABLE {error}", file=sys.stderr)
         return 2
