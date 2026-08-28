@@ -1,0 +1,1 @@
+/home/runner/work/_temp/60288bde-bb2a-40ff-a4c7-2a9aaa4752b1.sh: line 7: ./build/src/codeskeptic: No such file or directory
