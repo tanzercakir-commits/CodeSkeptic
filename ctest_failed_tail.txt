@@ -1,0 +1,155 @@
+Test project D:/a/CodeSkeptic/CodeSkeptic/build
+    Start 1286: SanitizerContract
+1/2 Test #1286: SanitizerContract ................***Failed    8.60 sec
+......s......Ess
+======================================================================
+ERROR: test_source_manifest_matches_stability_staging_scope (__main__.SanitizerContractTest.test_source_manifest_matches_stability_staging_scope)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\SanitizerContractTest.py", line 249, in test_source_manifest_matches_stability_staging_scope
+    staging = load_staging()
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\SanitizerContractTest.py", line 53, in load_staging
+    spec.loader.exec_module(staging)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "<frozen importlib._bootstrap_external>", line 759, in exec_module
+  File "<frozen importlib._bootstrap>", line 491, in _call_with_frames_removed
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\stage_stability_campaign.py", line 11, in <module>
+    import fcntl
+ModuleNotFoundError: No module named 'fcntl'
+
+----------------------------------------------------------------------
+Ran 16 tests in 8.219s
+
+FAILED (errors=1, skipped=3)
+
+    Start 1290: QualityFloorCampaignContract
+2/2 Test #1290: QualityFloorCampaignContract .....***Failed   10.85 sec
+....s......FF.F.........ss........FE...F...............s..s...s..........s..s.....
+======================================================================
+ERROR: test_interrupted_public_run_retains_private_recovery_workspace (__main__.QualityFloorCampaignTest.test_interrupted_public_run_retains_private_recovery_workspace)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 3998, in test_interrupted_public_run_retains_private_recovery_workspace
+    campaign.run_campaign(
+    ~~~~~~~~~~~~~~~~~~~~~^
+        source,
+        ^^^^^^^
+    ...<6 lines>...
+        jobs=1,
+        ^^^^^^^
+    )
+    ^
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_quality_floor_campaign.py", line 5959, in run_campaign
+    command = _campaign_container_command(
+        "run",
+    ...<11 lines>...
+        build_record=snapshot["build_record"],
+    )
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_quality_floor_campaign.py", line 4294, in _campaign_container_command
+    "$CONTAINER_CIDFILE": _mount_path(
+                          ~~~~~~~~~~~^
+        container_authority.cidfile, "container ID file"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ),
+    ^
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_quality_floor_campaign.py", line 4232, in _mount_path
+    raise CampaignError(f"{label} path is unsafe for a Podman bind mount")
+run_quality_floor_campaign.CampaignError: container ID file path is unsafe for a Podman bind mount
+
+======================================================================
+FAIL: test_cidfile_in_place_mutation_prevents_unlink (__main__.QualityFloorCampaignTest.test_cidfile_in_place_mutation_prevents_unlink)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_quality_floor_campaign.py", line 4665, in _unlink_campaign_cidfile
+    parent_descriptor = os.open(cidfile.parent, parent_flags)
+PermissionError: [Errno 13] Permission denied: 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\tmpdwo2lsl3'
+
+The above exception was the direct cause of the following exception:
+
+run_quality_floor_campaign.CampaignError: cannot remove campaign container ID file: [Errno 13] Permission denied: 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\tmpdwo2lsl3'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 3491, in test_cidfile_in_place_mutation_prevents_unlink
+    with self.assertRaisesRegex(
+         ~~~~~~~~~~~~~~~~~~~~~~^
+        campaign.CampaignError, "identity drift"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+AssertionError: "identity drift" does not match "cannot remove campaign container ID file: [Errno 13] Permission denied: 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\tmpdwo2lsl3'"
+
+======================================================================
+FAIL: test_cidfile_quarantine_preserves_concurrent_foreign_replacement (__main__.QualityFloorCampaignTest.test_cidfile_quarantine_preserves_concurrent_foreign_replacement)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_quality_floor_campaign.py", line 4665, in _unlink_campaign_cidfile
+    parent_descriptor = os.open(cidfile.parent, parent_flags)
+PermissionError: [Errno 13] Permission denied: 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\tmp5lnah6_4'
+
+The above exception was the direct cause of the following exception:
+
+run_quality_floor_campaign.CampaignError: cannot remove campaign container ID file: [Errno 13] Permission denied: 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\tmp5lnah6_4'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 3533, in test_cidfile_quarantine_preserves_concurrent_foreign_replacement
+    ), self.assertRaisesRegex(
+       ~~~~~~~~~~~~~~~~~~~~~~^
+        campaign.CampaignError, "foreign replacement|was replaced"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+AssertionError: "foreign replacement|was replaced" does not match "cannot remove campaign container ID file: [Errno 13] Permission denied: 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\tmp5lnah6_4'"
+
+======================================================================
+FAIL: test_cleanup_podman_control_uses_closed_environment_and_hard_bound (__main__.QualityFloorCampaignTest.test_cleanup_podman_control_uses_closed_environment_and_hard_bound)
+----------------------------------------------------------------------
+run_quality_floor_campaign.CampaignError: campaign control could not establish subreaper authority
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 3584, in test_cleanup_podman_control_uses_closed_environment_and_hard_bound
+    ), self.assertRaisesRegex(
+       ~~~~~~~~~~~~~~~~~~~~~~^
+        campaign.CampaignError, "output is oversized"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+AssertionError: "output is oversized" does not match "campaign control could not establish subreaper authority"
+
+======================================================================
+FAIL: test_interrupted_container_removes_exact_owned_podman_object (__main__.QualityFloorCampaignTest.test_interrupted_container_removes_exact_owned_podman_object)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 3102, in test_interrupted_container_removes_exact_owned_podman_object
+    self.assertFalse(log.with_suffix(".log.cid").exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_main_reports_interruption_and_recovery_workspace (__main__.QualityFloorCampaignTest.test_main_reports_interruption_and_recovery_workspace)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 2094, in test_main_reports_interruption_and_recovery_workspace
+    self.assertEqual(campaign.main(argv), 128 + signal.SIGTERM)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 2 != 143
+
+----------------------------------------------------------------------
+Ran 82 tests in 9.960s
+
+FAILED (failures=5, errors=1, skipped=8)
+
+
+0% tests passed, 2 tests failed out of 2
+
+Total Test time (real) =  20.26 sec
+
+The following tests FAILED:
+	1286 - SanitizerContract (Failed)
+	1290 - QualityFloorCampaignContract (Failed)
+Errors while running CTest
