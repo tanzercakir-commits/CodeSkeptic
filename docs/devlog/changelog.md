@@ -133,6 +133,13 @@
   checksum-pinned 1.16 GiB release-candidate Git bundle without weakening the
   aggregate 16 GiB evidence ceiling or any other authority's default file-size
   guard.
+- Aligned the runtime sanitizer projection with the authoritative sanitizer
+  verifier's tripwire contract. The projected gate matrix now accepts the
+  verified profile-specific nonzero runtime exit (for example ASan `-6`, UBSan
+  `1`, or a bounded timeout code) while retaining exact integer exit codes for
+  every other gate, and binds the observed exit code into the projection
+  digest. A retained UBSan receipt regression prevents the address-only `-6`
+  assumption from blocking valid fault-binary authority again.
 
 ## 2026-08-22 — Phase 10.8 cumulative quality-floor audit (in progress)
 

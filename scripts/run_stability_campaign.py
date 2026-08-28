@@ -4004,7 +4004,6 @@ def project_sanitizer_receipt(
     ):
         raise StabilityError("sanitizer preparation matrix failed")
     expected_gate_codes = {
-        "runtime_tripwire": -6,
         "focused_serial_worker": 0,
         "ctest_complete": 0,
         "single_process_complete": 0,
@@ -4015,18 +4014,31 @@ def project_sanitizer_receipt(
         "mcp_sequential": 0,
         "fuzz_smoke": 0,
     }
+    expected_gate_names = {"runtime_tripwire", *expected_gate_codes}
     gates = value.get("gates")
-    if not isinstance(gates, list) or len(gates) != len(expected_gate_codes):
+    if not isinstance(gates, list) or len(gates) != len(expected_gate_names):
         raise StabilityError("sanitizer gate matrix is incomplete")
     observed_gate_codes: dict[str, Any] = {}
     for gate in gates:
         if not isinstance(gate, dict):
             raise StabilityError("sanitizer gate record is malformed")
         name = gate.get("name")
+        if not isinstance(name, str) or name not in expected_gate_names:
+            raise StabilityError("sanitizer gate matrix failed")
         if name in observed_gate_codes:
             raise StabilityError("sanitizer gate matrix contains duplicates")
         observed_gate_codes[name] = gate.get("exit_code")
-    if observed_gate_codes != expected_gate_codes:
+    tripwire_code = observed_gate_codes.get("runtime_tripwire")
+    if (
+        set(observed_gate_codes) != expected_gate_names
+        or type(tripwire_code) is not int
+        or tripwire_code == 0
+        or any(
+            type(observed_gate_codes.get(name)) is not int
+            or observed_gate_codes.get(name) != code
+            for name, code in expected_gate_codes.items()
+        )
+    ):
         raise StabilityError("sanitizer gate matrix failed")
     tsan = value.get("tsan")
     if (
@@ -4043,7 +4055,7 @@ def project_sanitizer_receipt(
         "source_manifest_sha256": expected_value["source_manifest_sha256"],
         "builds_sha256": builds_sha,
         "test_binary_sha256": test_binary_sha,
-        "gate_matrix_sha256": digest_json(expected_gate_codes),
+        "gate_matrix_sha256": digest_json(observed_gate_codes),
     }
 
 

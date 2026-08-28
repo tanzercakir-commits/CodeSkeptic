@@ -3613,6 +3613,50 @@ class InnerAuthorityProjectionContractTest(unittest.TestCase):
                 missing_binary, sanitizer_expected
             )
 
+    def test_undefined_sanitizer_projection_accepts_verified_nonzero_tripwire(
+        self,
+    ) -> None:
+        sanitizer_path = (
+            ROOT / "docs" / "evidence" / "phase10" / "sanitizers"
+            / "2026-08-15-cache-linux-x86_64" / "undefined"
+            / "receipt.json"
+        )
+        sanitizer = json.loads(sanitizer_path.read_text(encoding="utf-8"))
+        expected = {
+            "profile": "undefined",
+            "source_revision": sanitizer["source"]["base_commit"],
+            "source_manifest_sha256": sanitizer["source"]["manifest"][
+                "digest"
+            ],
+        }
+
+        projection = stability.project_sanitizer_receipt(sanitizer, expected)
+        observed_gate_codes = {
+            gate["name"]: gate["exit_code"] for gate in sanitizer["gates"]
+        }
+        self.assertEqual(projection["profile"], "undefined")
+        self.assertNotEqual(observed_gate_codes["runtime_tripwire"], 0)
+        self.assertEqual(
+            projection["gate_matrix_sha256"],
+            stability.digest_json(observed_gate_codes),
+        )
+
+        failed = copy.deepcopy(sanitizer)
+        next(
+            gate for gate in failed["gates"]
+            if gate["name"] == "runtime_tripwire"
+        )["exit_code"] = 0
+        with self.assertRaisesRegex(stability.StabilityError, "gate matrix"):
+            stability.project_sanitizer_receipt(failed, expected)
+
+        wrong_type = copy.deepcopy(sanitizer)
+        next(
+            gate for gate in wrong_type["gates"]
+            if gate["name"] == "analyzer_finding"
+        )["exit_code"] = True
+        with self.assertRaisesRegex(stability.StabilityError, "gate matrix"):
+            stability.project_sanitizer_receipt(wrong_type, expected)
+
     def test_fault_binary_is_exactly_linked_to_undefined_sanitizer_authority(self) -> None:
         config = runtime_config()
         projection = {
