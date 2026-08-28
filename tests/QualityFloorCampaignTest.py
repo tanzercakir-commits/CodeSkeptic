@@ -2720,6 +2720,42 @@ class QualityFloorCampaignTest(unittest.TestCase):
                 )
             verifier.assert_not_called()
 
+    def test_inner_launch_rejects_runtime_v1_before_any_verifier(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            _binary, build_dir, analyzer = _fake_build(root)
+            source = {"revision": "a" * 40, "manifest_sha256": "b" * 64}
+            authority_dir = _write_fake_build_authority(root)
+            receipt = _fake_build_receipt(source, analyzer)
+            launch_path, launch, _record = _fake_launch_authority(
+                root, authority_dir, receipt
+            )
+            launch["runtime"]["schema"] = campaign.CAMPAIGN_RUNTIME_V1_SCHEMA
+            launch["runtime"]["normalized_argv"] = (
+                campaign._normalized_campaign_argv_v1("run", 1)
+            )
+            launch["runtime"]["normalized_argv_sha256"] = (
+                campaign.compact_json_digest(
+                    launch["runtime"]["normalized_argv"]
+                )
+            )
+            campaign.write_json(launch_path, launch)
+            token = campaign.sha256_file(launch_path)
+            verifier = mock.Mock(side_effect=AssertionError("verifier invoked"))
+            with mock.patch.dict(
+                campaign.os.environ,
+                {campaign.CAMPAIGN_INNER_TOKEN_ENV: token},
+                clear=True,
+            ), mock.patch.object(
+                campaign.build_authority,
+                "verify_authority_in_current_runtime",
+                verifier,
+            ), self.assertRaisesRegex(campaign.CampaignError, "missing or stale"):
+                campaign._inner_launch_context(
+                    "run", launch_path, root, authority_dir, build_dir
+                )
+            verifier.assert_not_called()
+
     def test_launch_rejects_runtime_argv_and_mount_path_drift(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = temporary_root(directory)
@@ -2784,6 +2820,101 @@ class QualityFloorCampaignTest(unittest.TestCase):
                     juliet_archive=Path("/juliet.zip"),
                     libarchive_checkout=Path("/libarchive"),
                 )
+
+    def test_runtime_v1_is_frozen_and_retained_only(self) -> None:
+        legacy = campaign._normalized_campaign_argv_v1(
+            "run", 4, container_layout="legacy"
+        )
+        current = campaign._normalized_campaign_argv(
+            "run", 4, container_layout="legacy"
+        )
+        self.assertEqual(
+            campaign.CAMPAIGN_RUNTIME_V1_SCHEMA,
+            "codeskeptic-quality-floor-runtime-v1",
+        )
+        self.assertEqual(
+            campaign.CAMPAIGN_RUNTIME_SCHEMA,
+            "codeskeptic-quality-floor-runtime-v2",
+        )
+        self.assertEqual(len(legacy), 111)
+        self.assertEqual(
+            campaign.compact_json_digest(legacy),
+            "ff75effe82a65505e8d0cedeb55981bd26bbabac2d84696637c59b6a182744ca",
+        )
+        self.assertEqual(len(current), 117)
+        self.assertEqual(
+            campaign.compact_json_digest(current),
+            "6347ab3afc7d27ee163b4b70af6101249118edd11307912a353693403fea4882",
+        )
+        self.assertNotIn("$CONTAINER_CIDFILE", legacy)
+        self.assertNotIn("$CONTAINER_NAME", legacy)
+        self.assertNotIn("$CONTAINER_TOKEN", legacy)
+        self.assertIn("$CONTAINER_CIDFILE", current)
+        self.assertIn("$CONTAINER_NAME", current)
+        self.assertTrue(any("$CONTAINER_TOKEN" in token for token in current))
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            _binary, _build_dir, analyzer = _fake_build(root)
+            source = {"revision": "a" * 40, "manifest_sha256": "b" * 64}
+            authority_dir = _write_fake_build_authority(root)
+            receipt = _fake_build_receipt(source, analyzer)
+            launch_path, launch, build_record = _fake_launch_authority(
+                root, authority_dir, receipt
+            )
+            launch["runtime"]["schema"] = campaign.CAMPAIGN_RUNTIME_V1_SCHEMA
+            launch["runtime"]["normalized_argv"] = (
+                campaign._normalized_campaign_argv_v1(
+                    "run", 1, container_layout="legacy"
+                )
+            )
+            launch["runtime"]["normalized_argv_sha256"] = (
+                campaign.compact_json_digest(
+                    launch["runtime"]["normalized_argv"]
+                )
+            )
+            campaign.write_json(launch_path, launch)
+            raw = launch_path.read_bytes()
+
+            with self.assertRaisesRegex(
+                campaign.CampaignError, "runtime schema drift"
+            ):
+                campaign._validate_launch_payload(
+                    launch,
+                    raw,
+                    expected_action="run",
+                    build_record=build_record,
+                    require_token=False,
+                )
+
+            retained = campaign._validate_retained_execution_authority(
+                launch_path, build_record
+            )
+            self.assertEqual(
+                retained["normalized_argv_sha256"],
+                launch["runtime"]["normalized_argv_sha256"],
+            )
+
+            changed = copy.deepcopy(launch)
+            changed["runtime"]["normalized_argv"].append("--privileged")
+            changed["runtime"]["normalized_argv_sha256"] = (
+                campaign.compact_json_digest(
+                    changed["runtime"]["normalized_argv"]
+                )
+            )
+            campaign.write_json(launch_path, changed)
+            with self.assertRaisesRegex(campaign.CampaignError, "argv drift"):
+                campaign._validate_retained_execution_authority(
+                    launch_path, build_record
+                )
+
+    def test_runtime_v1_rejects_new_container_layout(self) -> None:
+        with self.assertRaisesRegex(
+            campaign.CampaignError, "runtime v1 container layout"
+        ):
+            campaign._normalized_campaign_argv_v1(
+                "run", 4, container_layout="p10-09"
+            )
 
     def test_public_preflight_does_not_execute_host_analyzer(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

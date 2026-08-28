@@ -69,7 +69,8 @@ OPERATOR_SCHEMA = "codeskeptic-quality-floor-operator-v1"
 MUTATION_SCHEMA = "codeskeptic-quality-floor-resource-mutations-v1"
 AUTHORITY_SCHEMA = "codeskeptic-quality-floor-raw-authority-v1"
 AUTHORITY_NAME = "campaign-authority.json"
-CAMPAIGN_RUNTIME_SCHEMA = "codeskeptic-quality-floor-runtime-v1"
+CAMPAIGN_RUNTIME_V1_SCHEMA = "codeskeptic-quality-floor-runtime-v1"
+CAMPAIGN_RUNTIME_SCHEMA = "codeskeptic-quality-floor-runtime-v2"
 CAMPAIGN_LAUNCH_SCHEMA = "codeskeptic-quality-floor-launch-v1"
 EXECUTION_AUTHORITY_SCHEMA = "codeskeptic-quality-floor-execution-authority-v1"
 CAMPAIGN_LAUNCH_NAME = "campaign-launch-authority.json"
@@ -3431,6 +3432,170 @@ def _campaign_container_layout(build_record: Any) -> str:
     return container_layout
 
 
+def _normalized_campaign_argv_v1(
+    action: str,
+    jobs: int | None,
+    *,
+    require_accepted: bool = True,
+    container_layout: str = "legacy",
+) -> list[str]:
+    """Re-derive the frozen runtime-v1 contract for retained evidence only."""
+
+    if container_layout != "legacy":
+        raise CampaignError(
+            "retained campaign runtime v1 container layout is unsupported"
+        )
+    jobs = _campaign_jobs(action, jobs)
+    common = [
+        "$PODMAN",
+        "--cgroup-manager=cgroupfs",
+        "--conmon=/usr/bin/conmon",
+        "--events-backend=none",
+        "--hooks-dir=/usr/share/empty",
+        "--runtime=/usr/bin/crun",
+        "run",
+        "--rm",
+        "--pull=never",
+        "--network=none",
+        "--http-proxy=false",
+        "--env-host=false",
+        "--image-volume=ignore",
+        "--read-only",
+        "--cap-drop=all",
+        "--security-opt",
+        "label=disable",
+        "--security-opt",
+        "no-new-privileges",
+        "--tmpfs",
+        "/tmp:rw,nosuid,nodev,size=256m,mode=1777",
+        "--workdir",
+        "/source",
+        "-e",
+        f"{CAMPAIGN_INNER_TOKEN_ENV}=$LAUNCH_SHA256",
+        "-e",
+        f"{CAMPAIGN_INNER_ENV_TOKEN_ENV}=$ENV_SHA256",
+        "-e",
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "-e",
+        "HOME=/scratch/home",
+        "-e",
+        "LANG=C",
+        "-e",
+        "LC_ALL=C",
+        "-e",
+        "TZ=UTC",
+        "-e",
+        "TMPDIR=/scratch",
+        "-e",
+        "XDG_CACHE_HOME=/scratch/xdg-cache",
+        "-e",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "-e",
+        "GIT_OPTIONAL_LOCKS=0",
+        "-e",
+        "GIT_CONFIG_GLOBAL=/dev/null",
+        "-e",
+        "GIT_CONFIG_NOSYSTEM=1",
+        "-e",
+        "GIT_NO_REPLACE_OBJECTS=1",
+        "-e",
+        "GIT_CONFIG_COUNT=5",
+        "-e",
+        "GIT_CONFIG_KEY_0=safe.directory",
+        "-e",
+        "GIT_CONFIG_VALUE_0=/source",
+        "-e",
+        "GIT_CONFIG_KEY_1=safe.directory",
+        "-e",
+        "GIT_CONFIG_VALUE_1=/libarchive",
+        "-e",
+        "GIT_CONFIG_KEY_2=core.hooksPath",
+        "-e",
+        "GIT_CONFIG_VALUE_2=/dev/null",
+        "-e",
+        "GIT_CONFIG_KEY_3=core.fsmonitor",
+        "-e",
+        "GIT_CONFIG_VALUE_3=false",
+        "-e",
+        "GIT_CONFIG_KEY_4=core.commitGraph",
+        "-e",
+        "GIT_CONFIG_VALUE_4=false",
+        "-v",
+        "$SOURCE:/source:ro",
+        "-v",
+        "$BUILD:/build:ro",
+        "-v",
+        "$BUILD_AUTHORITY:/build-authority:ro",
+    ]
+    if action == "run":
+        common.extend(
+            [
+                "-v",
+                "$JULIET:/juliet:ro",
+                "-v",
+                "$JULIET_ARCHIVE:/juliet.zip:ro",
+                "-v",
+                "$LIBARCHIVE:/libarchive:ro",
+                "-v",
+                "$STAGE:/stage:rw",
+                "-v",
+                "$SCRATCH:/scratch:rw",
+            ]
+        )
+        inner = [
+            "_inner-run",
+            "--source", "/source",
+            "--build-authority", "/build-authority",
+            "--build-dir", "/build",
+            "--juliet-dir", "/juliet",
+            "--juliet-archive", "/juliet.zip",
+            "--libarchive-checkout", "/libarchive",
+            "--output", "/stage/package",
+            "--launch-authority", f"/stage/{CAMPAIGN_LAUNCH_NAME}",
+            "--jobs", str(jobs),
+        ]
+    elif action == "assemble":
+        common.extend(
+            [
+                "-v", "$STAGE:/stage:rw",
+                "-v", "$SCRATCH:/scratch:rw",
+            ]
+        )
+        inner = [
+            "_inner-assemble",
+            "--source", "/source",
+            "--build-authority", "/build-authority",
+            "--build-dir", "/build",
+            "--package", "/stage/package",
+            "--launch-authority", f"/stage/{CAMPAIGN_LAUNCH_NAME}",
+        ]
+    else:
+        common.extend(
+            [
+                "-v", "$PACKAGE:/package:ro",
+                "-v", "$LAUNCH_DIR:/launch:ro",
+                "-v", "$SCRATCH:/scratch:rw",
+            ]
+        )
+        inner = [
+            "_inner-verify",
+            "--source", "/source",
+            "--build-authority", "/build-authority",
+            "--build-dir", "/build",
+            "--package", "/package",
+            "--launch-authority", f"/launch/{CAMPAIGN_LAUNCH_NAME}",
+        ]
+        if not require_accepted:
+            inner.append("--allow-rejected")
+    return [
+        *common,
+        build_authority.PINNED_IMAGE,
+        "/usr/bin/python3",
+        "/source/scripts/run_quality_floor_campaign.py",
+        *inner,
+    ]
+
+
 def _normalized_campaign_argv(
     action: str,
     jobs: int | None,
@@ -3632,6 +3797,7 @@ def _validate_campaign_runtime(
     *,
     require_accepted: bool,
     build_record: dict[str, Any],
+    allow_retained_v1: bool = False,
 ) -> dict[str, Any]:
     required = {
         "schema", "image", "podman", "normalized_argv",
@@ -3639,8 +3805,6 @@ def _validate_campaign_runtime(
     }
     if not isinstance(runtime, dict) or set(runtime) != required:
         raise CampaignError("campaign runtime fields are malformed")
-    if runtime["schema"] != CAMPAIGN_RUNTIME_SCHEMA:
-        raise CampaignError("campaign runtime schema drift")
     retained = build_record.get("runtime")
     if (
         not isinstance(retained, dict)
@@ -3649,12 +3813,22 @@ def _validate_campaign_runtime(
     ):
         raise CampaignError("campaign runtime is not build-runtime bound")
     container_layout = _campaign_container_layout(build_record)
-    normalized = _normalized_campaign_argv(
-        action,
-        jobs,
-        require_accepted=require_accepted,
-        container_layout=container_layout,
-    )
+    if runtime["schema"] == CAMPAIGN_RUNTIME_SCHEMA:
+        normalized = _normalized_campaign_argv(
+            action,
+            jobs,
+            require_accepted=require_accepted,
+            container_layout=container_layout,
+        )
+    elif runtime["schema"] == CAMPAIGN_RUNTIME_V1_SCHEMA and allow_retained_v1:
+        normalized = _normalized_campaign_argv_v1(
+            action,
+            jobs,
+            require_accepted=require_accepted,
+            container_layout=container_layout,
+        )
+    else:
+        raise CampaignError("campaign runtime schema drift")
     if (
         runtime["normalized_argv"] != normalized
         or runtime["normalized_argv_sha256"] != compact_json_digest(normalized)
@@ -3881,6 +4055,7 @@ def _validate_launch_payload(
     expected_action: str,
     build_record: dict[str, Any],
     require_token: bool,
+    allow_retained_runtime_v1: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     fields = {
         "schema", "action", "jobs", "require_accepted",
@@ -3903,6 +4078,7 @@ def _validate_launch_payload(
         jobs,
         require_accepted=payload["require_accepted"],
         build_record=build_record,
+        allow_retained_v1=allow_retained_runtime_v1,
     )
     _validate_campaign_input_authority(
         payload["inputs"], payload["action"], build_record
@@ -3919,6 +4095,7 @@ def _read_launch_authority(
     expected_action: str,
     build_record: dict[str, Any],
     require_token: bool,
+    allow_retained_runtime_v1: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     path = _regular(path, "campaign launch authority")
     raw = path.read_bytes()
@@ -3931,6 +4108,7 @@ def _read_launch_authority(
         expected_action=expected_action,
         build_record=build_record,
         require_token=require_token,
+        allow_retained_runtime_v1=allow_retained_runtime_v1,
     )
 
 
@@ -3942,6 +4120,7 @@ def _validate_retained_execution_authority(
         expected_action="run",
         build_record=build_record,
         require_token=False,
+        allow_retained_runtime_v1=True,
     )
     return execution
 
@@ -5380,6 +5559,8 @@ def _inner_launch_context(
         not isinstance(payload, dict)
         or payload.get("schema") != CAMPAIGN_LAUNCH_SCHEMA
         or payload.get("action") != action
+        or not isinstance(payload.get("runtime"), dict)
+        or payload["runtime"].get("schema") != CAMPAIGN_RUNTIME_SCHEMA
         or os.environ.get(CAMPAIGN_INNER_TOKEN_ENV) != sha256_bytes(raw)
     ):
         raise CampaignError("campaign inner launch authority is missing or stale")
