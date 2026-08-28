@@ -140,6 +140,15 @@
   every other gate, and binds the observed exit code into the projection
   digest. A retained UBSan receipt regression prevents the address-only `-6`
   assumption from blocking valid fault-binary authority again.
+- Kept sanitizer re-verification read-only without starving CTest's documented
+  scratch contract. Sealing, installation verification, rootful preflight,
+  campaign execution, and the independent inner verifier now overlay only the
+  two profile-specific `Testing/Temporary` directories with bounded 16 MiB
+  tmpfs mounts while the complete `/authority` tree remains read-only. Exact
+  command regressions prevent the seal context from drifting from the
+  provisioner's already-qualified ASan and UBSan verification topology. The
+  v3 launch receipt records the ordered exceptions, and host recovery now
+  rejects missing, additional, or option-drifted `HostConfig.Tmpfs` claims.
 
 ## 2026-08-22 — Phase 10.8 cumulative quality-floor audit (in progress)
 

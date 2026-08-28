@@ -64,6 +64,7 @@ CONTAINER_SOURCE_ROOT = CONTAINER_AUTHORITY_ROOT / "source"
 CONTAINER_BUILD_ROOT = CONTAINER_AUTHORITY_ROOT / "build"
 SANITIZER_WORK_ROOT = Path("build/p10-09-sanitizers")
 SANITIZER_PROFILES = ("address", "undefined")
+SANITIZER_VERIFIER_CTEST_TMPFS_SIZE = "16m"
 RUNTIME_SOURCE_FILES = (
     "CMakeLists.txt", ".gitattributes", "Dockerfile", "action.yml",
 )
@@ -3107,6 +3108,18 @@ def _verify_static_authorities_in_image(
     command_runner: Any | None,
 ) -> None:
     config_sidecar = Path(f"{config_path}.sha256")
+    ctest_tmpfs = [
+        token
+        for profile in SANITIZER_PROFILES
+        for token in (
+            "--tmpfs",
+            (
+                f"{CONTAINER_SOURCE_ROOT}/{SANITIZER_WORK_ROOT.as_posix()}/"
+                f"{profile}-tests/Testing/Temporary:rw,nosuid,nodev,"
+                f"size={SANITIZER_VERIFIER_CTEST_TMPFS_SIZE},mode=1777"
+            ),
+        )
+    ]
     output = _external_output(
         [
             *options, "run", "--rm", "--pull=never", "--network=none",
@@ -3119,6 +3132,7 @@ def _verify_static_authorities_in_image(
             "--env=LC_ALL=C", "--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=67108864",
             "--volume",
             f"{_safe_mount_path(authority_root, 'authority root')}:/authority:ro",
+            *ctest_tmpfs,
             "--volume",
             f"{_safe_mount_path(config_path, 'runtime config')}:/config/runtime.json:ro",
             "--volume",

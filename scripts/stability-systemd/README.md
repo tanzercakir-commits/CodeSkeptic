@@ -405,8 +405,14 @@ exact
 `/sys/fs/cgroup/system.slice/codeskeptic-stability.service/codeskeptic-p10-09/measurement/cgroup.procs`
 pseudofile. The verifier does not receive that bind. The verifier therefore has
 exactly eight semantic bind mounts, while the two mutable roles have exactly
-nine; no role can mutate any other cgroup control file from inside the
-container.
+nine. After those parent binds, every role overlays exactly the address and
+undefined sanitizer `Testing/Temporary` directories with separate 16 MiB
+`rw,nosuid,nodev,mode=1777` tmpfs mounts so CTest discovery can write its
+documented scratch log without making any retained authority file writable.
+The launch receipt records these mounts in order, and host recovery requires
+Podman 5.8.4's exact `HostConfig.Tmpfs` projection, including `rprivate` and
+`tmpcopyup`; no role can mutate any other authority or cgroup control file from
+inside the container.
 
 The exact in-container command is:
 
@@ -417,7 +423,8 @@ The exact in-container command is:
 The container is not auto-removed. Podman must create a fresh CID file; the
 operator binds it to the durable session marker and host recovery rederives the
 effective command, process argv, the role's exact eight-or-nine semantic bind
-mounts, exact environment and labels, image digest/name/ID, CID path, IPC/PID/UTS and
+mounts, the exact two bounded CTest tmpfs mounts, exact environment and labels,
+image digest/name/ID, CID path, IPC/PID/UTS and
 cgroup/network topology, rootfs mode, security options, user, workdir, runtime,
 and resource limit from Podman inspection. Every Podman removal is centralized
 in host recovery; the runner has no direct `podman rm`, name-only fallback, or

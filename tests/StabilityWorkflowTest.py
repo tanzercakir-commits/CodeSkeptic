@@ -415,11 +415,11 @@ class StabilityWorkflowTest(unittest.TestCase):
         for binding in bind_mounts:
             _, destination, mode = binding.rsplit(":", 2)
             destination = destination.replace("${MEASUREMENT_CGROUP}", measurement)
-            actual_mount_contract.append({"destination": destination, "mode": mode})
-        self.assertEqual(
-            actual_mount_contract,
-            literal_constant(CONTROLLER, "RUNTIME_LAUNCH_MOUNTS"),
-        )
+            actual_mount_contract.append({
+                "destination": destination,
+                "kind": "bind",
+                "options": mode,
+            })
         self.assertEqual(
             shell_array(self.operator, "PODMAN_GLOBAL_OPTIONS"),
             [
@@ -464,6 +464,73 @@ class StabilityWorkflowTest(unittest.TestCase):
                 "--env=TZ=UTC",
             ],
         )
+        sanitizer_tmpfs = shell_array(
+            self.operator, "SANITIZER_CTEST_TMPFS_OPTIONS"
+        )
+        self.assertEqual(
+            sanitizer_tmpfs,
+            [
+                "--tmpfs",
+                (
+                    "/authority/source/build/p10-09-sanitizers/"
+                    "address-tests/Testing/Temporary:rw,nosuid,nodev,"
+                    "size=16m,mode=1777"
+                ),
+                "--tmpfs",
+                (
+                    "/authority/source/build/p10-09-sanitizers/"
+                    "undefined-tests/Testing/Temporary:rw,nosuid,nodev,"
+                    "size=16m,mode=1777"
+                ),
+            ],
+        )
+        for flag, specification in zip(
+            sanitizer_tmpfs[::2], sanitizer_tmpfs[1::2], strict=True
+        ):
+            self.assertEqual(flag, "--tmpfs")
+            destination, separator, options = specification.partition(":")
+            self.assertEqual(separator, ":")
+            actual_mount_contract.append({
+                "destination": destination,
+                "kind": "tmpfs",
+                "options": options,
+            })
+        self.assertEqual(
+            actual_mount_contract,
+            literal_constant(CONTROLLER, "RUNTIME_LAUNCH_MOUNTS"),
+        )
+        self.assertEqual(
+            {
+                mount["destination"]: (
+                    f'{mount["options"]},rprivate,tmpcopyup'
+                )
+                for mount in actual_mount_contract
+                if mount["kind"] == "tmpfs"
+            },
+            literal_constant(HOST_RECOVERY, "SANITIZER_CTEST_TMPFS"),
+        )
+        mount_appender = shell_function(
+            self.operator, "append_container_mounts"
+        )
+        self.assertLess(
+            mount_appender.index('target+=(--volume "$bind_mount")'),
+            mount_appender.index(
+                'target+=("${SANITIZER_CTEST_TMPFS_OPTIONS[@]}")'
+            ),
+        )
+        for invocation in (
+            'append_container_mounts probe_args "${CONTAINER_BIND_MOUNTS[@]}"',
+            (
+                'append_container_mounts verifier_args '
+                '"${verifier_bind_mounts[@]}"'
+            ),
+            (
+                'append_container_mounts podman_run_args '
+                '"${CONTAINER_BIND_MOUNTS[@]}"'
+            ),
+        ):
+            with self.subTest(invocation=invocation):
+                self.assertEqual(self.operator.count(invocation), 1)
         self.assertIn(
             '"cgroups": "disabled"', CONTROLLER.read_text(encoding="utf-8")
         )
@@ -557,7 +624,7 @@ class StabilityWorkflowTest(unittest.TestCase):
             self.operator,
         )
         self.assertIn(
-            'for bind_mount in "${CONTAINER_BIND_MOUNTS[@]}"',
+            'append_container_mounts probe_args "${CONTAINER_BIND_MOUNTS[@]}"',
             self.operator,
         )
         self.assertIn('probe_args+=(\n        "$PINNED_EVIDENCE_IMAGE"', self.operator)

@@ -1887,11 +1887,18 @@ class RuntimeConfigContractTest(unittest.TestCase):
             )
 
             launch = stability.build_runtime_launch_receipt(config_sha, BOOT_ID)
+            self.assertEqual(
+                launch["schema"], "codeskeptic-stability-runtime-launch-v3"
+            )
             self.assertEqual(launch["container"]["cgroups"], "disabled")
             self.assertEqual(
                 launch["container"]["cgroup_namespace"], "host"
             )
             self.assertNotIn("cgroup_parent", launch["container"])
+            self.assertEqual(
+                [mount["kind"] for mount in launch["mounts"][-2:]],
+                ["tmpfs", "tmpfs"],
+            )
             launch_path = root / "launch" / "receipt.json"
             write_canonical_pair(launch_path, launch)
             self.assertEqual(

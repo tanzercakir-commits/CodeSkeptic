@@ -123,6 +123,16 @@ CONTAINER_ENVIRONMENT = {
     "XDG_CACHE_HOME": "/runtime/xdg-cache",
     "container": "podman",
 }
+SANITIZER_CTEST_TMPFS = {
+    (
+        "/authority/source/build/p10-09-sanitizers/"
+        "address-tests/Testing/Temporary"
+    ): "rw,nosuid,nodev,size=16m,mode=1777,rprivate,tmpcopyup",
+    (
+        "/authority/source/build/p10-09-sanitizers/"
+        "undefined-tests/Testing/Temporary"
+    ): "rw,nosuid,nodev,size=16m,mode=1777,rprivate,tmpcopyup",
+}
 IMAGE_CONFIG_LABELS = {
     "io.buildah.version": "1.43.0",
     "org.opencontainers.image.version": "24.04",
@@ -1678,6 +1688,8 @@ def _validate_container_execution_contract(
     }
     if any(host_config.get(name) != claim for name, claim in expected_host.items()):
         raise RecoveryError("owned container isolation contract drift")
+    if host_config.get("Tmpfs") != SANITIZER_CTEST_TMPFS:
+        raise RecoveryError("owned container tmpfs contract drift")
     if host_config.get("Binds") != expected_container_binds(marker, kind):
         raise RecoveryError("owned container ordered bind contract drift")
     security = host_config.get("SecurityOpt")

@@ -34,7 +34,7 @@ import run_stability_fault_injection as fault_injection
 
 POLICY_SCHEMA = "codeskeptic-stability-campaign-v2"
 RUNTIME_CONFIG_SCHEMA = "codeskeptic-stability-runtime-v3"
-RUNTIME_LAUNCH_SCHEMA = "codeskeptic-stability-runtime-launch-v2"
+RUNTIME_LAUNCH_SCHEMA = "codeskeptic-stability-runtime-launch-v3"
 EVENT_SCHEMA = "codeskeptic-stability-event-v1"
 SESSION_SCHEMA = "codeskeptic-stability-session-v3"
 CYCLE_SCHEMA = "codeskeptic-stability-cycle-v1"
@@ -202,20 +202,45 @@ HOST_RECOVERY_MARKER_TEMP = (
     "/var/lib/codeskeptic-p10-09/.host-recovery-intent.tmp"
 )
 RUNTIME_LAUNCH_MOUNTS = [
-    {"destination": "/authority", "mode": "ro"},
-    {"destination": "/operator", "mode": "ro"},
-    {"destination": "/config/runtime.json", "mode": "ro"},
-    {"destination": "/config/runtime.json.sha256", "mode": "ro"},
-    {"destination": "/launch", "mode": "ro"},
-    {"destination": "/evidence", "mode": "rw"},
-    {"destination": "/runtime", "mode": "rw"},
-    {"destination": "/sys/fs/cgroup", "mode": "ro"},
+    {"destination": "/authority", "kind": "bind", "options": "ro"},
+    {"destination": "/operator", "kind": "bind", "options": "ro"},
+    {
+        "destination": "/config/runtime.json",
+        "kind": "bind",
+        "options": "ro",
+    },
+    {
+        "destination": "/config/runtime.json.sha256",
+        "kind": "bind",
+        "options": "ro",
+    },
+    {"destination": "/launch", "kind": "bind", "options": "ro"},
+    {"destination": "/evidence", "kind": "bind", "options": "rw"},
+    {"destination": "/runtime", "kind": "bind", "options": "rw"},
+    {"destination": "/sys/fs/cgroup", "kind": "bind", "options": "ro"},
     {
         "destination": (
             "/sys/fs/cgroup/system.slice/codeskeptic-stability.service/"
             "codeskeptic-p10-09/measurement/cgroup.procs"
         ),
-        "mode": "rw",
+        "kind": "bind",
+        "options": "rw",
+    },
+    {
+        "destination": (
+            "/authority/source/build/p10-09-sanitizers/"
+            "address-tests/Testing/Temporary"
+        ),
+        "kind": "tmpfs",
+        "options": "rw,nosuid,nodev,size=16m,mode=1777",
+    },
+    {
+        "destination": (
+            "/authority/source/build/p10-09-sanitizers/"
+            "undefined-tests/Testing/Temporary"
+        ),
+        "kind": "tmpfs",
+        "options": "rw,nosuid,nodev,size=16m,mode=1777",
     },
 ]
 RUNTIME_CONTROLLER_COMMAND = [

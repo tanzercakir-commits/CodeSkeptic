@@ -219,6 +219,20 @@ run_bound_container() {
     run_podman "$@"
 }
 
+append_container_mounts() {
+    local target_name="$1"
+    shift
+    local bind_mount
+    local -n target="$target_name"
+
+    for bind_mount in "$@"; do
+        target+=(--volume "$bind_mount")
+    done
+    # OCI parent mounts must precede nested mounts. Keep the complete authority
+    # read-only, then overlay only CTest's two verifier scratch directories.
+    target+=("${SANITIZER_CTEST_TMPFS_OPTIONS[@]}")
+}
+
 append_host_recovery_labels() {
     local kind="$1"
     local target_name="$2"
@@ -264,6 +278,13 @@ readonly -a PODMAN_CONTAINER_OPTIONS=(
     --env=LANG=C
     --env=LC_ALL=C
     --env=TZ=UTC
+)
+
+readonly -a SANITIZER_CTEST_TMPFS_OPTIONS=(
+    --tmpfs
+    /authority/source/build/p10-09-sanitizers/address-tests/Testing/Temporary:rw,nosuid,nodev,size=16m,mode=1777
+    --tmpfs
+    /authority/source/build/p10-09-sanitizers/undefined-tests/Testing/Temporary:rw,nosuid,nodev,size=16m,mode=1777
 )
 
 session_output=""
@@ -1559,7 +1580,6 @@ cleanup_container() {
 }
 
 run_rootful_preflight_probe() {
-    local bind_mount
     local preflight_container_id=""
     local probe_exit=0
     local -a probe_args=("${PODMAN_CONTAINER_OPTIONS[@]}")
@@ -1572,9 +1592,7 @@ run_rootful_preflight_probe() {
     probe_args+=(--name "$container_name")
     probe_args+=(--cidfile "$cidfile")
     append_host_recovery_labels preflight probe_args
-    for bind_mount in "${CONTAINER_BIND_MOUNTS[@]}"; do
-        probe_args+=(--volume "$bind_mount")
-    done
+    append_container_mounts probe_args "${CONTAINER_BIND_MOUNTS[@]}"
     probe_args+=(
         "$PINNED_EVIDENCE_IMAGE"
         "/usr/bin/taskset"
@@ -1628,7 +1646,6 @@ capture_host_snapshot() {
 }
 
 run_inner_verifier() {
-    local bind_mount
     local new_file
     local stderr_path="${RUNTIME_ROOT}/${session_name}.verifier.stderr"
     local verifier_exit=0
@@ -1657,9 +1674,7 @@ run_inner_verifier() {
     verifier_args+=(--name "$container_name")
     verifier_args+=(--cidfile "$cidfile")
     append_host_recovery_labels verifier verifier_args
-    for bind_mount in "${verifier_bind_mounts[@]}"; do
-        verifier_args+=(--volume "$bind_mount")
-    done
+    append_container_mounts verifier_args "${verifier_bind_mounts[@]}"
     verifier_args+=("$PINNED_EVIDENCE_IMAGE" "${RUNTIME_VERIFIER_COMMAND[@]}")
 
     run_bound_container "${verifier_args[@]}" \
@@ -2341,9 +2356,7 @@ podman_run_args=("${PODMAN_CONTAINER_OPTIONS[@]}")
 podman_run_args+=(--name "$container_name")
 podman_run_args+=(--cidfile "$cidfile")
 append_host_recovery_labels campaign podman_run_args
-for bind_mount in "${CONTAINER_BIND_MOUNTS[@]}"; do
-    podman_run_args+=(--volume "$bind_mount")
-done
+append_container_mounts podman_run_args "${CONTAINER_BIND_MOUNTS[@]}"
 podman_run_args+=("$PINNED_EVIDENCE_IMAGE" "${RUNTIME_CONTROLLER_COMMAND[@]}")
 
 runner_exit=0

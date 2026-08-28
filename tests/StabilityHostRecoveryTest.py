@@ -162,6 +162,7 @@ class FakePodman:
                 "ReadonlyRootfs": True,
                 "RestartPolicy": {"MaximumRetryCount": 0, "Name": "no"},
                 "SecurityOpt": ["label=disable", "no-new-privileges"],
+                "Tmpfs": dict(host_recovery.SANITIZER_CTEST_TMPFS),
                 "Ulimits": [
                     {"Hard": 4096, "Name": "RLIMIT_NOFILE", "Soft": 4096}
                 ],
@@ -954,6 +955,53 @@ class HostRecoveryTest(unittest.TestCase):
                     host_recovery._owned_container_inventory(marker),
                     [(CONTAINER_ID, kind)],
                 )
+
+    def test_owned_container_requires_exact_sanitizer_ctest_tmpfs_contract(
+        self,
+    ) -> None:
+        self.initialise_podman_store()
+        marker = self.arm()
+        expected = {
+            (
+                "/authority/source/build/p10-09-sanitizers/"
+                "address-tests/Testing/Temporary"
+            ): (
+                "rw,nosuid,nodev,size=16m,mode=1777,"
+                "rprivate,tmpcopyup"
+            ),
+            (
+                "/authority/source/build/p10-09-sanitizers/"
+                "undefined-tests/Testing/Temporary"
+            ): (
+                "rw,nosuid,nodev,size=16m,mode=1777,"
+                "rprivate,tmpcopyup"
+            ),
+        }
+        mutations = {
+            "missing": dict(list(expected.items())[1:]),
+            "extra": {**expected, "/foreign": "rw"},
+            "options": {
+                **expected,
+                next(iter(expected)): "rw,nosuid,nodev,size=1g",
+            },
+        }
+        for label, tmpfs in (("exact", expected), *mutations.items()):
+            with self.subTest(label=label):
+                self.fake_podman.containers.clear()
+                inspection = self.fake_podman.add_owned(marker, "campaign")
+                host = inspection["HostConfig"]
+                assert isinstance(host, dict)
+                host["Tmpfs"] = tmpfs
+                if label == "exact":
+                    self.assertEqual(
+                        host_recovery._owned_container_inventory(marker),
+                        [(CONTAINER_ID, "campaign")],
+                    )
+                else:
+                    with self.assertRaisesRegex(
+                        host_recovery.RecoveryError, "tmpfs"
+                    ):
+                        host_recovery._owned_container_inventory(marker)
 
     def test_preflight_source_digest_matches_the_recovery_contract(self) -> None:
         self.assertEqual(

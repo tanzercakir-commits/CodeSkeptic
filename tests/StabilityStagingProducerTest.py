@@ -4371,6 +4371,36 @@ while True:
         self.assertIn("PINNED_EVIDENCE_IMAGE_ID", source)
         self.assertLessEqual(stage.MAX_FILE_BYTES, 8 * 1024 * 1024 * 1024)
 
+    def test_static_authority_verifier_has_ephemeral_ctest_write_mounts(
+        self,
+    ) -> None:
+        assert stage is not None
+        runner = FakeCommandRunner()
+        runner.loaded = True
+        stage._verify_static_authorities_in_image(
+            [os.fspath(stage.PODMAN)],
+            Path("/host/authority"),
+            Path("/host/config/runtime.json"),
+            runner,
+        )
+        command = runner.commands[-1]
+        expected_mounts = {
+            (
+                "/authority/source/build/p10-09-sanitizers/"
+                f"{profile}-tests/Testing/Temporary:rw,nosuid,nodev,"
+                "size=16m,mode=1777"
+            )
+            for profile in stage.SANITIZER_PROFILES
+        }
+        self.assertEqual(command.count("--tmpfs"), len(expected_mounts))
+        authority_mount = "/host/authority:/authority:ro"
+        authority_index = command.index(authority_mount)
+        for mount in expected_mounts:
+            with self.subTest(mount=mount):
+                self.assertEqual(command.count(mount), 1)
+                self.assertEqual(command[command.index(mount) - 1], "--tmpfs")
+                self.assertLess(authority_index, command.index(mount))
+
     def test_external_commands_and_rootful_probes_have_hard_bounds(self) -> None:
         assert stage is not None
         self.assertEqual(
