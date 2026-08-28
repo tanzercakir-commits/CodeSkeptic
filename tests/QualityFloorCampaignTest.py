@@ -2821,7 +2821,9 @@ class QualityFloorCampaignTest(unittest.TestCase):
                     libarchive_checkout=Path("/libarchive"),
                 )
 
-    def test_runtime_v1_is_frozen_and_retained_only(self) -> None:
+    def test_runtime_v1_is_frozen_and_rejects_arbitrary_retained_input(
+        self,
+    ) -> None:
         legacy = campaign._normalized_campaign_argv_v1(
             "run", 4, container_layout="legacy"
         )
@@ -2835,6 +2837,18 @@ class QualityFloorCampaignTest(unittest.TestCase):
         self.assertEqual(
             campaign.CAMPAIGN_RUNTIME_SCHEMA,
             "codeskeptic-quality-floor-runtime-v2",
+        )
+        self.assertEqual(
+            campaign.RETAINED_RUNTIME_V1_SOURCE_REVISION,
+            "837fd0d37aec528a01df13b155c45f40b9ab6f89",
+        )
+        self.assertEqual(
+            campaign.RETAINED_RUNTIME_V1_BUILD_IDENTITY_SHA256,
+            "31b991324f4dc01ff59033f6c8aee39f3b31de24adfdda47e5540ea9dfdfcbbb",
+        )
+        self.assertEqual(
+            campaign.RETAINED_RUNTIME_V1_LAUNCH_SHA256,
+            "0cbc18d207835fcaa0512516e38f7bf91feeff8a139cff3a2cac4fbede8460f3",
         )
         self.assertEqual(len(legacy), 111)
         self.assertEqual(
@@ -2887,13 +2901,12 @@ class QualityFloorCampaignTest(unittest.TestCase):
                     require_token=False,
                 )
 
-            retained = campaign._validate_retained_execution_authority(
-                launch_path, build_record
-            )
-            self.assertEqual(
-                retained["normalized_argv_sha256"],
-                launch["runtime"]["normalized_argv_sha256"],
-            )
+            with self.assertRaisesRegex(
+                campaign.CampaignError, "runtime v1 provenance drift"
+            ):
+                campaign._validate_retained_execution_authority(
+                    launch_path, build_record
+                )
 
             changed = copy.deepcopy(launch)
             changed["runtime"]["normalized_argv"].append("--privileged")
@@ -2903,7 +2916,9 @@ class QualityFloorCampaignTest(unittest.TestCase):
                 )
             )
             campaign.write_json(launch_path, changed)
-            with self.assertRaisesRegex(campaign.CampaignError, "argv drift"):
+            with self.assertRaisesRegex(
+                campaign.CampaignError, "runtime v1 provenance drift"
+            ):
                 campaign._validate_retained_execution_authority(
                     launch_path, build_record
                 )

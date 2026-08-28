@@ -463,6 +463,57 @@ class QualityFloorEvidenceTest(unittest.TestCase):
         self.assertEqual(execution["action"], "run")
         self.assertEqual(execution["image"], record["runtime"]["image"])
 
+    def test_retained_runtime_v1_requires_exact_p10_08_provenance(self) -> None:
+        retained = PACKAGE / "raw" / campaign.BUILD_AUTHORITY_RAW_DIR
+        payload = build_authority._verify_bundle_structure(
+            retained,
+            None,
+            final=True,
+            podman=build_authority.DEFAULT_PODMAN,
+        )
+        record = campaign._build_authority_record(retained, payload)
+        launch_path = PACKAGE / "raw" / campaign.CAMPAIGN_LAUNCH_NAME
+        launch = campaign.strict_json(launch_path)
+        self.assertEqual(
+            campaign.sha256_file(launch_path),
+            campaign.RETAINED_RUNTIME_V1_LAUNCH_SHA256,
+        )
+        self.assertEqual(
+            record["source"]["revision"],
+            campaign.RETAINED_RUNTIME_V1_SOURCE_REVISION,
+        )
+        self.assertEqual(
+            record["build_identity_sha256"],
+            campaign.RETAINED_RUNTIME_V1_BUILD_IDENTITY_SHA256,
+        )
+        campaign._validate_retained_execution_authority(launch_path, record)
+
+        forged_record = campaign.copy_json(record)
+        forged_record["source"]["revision"] = "0" * 40
+        with self.assertRaisesRegex(
+            campaign.CampaignError, "runtime v1 provenance drift"
+        ):
+            campaign._validate_retained_execution_authority(
+                launch_path, forged_record
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            changed_path = Path(directory) / campaign.CAMPAIGN_LAUNCH_NAME
+            changed = campaign.copy_json(launch)
+            changed["runtime"]["normalized_argv"].append("--privileged")
+            changed["runtime"]["normalized_argv_sha256"] = (
+                campaign.compact_json_digest(
+                    changed["runtime"]["normalized_argv"]
+                )
+            )
+            campaign.write_json(changed_path, changed)
+            with self.assertRaisesRegex(
+                campaign.CampaignError, "runtime v1 provenance drift"
+            ):
+                campaign._validate_retained_execution_authority(
+                    changed_path, record
+                )
+
     def test_repository_preserves_quality_evidence_bytes(self) -> None:
         attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8")
         self.assertIn("docs/evidence/phase10/quality/** -text\n", attributes)

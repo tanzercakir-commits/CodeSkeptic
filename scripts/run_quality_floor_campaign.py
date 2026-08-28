@@ -74,6 +74,19 @@ CAMPAIGN_RUNTIME_SCHEMA = "codeskeptic-quality-floor-runtime-v2"
 CAMPAIGN_LAUNCH_SCHEMA = "codeskeptic-quality-floor-launch-v1"
 EXECUTION_AUTHORITY_SCHEMA = "codeskeptic-quality-floor-execution-authority-v1"
 CAMPAIGN_LAUNCH_NAME = "campaign-launch-authority.json"
+RETAINED_RUNTIME_V1_SOURCE_REVISION = (
+    "837fd0d37aec528a01df13b155c45f40b9ab6f89"
+)
+RETAINED_RUNTIME_V1_SOURCE_MANIFEST_SHA256 = (
+    "b33320937d76ffef84543e9b3492dce34d2c1786ecdd91ff06477e0e59fbd3f8"
+)
+RETAINED_RUNTIME_V1_SOURCE_FILE_COUNT = 399
+RETAINED_RUNTIME_V1_BUILD_IDENTITY_SHA256 = (
+    "31b991324f4dc01ff59033f6c8aee39f3b31de24adfdda47e5540ea9dfdfcbbb"
+)
+RETAINED_RUNTIME_V1_LAUNCH_SHA256 = (
+    "0cbc18d207835fcaa0512516e38f7bf91feeff8a139cff3a2cac4fbede8460f3"
+)
 CAMPAIGN_INNER_TOKEN_ENV = "CODESKEPTIC_QUALITY_FLOOR_LAUNCH_SHA256"
 CAMPAIGN_INNER_ENV_TOKEN_ENV = "CODESKEPTIC_QUALITY_FLOOR_ENV_SHA256"
 FIXED_COMPILER = "/usr/bin/clang-20"
@@ -3790,15 +3803,9 @@ def _campaign_runtime(
     }
 
 
-def _validate_campaign_runtime(
-    runtime: Any,
-    action: str,
-    jobs: int | None,
-    *,
-    require_accepted: bool,
-    build_record: dict[str, Any],
-    allow_retained_v1: bool = False,
-) -> dict[str, Any]:
+def _campaign_runtime_layout(
+    runtime: Any, build_record: dict[str, Any]
+) -> str:
     required = {
         "schema", "image", "podman", "normalized_argv",
         "normalized_argv_sha256",
@@ -3812,29 +3819,38 @@ def _validate_campaign_runtime(
         or runtime["podman"] != retained.get("podman")
     ):
         raise CampaignError("campaign runtime is not build-runtime bound")
-    container_layout = _campaign_container_layout(build_record)
-    if runtime["schema"] == CAMPAIGN_RUNTIME_SCHEMA:
-        normalized = _normalized_campaign_argv(
-            action,
-            jobs,
-            require_accepted=require_accepted,
-            container_layout=container_layout,
-        )
-    elif runtime["schema"] == CAMPAIGN_RUNTIME_V1_SCHEMA and allow_retained_v1:
-        normalized = _normalized_campaign_argv_v1(
-            action,
-            jobs,
-            require_accepted=require_accepted,
-            container_layout=container_layout,
-        )
-    else:
-        raise CampaignError("campaign runtime schema drift")
+    return _campaign_container_layout(build_record)
+
+
+def _validate_campaign_runtime_argv(
+    runtime: dict[str, Any], normalized: list[str]
+) -> dict[str, Any]:
     if (
         runtime["normalized_argv"] != normalized
         or runtime["normalized_argv_sha256"] != compact_json_digest(normalized)
     ):
         raise CampaignError("campaign normalized container argv drift")
     return runtime
+
+
+def _validate_campaign_runtime(
+    runtime: Any,
+    action: str,
+    jobs: int | None,
+    *,
+    require_accepted: bool,
+    build_record: dict[str, Any],
+) -> dict[str, Any]:
+    container_layout = _campaign_runtime_layout(runtime, build_record)
+    if runtime["schema"] != CAMPAIGN_RUNTIME_SCHEMA:
+        raise CampaignError("campaign runtime schema drift")
+    normalized = _normalized_campaign_argv(
+        action,
+        jobs,
+        require_accepted=require_accepted,
+        container_layout=container_layout,
+    )
+    return _validate_campaign_runtime_argv(runtime, normalized)
 
 
 def _campaign_mounts(
@@ -4048,6 +4064,47 @@ def _validate_campaign_input_authority(
     return value
 
 
+def _validate_retained_runtime_v1_provenance(
+    payload: dict[str, Any], raw: bytes, build_record: dict[str, Any]
+) -> None:
+    expected_source = {
+        "revision": RETAINED_RUNTIME_V1_SOURCE_REVISION,
+        "manifest_sha256": RETAINED_RUNTIME_V1_SOURCE_MANIFEST_SHA256,
+        "file_count": RETAINED_RUNTIME_V1_SOURCE_FILE_COUNT,
+    }
+    if (
+        raw != canonical_json(payload)
+        or sha256_bytes(raw) != RETAINED_RUNTIME_V1_LAUNCH_SHA256
+        or build_record.get("source") != expected_source
+        or build_record.get("build_identity_sha256")
+        != RETAINED_RUNTIME_V1_BUILD_IDENTITY_SHA256
+    ):
+        raise CampaignError("retained campaign runtime v1 provenance drift")
+
+
+def _validate_retained_runtime_v1(
+    payload: dict[str, Any],
+    raw: bytes,
+    action: str,
+    jobs: int | None,
+    *,
+    require_accepted: bool,
+    build_record: dict[str, Any],
+) -> dict[str, Any]:
+    _validate_retained_runtime_v1_provenance(payload, raw, build_record)
+    runtime = payload["runtime"]
+    container_layout = _campaign_runtime_layout(runtime, build_record)
+    if runtime["schema"] != CAMPAIGN_RUNTIME_V1_SCHEMA:
+        raise CampaignError("campaign runtime schema drift")
+    normalized = _normalized_campaign_argv_v1(
+        action,
+        jobs,
+        require_accepted=require_accepted,
+        container_layout=container_layout,
+    )
+    return _validate_campaign_runtime_argv(runtime, normalized)
+
+
 def _validate_launch_payload(
     payload: Any,
     raw: bytes,
@@ -4072,14 +4129,28 @@ def _validate_launch_payload(
     jobs = _campaign_jobs(payload["action"], payload["jobs"])
     if payload["build_identity_sha256"] != build_record["build_identity_sha256"]:
         raise CampaignError("campaign launch build identity mismatch")
-    _validate_campaign_runtime(
-        payload["runtime"],
-        payload["action"],
-        jobs,
-        require_accepted=payload["require_accepted"],
-        build_record=build_record,
-        allow_retained_v1=allow_retained_runtime_v1,
+    retained_runtime_v1 = (
+        allow_retained_runtime_v1
+        and isinstance(payload["runtime"], dict)
+        and payload["runtime"].get("schema") == CAMPAIGN_RUNTIME_V1_SCHEMA
     )
+    if retained_runtime_v1:
+        _validate_retained_runtime_v1(
+            payload,
+            raw,
+            payload["action"],
+            jobs,
+            require_accepted=payload["require_accepted"],
+            build_record=build_record,
+        )
+    else:
+        _validate_campaign_runtime(
+            payload["runtime"],
+            payload["action"],
+            jobs,
+            require_accepted=payload["require_accepted"],
+            build_record=build_record,
+        )
     _validate_campaign_input_authority(
         payload["inputs"], payload["action"], build_record
     )
