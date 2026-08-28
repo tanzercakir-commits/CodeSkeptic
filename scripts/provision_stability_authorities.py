@@ -141,7 +141,7 @@ def _sanitizer_source_build_tmpfs() -> str:
         raise ProvisionError("sanitizer source build tmpfs is not exact MiB")
     target = CONTAINER_SOURCE / "build"
     return (
-        f"{target}:rw,nosuid,nodev,"
+        f"{target}:rw,nosuid,nodev,notmpcopyup,"
         f"size={SANITIZER_SOURCE_BUILD_TMPFS_BYTES // mebibyte}m,mode=0755"
     )
 

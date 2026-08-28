@@ -371,7 +371,8 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
         )
         self.assertEqual(
             provision.SANITIZER_SOURCE_BUILD_TMPFS,
-            "/authority/source/build:rw,nosuid,nodev,size=16m,mode=0755",
+            "/authority/source/build:rw,nosuid,nodev,notmpcopyup,"
+            "size=16m,mode=0755",
         )
         commands = (
             (
@@ -483,7 +484,7 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
                         )
                         self.assertLess(test_mount_index, ctest_index)
 
-    def test_sanitizer_mounts_do_not_materialize_publication_destination(self) -> None:
+    def test_sanitizer_mounts_do_not_copy_populated_source_build(self) -> None:
         podman = "/usr/bin/podman"
         environment = provision.build_authority._podman_environment()
         try:
@@ -517,7 +518,15 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
             source_build.mkdir(parents=True)
             test_build.mkdir()
             fuzz_build.mkdir()
+            producer_residue = source_build / "producer-residue.bin"
+            producer_residue.write_bytes(
+                b"x" * (provision.SANITIZER_SOURCE_BUILD_TMPFS_BYTES + 1)
+            )
             source_build_before = source_build.lstat()
+            residue_before = (
+                producer_residue.lstat(),
+                hashlib.sha256(producer_residue.read_bytes()).hexdigest(),
+            )
             publication = source / "build/p10-09-sanitizers"
             profile = "address"
             completed = provision.staging._bounded_command(
@@ -562,7 +571,22 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
                 (source_build_after.st_dev, source_build_after.st_ino),
                 (source_build_before.st_dev, source_build_before.st_ino),
             )
-            self.assertEqual(list(source_build.iterdir()), [])
+            self.assertEqual(list(source_build.iterdir()), [producer_residue])
+            residue_after = producer_residue.lstat()
+            self.assertEqual(
+                (
+                    residue_after.st_dev,
+                    residue_after.st_ino,
+                    residue_after.st_size,
+                    hashlib.sha256(producer_residue.read_bytes()).hexdigest(),
+                ),
+                (
+                    residue_before[0].st_dev,
+                    residue_before[0].st_ino,
+                    residue_before[0].st_size,
+                    residue_before[1],
+                ),
+            )
 
     def test_ephemeral_ctest_mount_preserves_readonly_host_build(self) -> None:
         podman = "/usr/bin/podman"
