@@ -1,0 +1,106 @@
+Test project /Users/runner/work/CodeSkeptic/CodeSkeptic/build
+    Start 1294: QualityFloorCampaignContract
+1/1 Test #1294: QualityFloorCampaignContract .....***Failed    1.92 sec
+............F.F.........s.........F....F...............s......s..........s..s.....
+======================================================================
+FAIL: test_cidfile_quarantine_preserves_concurrent_foreign_replacement (__main__.QualityFloorCampaignTest.test_cidfile_quarantine_preserves_concurrent_foreign_replacement)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/scripts/run_quality_floor_campaign.py", line 4688, in _unlink_campaign_cidfile
+    _rename_noreplace_at(
+    ~~~~~~~~~~~~~~~~~~~~^
+        parent_descriptor,
+        ^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+        candidate,
+        ^^^^^^^^^^
+    )
+    ^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1176, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1180, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1247, in _execute_mock_call
+    result = effect(*args, **kwargs)
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorCampaignTest.py", line 3517, in rename_then_replace
+    real_rename(
+    ~~~~~~~~~~~^
+        source_directory,
+        ^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+        destination,
+        ^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/scripts/run_quality_floor_campaign.py", line 4827, in _rename_noreplace_at
+    raise OSError(
+    ...<3 lines>...
+    )
+OSError: [Errno 78] atomic no-replace cleanup is unavailable: '.codeskeptic-quality-cid-cleanup-259f4d9fdb310b3a090f020a4c397c85'
+
+The above exception was the direct cause of the following exception:
+
+run_quality_floor_campaign.CampaignError: cannot remove campaign container ID file: [Errno 78] atomic no-replace cleanup is unavailable: '.codeskeptic-quality-cid-cleanup-259f4d9fdb310b3a090f020a4c397c85'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorCampaignTest.py", line 3533, in test_cidfile_quarantine_preserves_concurrent_foreign_replacement
+    ), self.assertRaisesRegex(
+       ~~~~~~~~~~~~~~~~~~~~~~^
+        campaign.CampaignError, "foreign replacement|was replaced"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+AssertionError: "foreign replacement|was replaced" does not match "cannot remove campaign container ID file: [Errno 78] atomic no-replace cleanup is unavailable: '.codeskeptic-quality-cid-cleanup-259f4d9fdb310b3a090f020a4c397c85'"
+
+======================================================================
+FAIL: test_cleanup_podman_control_uses_closed_environment_and_hard_bound (__main__.QualityFloorCampaignTest.test_cleanup_podman_control_uses_closed_environment_and_hard_bound)
+----------------------------------------------------------------------
+run_quality_floor_campaign.CampaignError: campaign control could not establish subreaper authority
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorCampaignTest.py", line 3584, in test_cleanup_podman_control_uses_closed_environment_and_hard_bound
+    ), self.assertRaisesRegex(
+       ~~~~~~~~~~~~~~~~~~~~~~^
+        campaign.CampaignError, "output is oversized"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+AssertionError: "output is oversized" does not match "campaign control could not establish subreaper authority"
+
+======================================================================
+FAIL: test_interrupted_container_removes_exact_owned_podman_object (__main__.QualityFloorCampaignTest.test_interrupted_container_removes_exact_owned_podman_object)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorCampaignTest.py", line 3102, in test_interrupted_container_removes_exact_owned_podman_object
+    self.assertFalse(log.with_suffix(".log.cid").exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_main_reports_interruption_and_recovery_workspace (__main__.QualityFloorCampaignTest.test_main_reports_interruption_and_recovery_workspace)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorCampaignTest.py", line 2094, in test_main_reports_interruption_and_recovery_workspace
+    self.assertEqual(campaign.main(argv), 128 + signal.SIGTERM)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 2 != 143
+
+----------------------------------------------------------------------
+Ran 82 tests in 1.549s
+
+FAILED (failures=4, skipped=5)
+
+
+0% tests passed, 1 tests failed out of 1
+
+Total Test time (real) =   1.94 sec
+
+The following tests FAILED:
+	1294 - QualityFloorCampaignContract (Failed)
+Errors while running CTest
