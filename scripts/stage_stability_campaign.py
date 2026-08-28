@@ -298,7 +298,11 @@ def _sha256_regular(path: Path, maximum: int = MAX_FILE_BYTES) -> str:
         or before.st_size > maximum
     ):
         raise StagingError(f"inadmissible regular file: {path}")
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_BINARY", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
     flags |= getattr(os, "O_NOFOLLOW", 0)
     digest = hashlib.sha256()
     try:

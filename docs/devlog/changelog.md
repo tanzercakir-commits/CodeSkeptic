@@ -115,6 +115,12 @@
   boundary. Non-POSIX hosts can now load and compare the portable source
   manifest contract, while any attempt to acquire the Linux authority lock is
   still rejected immediately with a controlled fail-closed error.
+- Made low-level stability-manifest hashing request Windows binary mode, so
+  retained archives have the same exact digest as the sanitizer and
+  determinism authorities instead of being exposed to CRT text translation.
+- Made the interrupted-campaign recovery-path assertion compare the native
+  rendered path. Windows now verifies its actual separator convention while
+  preserving the same retained recovery-workspace contract.
 
 ## 2026-08-22 — Phase 10.8 cumulative quality-floor audit (in progress)
 

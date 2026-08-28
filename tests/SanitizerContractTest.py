@@ -293,6 +293,33 @@ class SanitizerContractTest(unittest.TestCase):
                 staging_manifest,
             )
 
+    def test_stability_hash_requests_binary_mode(self) -> None:
+        runner = load_runner()
+        staging = load_staging()
+        archive = ROOT / "third_party" / "googletest-v1.14.0.tar.gz"
+        native_binary_flag = getattr(staging.os, "O_BINARY", 0)
+        binary_flag = native_binary_flag or 1 << 29
+        observed_flags = []
+        real_open = staging.os.open
+
+        def binary_open(path, flags, mode=0o777, *, dir_fd=None):
+            observed_flags.append(flags)
+            if not native_binary_flag:
+                flags &= ~binary_flag
+            if dir_fd is None:
+                return real_open(path, flags, mode)
+            return real_open(path, flags, mode, dir_fd=dir_fd)
+
+        with mock.patch.object(
+            staging.os, "O_BINARY", binary_flag, create=True
+        ), mock.patch.object(staging.os, "open", side_effect=binary_open):
+            self.assertEqual(
+                staging._sha256_regular(archive), runner.sha256_file(archive)
+            )
+
+        self.assertTrue(observed_flags)
+        self.assertTrue(observed_flags[0] & binary_flag)
+
     def test_stability_lifecycle_lock_fails_closed_without_fcntl(self) -> None:
         staging = load_staging()
         with tempfile.TemporaryDirectory() as temporary:

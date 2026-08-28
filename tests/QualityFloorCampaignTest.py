@@ -2090,7 +2090,8 @@ class QualityFloorCampaignTest(unittest.TestCase):
             "--package", "/does/not/matter",
         ]
         interrupted = campaign.CampaignInterrupted(signal.SIGTERM)
-        interrupted.recovery_paths.append(Path("/tmp/private-recovery"))
+        recovery = Path("/tmp/private-recovery")
+        interrupted.recovery_paths.append(recovery)
         interrupted.cleanup_failures.append("descendant cleanup incomplete")
         stderr = io.StringIO()
         with mock.patch.object(
@@ -2102,7 +2103,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
         signal_guard.assert_called_once_with(enabled=True)
         detail = stderr.getvalue()
         self.assertIn("QUALITY_FLOOR_CAMPAIGN_INTERRUPTED signal=15", detail)
-        self.assertIn("recovery=/tmp/private-recovery", detail)
+        self.assertIn(f"recovery={recovery}", detail)
         self.assertIn("cleanup_failed=descendant cleanup incomplete", detail)
 
     def test_cli_requires_build_authority_and_build_directory_arguments(self) -> None:
