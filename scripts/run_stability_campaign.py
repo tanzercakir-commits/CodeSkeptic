@@ -7279,6 +7279,35 @@ def verify_fault_injection_test_binary_authority(
     }
 
 
+def _load_hosted_exact_head_document(path: Path, label: str) -> dict[str, Any]:
+    """Load the compact ASCII-canonical document emitted by its authority."""
+
+    data = _read_regular_bytes(path, MAX_DOCUMENT_BYTES)
+    try:
+        value = json.loads(data.decode("ascii"))
+        canonical = (
+            json.dumps(
+                value,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=True,
+                allow_nan=False,
+            )
+            + "\n"
+        ).encode("ascii")
+    except (
+        UnicodeDecodeError,
+        UnicodeEncodeError,
+        json.JSONDecodeError,
+        TypeError,
+        ValueError,
+    ) as error:
+        raise StabilityError(f"{label} JSON is malformed: {error}") from error
+    if not isinstance(value, dict) or canonical != data:
+        raise StabilityError(f"{label} is not canonical JSON")
+    return value
+
+
 def _verify_hosted_record_file(root: Path, record: dict[str, Any], label: str) -> str:
     path_value = _evidence_relative(record.get("path"), label)
     path = root / path_value
@@ -7297,7 +7326,9 @@ def verify_hosted_exact_head_evidence(
     root: Path, *, repository: str, revision: str,
 ) -> dict[str, Any]:
     before = directory_identity(root, "hosted exact-head evidence")
-    receipt = _load_document(root / "receipt.json", "hosted exact-head receipt")
+    receipt = _load_hosted_exact_head_document(
+        root / "receipt.json", "hosted exact-head receipt"
+    )
     receipt_data = _read_regular_bytes(root / "receipt.json", MAX_DOCUMENT_BYTES)
     expected_sidecar = (
         f"{hashlib.sha256(receipt_data).hexdigest()}  receipt.json\n"
@@ -7339,7 +7370,9 @@ def verify_hosted_exact_head_evidence(
     ]
     if _regular_files(root) != sorted(expected_files):
         raise StabilityError("hosted exact-head file set drift")
-    manifest_paths = ["receipt.json", "receipt.json.sha256", *referenced]
+    manifest_paths = sorted(
+        ["receipt.json", "receipt.json.sha256", *referenced]
+    )
     expected_manifest = b"".join(
         f"{sha256_file(root / path)}  {path}\n".encode("utf-8")
         for path in manifest_paths
@@ -7388,7 +7421,9 @@ def verify_hosted_exact_head_authority(
     structural = verify_hosted_exact_head_evidence(
         root, repository=repository, revision=revision
     )
-    retained = _load_document(root / "receipt.json", "hosted exact-head receipt")
+    retained = _load_hosted_exact_head_document(
+        root / "receipt.json", "hosted exact-head receipt"
+    )
     if rederived != retained:
         raise StabilityError("hosted exact-head rederived receipt drift")
     after = directory_identity(root, "hosted exact-head authority")

@@ -470,6 +470,18 @@ class HostedExactHeadReceiptTest(unittest.TestCase):
         projection = stability.project_hosted_exact_head_receipt(
             receipt, repository=REPOSITORY, revision=REVISION
         )
+        structural = stability.verify_hosted_exact_head_evidence(
+            self.fixture.output,
+            repository=REPOSITORY,
+            revision=REVISION,
+        )
+        self.assertEqual(structural["projection"], projection)
+        self.assertEqual(
+            structural["receipt_sha256"],
+            hashlib.sha256(
+                (self.fixture.output / "receipt.json").read_bytes()
+            ).hexdigest(),
+        )
         self.assertEqual(projection["gate_count"], 10)
         self.assertEqual(projection["workflow_run_count"], 5)
         self.assertEqual(

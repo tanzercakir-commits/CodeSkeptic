@@ -121,6 +121,12 @@
 - Made the interrupted-campaign recovery-path assertion compare the native
   rendered path. Windows now verifies its actual separator convention while
   preserving the same retained recovery-workspace contract.
+- Closed the hosted-evidence producer/runtime integration gap found by the
+  first full sealed-bundle rehearsal. The runtime verifier now consumes the
+  authority producer's compact ASCII-canonical receipt and lexicographically
+  ordered `SHA256SUMS`, while still rejecting alternate encodings, ordering,
+  checksums, inventories, or exact-head identities. A round-trip regression
+  passes the producer's real sealed output directly to the runtime verifier.
 
 ## 2026-08-22 — Phase 10.8 cumulative quality-floor audit (in progress)
 

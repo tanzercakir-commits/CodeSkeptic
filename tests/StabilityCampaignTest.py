@@ -3759,7 +3759,9 @@ class InnerAuthorityProjectionContractTest(unittest.TestCase):
         snapshot_path.write_bytes(snapshot_payload)
         snapshot["sha256"] = hashlib.sha256(snapshot_payload).hexdigest()
         snapshot["size"] = len(snapshot_payload)
-        write_document(hosted_root / "receipt.json", sealed)
+        (hosted_root / "receipt.json").write_bytes(
+            hosted_authority._canonical_bytes(sealed)
+        )
         receipt_data = (hosted_root / "receipt.json").read_bytes()
         (hosted_root / "receipt.json.sha256").write_text(
             f"{hashlib.sha256(receipt_data).hexdigest()}  receipt.json\n",
@@ -3769,7 +3771,9 @@ class InnerAuthorityProjectionContractTest(unittest.TestCase):
             [record["path"] for record in sealed["logs"]]
             + [record["path"] for record in sealed["snapshots"]]
         )
-        manifest_paths = ["receipt.json", "receipt.json.sha256", *retained_paths]
+        manifest_paths = sorted(
+            ["receipt.json", "receipt.json.sha256", *retained_paths]
+        )
         (hosted_root / "SHA256SUMS").write_bytes(b"".join(
             f"{stability.sha256_file(hosted_root / path)}  {path}\n".encode("utf-8")
             for path in manifest_paths
@@ -3788,7 +3792,10 @@ class InnerAuthorityProjectionContractTest(unittest.TestCase):
         root = self.root / "hosted-adapter"
         source_root = self.root / "source-adapter"
         receipt = {"schema": "fixture-hosted-receipt"}
-        write_document(root / "receipt.json", receipt)
+        (root / "receipt.json").parent.mkdir(parents=True, exist_ok=True)
+        (root / "receipt.json").write_bytes(
+            hosted_authority._canonical_bytes(receipt)
+        )
         identity = {"schema": "fixture-directory-identity"}
         structural = {"bundle": identity, "projection": {}}
         source = object()
