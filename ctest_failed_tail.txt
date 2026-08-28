@@ -1,0 +1,51 @@
+Test project D:/a/CodeSkeptic/CodeSkeptic/build
+    Start 1286: SanitizerContract
+1/2 Test #1286: SanitizerContract ................***Failed    9.53 sec
+......s......F.ss
+======================================================================
+FAIL: test_source_manifest_matches_stability_staging_scope (__main__.SanitizerContractTest.test_source_manifest_matches_stability_staging_scope)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\SanitizerContractTest.py", line 254, in test_source_manifest_matches_stability_staging_scope
+    self.assertEqual(
+    ~~~~~~~~~~~~~~~~^
+        runner_manifest["digest"], staging_manifest,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+AssertionError: '52b790c043f1f9b62f9680b13e27f5bf57f0a0666b0c6c349cac3a547bc82af5' != '5d090bf7fcf9ce2d522658d63e20da1c6448e86263a134aedbff363fd6a308d7'
+- 52b790c043f1f9b62f9680b13e27f5bf57f0a0666b0c6c349cac3a547bc82af5
++ 5d090bf7fcf9ce2d522658d63e20da1c6448e86263a134aedbff363fd6a308d7
+
+
+----------------------------------------------------------------------
+Ran 17 tests in 9.175s
+
+FAILED (failures=1, skipped=3)
+
+    Start 1290: QualityFloorCampaignContract
+2/2 Test #1290: QualityFloorCampaignContract .....***Failed   16.10 sec
+....s......ss.s..........ss........s....F...............s..s...s..........s..s.....
+======================================================================
+FAIL: test_main_reports_interruption_and_recovery_workspace (__main__.QualityFloorCampaignTest.test_main_reports_interruption_and_recovery_workspace)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 2105, in test_main_reports_interruption_and_recovery_workspace
+    self.assertIn("recovery=/tmp/private-recovery", detail)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'recovery=/tmp/private-recovery' not found in 'QUALITY_FLOOR_CAMPAIGN_INTERRUPTED signal=15 recovery=\\tmp\\private-recovery cleanup_failed=descendant cleanup incomplete\n'
+
+----------------------------------------------------------------------
+Ran 83 tests in 15.212s
+
+FAILED (failures=1, skipped=12)
+
+
+0% tests passed, 2 tests failed out of 2
+
+Total Test time (real) =  25.73 sec
+
+The following tests FAILED:
+	1286 - SanitizerContract (Failed)
+	1290 - QualityFloorCampaignContract (Failed)
+Errors while running CTest
