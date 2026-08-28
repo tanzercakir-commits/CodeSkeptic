@@ -83,6 +83,7 @@ RELEASE_CONTAINER_FILE_BYTES = max(
 )
 RELEASE_CONTAINER_TMPFS_BYTES = staging.LARGE_TEMPORARY_RESERVE_BYTES
 SANITIZER_CONTAINER_TMPFS_BYTES = RELEASE_CONTAINER_TMPFS_BYTES + (1 << 30)
+SANITIZER_SOURCE_BUILD_TMPFS_BYTES = 16 * 1024 * 1024
 SANITIZER_VERIFIER_CTEST_TMPFS_BYTES = 16 * 1024 * 1024
 MAX_CONTAINER_WRITABLE_BYTES = MAX_TREE_BYTES
 MAX_CONTAINER_WRITABLE_INODES = MAX_TREE_FILES + MAX_TREE_DIRECTORIES
@@ -95,7 +96,7 @@ CONTAINER_MIRRORS = Path("/authority/mirrors")
 CONTAINER_RELEASE = Path("/authority/release")
 CONTAINER_RELEASE_SOURCE = CONTAINER_RELEASE / "source"
 CONTAINER_RELEASE_BUILD = CONTAINER_RELEASE / "build"
-CONTAINER_SANITIZER_WORK = Path("/authority/work/p10-09-sanitizers")
+CONTAINER_SANITIZER_WORK = CONTAINER_SOURCE / "build/p10-09-sanitizers"
 CONTAINER_SANITIZERS = Path("/authority/sanitizers")
 CONTAINER_SCRATCH = Path("/work")
 
@@ -129,6 +130,23 @@ def _tmpfs_mount(capacity_bytes: int) -> str:
 
 RELEASE_CONTAINER_TMPFS = _tmpfs_mount(RELEASE_CONTAINER_TMPFS_BYTES)
 SANITIZER_CONTAINER_TMPFS = _tmpfs_mount(SANITIZER_CONTAINER_TMPFS_BYTES)
+
+
+def _sanitizer_source_build_tmpfs() -> str:
+    mebibyte = 1 << 20
+    if (
+        SANITIZER_SOURCE_BUILD_TMPFS_BYTES <= 0
+        or SANITIZER_SOURCE_BUILD_TMPFS_BYTES % mebibyte != 0
+    ):
+        raise ProvisionError("sanitizer source build tmpfs is not exact MiB")
+    target = CONTAINER_SOURCE / "build"
+    return (
+        f"{target}:rw,nosuid,nodev,"
+        f"size={SANITIZER_SOURCE_BUILD_TMPFS_BYTES // mebibyte}m,mode=0755"
+    )
+
+
+SANITIZER_SOURCE_BUILD_TMPFS = _sanitizer_source_build_tmpfs()
 
 
 def _sanitizer_verifier_ctest_tmpfs(profile: str) -> str:
@@ -605,6 +623,15 @@ def _normalized_container_argv(mode: str, profile: str | None = None) -> list[st
         fuzz_build = CONTAINER_SANITIZER_WORK / f"{profile}-fuzz"
         output = CONTAINER_SANITIZERS / profile
         writable = mode == "sanitizer-produce"
+        # Keep the staged source bind read-only while presenting the canonical
+        # repository-local build path to CMake.  Parent mounts must precede
+        # their nested bind/tmpfs mounts in the OCI mount list.
+        command.extend([
+            "-v", f"$SOURCE:{CONTAINER_SOURCE}:ro",
+            "--tmpfs", SANITIZER_SOURCE_BUILD_TMPFS,
+            "-v", f"$TEST_BUILD:{test_build}:{'rw' if writable else 'ro'}",
+            "-v", f"$FUZZ_BUILD:{fuzz_build}:{'rw' if writable else 'ro'}",
+        ])
         if not writable:
             # CTest show-only discovery still creates LastTest.log.  Keep the
             # authority build read-only while giving that single verifier-only
@@ -613,9 +640,6 @@ def _normalized_container_argv(mode: str, profile: str | None = None) -> list[st
                 "--tmpfs", _sanitizer_verifier_ctest_tmpfs(profile)
             ])
         command.extend([
-            "-v", f"$SOURCE:{CONTAINER_SOURCE}:ro",
-            "-v", f"$TEST_BUILD:{test_build}:{'rw' if writable else 'ro'}",
-            "-v", f"$FUZZ_BUILD:{fuzz_build}:{'rw' if writable else 'ro'}",
             "-v", f"$OUTPUT:{output}:{'rw' if writable else 'ro'}",
             build_authority.PINNED_IMAGE,
             "/usr/bin/python3",

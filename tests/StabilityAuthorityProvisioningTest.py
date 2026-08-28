@@ -365,6 +365,14 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
                 mount,
                 f"/tmp:rw,size={capacity >> 30}g,mode=1777",
             )
+        self.assertEqual(
+            provision.SANITIZER_SOURCE_BUILD_TMPFS_BYTES,
+            16 * (1 << 20),
+        )
+        self.assertEqual(
+            provision.SANITIZER_SOURCE_BUILD_TMPFS,
+            "/authority/source/build:rw,nosuid,nodev,size=16m,mode=0755",
+        )
         commands = (
             (
                 provision._normalized_container_argv(
@@ -401,8 +409,8 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
                 )
                 self.assertNotIn(temporary, producer)
                 self.assertIn(temporary, verifier)
-                self.assertEqual(producer.count("--tmpfs"), 1)
-                self.assertEqual(verifier.count("--tmpfs"), 2)
+                self.assertEqual(producer.count("--tmpfs"), 2)
+                self.assertEqual(verifier.count("--tmpfs"), 3)
                 self.assertIn(
                     f"$TEST_BUILD:{provision.CONTAINER_SANITIZER_WORK}/"
                     f"{profile}-tests:ro",
@@ -414,41 +422,66 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
                     verifier,
                 )
 
-    def test_sanitizer_work_mount_namespace_is_outside_source_authority(self) -> None:
+    def test_sanitizer_work_uses_canonical_ephemeral_source_build_namespace(
+        self,
+    ) -> None:
         self.assertEqual(
             provision.CONTAINER_SANITIZER_WORK,
-            Path("/authority/work/p10-09-sanitizers"),
+            provision.CONTAINER_SOURCE / "build/p10-09-sanitizers",
         )
-        self.assertFalse(
-            provision.CONTAINER_SANITIZER_WORK.is_relative_to(
-                provision.CONTAINER_SOURCE
-            )
-        )
+        with mock.patch.object(
+            provision.sanitizer, "ROOT", provision.CONTAINER_SOURCE
+        ):
+            for profile in provision.PROFILES:
+                for role in ("tests", "fuzz"):
+                    build = (
+                        provision.CONTAINER_SANITIZER_WORK
+                        / f"{profile}-{role}"
+                    )
+                    self.assertEqual(
+                        provision.sanitizer._inside_root(
+                            build, f"sanitizer {role} build"
+                        ),
+                        build,
+                    )
         for profile in provision.PROFILES:
             with self.subTest(profile=profile):
-                verifier = provision._normalized_container_argv(
-                    "sanitizer-verify", profile
-                )
-                nested_source_prefix = f"{provision.CONTAINER_SOURCE}/"
-                for marker in ("$TEST_BUILD:", "$FUZZ_BUILD:"):
-                    mount = next(
-                        argument
-                        for argument in verifier
-                        if argument.startswith(marker)
+                for mode in ("sanitizer-produce", "sanitizer-verify"):
+                    command = provision._normalized_container_argv(
+                        mode, profile
                     )
-                    target = mount.split(":", 2)[1]
-                    self.assertFalse(target.startswith(nested_source_prefix))
-                tmpfs_targets = [
-                    verifier[index + 1]
-                    for index, argument in enumerate(verifier[:-1])
-                    if argument == "--tmpfs"
-                ]
-                self.assertIn(
-                    provision._sanitizer_verifier_ctest_tmpfs(profile),
-                    tmpfs_targets,
-                )
-                for target in tmpfs_targets:
-                    self.assertFalse(target.startswith(nested_source_prefix))
+                    self.assertIn(
+                        provision.SANITIZER_SOURCE_BUILD_TMPFS, command
+                    )
+                    overlay_index = command.index(
+                        provision.SANITIZER_SOURCE_BUILD_TMPFS
+                    )
+                    source_index = command.index(
+                        f"$SOURCE:{provision.CONTAINER_SOURCE}:ro"
+                    )
+                    self.assertLess(source_index, overlay_index)
+                    test_mount_index = None
+                    for marker in ("$TEST_BUILD:", "$FUZZ_BUILD:"):
+                        mount_index = next(
+                            index
+                            for index, argument in enumerate(command)
+                            if argument.startswith(marker)
+                        )
+                        target = command[mount_index].split(":", 2)[1]
+                        self.assertTrue(
+                            Path(target).is_relative_to(
+                                provision.CONTAINER_SANITIZER_WORK
+                            )
+                        )
+                        self.assertLess(overlay_index, mount_index)
+                        if marker == "$TEST_BUILD:":
+                            test_mount_index = mount_index
+                    if mode == "sanitizer-verify":
+                        self.assertIsNotNone(test_mount_index)
+                        ctest_index = command.index(
+                            provision._sanitizer_verifier_ctest_tmpfs(profile)
+                        )
+                        self.assertLess(test_mount_index, ctest_index)
 
     def test_sanitizer_mounts_do_not_materialize_publication_destination(self) -> None:
         podman = "/usr/bin/podman"
@@ -478,11 +511,13 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
         ) as temporary:
             root = Path(temporary)
             source = root / "source"
+            source_build = source / "build"
             test_build = root / "test-build"
             fuzz_build = root / "fuzz-build"
-            source.mkdir()
+            source_build.mkdir(parents=True)
             test_build.mkdir()
             fuzz_build.mkdir()
+            source_build_before = source_build.lstat()
             publication = source / "build/p10-09-sanitizers"
             profile = "address"
             completed = provision.staging._bounded_command(
@@ -499,6 +534,8 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
                     "label=disable",
                     "-v",
                     f"{source}:{provision.CONTAINER_SOURCE}:ro",
+                    "--tmpfs",
+                    provision.SANITIZER_SOURCE_BUILD_TMPFS,
                     "-v",
                     f"{test_build}:{provision.CONTAINER_SANITIZER_WORK}/"
                     f"{profile}-tests:rw",
@@ -520,6 +557,12 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
                 output.decode(errors="replace"),
             )
             self.assertFalse(publication.exists())
+            source_build_after = source_build.lstat()
+            self.assertEqual(
+                (source_build_after.st_dev, source_build_after.st_ino),
+                (source_build_before.st_dev, source_build_before.st_ino),
+            )
+            self.assertEqual(list(source_build.iterdir()), [])
 
     def test_ephemeral_ctest_mount_preserves_readonly_host_build(self) -> None:
         podman = "/usr/bin/podman"
