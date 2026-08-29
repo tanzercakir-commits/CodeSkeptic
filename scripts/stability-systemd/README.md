@@ -201,6 +201,21 @@ private sibling and publishes that tree to its fixed name with one
 journal. Each fixed-root rename has a durable intent and commit record and uses
 `RENAME_NOREPLACE` while the old inode remains pinned.
 
+Migration deliberately has a stricter temporary-root contract than the other
+bundle actions. Its root must be the exact empty, mode-`0700`, root-owned
+`/var/lib/codeskeptic-p10-09-migration-temporary` sibling of the absent
+migration journal, beneath a real root-owned parent with no group or world
+write access. The producer pins that inode across target verification,
+capacity proof, journal creation, and installation. Before any journal or
+systemd mutation it also requires the temporary root, `/opt`, `/etc`,
+`/etc/systemd`, `/etc/systemd/system`, `/var/lib`, and an already-existing
+`/etc/systemd/system.control` publication parent to report one device, then
+applies one aggregate free-space gate for both the temporary workspace and the
+retained-old-plus-new persistent footprint. Different device identities are
+rejected rather than treated as proof of independent capacity; this avoids
+double-counting one Btrfs pool whose subvolumes expose different `st_dev`
+values.
+
 The one-time Fedora migration fence is deliberately host-version-specific. On
 the qualified `systemd 259 (259.8-1.fc44)` host it create-new publishes
 `/etc/systemd/system.control/codeskeptic-stability.service -> /dev/null`, then

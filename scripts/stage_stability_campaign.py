@@ -31,7 +31,7 @@ except ModuleNotFoundError:  # Windows can inspect portable source contracts.
     fcntl = None
 
 
-TOOL_VERSION = "5"
+TOOL_VERSION = "6"
 BUNDLE_RECEIPT_SCHEMA = "codeskeptic-stability-staging-bundle-v1"
 INVENTORY_SCHEMA = "codeskeptic-stability-staging-inventory-v1"
 INSTALLATION_RECEIPT_SCHEMA = "codeskeptic-stability-installation-v1"
@@ -7000,19 +7000,61 @@ def _migration_plan(
     }
 
 
-def _verify_migration_capacity(bundle: Path, temporary_root: Path) -> None:
+def _migration_capacity_roots() -> tuple[tuple[str, Path], ...]:
+    """Return every persistent parent that the migration will mutate."""
+
+    roots = (
+        ("migration journal", MIGRATION_ROOT.parent),
+        ("installation", AUTHORITY_ROOT.parent.parent),
+        ("configuration", CONFIG_PATH.parent.parent),
+        ("state", STATE_ROOT.parent),
+        ("unit", UNIT_PATH.parent),
+        ("unit drop-in", UNIT_DROPIN_DIRECTORY.parent),
+        ("systemd control", SYSTEMD_CONTROL_ROOT.parent),
+    )
+    if SYSTEMD_CONTROL_ROOT.exists() or SYSTEMD_CONTROL_ROOT.is_symlink():
+        return (*roots, ("existing systemd control", SYSTEMD_CONTROL_ROOT))
+    return roots
+
+
+def _verify_migration_capacity_topology(temporary_root: Path) -> None:
+    """Require one allocation domain instead of guessing from split devices."""
+
     if not temporary_root.is_absolute():
         raise StagingError("migration temporary root must be absolute")
     try:
         temporary_metadata = temporary_root.lstat()
-        target_metadata = AUTHORITY_ROOT.parent.parent.lstat()
+        temporary_resolved = temporary_root.resolve(strict=True)
     except OSError as error:
-        raise StagingError(f"cannot inspect migration capacity roots: {error}") from error
+        raise StagingError(
+            f"cannot inspect migration capacity roots: {error}"
+        ) from error
     if (
         not stat.S_ISDIR(temporary_metadata.st_mode)
-        or not stat.S_ISDIR(target_metadata.st_mode)
+        or temporary_resolved != temporary_root
     ):
-        raise StagingError("migration capacity root is not a directory")
+        raise StagingError("migration capacity root is not a real directory")
+    for label, root in _migration_capacity_roots():
+        try:
+            metadata = root.lstat()
+            resolved = root.resolve(strict=True)
+        except OSError as error:
+            raise StagingError(
+                f"cannot inspect migration {label} capacity root: {error}"
+            ) from error
+        if not stat.S_ISDIR(metadata.st_mode) or resolved != root:
+            raise StagingError(
+                f"migration {label} capacity root is not a real directory"
+            )
+        if metadata.st_dev != temporary_metadata.st_dev:
+            raise StagingError(
+                "migration temporary and persistent roots must share one "
+                "filesystem"
+            )
+
+
+def _verify_migration_capacity(bundle: Path, temporary_root: Path) -> None:
+    _verify_migration_capacity_topology(temporary_root)
     bundle_bytes = _regular_tree_size(bundle)
     temporary_bytes = _bundle_temporary_requirement(
         bundle, include_snapshot=True
@@ -7020,13 +7062,129 @@ def _verify_migration_capacity(bundle: Path, temporary_root: Path) -> None:
     persistent_bytes = bundle_bytes + _bundle_temporary_requirement(
         bundle, include_snapshot=False
     )
-    if temporary_metadata.st_dev == target_metadata.st_dev:
-        _temporary_capacity(
-            temporary_root, temporary_bytes + persistent_bytes
+    _temporary_capacity(temporary_root, temporary_bytes + persistent_bytes)
+
+
+def _verify_migration_temporary_root_authority(
+    temporary_root: Path,
+    authority: tuple[int, int, int],
+    *,
+    owner_uid: int,
+    owner_gid: int,
+) -> None:
+    device, inode, descriptor = authority
+    try:
+        metadata = temporary_root.lstat()
+        opened = os.fstat(descriptor)
+        resolved = temporary_root.resolve(strict=True)
+        names = list(temporary_root.iterdir())
+    except OSError as error:
+        raise StagingError(
+            f"cannot recheck migration temporary root authority: {error}"
+        ) from error
+    if (
+        resolved != temporary_root
+        or not stat.S_ISDIR(metadata.st_mode)
+        or not stat.S_ISDIR(opened.st_mode)
+        or (metadata.st_dev, metadata.st_ino) != (device, inode)
+        or (opened.st_dev, opened.st_ino) != (device, inode)
+        or metadata.st_uid != owner_uid
+        or metadata.st_gid != owner_gid
+        or opened.st_uid != owner_uid
+        or opened.st_gid != owner_gid
+        or stat.S_IMODE(metadata.st_mode) != 0o700
+        or stat.S_IMODE(opened.st_mode) != 0o700
+        or names
+    ):
+        raise StagingError("migration temporary root identity changed")
+
+
+@contextlib.contextmanager
+def _migration_temporary_root_guard(
+    temporary_root: Path,
+    *,
+    owner_uid: int,
+    owner_gid: int,
+):
+    """Pin one empty root-controlled sibling for the whole migration."""
+
+    canonical_root = (
+        MIGRATION_ROOT.parent / f"{MIGRATION_ROOT.name}-temporary"
+    )
+    if (
+        not temporary_root.is_absolute()
+        or not MIGRATION_ROOT.is_absolute()
+        or temporary_root != canonical_root
+    ):
+        raise StagingError(
+            "migration temporary root must be the exact canonical sibling of "
+            "the migration root"
         )
-    else:
-        _temporary_capacity(temporary_root, temporary_bytes)
-        _temporary_capacity(AUTHORITY_ROOT.parent.parent, persistent_bytes)
+    parent = MIGRATION_ROOT.parent
+    try:
+        parent_metadata = parent.lstat()
+        parent_resolved = parent.resolve(strict=True)
+        metadata = temporary_root.lstat()
+        resolved = temporary_root.resolve(strict=True)
+    except OSError as error:
+        raise StagingError(
+            f"cannot inspect migration temporary root authority: {error}"
+        ) from error
+    if (
+        parent_resolved != parent
+        or not stat.S_ISDIR(parent_metadata.st_mode)
+        or parent_metadata.st_uid != owner_uid
+        or parent_metadata.st_gid != owner_gid
+        or stat.S_IMODE(parent_metadata.st_mode) & 0o022
+    ):
+        raise StagingError(
+            "migration temporary root parent is not root-controlled"
+        )
+    if (
+        resolved != temporary_root
+        or not stat.S_ISDIR(metadata.st_mode)
+        or metadata.st_dev != parent_metadata.st_dev
+        or metadata.st_uid != owner_uid
+        or metadata.st_gid != owner_gid
+        or stat.S_IMODE(metadata.st_mode) != 0o700
+    ):
+        raise StagingError("migration temporary root authority drift")
+    try:
+        if any(temporary_root.iterdir()):
+            raise StagingError("migration temporary root is not empty")
+    except OSError as error:
+        raise StagingError(
+            f"cannot enumerate migration temporary root: {error}"
+        ) from error
+    descriptor = _open_identity_pin(
+        temporary_root,
+        metadata.st_dev,
+        metadata.st_ino,
+        True,
+        "migration temporary root",
+    )
+    authority = (metadata.st_dev, metadata.st_ino, descriptor)
+    primary: BaseException | None = None
+    try:
+        _verify_migration_temporary_root_authority(
+            temporary_root,
+            authority,
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+        )
+        yield authority
+    except BaseException as error:
+        primary = error
+    cleanup_errors: list[Exception] = []
+    try:
+        os.close(descriptor)
+    except OSError as error:
+        cleanup_errors.append(error)
+    _raise_primary_and_cleanup(
+        primary,
+        cleanup_errors,
+        "migration temporary root guard failed",
+    )
 
 
 def _prepare_migration_transaction(
@@ -8534,7 +8692,7 @@ def _remove_recorded_partial_targets(
             )
 
 
-def migrate_installation(
+def _migrate_installation_pinned(
     bundle: Path,
     *,
     current_revision: str,
@@ -8543,6 +8701,7 @@ def migrate_installation(
     expected_revision: str,
     expected_bundle_receipt_sha256: str,
     temporary_root: Path,
+    temporary_root_authority: tuple[int, int, int],
     command_runner: Any | None = None,
     require_root: bool = True,
     owner_uid: int = 0,
@@ -8572,12 +8731,24 @@ def migrate_installation(
     )
     if current_revision == expected_revision:
         raise StagingError("installation migration revisions must differ")
+    _verify_migration_temporary_root_authority(
+        temporary_root,
+        temporary_root_authority,
+        owner_uid=owner_uid,
+        owner_gid=owner_gid,
+    )
     verify_bundle(
         bundle,
         expected_revision=expected_revision,
         expected_bundle_receipt_sha256=expected_bundle_receipt_sha256,
         command_runner=command_runner,
         temporary_root=temporary_root,
+    )
+    _verify_migration_temporary_root_authority(
+        temporary_root,
+        temporary_root_authority,
+        owner_uid=owner_uid,
+        owner_gid=owner_gid,
     )
     _verify_migration_capacity(bundle, temporary_root)
     with _migration_lock(owner_uid, owner_gid):
@@ -8617,6 +8788,13 @@ def migrate_installation(
                 systemd_version=systemd_version,
             )
             try:
+                _verify_migration_temporary_root_authority(
+                    temporary_root,
+                    temporary_root_authority,
+                    owner_uid=owner_uid,
+                    owner_gid=owner_gid,
+                )
+                _verify_migration_capacity(bundle, temporary_root)
                 transaction_nodes = _prepare_migration_transaction(
                     plan, owner_uid, owner_gid
                 )
@@ -8648,6 +8826,12 @@ def migrate_installation(
                             owner_uid=owner_uid,
                             owner_gid=owner_gid,
                             transaction_nodes=transaction_nodes,
+                        )
+                        _verify_migration_temporary_root_authority(
+                            temporary_root,
+                            temporary_root_authority,
+                            owner_uid=owner_uid,
+                            owner_gid=owner_gid,
                         )
                         installed = install_bundle(
                             bundle,
@@ -8835,6 +9019,49 @@ def migrate_installation(
                     _release_created(transaction_nodes)
                 _close_migration_nodes(nodes)
                 raise
+
+
+def migrate_installation(
+    bundle: Path,
+    *,
+    current_revision: str,
+    current_bundle_receipt_sha256: str,
+    current_producer_sha256: str,
+    expected_revision: str,
+    expected_bundle_receipt_sha256: str,
+    temporary_root: Path,
+    command_runner: Any | None = None,
+    require_root: bool = True,
+    owner_uid: int = 0,
+    owner_gid: int = 0,
+) -> dict[str, Any]:
+    """Run migration while its canonical temporary authority stays pinned."""
+
+    if require_root:
+        _require_root()
+    with _migration_temporary_root_guard(
+        temporary_root,
+        owner_uid=owner_uid,
+        owner_gid=owner_gid,
+    ) as temporary_root_authority:
+        return _migrate_installation_pinned(
+            bundle,
+            current_revision=current_revision,
+            current_bundle_receipt_sha256=(
+                current_bundle_receipt_sha256
+            ),
+            current_producer_sha256=current_producer_sha256,
+            expected_revision=expected_revision,
+            expected_bundle_receipt_sha256=(
+                expected_bundle_receipt_sha256
+            ),
+            temporary_root=temporary_root,
+            temporary_root_authority=temporary_root_authority,
+            command_runner=command_runner,
+            require_root=require_root,
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+        )
 
 
 def _resolve_interrupted_migration(

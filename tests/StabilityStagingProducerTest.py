@@ -819,7 +819,7 @@ while True:
 
     def test_cli_is_versioned_and_exposes_the_complete_lifecycle(self) -> None:
         assert stage is not None
-        self.assertEqual(stage.TOOL_VERSION, "5")
+        self.assertEqual(stage.TOOL_VERSION, "6")
         parser = stage.build_parser()
         subparser_actions = [
             action
@@ -855,7 +855,7 @@ while True:
         )
         self.assertEqual(version.returncode, 0, version.stderr)
         self.assertEqual(version.stderr, "")
-        self.assertEqual(version.stdout, "CodeSkeptic P10-09 staging producer 5\n")
+        self.assertEqual(version.stdout, "CodeSkeptic P10-09 staging producer 6\n")
 
     def test_cli_dispatches_every_lifecycle_command(self) -> None:
         assert stage is not None
@@ -4824,6 +4824,413 @@ while True:
             arguments.expected_bundle_receipt_sha256, "5" * 64
         )
 
+    def test_migration_capacity_uses_one_aggregate_fixed_filesystem_gate(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            install_workspace = workspace / "layout"
+            install_workspace.mkdir()
+            bundle = workspace / "sealed"
+            bundle.mkdir()
+            with patched_install_layout(install_workspace) as _layout:
+                migration_root = (
+                    install_workspace
+                    / "var/lib/codeskeptic-p10-09-migration"
+                )
+                temporary_root = (
+                    migration_root.parent / f"{migration_root.name}-temporary"
+                )
+                temporary_root.mkdir(mode=0o700)
+                control_root = (
+                    install_workspace / "etc/systemd/system.control"
+                )
+                requirements = mock.patch.object(
+                    stage,
+                    "_bundle_temporary_requirement",
+                    side_effect=(
+                        lambda *_args, include_snapshot: (
+                            20 if include_snapshot else 30
+                        )
+                    ),
+                )
+                with (
+                    mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                    mock.patch.object(
+                        stage, "SYSTEMD_CONTROL_ROOT", control_root
+                    ),
+                    mock.patch.object(
+                        stage, "_regular_tree_size", return_value=10
+                    ),
+                    requirements,
+                    mock.patch.object(
+                        stage, "_temporary_available_bytes", return_value=59
+                    ),
+                    self.assertRaisesRegex(
+                        stage.StagingError, "insufficient free space"
+                    ),
+                ):
+                    stage._verify_migration_capacity(bundle, temporary_root)
+                with (
+                    mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                    mock.patch.object(
+                        stage, "SYSTEMD_CONTROL_ROOT", control_root
+                    ),
+                    mock.patch.object(
+                        stage, "_regular_tree_size", return_value=10
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "_bundle_temporary_requirement",
+                        side_effect=(
+                            lambda *_args, include_snapshot: (
+                                20 if include_snapshot else 30
+                            )
+                        ),
+                    ),
+                    mock.patch.object(
+                        stage, "_temporary_available_bytes", return_value=60
+                    ) as available,
+                ):
+                    stage._verify_migration_capacity(bundle, temporary_root)
+                available.assert_called_once_with(temporary_root)
+
+    def test_migration_capacity_rejects_split_device_topology(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            install_workspace = workspace / "layout"
+            install_workspace.mkdir()
+            bundle = workspace / "sealed"
+            bundle.mkdir()
+            with patched_install_layout(install_workspace) as layout:
+                migration_root = (
+                    install_workspace
+                    / "var/lib/codeskeptic-p10-09-migration"
+                )
+                temporary_root = (
+                    migration_root.parent / f"{migration_root.name}-temporary"
+                )
+                temporary_root.mkdir(mode=0o700)
+                control_root = (
+                    install_workspace / "etc/systemd/system.control"
+                )
+                split_root = layout["AUTHORITY_ROOT"].parent.parent
+                real_lstat = Path.lstat
+
+                def split_device(path: Path, *args, **kwargs):
+                    metadata = real_lstat(path, *args, **kwargs)
+                    if path == split_root:
+                        values = list(metadata)
+                        values[2] = metadata.st_dev + 1
+                        return os.stat_result(values)
+                    return metadata
+
+                with (
+                    mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                    mock.patch.object(
+                        stage, "SYSTEMD_CONTROL_ROOT", control_root
+                    ),
+                    mock.patch.object(Path, "lstat", new=split_device),
+                    mock.patch.object(
+                        stage, "_regular_tree_size", return_value=10
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "_bundle_temporary_requirement",
+                        return_value=20,
+                    ),
+                    mock.patch.object(
+                        stage, "_temporary_available_bytes", return_value=1000
+                    ),
+                    self.assertRaisesRegex(
+                        stage.StagingError, "share one filesystem"
+                    ),
+                ):
+                    stage._verify_migration_capacity(bundle, temporary_root)
+
+    def test_migration_rejects_absent_control_parent_device_drift_before_lock(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            install_workspace = workspace / "layout"
+            install_workspace.mkdir()
+            bundle = workspace / "sealed"
+            bundle.mkdir()
+            with patched_install_layout(install_workspace) as _layout:
+                migration_root = (
+                    install_workspace
+                    / "var/lib/codeskeptic-p10-09-migration"
+                )
+                temporary_root = (
+                    migration_root.parent / f"{migration_root.name}-temporary"
+                )
+                temporary_root.mkdir(mode=0o700)
+                control_root = (
+                    install_workspace / "etc/systemd/system.control"
+                )
+                self.assertFalse(control_root.exists())
+                split_root = control_root.parent
+                real_lstat = Path.lstat
+
+                def split_device(path: Path, *args, **kwargs):
+                    metadata = real_lstat(path, *args, **kwargs)
+                    if path == split_root:
+                        values = list(metadata)
+                        values[2] = metadata.st_dev + 1
+                        return os.stat_result(values)
+                    return metadata
+
+                with (
+                    mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                    mock.patch.object(
+                        stage, "SYSTEMD_CONTROL_ROOT", control_root
+                    ),
+                    mock.patch.object(Path, "lstat", new=split_device),
+                    mock.patch.object(stage, "verify_bundle", return_value={}),
+                    mock.patch.object(
+                        stage, "_regular_tree_size", return_value=10
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "_bundle_temporary_requirement",
+                        return_value=20,
+                    ),
+                    mock.patch.object(
+                        stage, "_temporary_available_bytes", return_value=1000
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "_migration_lock",
+                        side_effect=stage.StagingError("migration lock reached"),
+                    ) as migration_lock,
+                    self.assertRaisesRegex(
+                        stage.StagingError, "share one filesystem"
+                    ),
+                ):
+                    stage.migrate_installation(
+                        bundle,
+                        current_revision="1" * 40,
+                        current_bundle_receipt_sha256="2" * 64,
+                        current_producer_sha256="3" * 64,
+                        expected_revision="4" * 40,
+                        expected_bundle_receipt_sha256="5" * 64,
+                        temporary_root=temporary_root,
+                        require_root=False,
+                        owner_uid=os.getuid(),
+                        owner_gid=os.getgid(),
+                    )
+                migration_lock.assert_not_called()
+                self.assertFalse(migration_root.exists())
+
+    def test_migration_rejects_existing_control_root_device_drift_before_lock(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            install_workspace = workspace / "layout"
+            install_workspace.mkdir()
+            bundle = workspace / "sealed"
+            bundle.mkdir()
+            with patched_install_layout(install_workspace) as _layout:
+                migration_root = (
+                    install_workspace
+                    / "var/lib/codeskeptic-p10-09-migration"
+                )
+                temporary_root = (
+                    migration_root.parent / f"{migration_root.name}-temporary"
+                )
+                temporary_root.mkdir(mode=0o700)
+                control_root = (
+                    install_workspace / "etc/systemd/system.control"
+                )
+                control_root.mkdir(mode=0o755)
+                split_root = control_root
+                real_lstat = Path.lstat
+
+                def split_device(path: Path, *args, **kwargs):
+                    metadata = real_lstat(path, *args, **kwargs)
+                    if path == split_root:
+                        values = list(metadata)
+                        values[2] = metadata.st_dev + 1
+                        return os.stat_result(values)
+                    return metadata
+
+                with (
+                    mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                    mock.patch.object(
+                        stage, "SYSTEMD_CONTROL_ROOT", control_root
+                    ),
+                    mock.patch.object(Path, "lstat", new=split_device),
+                    mock.patch.object(stage, "verify_bundle", return_value={}),
+                    mock.patch.object(
+                        stage, "_regular_tree_size", return_value=10
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "_bundle_temporary_requirement",
+                        return_value=20,
+                    ),
+                    mock.patch.object(
+                        stage, "_temporary_available_bytes", return_value=1000
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "_migration_lock",
+                        side_effect=stage.StagingError("migration lock reached"),
+                    ) as migration_lock,
+                    self.assertRaisesRegex(
+                        stage.StagingError, "share one filesystem"
+                    ),
+                ):
+                    stage.migrate_installation(
+                        bundle,
+                        current_revision="1" * 40,
+                        current_bundle_receipt_sha256="2" * 64,
+                        current_producer_sha256="3" * 64,
+                        expected_revision="4" * 40,
+                        expected_bundle_receipt_sha256="5" * 64,
+                        temporary_root=temporary_root,
+                        require_root=False,
+                        owner_uid=os.getuid(),
+                        owner_gid=os.getgid(),
+                    )
+                migration_lock.assert_not_called()
+                self.assertFalse(migration_root.exists())
+
+    def test_migration_rejects_noncanonical_temporary_root_before_verify(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            bundle = workspace / "sealed"
+            bundle.mkdir()
+            migration_root = workspace / "var/lib/migration"
+            migration_root.parent.mkdir(parents=True)
+            temporary_root = workspace / "home/migration-temporary"
+            temporary_root.mkdir(parents=True, mode=0o700)
+            with (
+                mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                mock.patch.object(stage, "verify_bundle") as verify_bundle,
+                mock.patch.object(stage, "_verify_migration_capacity"),
+                mock.patch.object(
+                    stage,
+                    "_migration_lock",
+                    side_effect=stage.StagingError("migration lock reached"),
+                ) as migration_lock,
+                self.assertRaisesRegex(
+                    stage.StagingError, "exact canonical sibling"
+                ),
+            ):
+                stage.migrate_installation(
+                    bundle,
+                    current_revision="1" * 40,
+                    current_bundle_receipt_sha256="2" * 64,
+                    current_producer_sha256="3" * 64,
+                    expected_revision="4" * 40,
+                    expected_bundle_receipt_sha256="5" * 64,
+                    temporary_root=temporary_root,
+                    require_root=False,
+                    owner_uid=os.getuid(),
+                    owner_gid=os.getgid(),
+                )
+            verify_bundle.assert_not_called()
+            migration_lock.assert_not_called()
+
+    def test_migration_pins_temporary_root_across_bundle_verification(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            bundle = workspace / "sealed"
+            bundle.mkdir()
+            migration_root = workspace / "migration"
+            temporary_root = workspace / "migration-temporary"
+            temporary_root.mkdir(mode=0o700)
+            displaced_root = workspace / "displaced-migration-temporary"
+
+            def replace_temporary_root(*_args, **_kwargs):
+                temporary_root.rename(displaced_root)
+                temporary_root.mkdir(mode=0o700)
+                return {}
+
+            with (
+                mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                mock.patch.object(
+                    stage,
+                    "verify_bundle",
+                    side_effect=replace_temporary_root,
+                ) as verify_bundle,
+                mock.patch.object(stage, "_verify_migration_capacity"),
+                mock.patch.object(
+                    stage,
+                    "_migration_lock",
+                    side_effect=stage.StagingError("migration lock reached"),
+                ) as migration_lock,
+                self.assertRaisesRegex(
+                    stage.StagingError, "temporary root identity changed"
+                ),
+            ):
+                stage.migrate_installation(
+                    bundle,
+                    current_revision="1" * 40,
+                    current_bundle_receipt_sha256="2" * 64,
+                    current_producer_sha256="3" * 64,
+                    expected_revision="4" * 40,
+                    expected_bundle_receipt_sha256="5" * 64,
+                    temporary_root=temporary_root,
+                    require_root=False,
+                    owner_uid=os.getuid(),
+                    owner_gid=os.getgid(),
+                )
+            verify_bundle.assert_called_once()
+            migration_lock.assert_not_called()
+
+    def test_migration_rejects_writable_temporary_parent_before_verify(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            bundle = workspace / "sealed"
+            bundle.mkdir()
+            migration_parent = workspace / "var-lib"
+            migration_parent.mkdir(mode=0o700)
+            migration_parent.chmod(0o777)
+            migration_root = migration_parent / "migration"
+            temporary_root = (
+                migration_parent / f"{migration_root.name}-temporary"
+            )
+            temporary_root.mkdir(mode=0o700)
+            with (
+                mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                mock.patch.object(stage, "verify_bundle") as verify_bundle,
+                self.assertRaisesRegex(
+                    stage.StagingError, "parent is not root-controlled"
+                ),
+            ):
+                stage.migrate_installation(
+                    bundle,
+                    current_revision="1" * 40,
+                    current_bundle_receipt_sha256="2" * 64,
+                    current_producer_sha256="3" * 64,
+                    expected_revision="4" * 40,
+                    expected_bundle_receipt_sha256="5" * 64,
+                    temporary_root=temporary_root,
+                    require_root=False,
+                    owner_uid=os.getuid(),
+                    owner_gid=os.getgid(),
+                )
+            verify_bundle.assert_not_called()
+
     def test_install_migration_rehomes_exact_roots_and_retains_backup(
         self,
     ) -> None:
@@ -4834,13 +5241,15 @@ while True:
             install_workspace.mkdir()
             bundle = workspace / "sealed"
             bundle.mkdir()
-            temporary_root = workspace / "temporary"
-            temporary_root.mkdir()
             with patched_install_layout(install_workspace) as layout:
                 migration_root = (
                     install_workspace
                     / "var/lib/codeskeptic-p10-09-migration"
                 )
+                temporary_root = (
+                    migration_root.parent / f"{migration_root.name}-temporary"
+                )
+                temporary_root.mkdir(mode=0o700)
                 migration_lock = (
                     install_workspace
                     / "run/codeskeptic-p10-09-migration.lock"
@@ -4914,7 +5323,12 @@ while True:
                     ),
                     mock.patch.object(stage, "verify_bundle", return_value={}),
                     mock.patch.object(
-                        stage, "_verify_migration_capacity", create=True
+                        stage, "_regular_tree_size", return_value=1
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "_bundle_temporary_requirement",
+                        return_value=1,
                     ),
                     mock.patch.object(
                         stage,
@@ -4991,9 +5405,9 @@ while True:
             workspace = Path(temporary)
             bundle = workspace / "bundle"
             bundle.mkdir()
-            temporary_root = workspace / "temporary"
-            temporary_root.mkdir()
             migration_root = workspace / "migration"
+            temporary_root = workspace / f"{migration_root.name}-temporary"
+            temporary_root.mkdir(mode=0o700)
             with (
                 mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
                 mock.patch.object(stage, "verify_bundle", return_value={}),
@@ -5021,6 +5435,75 @@ while True:
                 )
             migration_lock.assert_not_called()
             self.assertFalse(migration_root.exists())
+
+    def test_locked_capacity_recheck_closes_pinned_old_nodes(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            bundle = workspace / "bundle"
+            bundle.mkdir()
+            migration_root = workspace / "migration"
+            temporary_root = workspace / f"{migration_root.name}-temporary"
+            temporary_root.mkdir(mode=0o700)
+            nodes = [{"fixture": "identity-pinned old roots"}]
+            with (
+                mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                mock.patch.object(stage, "verify_bundle", return_value={}),
+                mock.patch.object(
+                    stage,
+                    "_verify_migration_capacity",
+                    side_effect=(
+                        None,
+                        stage.StagingError("locked capacity recheck failed"),
+                    ),
+                ),
+                mock.patch.object(
+                    stage,
+                    "_migration_lock",
+                    return_value=contextlib.nullcontext(),
+                ),
+                mock.patch.object(
+                    stage,
+                    "_migration_guided_lock",
+                    return_value=contextlib.nullcontext(),
+                ),
+                mock.patch.object(
+                    stage, "_verify_current_installation_with_producer"
+                ),
+                mock.patch.object(stage, "_run_current_recovery_gates"),
+                mock.patch.object(
+                    stage,
+                    "_verify_migration_systemd_version",
+                    return_value=stage.MIGRATION_SYSTEMD_VERSION,
+                ),
+                mock.patch.object(
+                    stage, "_migration_source_nodes", return_value=nodes
+                ),
+                mock.patch.object(stage, "_migration_plan", return_value={}),
+                mock.patch.object(
+                    stage, "_prepare_migration_transaction"
+                ) as prepare_transaction,
+                mock.patch.object(
+                    stage, "_close_migration_nodes"
+                ) as close_nodes,
+                self.assertRaisesRegex(
+                    stage.StagingError, "locked capacity recheck failed"
+                ),
+            ):
+                stage.migrate_installation(
+                    bundle,
+                    current_revision="1" * 40,
+                    current_bundle_receipt_sha256="2" * 64,
+                    current_producer_sha256="3" * 64,
+                    expected_revision="4" * 40,
+                    expected_bundle_receipt_sha256="5" * 64,
+                    temporary_root=temporary_root,
+                    require_root=False,
+                    owner_uid=os.getuid(),
+                    owner_gid=os.getgid(),
+                )
+            prepare_transaction.assert_not_called()
+            close_nodes.assert_called_once_with(nodes)
 
     def test_migration_rejects_unpinned_or_misreporting_old_producer(self) -> None:
         assert stage is not None
@@ -5757,13 +6240,15 @@ while True:
             install_workspace.mkdir()
             bundle = workspace / "sealed"
             bundle.mkdir()
-            temporary_root = workspace / "temporary"
-            temporary_root.mkdir()
             with patched_install_layout(install_workspace) as layout:
                 migration_root = (
                     install_workspace
                     / "var/lib/codeskeptic-p10-09-migration"
                 )
+                temporary_root = (
+                    migration_root.parent / f"{migration_root.name}-temporary"
+                )
+                temporary_root.mkdir(mode=0o700)
                 migration_lock = (
                     install_workspace
                     / "run/codeskeptic-p10-09-migration.lock"
