@@ -826,6 +826,7 @@ def _verify_operator_snapshot(stage: Any, roots: SnapshotRoots) -> None:
         "guided-stability.sh": systemd / "guided-stability.sh",
         "post-stop.sh": systemd / "post-stop.sh",
         "run-authoritative-stability.sh": systemd / "run-authoritative-stability.sh",
+        stage.UNIT_DROPIN_NAME: systemd / stage.UNIT_DROPIN_NAME,
         stage.UNIT_NAME: systemd / stage.UNIT_NAME,
         "stage_stability_campaign.py": source / "scripts" / "stage_stability_campaign.py",
     }
@@ -850,6 +851,9 @@ def _verify_operator_snapshot(stage: Any, roots: SnapshotRoots) -> None:
         if _mode(operator_path.lstat()) != expected_mode:
             raise ExportError(f"exported operator {name} mode drift")
     try:
+        stage.verify_timeout_override(
+            roots.operator / stage.UNIT_DROPIN_NAME
+        )
         stage.verify_static_unit(roots.operator / stage.UNIT_NAME)
         stage._reject_operator_hooks(roots.operator)  # noqa: SLF001
     except Exception as error:

@@ -110,7 +110,8 @@ digest and image ID before any installation path is changed.
 ## Staging lifecycle
 
 `scripts/stage_stability_campaign.py` exposes exactly `prepare`, `configure`,
-`seal`, `verify`, `install`, `verify-install`, and
+`seal`, `verify`, `install`, `migrate-install`,
+`recover-install-migration`, `verify-install`, and
 `verify-install-filesystem`. `prepare` clones a clean,
 detached, standalone exact-head source and creates only the fixed authority
 layout; the `config` root remains absent until publication. It
@@ -188,12 +189,85 @@ verify-install create, use, and remove the exact service pathname
 cold boot reopens the persistent dedicated store without changing Podman's
 storage identity.
 
+`migrate-install` is the only admissible replacement path when a different
+receipt-bound revision already occupies the fixed installation names. Before
+the first host mutation it fully verifies the target bundle, proves sufficient
+temporary plus persistent capacity, locks both the external migration domain
+and the installed guided lifecycle, executes the current installed producer
+whose SHA-256 is supplied out of band, and passes startup-recovery and cgroup
+clean-state gates. It builds the complete persistent canonical journal in a
+private sibling and publishes that tree to its fixed name with one
+`RENAME_NOREPLACE`, so a power loss cannot expose a half-created authoritative
+journal. Each fixed-root rename has a durable intent and commit record and uses
+`RENAME_NOREPLACE` while the old inode remains pinned.
+
+The one-time Fedora migration fence is deliberately host-version-specific. On
+the qualified `systemd 259 (259.8-1.fc44)` host it create-new publishes
+`/etc/systemd/system.control/codeskeptic-stability.service -> /dev/null`, then
+requires the exact masked fragment, inactive/dead/no-job/no-PID state, a
+rejected manual start, and an empty service cgroup. This control-path technique
+is not presented as a portable installation API. The fence persists across a
+power loss and is removed by exact inode only after either the old or target
+installation has been fully restored and reverified. Its symlink inode is
+prepared inside the atomic migration journal and hard-linked into
+`system.control`; recovery therefore rejects even a root-owned `/dev/null`
+mask with a different inode instead of adopting and deleting an administrator's
+pre-existing mask. A create-new `system.control` directory is likewise bound by
+durable intent and commit records before publication. It is removed with a
+completed rollback only after the complete journal root has been moved from its
+fixed name into an exact-inode quarantine and that parent rename has been
+durably synced. A power loss while deleting the quarantine can therefore leak
+only a non-authoritative random sibling, never a partial journal at the fixed
+name. The optional control-root cleanup runs afterward, so a later power loss
+can leave only a harmless empty control directory, never a journal committed to
+a missing inode.
+If that exact directory changed or became occupied after fence release, cleanup
+preserves it and reports it as retained. A successful replacement retains it
+with the old backup journal so later recovery can recreate only the same
+journal-owned fence. While the journal's `active` marker exists, the new guided
+entrypoint also refuses to run.
+
+The old roots are retained below the root-private migration journal after a
+successful replacement. Installer exit status is not treated as the commit
+decision. Every migration-mode file inode, directory staging root, and tree
+staging root is first allocated below the journal's pre-published
+`publication-staging` authority, with same-filesystem identity enforced against
+its fixed target parent. Files are staged directly in that root, so their
+successful atomic rename cannot strand a wrapper directory. A crash before
+target intent therefore leaves no unowned staging name in `/etc`, `/opt`, or
+the fixed state parents. Before every target create-new publication, the
+installer durably records that target's staged device/inode identity and
+records commit only after the rename, both changed parent directories, and the
+published inode are durably verified. A target receipt and all fixed targets
+are independently rederived. Recovery accepts the complete target only when
+`publication-staging` is empty; it never deletes an unauthenticated child while
+committing success. Any remaining or unexpected child keeps the fence and
+journal fail-closed.
+Recovery can therefore move only authenticated installer-owned partial targets
+into deterministic journal-owned quarantine names before restoring old roots;
+that quarantine is removed only with the complete rolled-back journal. The
+active marker is atomically renamed to a retained `retired` marker after target
+success instead of opening a child-deletion crash window. An unexplained or
+foreign partial target is
+never overwritten; the fence and journal stay in place. Recovery infers each
+old inode's source/backup location, holds that old state's existing
+`guided.lock` across all rollback mutations, completes a fully verified target
+or restores only unobstructed old names, and remains fail-closed on foreign or
+ambiguous state.
+The retained backup is not automatically deleted; it becomes removable only
+after the separate live probe accepts the new systemd and runtime contract.
+
 `verify-install-filesystem` is the mutation-free recovery subset. It rederives
 the receipt and sidecar, retained bundle metadata and manifests, mapped payload
 inventory and ownership, exact-head source/operator/config/unit bytes, and the
 retained image archive without listing, starting, or removing a Podman object
-and without creating the runroot. Whole-host recovery runs this subset before
-it trusts a recovery marker or container identity. The explicit staging/admin
+and without creating the runroot. The unit authority includes the exact
+service-specific `10-timeout-abort.conf` override, its fixed live path, root
+ownership, modes, and byte identity. That override restores systemd's
+`terminate` stop-timeout behavior for only the CodeSkeptic service while
+shadowing Fedora's type-wide `service.d/10-timeout-abort.conf` policy.
+Whole-host recovery runs this subset before it trusts a recovery marker or
+container identity. The explicit staging/admin
 `verify-install` action retains the full image-store execution checks, but the
 guided launch does not call it: mutating Podman before durable recovery
 authority would create an unowned crash window. During a guided launch, the
@@ -237,10 +311,11 @@ sudo python3 scripts/stage_stability_campaign.py install --bundle SEALED \
 
 ## One-command guided start
 
-The checksummed exact-head staging step installs the authority, canonical config pair,
-dedicated image store, operator bundle, and an exact copy of the service unit;
-it must never synthesize authority from a dirty working tree. After that step,
-one command starts and follows the operator:
+The checksummed exact-head staging step installs the authority, canonical
+config pair, dedicated image store, operator bundle, exact service unit, and
+its canonical timeout override; it must never synthesize authority from a
+dirty working tree. After that step, one command starts and follows the
+operator:
 
 ```text
 /opt/codeskeptic-p10-09/operator/guided-stability.sh
@@ -550,9 +625,11 @@ fails closed.
 
 ## Terminal notification
 
-The staged service fixes `CODESKEPTIC_TERMINAL_NOTIFY=0`, and the guided
-entrypoint rejects every systemd drop-in so the effective service authority
-cannot be changed outside the staged unit. Guided emits a triple terminal bell
-when its bounded handoff wait returns; post-stop also attempts the console bell
+The staged service fixes `CODESKEPTIC_TERMINAL_NOTIFY=0`. The guided entrypoint
+accepts only the bundle-bound, service-specific timeout override and rejects
+every non-canonical systemd drop-in, so the effective service authority cannot
+be changed outside the staged unit and its sealed override. Guided emits a
+triple terminal bell when its bounded handoff wait returns; post-stop also
+attempts the console bell
 after persisting its exact outcome. Notification delivery is never an
 acceptance condition, and no exit-code capture is required from the user.

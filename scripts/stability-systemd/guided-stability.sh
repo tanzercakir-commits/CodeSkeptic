@@ -14,7 +14,9 @@ readonly HOST_RECOVERY_PATH="${OPERATOR_ROOT}/host-recovery.py"
 readonly POST_STOP_PATH="${OPERATOR_ROOT}/post-stop.sh"
 readonly README_PATH="${OPERATOR_ROOT}/README.md"
 readonly UNIT_BUNDLE_PATH="${OPERATOR_ROOT}/codeskeptic-stability.service"
+readonly UNIT_DROPIN_BUNDLE_PATH="${OPERATOR_ROOT}/10-timeout-abort.conf"
 readonly UNIT_PATH="/etc/systemd/system/codeskeptic-stability.service"
+readonly UNIT_DROPIN_PATH="${UNIT_PATH}.d/10-timeout-abort.conf"
 readonly CONFIG_ROOT="/etc/codeskeptic-p10-09"
 readonly CONFIG_PATH="${CONFIG_ROOT}/runtime.json"
 readonly CONFIG_SHA_PATH="${CONFIG_PATH}.sha256"
@@ -34,6 +36,7 @@ readonly SESSION_PATH="/run/codeskeptic-p10-09/session-name"
 readonly RESTORE_GRAPHICAL_PATH="/var/lib/codeskeptic-p10-09/graphical-restoration-state.json"
 readonly INSTALLATION_RECEIPT_PATH="/opt/codeskeptic-p10-09/installation/receipt.json"
 readonly INSTALLATION_AUTHORITY_PATH="/var/lib/codeskeptic-p10-09/installation-authority.json"
+readonly MIGRATION_ACTIVE_PATH="/var/lib/codeskeptic-p10-09-migration/active"
 readonly SERVICE_UNIT="codeskeptic-stability.service"
 readonly SYSTEMCTL="/usr/bin/systemctl"
 readonly PRLIMIT="/usr/bin/prlimit"
@@ -587,6 +590,9 @@ else
 fi
 [[ "$0" == "$GUIDED_PATH" ]] ||
     staging_unavailable "run the installed entrypoint ${GUIDED_PATH}"
+[[ ! -e "$MIGRATION_ACTIVE_PATH" && ! -L "$MIGRATION_ACTIVE_PATH" ]] ||
+    staging_unavailable \
+        "installation migration is unresolved: ${MIGRATION_ACTIVE_PATH}"
 if [[ "$guided_mode" == "campaign" ]]; then
     campaign_target_user="${SUDO_USER:-}"
     campaign_target_uid="${SUDO_UID:-}"
@@ -672,6 +678,9 @@ fi
     staging_unavailable "guided invocation lock is not exactly inherited"
 /usr/bin/cmp --silent -- "$UNIT_BUNDLE_PATH" "$UNIT_PATH" ||
     staging_unavailable "reinstall ${UNIT_PATH} from the staged operator bundle"
+/usr/bin/cmp --silent -- "$UNIT_DROPIN_BUNDLE_PATH" "$UNIT_DROPIN_PATH" ||
+    staging_unavailable \
+        "reinstall ${UNIT_DROPIN_PATH} from the staged operator bundle"
 
 "$PYTHON" -B - "$CONFIG_PATH" "$CONFIG_SHA_PATH" "$MAX_CONFIG_BYTES" <<'PY' ||
 import hashlib
@@ -702,9 +711,16 @@ fragment_path="$(
 drop_in_paths="$(
     "$SYSTEMCTL" show --property=DropInPaths --value "$SERVICE_UNIT"
 )" || staging_unavailable "cannot inspect ${SERVICE_UNIT} drop-in authority"
-[[ -z "$drop_in_paths" ]] ||
+[[ "$drop_in_paths" == "$UNIT_DROPIN_PATH" ]] ||
     staging_unavailable \
-        "${SERVICE_UNIT} must not have systemd drop-ins: ${drop_in_paths}"
+        "${SERVICE_UNIT} has non-canonical systemd drop-ins: ${drop_in_paths}"
+timeout_stop_failure_mode="$(
+    "$SYSTEMCTL" show --property=TimeoutStopFailureMode --value "$SERVICE_UNIT"
+)" || staging_unavailable \
+    "cannot inspect ${SERVICE_UNIT} stop-timeout failure mode"
+[[ "$timeout_stop_failure_mode" == "terminate" ]] ||
+    staging_unavailable \
+        "${SERVICE_UNIT} stop-timeout failure mode drift: ${timeout_stop_failure_mode}"
 [[ "$("$SYSTEMCTL" show --property=LoadState --value "$SERVICE_UNIT")" == "loaded" ]] ||
     staging_unavailable "systemd could not load ${SERVICE_UNIT}"
 [[ "$("$SYSTEMCTL" show --property=UnitFileState --value "$SERVICE_UNIT")" == "static" ]] ||

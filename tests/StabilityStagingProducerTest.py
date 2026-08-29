@@ -54,6 +54,7 @@ UNIT = (
     / "stability-systemd"
     / "codeskeptic-stability.service"
 )
+TIMEOUT_OVERRIDE = UNIT.parent / "10-timeout-abort.conf"
 
 BUNDLE_FIELDS = frozenset(
     {
@@ -320,6 +321,7 @@ def initialize_lifecycle_source(
         "ProtectControlGroups=no\n",
         encoding="utf-8",
     )
+    shutil.copyfile(TIMEOUT_OVERRIDE, systemd / TIMEOUT_OVERRIDE.name)
     for executable in (
         "guided-stability.sh", "run-authoritative-stability.sh",
         "cgroup-authority.py", "container-entry.py", "host-recovery.py",
@@ -417,6 +419,7 @@ def make_manual_prepared_tree(
             systemd / "run-authoritative-stability.sh"
         ),
         UNIT.name: systemd / UNIT.name,
+        TIMEOUT_OVERRIDE.name: systemd / TIMEOUT_OVERRIDE.name,
         PRODUCER.name: source / "scripts" / PRODUCER.name,
     }
     for name, source_path in operator_files.items():
@@ -426,6 +429,13 @@ def make_manual_prepared_tree(
         )
     shutil.copyfile(systemd / UNIT.name, prepared / "unit" / UNIT.name)
     (prepared / "unit" / UNIT.name).chmod(0o400)
+    retained_dropin_directory = prepared / "unit" / f"{UNIT.name}.d"
+    retained_dropin_directory.mkdir(mode=0o700)
+    shutil.copyfile(
+        systemd / TIMEOUT_OVERRIDE.name,
+        retained_dropin_directory / TIMEOUT_OVERRIDE.name,
+    )
+    (retained_dropin_directory / TIMEOUT_OVERRIDE.name).chmod(0o400)
     write_payload(
         prepared / "image" / stage.PINNED_ARCHIVE_NAME,
         b"fixture OCI archive\n",
@@ -474,6 +484,15 @@ def patched_install_layout(workspace: Path):
         "CONFIG_PATH": workspace / "etc/codeskeptic-p10-09/runtime.json",
         "UNIT_PATH": (
             workspace / "etc/systemd/system/codeskeptic-stability.service"
+        ),
+        "UNIT_DROPIN_DIRECTORY": (
+            workspace
+            / "etc/systemd/system/codeskeptic-stability.service.d"
+        ),
+        "UNIT_DROPIN_PATH": (
+            workspace
+            / "etc/systemd/system/codeskeptic-stability.service.d"
+            / TIMEOUT_OVERRIDE.name
         ),
         "INSTALLATION_ROOT": workspace / "opt/codeskeptic-p10-09/installation",
         "INSTALLATION_RECEIPT_PATH": (
@@ -800,7 +819,7 @@ while True:
 
     def test_cli_is_versioned_and_exposes_the_complete_lifecycle(self) -> None:
         assert stage is not None
-        self.assertEqual(stage.TOOL_VERSION, "4")
+        self.assertEqual(stage.TOOL_VERSION, "5")
         parser = stage.build_parser()
         subparser_actions = [
             action
@@ -812,10 +831,12 @@ while True:
             set(subparser_actions[0].choices),
             {
                 "prepare", "configure", "seal", "verify", "install",
-                "verify-install", "verify-install-filesystem",
+                "migrate-install", "recover-install-migration",
+                "verify-install",
+                "verify-install-filesystem",
             },
         )
-        for command in ("seal", "verify", "install"):
+        for command in ("seal", "verify", "install", "migrate-install"):
             command_parser = subparser_actions[0].choices[command]
             temporary_actions = [
                 action
@@ -834,7 +855,7 @@ while True:
         )
         self.assertEqual(version.returncode, 0, version.stderr)
         self.assertEqual(version.stderr, "")
-        self.assertEqual(version.stdout, "CodeSkeptic P10-09 staging producer 4\n")
+        self.assertEqual(version.stdout, "CodeSkeptic P10-09 staging producer 5\n")
 
     def test_cli_dispatches_every_lifecycle_command(self) -> None:
         assert stage is not None
@@ -3653,7 +3674,8 @@ while True:
         def assert_fixed_targets_absent(layout: dict[str, Path]) -> None:
             for name in (
                 "AUTHORITY_ROOT", "OPERATOR_ROOT", "CONFIG_PATH",
-                "UNIT_PATH", "INSTALLATION_ROOT", "STATE_ROOT",
+                "UNIT_PATH", "UNIT_DROPIN_DIRECTORY", "INSTALLATION_ROOT",
+                "STATE_ROOT",
                 "INSTALLATION_AUTHORITY_PATH",
                 "PODMAN_ROOT", "PODMAN_RUNROOT",
             ):
@@ -3763,6 +3785,24 @@ while True:
                 }
                 stage.install_bundle(sealed, **arguments)
                 receipt_path = layout["INSTALLATION_RECEIPT_PATH"]
+                live_dropin = layout["UNIT_DROPIN_PATH"]
+                retained_dropin = (
+                    layout["INSTALLATION_ROOT"]
+                    / "unit"
+                    / f"{UNIT.name}.d"
+                    / TIMEOUT_OVERRIDE.name
+                )
+                self.assertEqual(
+                    live_dropin.read_bytes(), TIMEOUT_OVERRIDE.read_bytes()
+                )
+                self.assertEqual(
+                    live_dropin.read_bytes(), retained_dropin.read_bytes()
+                )
+                self.assertEqual(
+                    layout["UNIT_DROPIN_DIRECTORY"].stat().st_mode & 0o777,
+                    0o555,
+                )
+                self.assertEqual(live_dropin.stat().st_mode & 0o777, 0o444)
                 sidecar_path = Path(f"{receipt_path}.sha256")
                 self.assertTrue(receipt_path.is_file())
                 self.assertTrue(sidecar_path.is_file())
@@ -3899,6 +3939,45 @@ while True:
                 authority_path.write_bytes(authority_bytes)
                 authority_path.chmod(0o400)
 
+                live_dropin.chmod(0o600)
+                live_dropin.write_text(
+                    "[Service]\nTimeoutStopFailureMode=abort\n",
+                    encoding="utf-8",
+                )
+                live_dropin.chmod(0o444)
+                with self.assertRaises(stage.StagingError):
+                    stage.verify_installation_filesystem(
+                        receipt_path,
+                        require_root=False,
+                        owner_uid=os.getuid(),
+                        owner_gid=os.getgid(),
+                        **bundle_authority(sealed),
+                    )
+                live_dropin.chmod(0o600)
+                live_dropin.write_bytes(TIMEOUT_OVERRIDE.read_bytes())
+                live_dropin.chmod(0o444)
+
+                dropin_directory = layout["UNIT_DROPIN_DIRECTORY"]
+                dropin_directory.chmod(0o755)
+                foreign_dropin = dropin_directory / "99-foreign.conf"
+                foreign_dropin.write_text(
+                    "[Service]\nEnvironment=DRIFT=1\n",
+                    encoding="utf-8",
+                )
+                foreign_dropin.chmod(0o444)
+                dropin_directory.chmod(0o555)
+                with self.assertRaises(stage.StagingError):
+                    stage.verify_installation_filesystem(
+                        receipt_path,
+                        require_root=False,
+                        owner_uid=os.getuid(),
+                        owner_gid=os.getgid(),
+                        **bundle_authority(sealed),
+                    )
+                dropin_directory.chmod(0o755)
+                foreign_dropin.unlink()
+                dropin_directory.chmod(0o555)
+
                 stage.install_bundle(sealed, **arguments)
                 self.assertEqual(receipt_path.stat().st_ino, receipt_inode)
                 self.assertEqual(receipt_path.read_bytes(), receipt_bytes)
@@ -3921,6 +4000,41 @@ while True:
                     installed_operator.read_text(encoding="utf-8"),
                     "tampered\n",
                 )
+
+    def test_live_timeout_override_rejects_mode_and_hardlink_drift(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            expected = workspace / "expected.conf"
+            expected.write_bytes(stage.UNIT_DROPIN_DATA)
+            directory = workspace / "codeskeptic-stability.service.d"
+            directory.mkdir(mode=0o755)
+            live = directory / stage.UNIT_DROPIN_NAME
+            live.write_bytes(stage.UNIT_DROPIN_DATA)
+            live.chmod(0o444)
+            directory.chmod(0o555)
+            with (
+                mock.patch.object(stage, "UNIT_DROPIN_DIRECTORY", directory),
+                mock.patch.object(stage, "UNIT_DROPIN_PATH", live),
+            ):
+                stage.verify_live_dropin_authority(
+                    expected, os.getuid(), os.getgid()
+                )
+                live.chmod(0o644)
+                with self.assertRaisesRegex(
+                    stage.StagingError, "drop-in file authority drift"
+                ):
+                    stage.verify_live_dropin_authority(
+                        expected, os.getuid(), os.getgid()
+                    )
+                live.chmod(0o444)
+                os.link(live, workspace / "outside-hardlink")
+                with self.assertRaisesRegex(
+                    stage.StagingError, "drop-in file authority drift"
+                ):
+                    stage.verify_live_dropin_authority(
+                        expected, os.getuid(), os.getgid()
+                    )
 
     def test_post_commit_pin_release_failure_never_enters_rollback(self) -> None:
         assert stage is not None
@@ -4014,6 +4128,7 @@ while True:
                 self.assertFalse(layout["OPERATOR_ROOT"].exists())
                 self.assertFalse(layout["CONFIG_PATH"].exists())
                 self.assertFalse(layout["UNIT_PATH"].exists())
+                self.assertFalse(layout["UNIT_DROPIN_DIRECTORY"].exists())
                 self.assertFalse(layout["INSTALLATION_RECEIPT_PATH"].exists())
                 self.assertEqual(runner.commands, [])
 
@@ -4052,7 +4167,8 @@ while True:
                     )
                 for name in (
                     "AUTHORITY_ROOT", "OPERATOR_ROOT", "CONFIG_PATH",
-                    "UNIT_PATH", "INSTALLATION_ROOT", "STATE_ROOT",
+                    "UNIT_PATH", "UNIT_DROPIN_DIRECTORY", "INSTALLATION_ROOT",
+                    "STATE_ROOT",
                     "PODMAN_ROOT", "PODMAN_RUNROOT",
                 ):
                     self.assertFalse(layout[name].exists(), name)
@@ -4090,7 +4206,8 @@ while True:
                     )
                 for name in (
                     "AUTHORITY_ROOT", "OPERATOR_ROOT", "CONFIG_PATH",
-                    "UNIT_PATH", "INSTALLATION_ROOT", "STATE_ROOT",
+                    "UNIT_PATH", "UNIT_DROPIN_DIRECTORY", "INSTALLATION_ROOT",
+                    "STATE_ROOT",
                     "PODMAN_ROOT", "PODMAN_RUNROOT",
                 ):
                     self.assertFalse(layout[name].exists(), name)
@@ -4152,7 +4269,8 @@ while True:
                 )
                 for name in (
                     "AUTHORITY_ROOT", "OPERATOR_ROOT", "CONFIG_PATH",
-                    "UNIT_PATH", "INSTALLATION_ROOT", "STATE_ROOT",
+                    "UNIT_PATH", "UNIT_DROPIN_DIRECTORY", "INSTALLATION_ROOT",
+                    "STATE_ROOT",
                     "PODMAN_ROOT", "PODMAN_RUNROOT",
                 ):
                     self.assertFalse(layout[name].exists(), name)
@@ -4236,6 +4354,7 @@ while True:
                 self.assertFalse(layout["OPERATOR_ROOT"].exists())
                 self.assertFalse(layout["CONFIG_PATH"].exists())
                 self.assertFalse(layout["UNIT_PATH"].exists())
+                self.assertFalse(layout["UNIT_DROPIN_DIRECTORY"].exists())
                 self.assertFalse(layout["INSTALLATION_ROOT"].exists())
                 self.assertFalse(layout["STATE_ROOT"].exists())
                 self.assertFalse(layout["PODMAN_ROOT"].exists())
@@ -4272,9 +4391,13 @@ while True:
                     )
                     self.assertNotIn("pull", command)
 
-    def test_service_unit_is_static_and_any_dropin_authority_is_rejected(self) -> None:
+    def test_service_unit_is_static_and_only_canonical_dropin_is_accepted(self) -> None:
         assert stage is not None
         source = UNIT.read_text(encoding="utf-8")
+        self.assertEqual(
+            TIMEOUT_OVERRIDE.read_bytes(),
+            b"[Service]\nTimeoutStopFailureMode=terminate\n",
+        )
         self.assertIn("Delegate=cpu cpuset memory pids", source.splitlines())
         self.assertNotIn("Delegate=yes", source.splitlines())
         self.assertIn(
@@ -4346,16 +4469,8 @@ while True:
                     with self.assertRaises(stage.StagingError):
                         stage.verify_static_unit(drifted)
 
-            unit_root = workspace / "systemd"
-            unit_root.mkdir()
-            stage.reject_dropin_authority(unit_root, UNIT.name)
-            dropin = unit_root / f"{UNIT.name}.d"
-            dropin.mkdir()
-            (dropin / "override.conf").write_text(
-                "[Service]\nEnvironment=DRIFT=1\n", encoding="utf-8"
-            )
             with self.assertRaises(stage.StagingError):
-                stage.reject_dropin_authority(unit_root, UNIT.name)
+                stage.verify_static_unit(TIMEOUT_OVERRIDE)
 
     def test_image_provisioning_is_archive_only_pinned_and_never_pulls(self) -> None:
         assert stage is not None
@@ -4656,6 +4771,16 @@ while True:
             '"$PYTHON" -B "$STAGING_TOOL_PATH" verify-install \\\n',
             guided,
         )
+        self.assertIn(
+            'readonly MIGRATION_ACTIVE_PATH="/var/lib/'
+            'codeskeptic-p10-09-migration/active"',
+            guided,
+        )
+        self.assertIn(
+            '[[ ! -e "$MIGRATION_ACTIVE_PATH" '
+            '&& ! -L "$MIGRATION_ACTIVE_PATH" ]]',
+            guided,
+        )
         recovery = HOST_RECOVERY.read_text(encoding="utf-8")
         self.assertIn('GUIDED_LIFECYCLE_LOCK = STATE_ROOT / "guided.lock"', recovery)
         self.assertIn('getattr(os, "O_NOFOLLOW", 0)', recovery)
@@ -4670,6 +4795,1839 @@ while True:
             "verify_runtime_static_authority_identities(config, authorities)",
         ):
             self.assertIn(token, operator)
+
+    def test_install_migration_contract_is_explicitly_receipt_bound(self) -> None:
+        assert stage is not None
+        self.assertTrue(
+            hasattr(stage, "migrate_installation"),
+            "the fixed installation has no audited migration lifecycle",
+        )
+        parser = stage.build_parser()
+        arguments = parser.parse_args([
+            "migrate-install",
+            "--bundle", "/sealed",
+            "--current-revision", "1" * 40,
+            "--current-bundle-receipt-sha256", "2" * 64,
+            "--current-producer-sha256", "3" * 64,
+            "--expected-revision", "4" * 40,
+            "--expected-bundle-receipt-sha256", "5" * 64,
+            "--temporary-root", "/temporary",
+        ])
+        self.assertEqual(arguments.command, "migrate-install")
+        self.assertEqual(arguments.current_revision, "1" * 40)
+        self.assertEqual(
+            arguments.current_bundle_receipt_sha256, "2" * 64
+        )
+        self.assertEqual(arguments.current_producer_sha256, "3" * 64)
+        self.assertEqual(arguments.expected_revision, "4" * 40)
+        self.assertEqual(
+            arguments.expected_bundle_receipt_sha256, "5" * 64
+        )
+
+    def test_install_migration_rehomes_exact_roots_and_retains_backup(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            install_workspace = workspace / "layout"
+            install_workspace.mkdir()
+            bundle = workspace / "sealed"
+            bundle.mkdir()
+            temporary_root = workspace / "temporary"
+            temporary_root.mkdir()
+            with patched_install_layout(install_workspace) as layout:
+                migration_root = (
+                    install_workspace
+                    / "var/lib/codeskeptic-p10-09-migration"
+                )
+                migration_lock = (
+                    install_workspace
+                    / "run/codeskeptic-p10-09-migration.lock"
+                )
+                control_root = install_workspace / "etc/systemd/system.control"
+                control_root.mkdir(parents=True)
+                control_mask = control_root / UNIT.name
+                fixed = {
+                    "opt": layout["AUTHORITY_ROOT"].parent,
+                    "config": layout["CONFIG_PATH"].parent,
+                    "state": layout["STATE_ROOT"],
+                    "unit": layout["UNIT_PATH"],
+                    "dropin": layout["UNIT_DROPIN_DIRECTORY"],
+                }
+                for name, path in fixed.items():
+                    if name == "unit":
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        path.write_text("old unit\n", encoding="utf-8")
+                    elif name == "opt":
+                        path.mkdir(parents=True, exist_ok=True)
+                        for child in ("authority", "operator", "installation"):
+                            (path / child).mkdir()
+                        (path / "authority" / "old-marker").write_text(
+                            name + "\n", encoding="utf-8"
+                        )
+                    else:
+                        path.mkdir(parents=True, exist_ok=True)
+                        (path / "old-marker").write_text(
+                            name + "\n", encoding="utf-8"
+                        )
+
+                def install_target(_bundle, **_kwargs):
+                    for name, path in fixed.items():
+                        self.assertFalse(path.exists(), name)
+                        if name == "unit":
+                            path.write_text("new unit\n", encoding="utf-8")
+                        elif name == "opt":
+                            path.mkdir()
+                            for child in (
+                                "authority", "operator", "installation"
+                            ):
+                                (path / child).mkdir()
+                            (path / "authority" / "new-marker").write_text(
+                                name + "\n", encoding="utf-8"
+                            )
+                            layout["INSTALLATION_RECEIPT_PATH"].write_text(
+                                '{"fixture":"target"}\n', encoding="utf-8"
+                            )
+                        else:
+                            path.mkdir()
+                            (path / "new-marker").write_text(
+                                name + "\n", encoding="utf-8"
+                            )
+                    return {
+                        "bundle_revision": "4" * 40,
+                        "bundle_receipt_sha256": "5" * 64,
+                    }
+
+                patches = (
+                    mock.patch.object(
+                        stage, "MIGRATION_ROOT", migration_root, create=True
+                    ),
+                    mock.patch.object(
+                        stage, "MIGRATION_LOCK_PATH", migration_lock, create=True
+                    ),
+                    mock.patch.object(
+                        stage, "SYSTEMD_CONTROL_ROOT", control_root, create=True
+                    ),
+                    mock.patch.object(
+                        stage, "MIGRATION_MASK_PATH", control_mask, create=True
+                    ),
+                    mock.patch.object(stage, "verify_bundle", return_value={}),
+                    mock.patch.object(
+                        stage, "_verify_migration_capacity", create=True
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "_verify_current_installation_with_producer",
+                        return_value={},
+                        create=True,
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "_verify_migration_systemd_version",
+                        return_value=stage.MIGRATION_SYSTEMD_VERSION,
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "_migration_service_guard",
+                        return_value=contextlib.nullcontext(),
+                        create=True,
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "_migration_guided_lock",
+                        return_value=contextlib.nullcontext(),
+                        create=True,
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "_run_current_recovery_gates",
+                        create=True,
+                    ),
+                    mock.patch.object(
+                        stage, "install_bundle", side_effect=install_target
+                    ),
+                )
+                with contextlib.ExitStack() as stack:
+                    for patch in patches:
+                        stack.enter_context(patch)
+                    result = stage.migrate_installation(
+                        bundle,
+                        current_revision="1" * 40,
+                        current_bundle_receipt_sha256="2" * 64,
+                        current_producer_sha256="3" * 64,
+                        expected_revision="4" * 40,
+                        expected_bundle_receipt_sha256="5" * 64,
+                        temporary_root=temporary_root,
+                        require_root=False,
+                        owner_uid=os.getuid(),
+                        owner_gid=os.getgid(),
+                    )
+                self.assertEqual(result, {
+                    "bundle_revision": "4" * 40,
+                    "bundle_receipt_sha256": "5" * 64,
+                })
+                for name, path in fixed.items():
+                    self.assertTrue(path.exists(), name)
+                    backup = migration_root / "backup" / name
+                    self.assertTrue(backup.exists(), name)
+                    marker = (
+                        backup.read_text(encoding="utf-8")
+                        if name == "unit"
+                        else (
+                            backup
+                            / ("authority/old-marker" if name == "opt" else "old-marker")
+                        ).read_text(encoding="utf-8")
+                    )
+                    self.assertEqual(marker, "old unit\n" if name == "unit" else name + "\n")
+                self.assertTrue((migration_root / "plan.json").is_file())
+                self.assertTrue((migration_root / "success.json").is_file())
+                self.assertFalse((migration_root / "active").exists())
+                self.assertTrue((migration_root / "retired").is_file())
+
+    def test_migration_capacity_failure_precedes_lock_and_journal(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            bundle = workspace / "bundle"
+            bundle.mkdir()
+            temporary_root = workspace / "temporary"
+            temporary_root.mkdir()
+            migration_root = workspace / "migration"
+            with (
+                mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                mock.patch.object(stage, "verify_bundle", return_value={}),
+                mock.patch.object(
+                    stage,
+                    "_verify_migration_capacity",
+                    side_effect=stage.StagingError("insufficient migration capacity"),
+                ),
+                mock.patch.object(stage, "_migration_lock") as migration_lock,
+                self.assertRaisesRegex(
+                    stage.StagingError, "insufficient migration capacity"
+                ),
+            ):
+                stage.migrate_installation(
+                    bundle,
+                    current_revision="1" * 40,
+                    current_bundle_receipt_sha256="2" * 64,
+                    current_producer_sha256="3" * 64,
+                    expected_revision="4" * 40,
+                    expected_bundle_receipt_sha256="5" * 64,
+                    temporary_root=temporary_root,
+                    require_root=False,
+                    owner_uid=os.getuid(),
+                    owner_gid=os.getgid(),
+                )
+            migration_lock.assert_not_called()
+            self.assertFalse(migration_root.exists())
+
+    def test_migration_rejects_unpinned_or_misreporting_old_producer(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            operator = workspace / "operator"
+            operator.mkdir()
+            producer = operator / "stage_stability_campaign.py"
+            producer.write_bytes(b"# exact installed producer fixture\n")
+            producer.chmod(0o555)
+            receipt = workspace / "installation/receipt.json"
+            current_sha = hashlib.sha256(producer.read_bytes()).hexdigest()
+            with (
+                mock.patch.object(stage, "OPERATOR_ROOT", operator),
+                mock.patch.object(
+                    stage, "INSTALLATION_RECEIPT_PATH", receipt
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    stage.StagingError, "producer authority drift"
+                ):
+                    stage._verify_current_installation_with_producer(
+                        current_revision="1" * 40,
+                        current_bundle_receipt_sha256="2" * 64,
+                        current_producer_sha256="3" * 64,
+                        command_runner=lambda *_args, **_kwargs: b"unused\n",
+                        owner_uid=os.getuid(),
+                        owner_gid=os.getgid(),
+                    )
+                with self.assertRaisesRegex(
+                    stage.StagingError, "verification output drift"
+                ):
+                    stage._verify_current_installation_with_producer(
+                        current_revision="1" * 40,
+                        current_bundle_receipt_sha256="2" * 64,
+                        current_producer_sha256=current_sha,
+                        command_runner=lambda *_args, **_kwargs: b"wrong\n",
+                        owner_uid=os.getuid(),
+                        owner_gid=os.getgid(),
+                    )
+
+    def test_migration_install_failure_quarantines_all_created_targets(self) -> None:
+        assert stage is not None
+        with sealed_bundle_fixture() as fixture:
+            workspace, _prepared, _revision, sealed, _receipt = fixture
+            install_workspace = workspace / "migration-install-root"
+            install_workspace.mkdir()
+            temporary_root = workspace / "migration-temporary"
+            temporary_root.mkdir(mode=0o700)
+            migration_root = workspace / "migration-journal"
+            runner = FakeCommandRunner()
+            with patched_install_layout(install_workspace) as layout:
+                real_load = stage._load_and_verify_image_archive
+
+                def fail_only_persistent_store(*args, **kwargs):
+                    if kwargs.get("podman_root") == layout["PODMAN_ROOT"]:
+                        raise stage.StagingError(
+                            "simulated persistent image-store failure"
+                        )
+                    return real_load(*args, **kwargs)
+
+                with mock.patch.object(stage, "MIGRATION_ROOT", migration_root):
+                    transaction = stage._prepare_migration_transaction(
+                        {"fixture": "installer-target-ledger"},
+                        os.getuid(),
+                        os.getgid(),
+                    )
+                    with (
+                        mock.patch.object(
+                            stage,
+                            "_load_and_verify_image_archive",
+                            side_effect=fail_only_persistent_store,
+                        ),
+                        self.assertRaisesRegex(
+                            stage.StagingError,
+                            "simulated persistent image-store failure",
+                        ) as caught,
+                    ):
+                        stage.install_bundle(
+                            sealed,
+                            **bundle_authority(sealed),
+                            command_runner=runner,
+                            require_root=False,
+                            owner_uid=os.getuid(),
+                            owner_gid=os.getgid(),
+                            temporary_root=temporary_root,
+                            migration_transaction_nodes=transaction,
+                        )
+                    records = stage._load_migration_target_records(
+                        owner_uid=os.getuid(), owner_gid=os.getgid()
+                    )
+                    quarantined = sorted(
+                        path.name
+                        for path in (migration_root / "failed-targets").iterdir()
+                    )
+                    failed_metadata = (
+                        migration_root / "failed-targets"
+                    ).lstat()
+                    diagnostic = (
+                        f"error={caught.exception}; "
+                        f"records={[record['path'] for record in records]}; "
+                        f"quarantined={quarantined}; "
+                        f"failed-targets-mode="
+                        f"{stat.S_IMODE(failed_metadata.st_mode):04o}; "
+                        f"failed-targets-owner="
+                        f"{failed_metadata.st_uid}:{failed_metadata.st_gid}"
+                    )
+                    for path in (
+                        layout["AUTHORITY_ROOT"].parent,
+                        layout["CONFIG_PATH"].parent,
+                        layout["STATE_ROOT"],
+                        layout["UNIT_PATH"],
+                        layout["UNIT_DROPIN_DIRECTORY"],
+                    ):
+                        self.assertFalse(
+                            path.exists() or path.is_symlink(),
+                            f"{path}: {diagnostic}",
+                        )
+                    self.assertGreater(len(records), 5)
+                    self.assertEqual(
+                        quarantined,
+                        [f"{record['index']:04d}" for record in records],
+                    )
+                    stage._rollback_created(transaction)
+                self.assertFalse(migration_root.exists())
+
+    def test_migration_journal_publishes_only_as_one_complete_tree(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            migration_root = workspace / "var/lib/codeskeptic-p10-09-migration"
+            migration_root.parent.mkdir(parents=True)
+            observed = False
+            original_rename = stage._rename_noreplace
+
+            def interrupt_at_publication(source, destination):
+                nonlocal observed
+                if destination == migration_root:
+                    observed = True
+                    self.assertNotEqual(source, migration_root)
+                    self.assertFalse(migration_root.exists())
+                    self.assertEqual(
+                        {path.name for path in source.iterdir()},
+                        {
+                            "active", "backup", "failed-targets", "fence",
+                            "moves", "plan.json", "publication-staging",
+                            "targets",
+                        },
+                    )
+                    self.assertEqual(
+                        os.readlink(source / "fence" / "mask-anchor"),
+                        "/dev/null",
+                    )
+                    self.assertEqual(
+                        (source / "active").read_bytes(),
+                        b"codeskeptic-installation-migration-active-v1\n",
+                    )
+                    raise KeyboardInterrupt("simulated power loss before publish")
+                return original_rename(source, destination)
+
+            with (
+                mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                mock.patch.object(
+                    stage, "_rename_noreplace", side_effect=interrupt_at_publication
+                ),
+                self.assertRaises(KeyboardInterrupt),
+            ):
+                stage._prepare_migration_transaction(
+                    {"fixture": "complete-before-publication"},
+                    os.getuid(),
+                    os.getgid(),
+                )
+            self.assertTrue(observed)
+            self.assertFalse(migration_root.exists())
+            self.assertEqual(list(migration_root.parent.iterdir()), [])
+
+    def test_rollback_journal_quarantine_crash_does_not_block_a_new_migration(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            migration_root = workspace / "var/lib/codeskeptic-p10-09-migration"
+            migration_root.parent.mkdir(parents=True)
+            quarantine = (
+                migration_root.parent / ".codeskeptic-cleanup-simulated"
+            )
+            with mock.patch.object(stage, "MIGRATION_ROOT", migration_root):
+                transaction = stage._prepare_migration_transaction(
+                    {"fixture": "atomic-rollback-removal"},
+                    os.getuid(),
+                    os.getgid(),
+                )
+                root_records = [
+                    record for record in transaction
+                    if record.path == migration_root and record.is_directory
+                ]
+                self.assertEqual(len(root_records), 1)
+                root_record = root_records[0]
+                with self.assertRaisesRegex(
+                    stage.StagingError,
+                    "rolled-back migration journal identity drift",
+                ):
+                    stage._remove_rolled_back_migration_root(
+                        os.getuid(),
+                        os.getgid(),
+                        expected_identity=(
+                            root_record.device,
+                            root_record.inode + 1,
+                        ),
+                    )
+                self.assertTrue(migration_root.is_dir())
+
+                def interrupt_after_quarantine(
+                    path, device, inode, is_directory,
+                ):
+                    self.assertEqual(path, migration_root)
+                    self.assertEqual(
+                        (device, inode, is_directory),
+                        (root_record.device, root_record.inode, True),
+                    )
+                    os.rename(migration_root, quarantine)
+                    stage._fsync_directory(migration_root.parent)
+                    raise KeyboardInterrupt(
+                        "simulated power loss after journal quarantine"
+                    )
+
+                with (
+                    mock.patch.object(
+                        stage,
+                        "_remove_created_identity",
+                        side_effect=interrupt_after_quarantine,
+                    ),
+                    self.assertRaises(KeyboardInterrupt),
+                ):
+                    stage._remove_rolled_back_migration_root(
+                        os.getuid(),
+                        os.getgid(),
+                        expected_identity=(
+                            root_record.device,
+                            root_record.inode,
+                        ),
+                    )
+
+                self.assertFalse(migration_root.exists())
+                self.assertTrue(quarantine.is_dir())
+                stage._release_created(transaction)
+
+                next_transaction = stage._prepare_migration_transaction(
+                    {"fixture": "after-atomic-rollback-removal"},
+                    os.getuid(),
+                    os.getgid(),
+                )
+                next_root = next(
+                    record for record in next_transaction
+                    if record.path == migration_root and record.is_directory
+                )
+                stage._remove_rolled_back_migration_root(
+                    os.getuid(),
+                    os.getgid(),
+                    expected_identity=(next_root.device, next_root.inode),
+                )
+                stage._release_created(next_transaction)
+
+                quarantine_metadata = quarantine.lstat()
+                stage._remove_created_identity(
+                    quarantine,
+                    quarantine_metadata.st_dev,
+                    quarantine_metadata.st_ino,
+                    True,
+                )
+            self.assertEqual(list(migration_root.parent.iterdir()), [])
+
+    def test_migration_publication_staging_is_journal_owned_across_crashes(
+        self,
+    ) -> None:
+        assert stage is not None
+        for crash_point in ("before-intent", "after-intent", "after-rename"):
+            with self.subTest(crash_point=crash_point), tempfile.TemporaryDirectory() as temporary:
+                workspace = Path(temporary)
+                migration_root = workspace / "var/lib/migration"
+                migration_root.parent.mkdir(parents=True)
+                destination = workspace / "etc/systemd/system" / UNIT.name
+                destination.parent.mkdir(parents=True)
+                with (
+                    mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                    mock.patch.object(stage, "UNIT_PATH", destination),
+                ):
+                    transaction = stage._prepare_migration_transaction(
+                        {"fixture": crash_point},
+                        os.getuid(),
+                        os.getgid(),
+                    )
+                    root_record = next(
+                        record for record in transaction
+                        if record.path == migration_root and record.is_directory
+                    )
+                    ledger = stage._MigrationTargetLedger(
+                        transaction, os.getuid(), os.getgid()
+                    )
+                    staged, staged_metadata, payload_descriptor = (
+                        ledger.create_file_publication_staging(
+                            destination,
+                            ".codeskeptic-file-",
+                            "crash-window fixture",
+                        )
+                    )
+                    os.write(payload_descriptor, b"partial target\n")
+                    os.fsync(payload_descriptor)
+                    target_record = stage._CreatedNode(
+                        destination,
+                        staged_metadata.st_dev,
+                        staged_metadata.st_ino,
+                        False,
+                        payload_descriptor,
+                    )
+                    if crash_point != "before-intent":
+                        ledger.prepare_publication(target_record, staged)
+                    if crash_point == "after-rename":
+                        stage._rename_noreplace(staged, destination)
+                        stage._fsync_directory(destination.parent)
+
+                    target_record.close()
+                    records = stage._load_migration_target_records(
+                        owner_uid=os.getuid(), owner_gid=os.getgid()
+                    )
+                    stage._remove_recorded_partial_targets(records, [], {})
+                    self.assertFalse(destination.exists())
+                    if staged.exists():
+                        self.assertEqual(
+                            staged.parent,
+                            migration_root / "publication-staging",
+                        )
+
+                    stage._remove_rolled_back_migration_root(
+                        os.getuid(),
+                        os.getgid(),
+                        expected_identity=(
+                            root_record.device,
+                            root_record.inode,
+                        ),
+                    )
+                    stage._release_created(transaction)
+                self.assertFalse(migration_root.exists())
+                self.assertFalse(any(
+                    child.name.startswith(".codeskeptic-file-")
+                    for child in destination.parent.iterdir()
+                ))
+
+    def test_directory_and_tree_preintent_staging_is_journal_owned(
+        self,
+    ) -> None:
+        assert stage is not None
+        cases = (
+            ("directory", ".dropin.directory-"),
+            ("tree", ".dropin.install-"),
+        )
+        for label, prefix in cases:
+            with (
+                self.subTest(label=label),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                workspace = Path(temporary)
+                migration_root = workspace / "var/lib/migration"
+                migration_root.parent.mkdir(parents=True)
+                destination = workspace / "etc/systemd/system/dropin"
+                destination.parent.mkdir(parents=True)
+                with (
+                    mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                    mock.patch.object(
+                        stage, "UNIT_DROPIN_DIRECTORY", destination
+                    ),
+                ):
+                    transaction = stage._prepare_migration_transaction(
+                        {"fixture": f"{label}-preintent"},
+                        os.getuid(),
+                        os.getgid(),
+                    )
+                    root_record = next(
+                        record for record in transaction
+                        if record.path == migration_root and record.is_directory
+                    )
+                    ledger = stage._MigrationTargetLedger(
+                        transaction, os.getuid(), os.getgid()
+                    )
+                    staged, metadata, descriptor = (
+                        ledger.create_publication_staging(
+                            destination,
+                            prefix,
+                            f"{label} preintent fixture",
+                        )
+                    )
+                    (staged / "partial").write_bytes(b"partial tree\n")
+                    stage._fsync_tree(staged)
+                    os.close(descriptor)
+                    self.assertEqual(
+                        (staged.lstat().st_dev, staged.lstat().st_ino),
+                        (metadata.st_dev, metadata.st_ino),
+                    )
+                    self.assertEqual(
+                        staged.parent,
+                        migration_root / "publication-staging",
+                    )
+                    self.assertFalse(destination.exists())
+
+                    stage._remove_rolled_back_migration_root(
+                        os.getuid(),
+                        os.getgid(),
+                        expected_identity=(
+                            root_record.device,
+                            root_record.inode,
+                        ),
+                    )
+                    stage._release_created(transaction)
+                self.assertFalse(migration_root.exists())
+                self.assertFalse(destination.exists())
+
+    def test_cross_filesystem_publication_is_rejected_before_staging(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            migration_root = workspace / "var/lib/migration"
+            migration_root.parent.mkdir(parents=True)
+            destination = workspace / "etc/systemd/system" / UNIT.name
+            destination.parent.mkdir(parents=True)
+            destination.write_bytes(b"fixed target\n")
+            with (
+                mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                mock.patch.object(stage, "UNIT_PATH", destination),
+            ):
+                transaction = stage._prepare_migration_transaction(
+                    {"fixture": "cross-filesystem-publication"},
+                    os.getuid(),
+                    os.getgid(),
+                )
+                ledger = stage._MigrationTargetLedger(
+                    transaction, os.getuid(), os.getgid()
+                )
+                staging_root = migration_root / "publication-staging"
+                with self.assertRaisesRegex(
+                    stage.StagingError, "outside its target plan"
+                ):
+                    ledger.create_publication_staging(
+                        destination,
+                        ".codeskeptic-file-",
+                        "forbidden wrapper fixture",
+                    )
+                real_verify = stage._verify_migration_owned_path
+
+                def report_other_filesystem(path, **kwargs):
+                    metadata = real_verify(path, **kwargs)
+                    if path == staging_root:
+                        values = list(metadata)
+                        values[2] = metadata.st_dev + 1
+                        return os.stat_result(values)
+                    return metadata
+
+                with (
+                    mock.patch.object(
+                        stage,
+                        "_verify_migration_owned_path",
+                        side_effect=report_other_filesystem,
+                    ),
+                    self.assertRaisesRegex(
+                        stage.StagingError, "crosses a filesystem"
+                    ),
+                ):
+                    ledger.create_file_publication_staging(
+                        destination,
+                        ".codeskeptic-file-",
+                        "cross-filesystem fixture",
+                    )
+                self.assertEqual(destination.read_bytes(), b"fixed target\n")
+                self.assertEqual(list(staging_root.iterdir()), [])
+                stage._rollback_created(transaction)
+            self.assertFalse(migration_root.exists())
+
+    def test_cross_parent_publication_syncs_both_parents_before_commit(
+        self,
+    ) -> None:
+        assert stage is not None
+        for kind in ("file", "directory", "tree"):
+            with (
+                self.subTest(kind=kind),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                workspace = Path(temporary)
+                migration_root = workspace / "var/lib/migration"
+                migration_root.parent.mkdir(parents=True)
+                destination = workspace / "etc/codeskeptic/dropin"
+                destination.parent.mkdir(parents=True)
+                source = workspace / "source"
+                inventory = None
+                if kind == "tree":
+                    make_inventory_tree(source)
+                    inventory = stage.collect_inventory(source)
+                with (
+                    mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                    mock.patch.object(
+                        stage, "UNIT_DROPIN_DIRECTORY", destination
+                    ),
+                ):
+                    transaction = stage._prepare_migration_transaction(
+                        {"fixture": f"{kind}-sync-order"},
+                        os.getuid(),
+                        os.getgid(),
+                    )
+                    ledger = stage._MigrationTargetLedger(
+                        transaction, os.getuid(), os.getgid()
+                    )
+                    staging_root = migration_root / "publication-staging"
+                    events: list[str] = []
+                    original_rename = stage._rename_noreplace
+                    original_fsync = stage._fsync_directory
+                    original_append = stage._MigrationTargetLedger.append
+
+                    def observe_rename(source_path, destination_path):
+                        result = original_rename(
+                            source_path, destination_path
+                        )
+                        if destination_path == destination:
+                            events.append("rename")
+                        return result
+
+                    def observe_fsync(path):
+                        result = original_fsync(path)
+                        if "rename" in events:
+                            if path == staging_root:
+                                events.append("source-fsync")
+                            elif path == destination.parent:
+                                events.append("target-fsync")
+                        return result
+
+                    def observe_append(self, record):
+                        if self is ledger:
+                            events.append("commit")
+                        return original_append(self, record)
+
+                    with (
+                        mock.patch.object(
+                            stage,
+                            "_rename_noreplace",
+                            side_effect=observe_rename,
+                        ),
+                        mock.patch.object(
+                            stage,
+                            "_fsync_directory",
+                            side_effect=observe_fsync,
+                        ),
+                        mock.patch.object(
+                            stage._MigrationTargetLedger,
+                            "append",
+                            new=observe_append,
+                        ),
+                    ):
+                        if kind == "file":
+                            stage._write_new(
+                                destination,
+                                b"published file\n",
+                                0o600,
+                                owner_uid=os.getuid(),
+                                owner_gid=os.getgid(),
+                                created_nodes=ledger,
+                            )
+                        elif kind == "directory":
+                            stage._create_directory_create_new(
+                                destination,
+                                0o500,
+                                os.getuid(),
+                                os.getgid(),
+                                created_nodes=ledger,
+                            )
+                        else:
+                            self.assertEqual(
+                                stage.install_tree_create_new(
+                                    source,
+                                    destination,
+                                    inventory,
+                                    owner_uid=os.getuid(),
+                                    owner_gid=os.getgid(),
+                                    created_nodes=ledger,
+                                ),
+                                "created",
+                            )
+                    self.assertEqual(
+                        events,
+                        ["rename", "source-fsync", "target-fsync", "commit"],
+                    )
+                    ledger.rollback_publications()
+                    stage._rollback_created(transaction)
+                self.assertFalse(migration_root.exists())
+                self.assertFalse(destination.exists())
+
+    def test_normal_migration_success_requires_empty_publication_staging(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            migration_root = workspace / "var/lib/migration"
+            migration_root.parent.mkdir(parents=True)
+            receipt = workspace / "installation-receipt.json"
+            receipt.write_bytes(b'{"fixture":"target"}\n')
+            with (
+                mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                mock.patch.object(
+                    stage, "INSTALLATION_RECEIPT_PATH", receipt
+                ),
+            ):
+                transaction = stage._prepare_migration_transaction(
+                    {"fixture": "normal-success"},
+                    os.getuid(),
+                    os.getgid(),
+                )
+                stage._publish_migration_success(
+                    {
+                        "bundle_revision": "4" * 40,
+                        "bundle_receipt_sha256": "5" * 64,
+                    },
+                    outcome="installed",
+                    current_revision="1" * 40,
+                    current_bundle_receipt_sha256="2" * 64,
+                    expected_revision="4" * 40,
+                    expected_bundle_receipt_sha256="5" * 64,
+                    owner_uid=os.getuid(),
+                    owner_gid=os.getgid(),
+                    transaction_nodes=transaction,
+                )
+                self.assertTrue((migration_root / "success.json").is_file())
+                self.assertEqual(
+                    list((migration_root / "publication-staging").iterdir()),
+                    [],
+                )
+                stage._rollback_created(transaction)
+            self.assertFalse(migration_root.exists())
+
+    def test_verified_target_check_preserves_unexpected_staging_inode(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            migration_root = workspace / "var/lib/migration"
+            migration_root.parent.mkdir(parents=True)
+            with mock.patch.object(stage, "MIGRATION_ROOT", migration_root):
+                transaction = stage._prepare_migration_transaction(
+                    {"fixture": "nonempty-publication-staging"},
+                    os.getuid(),
+                    os.getgid(),
+                )
+                staged = (
+                    migration_root
+                    / "publication-staging"
+                    / (".codeskeptic-file-" + "b" * 32)
+                )
+                staged.write_bytes(b"unresolved payload\n")
+                with self.assertRaisesRegex(
+                    stage.StagingError,
+                    "publication staging is not empty",
+                ):
+                    stage._verify_target_publication_staging_empty(
+                        os.getuid(), os.getgid()
+                    )
+                self.assertEqual(staged.read_bytes(), b"unresolved payload\n")
+                stage._rollback_created(transaction)
+            self.assertFalse(migration_root.exists())
+
+    def test_migration_target_journal_rejects_intent_commit_tamper(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            install_workspace = workspace / "layout"
+            install_workspace.mkdir()
+            with patched_install_layout(install_workspace) as layout:
+                migration_root = workspace / "migration"
+                target = layout["UNIT_PATH"]
+                staging = (
+                    migration_root
+                    / "publication-staging"
+                    / (".codeskeptic-file-" + "a" * 32)
+                )
+                metadata = workspace.stat()
+                intent = {
+                    "schema": stage.INSTALLATION_MIGRATION_TARGET_SCHEMA,
+                    "index": 0,
+                    "path": target.as_posix(),
+                    "staging": staging.as_posix(),
+                    "device": metadata.st_dev,
+                    "inode": metadata.st_ino,
+                    "type": "file",
+                    "phase": "intent",
+                }
+                commit = copy.deepcopy(intent)
+                commit["phase"] = "commit"
+                commit["inode"] += 1
+                with mock.patch.object(stage, "MIGRATION_ROOT", migration_root):
+                    transaction = stage._prepare_migration_transaction(
+                        {"fixture": "target-journal-tamper"},
+                        os.getuid(),
+                        os.getgid(),
+                    )
+                    stage._write_migration_record(
+                        migration_root / "targets/0000.intent.json",
+                        stage.canonical_document(intent),
+                        owner_uid=os.getuid(),
+                        owner_gid=os.getgid(),
+                        created_nodes=transaction,
+                    )
+                    stage._write_migration_record(
+                        migration_root / "targets/0000.commit.json",
+                        stage.canonical_document(commit),
+                        owner_uid=os.getuid(),
+                        owner_gid=os.getgid(),
+                        created_nodes=transaction,
+                    )
+                    with self.assertRaisesRegex(
+                        stage.StagingError, "commit differs from intent"
+                    ):
+                        stage._load_migration_target_records(
+                            owner_uid=os.getuid(), owner_gid=os.getgid()
+                        )
+                    stage._rollback_created(transaction)
+                self.assertFalse(migration_root.exists())
+
+    def test_install_migration_restores_old_roots_after_install_failure(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            install_workspace = workspace / "layout"
+            install_workspace.mkdir()
+            bundle = workspace / "sealed"
+            bundle.mkdir()
+            temporary_root = workspace / "temporary"
+            temporary_root.mkdir()
+            with patched_install_layout(install_workspace) as layout:
+                migration_root = (
+                    install_workspace
+                    / "var/lib/codeskeptic-p10-09-migration"
+                )
+                migration_lock = (
+                    install_workspace
+                    / "run/codeskeptic-p10-09-migration.lock"
+                )
+                control_root = install_workspace / "etc/systemd/system.control"
+                control_root.mkdir(parents=True)
+                control_mask = control_root / UNIT.name
+                fixed = {
+                    "opt": layout["AUTHORITY_ROOT"].parent,
+                    "config": layout["CONFIG_PATH"].parent,
+                    "state": layout["STATE_ROOT"],
+                    "unit": layout["UNIT_PATH"],
+                }
+                for name, path in fixed.items():
+                    if name == "unit":
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        path.write_text("old unit\n", encoding="utf-8")
+                    elif name == "opt":
+                        path.mkdir(parents=True, exist_ok=True)
+                        for child in ("authority", "operator", "installation"):
+                            (path / child).mkdir()
+                        (path / "authority" / "old-marker").write_text(
+                            name + "\n", encoding="utf-8"
+                        )
+                    else:
+                        path.mkdir(parents=True, exist_ok=True)
+                        (path / "old-marker").write_text(
+                            name + "\n", encoding="utf-8"
+                        )
+                cleanup_observed: list[tuple[int, int]] = []
+
+                @contextlib.contextmanager
+                def created_control_guard(*_args, **_kwargs):
+                    release = {
+                        "ready": False,
+                        "control_created": True,
+                        "control_identity": (3, 4),
+                    }
+                    yield release
+                    self.assertTrue(release["ready"])
+
+                def cleanup_after_journal(identity):
+                    self.assertFalse(migration_root.exists())
+                    cleanup_observed.append(identity)
+
+                patches = (
+                    mock.patch.object(
+                        stage, "MIGRATION_ROOT", migration_root, create=True
+                    ),
+                    mock.patch.object(
+                        stage, "MIGRATION_LOCK_PATH", migration_lock, create=True
+                    ),
+                    mock.patch.object(
+                        stage, "SYSTEMD_CONTROL_ROOT", control_root, create=True
+                    ),
+                    mock.patch.object(
+                        stage, "MIGRATION_MASK_PATH", control_mask, create=True
+                    ),
+                    mock.patch.object(stage, "verify_bundle", return_value={}),
+                    mock.patch.object(
+                        stage, "_verify_migration_capacity", create=True
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "_verify_current_installation_with_producer",
+                        return_value={},
+                        create=True,
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "_verify_migration_systemd_version",
+                        return_value=stage.MIGRATION_SYSTEMD_VERSION,
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "_migration_service_guard",
+                        side_effect=created_control_guard,
+                        create=True,
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "_migration_guided_lock",
+                        return_value=contextlib.nullcontext(),
+                        create=True,
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "_run_current_recovery_gates",
+                        create=True,
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "install_bundle",
+                        side_effect=stage.StagingError("target install failed"),
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "_remove_created_migration_control_root",
+                        side_effect=cleanup_after_journal,
+                    ),
+                )
+                with contextlib.ExitStack() as stack:
+                    for patch in patches:
+                        stack.enter_context(patch)
+                    with self.assertRaisesRegex(
+                        stage.StagingError, "target install failed"
+                    ):
+                        stage.migrate_installation(
+                            bundle,
+                            current_revision="1" * 40,
+                            current_bundle_receipt_sha256="2" * 64,
+                            current_producer_sha256="3" * 64,
+                            expected_revision="4" * 40,
+                            expected_bundle_receipt_sha256="5" * 64,
+                            temporary_root=temporary_root,
+                            require_root=False,
+                            owner_uid=os.getuid(),
+                            owner_gid=os.getgid(),
+                        )
+                for name, path in fixed.items():
+                    self.assertTrue(path.exists(), name)
+                    marker = (
+                        path.read_text(encoding="utf-8")
+                        if name == "unit"
+                        else (
+                            path
+                            / ("authority/old-marker" if name == "opt" else "old-marker")
+                        ).read_text(encoding="utf-8")
+                    )
+                    self.assertEqual(marker, "old unit\n" if name == "unit" else name + "\n")
+                self.assertFalse(migration_root.exists())
+                self.assertEqual(cleanup_observed, [(3, 4)])
+
+    def test_migration_fence_is_identity_bound_and_behavior_probed(self) -> None:
+        assert stage is not None
+
+        class SystemdFenceRunner:
+            def __init__(self, mask: Path, unit: Path) -> None:
+                self.mask = mask
+                self.unit = unit
+                self.negative_probes = 0
+
+            def __call__(self, argv, **_kwargs):
+                command = [os.fspath(item) for item in argv]
+                if command[1:] == ["--version"]:
+                    return (
+                        stage.MIGRATION_SYSTEMD_VERSION
+                        + "\nfixture features\n"
+                    ).encode("ascii")
+                if "daemon-reload" in command:
+                    return b""
+                if "show" in command:
+                    property_token = next(
+                        token for token in command
+                        if token.startswith("--property=")
+                    )
+                    property_name = property_token.split("=", 1)[1]
+                    masked = self.mask.is_symlink()
+                    values = {
+                        "LoadState": "masked" if masked else "loaded",
+                        "FragmentPath": os.fspath(
+                            self.mask if masked else self.unit
+                        ),
+                        "ActiveState": "inactive",
+                        "SubState": "dead",
+                        "Job": "",
+                        "MainPID": "0",
+                        "ControlPID": "0",
+                    }
+                    return (values[property_name] + "\n").encode("ascii")
+                raise AssertionError(command)
+
+            def expected_failure(self, argv, **_kwargs):
+                self.negative_probes += 1
+                self.assert_masked(argv)
+                return 1
+
+            def assert_masked(self, argv):
+                if not self.mask.is_symlink():
+                    raise AssertionError("negative start ran without the mask")
+                if argv[-1] != UNIT.name:
+                    raise AssertionError("negative start targeted another unit")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            control = workspace / "etc/systemd/system.control"
+            control.mkdir(parents=True)
+            control.chmod(0o755)
+            unit = workspace / "etc/systemd/system" / UNIT.name
+            unit.parent.mkdir(parents=True)
+            unit.write_text("fixture unit\n", encoding="utf-8")
+            mask = control / UNIT.name
+            migration_root = workspace / "var/lib/migration"
+            migration_root.parent.mkdir(parents=True)
+            absent_cgroup = workspace / "sys/fs/cgroup/absent"
+            runner = SystemdFenceRunner(mask, unit)
+            with (
+                mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                mock.patch.object(stage, "SYSTEMD_CONTROL_ROOT", control),
+                mock.patch.object(stage, "MIGRATION_MASK_PATH", mask),
+                mock.patch.object(stage, "UNIT_PATH", unit),
+                mock.patch.object(stage, "SERVICE_CGROUP_PATH", absent_cgroup),
+            ):
+                transaction = stage._prepare_migration_transaction(
+                    {"fixture": "fence-identity"},
+                    os.getuid(),
+                    os.getgid(),
+                )
+                with stage._migration_service_guard(
+                    runner, os.getuid(), os.getgid()
+                ) as release:
+                    self.assertEqual(os.readlink(mask), "/dev/null")
+                    self.assertEqual(
+                        mask.lstat().st_ino,
+                        (migration_root / "fence/mask-anchor").lstat().st_ino,
+                    )
+                    release["ready"] = True
+                stage._rollback_created(transaction)
+            self.assertFalse(mask.exists() or mask.is_symlink())
+            self.assertFalse(migration_root.exists())
+            self.assertTrue(control.is_dir())
+            self.assertEqual(runner.negative_probes, 1)
+
+    def test_migration_recovery_never_adopts_a_foreign_admin_mask(self) -> None:
+        assert stage is not None
+
+        class VersionOnlyRunner:
+            def __call__(self, argv, **_kwargs):
+                command = [os.fspath(item) for item in argv]
+                if command[1:] == ["--version"]:
+                    return (
+                        stage.MIGRATION_SYSTEMD_VERSION
+                        + "\nfixture features\n"
+                    ).encode("ascii")
+                raise AssertionError(command)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            migration_root = workspace / "var/lib/migration"
+            migration_root.parent.mkdir(parents=True)
+            control = workspace / "etc/systemd/system.control"
+            control.mkdir(parents=True)
+            control.chmod(0o755)
+            mask = control / UNIT.name
+            mask.symlink_to("/dev/null")
+            foreign_identity = mask.lstat().st_dev, mask.lstat().st_ino
+            with (
+                mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                mock.patch.object(stage, "SYSTEMD_CONTROL_ROOT", control),
+                mock.patch.object(stage, "MIGRATION_MASK_PATH", mask),
+            ):
+                transaction = stage._prepare_migration_transaction(
+                    {"fixture": "foreign-admin-mask"},
+                    os.getuid(),
+                    os.getgid(),
+                )
+                with self.assertRaisesRegex(
+                    stage.StagingError, "recovery fence authority drift"
+                ):
+                    stage._ensure_migration_recovery_fence(
+                        VersionOnlyRunner(), os.getuid(), os.getgid()
+                    )
+                self.assertEqual(
+                    (mask.lstat().st_dev, mask.lstat().st_ino),
+                    foreign_identity,
+                )
+                self.assertNotEqual(
+                    mask.lstat().st_ino,
+                    (migration_root / "fence/mask-anchor").lstat().st_ino,
+                )
+                stage._rollback_created(transaction)
+            self.assertEqual(os.readlink(mask), "/dev/null")
+
+    def test_created_systemd_control_root_has_durable_provenance(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            migration_root = workspace / "var/lib/migration"
+            migration_root.parent.mkdir(parents=True)
+            control = workspace / "etc/systemd/system.control"
+            control.parent.mkdir(parents=True)
+            mask = control / UNIT.name
+            with (
+                mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                mock.patch.object(stage, "SYSTEMD_CONTROL_ROOT", control),
+                mock.patch.object(stage, "MIGRATION_MASK_PATH", mask),
+            ):
+                transaction = stage._prepare_migration_transaction(
+                    {"fixture": "created-control-root"},
+                    os.getuid(),
+                    os.getgid(),
+                )
+                created, identity = stage._create_migration_control_root(
+                    os.getuid(), os.getgid()
+                )
+                self.assertTrue(created)
+                self.assertEqual(
+                    (control.lstat().st_dev, control.lstat().st_ino),
+                    identity,
+                )
+                self.assertTrue(
+                    (migration_root / "fence/control.intent.json").is_file()
+                )
+                self.assertTrue(
+                    (migration_root / "fence/control.commit.json").is_file()
+                )
+                rediscovered, rediscovered_identity = (
+                    stage._create_migration_control_root(
+                        os.getuid(), os.getgid()
+                    )
+                )
+                self.assertTrue(rediscovered)
+                self.assertEqual(rediscovered_identity, identity)
+                intent = json.loads(
+                    (
+                        migration_root / "fence/control.intent.json"
+                    ).read_text(encoding="utf-8")
+                )
+                staging = Path(intent["staging"])
+                os.rename(control, staging)
+                with self.assertRaisesRegex(
+                    stage.StagingError,
+                    "committed systemd control root is not at its fixed path",
+                ):
+                    stage._create_migration_control_root(
+                        os.getuid(), os.getgid()
+                    )
+                os.rename(staging, control)
+                mask_identity = stage._create_migration_mask(
+                    os.getuid(), os.getgid()
+                )
+                stage._remove_migration_mask(*mask_identity)
+                stage._rollback_created(transaction)
+                self.assertFalse(migration_root.exists())
+                self.assertTrue(control.is_dir())
+                stage._remove_created_migration_control_root(identity)
+            self.assertFalse(control.exists())
+            self.assertFalse(migration_root.exists())
+
+    def test_journal_removal_crash_leaves_a_reusable_control_root(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            migration_root = workspace / "var/lib/migration"
+            migration_root.parent.mkdir(parents=True)
+            control = workspace / "etc/systemd/system.control"
+            control.parent.mkdir(parents=True)
+            mask = control / UNIT.name
+            with (
+                mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                mock.patch.object(stage, "SYSTEMD_CONTROL_ROOT", control),
+                mock.patch.object(stage, "MIGRATION_MASK_PATH", mask),
+            ):
+                transaction = stage._prepare_migration_transaction(
+                    {"fixture": "control-cleanup-crash"},
+                    os.getuid(),
+                    os.getgid(),
+                )
+                created, identity = stage._create_migration_control_root(
+                    os.getuid(), os.getgid()
+                )
+                self.assertTrue(created)
+                mask_identity = stage._create_migration_mask(
+                    os.getuid(), os.getgid()
+                )
+                stage._remove_migration_mask(*mask_identity)
+                stage._rollback_created(transaction)
+
+                self.assertFalse(migration_root.exists())
+                self.assertEqual(
+                    (control.lstat().st_dev, control.lstat().st_ino),
+                    identity,
+                )
+
+                next_transaction = stage._prepare_migration_transaction(
+                    {"fixture": "after-control-cleanup-crash"},
+                    os.getuid(),
+                    os.getgid(),
+                )
+                reused, reused_identity = stage._create_migration_control_root(
+                    os.getuid(), os.getgid()
+                )
+                self.assertFalse(reused)
+                self.assertEqual(reused_identity, identity)
+                self.assertTrue(
+                    (migration_root / "fence/control.reuse.json").is_file()
+                )
+                stage._rollback_created(next_transaction)
+            self.assertTrue(control.is_dir())
+            self.assertFalse(migration_root.exists())
+
+    def test_control_root_intent_interrupt_preserves_recoverable_staging(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            migration_root = workspace / "var/lib/migration"
+            migration_root.parent.mkdir(parents=True)
+            control = workspace / "etc/systemd/system.control"
+            control.parent.mkdir(parents=True)
+            mask = control / UNIT.name
+            original_write = stage._write_migration_control_record
+            interrupted = False
+
+            def interrupt_after_durable_intent(
+                value, phase, owner_uid, owner_gid,
+            ):
+                nonlocal interrupted
+                original_write(value, phase, owner_uid, owner_gid)
+                if phase == "intent" and not interrupted:
+                    interrupted = True
+                    raise KeyboardInterrupt(
+                        "simulated interruption after durable intent"
+                    )
+
+            with (
+                mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                mock.patch.object(stage, "SYSTEMD_CONTROL_ROOT", control),
+                mock.patch.object(stage, "MIGRATION_MASK_PATH", mask),
+            ):
+                transaction = stage._prepare_migration_transaction(
+                    {"fixture": "control-intent-interruption"},
+                    os.getuid(),
+                    os.getgid(),
+                )
+                with (
+                    mock.patch.object(
+                        stage,
+                        "_write_migration_control_record",
+                        side_effect=interrupt_after_durable_intent,
+                    ),
+                    self.assertRaises(KeyboardInterrupt),
+                ):
+                    stage._create_migration_control_root(
+                        os.getuid(), os.getgid()
+                    )
+                intent = json.loads(
+                    (
+                        migration_root / "fence/control.intent.json"
+                    ).read_text(encoding="utf-8")
+                )
+                staging = Path(intent["staging"])
+                self.assertTrue(staging.is_dir())
+                self.assertFalse(control.exists())
+
+                created, identity = stage._create_migration_control_root(
+                    os.getuid(), os.getgid()
+                )
+                self.assertTrue(created)
+                self.assertEqual(
+                    (control.lstat().st_dev, control.lstat().st_ino),
+                    identity,
+                )
+                self.assertTrue(
+                    (migration_root / "fence/control.commit.json").is_file()
+                )
+                stage._rollback_created(transaction)
+                self.assertFalse(migration_root.exists())
+                stage._remove_created_migration_control_root(identity)
+            self.assertFalse(control.exists())
+
+    def test_interrupted_migration_recovery_removes_recorded_partial_target(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            install_workspace = workspace / "layout"
+            install_workspace.mkdir()
+            bundle = workspace / "sealed"
+            bundle.mkdir()
+            with patched_install_layout(install_workspace) as layout:
+                migration_root = (
+                    install_workspace
+                    / "var/lib/codeskeptic-p10-09-migration"
+                )
+                migration_lock = (
+                    install_workspace
+                    / "run/codeskeptic-p10-09-migration.lock"
+                )
+                fixed = {
+                    "opt": layout["AUTHORITY_ROOT"].parent,
+                    "config": layout["CONFIG_PATH"].parent,
+                    "state": layout["STATE_ROOT"],
+                    "unit": layout["UNIT_PATH"],
+                }
+                for name, path in fixed.items():
+                    if name == "unit":
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        path.write_text("old unit\n", encoding="utf-8")
+                    elif name == "opt":
+                        path.mkdir(parents=True, exist_ok=True)
+                        for child in ("authority", "operator", "installation"):
+                            (path / child).mkdir()
+                        (path / "authority" / "old-marker").write_text(
+                            name + "\n", encoding="utf-8"
+                        )
+                    else:
+                        path.mkdir(parents=True, exist_ok=True)
+                        (path / "old-marker").write_text(
+                            name + "\n", encoding="utf-8"
+                        )
+                with (
+                    mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                    mock.patch.object(
+                        stage, "MIGRATION_LOCK_PATH", migration_lock
+                    ),
+                ):
+                    nodes = stage._migration_source_nodes()
+                    plan = stage._migration_plan(
+                        nodes,
+                        current_revision="1" * 40,
+                        current_bundle_receipt_sha256="2" * 64,
+                        current_producer_sha256="3" * 64,
+                        expected_revision="4" * 40,
+                        expected_bundle_receipt_sha256="5" * 64,
+                        systemd_version=stage.MIGRATION_SYSTEMD_VERSION,
+                    )
+                    transaction = stage._prepare_migration_transaction(
+                        plan, os.getuid(), os.getgid()
+                    )
+                    first = nodes[0]
+                    prefix = f"00-{first['name']}"
+                    stage._write_migration_record(
+                        migration_root
+                        / "moves"
+                        / f"{prefix}.intent.json",
+                        stage.canonical_document(
+                            stage._migration_move_value(first, 0, "intent")
+                        ),
+                        owner_uid=os.getuid(),
+                        owner_gid=os.getgid(),
+                        created_nodes=transaction,
+                    )
+                    stage._rename_noreplace(first["source"], first["backup"])
+                    stage._fsync_directory(first["source"].parent)
+                    stage._fsync_directory(first["backup"].parent)
+                    stage._write_migration_record(
+                        migration_root
+                        / "moves"
+                        / f"{prefix}.commit.json",
+                        stage.canonical_document(
+                            stage._migration_move_value(first, 0, "commit")
+                        ),
+                        owner_uid=os.getuid(),
+                        owner_gid=os.getgid(),
+                        created_nodes=transaction,
+                    )
+                    targets = stage._MigrationTargetLedger(
+                        transaction, os.getuid(), os.getgid()
+                    )
+                    original_rename = stage._rename_noreplace
+
+                    def require_intent_before_target(source, destination):
+                        if destination == first["source"]:
+                            self.assertTrue(
+                                (
+                                    migration_root
+                                    / "targets/0000.intent.json"
+                                ).is_file()
+                            )
+                            self.assertFalse(
+                                (
+                                    migration_root
+                                    / "targets/0000.commit.json"
+                                ).exists()
+                            )
+                        return original_rename(source, destination)
+
+                    with mock.patch.object(
+                        stage,
+                        "_rename_noreplace",
+                        side_effect=require_intent_before_target,
+                    ):
+                        stage._write_new(
+                            first["source"],
+                            b"partial target unit\n",
+                            0o600,
+                            owner_uid=os.getuid(),
+                            owner_gid=os.getgid(),
+                            created_nodes=targets,
+                        )
+                    self.assertTrue(
+                        (migration_root / "targets/0000.intent.json").is_file()
+                    )
+                    self.assertTrue(
+                        (migration_root / "targets/0000.commit.json").is_file()
+                    )
+                    stage._release_created(targets)
+                    stage._release_created(transaction)
+                    stage._close_migration_nodes(nodes)
+                    target = {"revision": "4" * 40}
+                    lock_state = {"held": False}
+                    original_restore = stage._restore_migration_nodes
+
+                    @contextlib.contextmanager
+                    def hold_old_guided_lock(*_args, **_kwargs):
+                        lock_state["held"] = True
+                        try:
+                            yield
+                        finally:
+                            lock_state["held"] = False
+
+                    def restore_while_locked(values):
+                        self.assertTrue(lock_state["held"])
+                        return original_restore(values)
+
+                    def retain_control_after_journal(_identity):
+                        self.assertFalse(migration_root.exists())
+                        raise stage.StagingError(
+                            "simulated optional control-root cleanup failure"
+                        )
+
+                    patches = (
+                        mock.patch.object(
+                            stage,
+                            "_assert_expected_bundle_identity",
+                            return_value=target,
+                        ),
+                        mock.patch.object(
+                            stage,
+                            "_verify_bundle_structure",
+                            return_value=target,
+                        ),
+                        mock.patch.object(
+                            stage,
+                            "_try_verify_target_installation",
+                            return_value=None,
+                        ),
+                        mock.patch.object(
+                            stage,
+                            "_ensure_migration_recovery_fence",
+                            return_value=((1, 2), True, (3, 4)),
+                        ),
+                        mock.patch.object(
+                            stage, "_release_migration_recovery_fence"
+                        ),
+                        mock.patch.object(
+                            stage,
+                            "_verify_current_installation_with_producer",
+                        ),
+                        mock.patch.object(
+                            stage, "_run_current_recovery_gates"
+                        ),
+                        mock.patch.object(
+                            stage,
+                            "_migration_guided_lock_at",
+                            side_effect=hold_old_guided_lock,
+                        ),
+                        mock.patch.object(
+                            stage,
+                            "_restore_migration_nodes",
+                            side_effect=restore_while_locked,
+                        ),
+                        mock.patch.object(
+                            stage,
+                            "_remove_created_migration_control_root",
+                            side_effect=retain_control_after_journal,
+                        ),
+                    )
+                    with contextlib.ExitStack() as stack:
+                        for patch in patches:
+                            stack.enter_context(patch)
+                        recovered = stage.recover_installation_migration(
+                            bundle,
+                            current_revision="1" * 40,
+                            current_bundle_receipt_sha256="2" * 64,
+                            current_producer_sha256="3" * 64,
+                            expected_revision="4" * 40,
+                            expected_bundle_receipt_sha256="5" * 64,
+                            require_root=False,
+                            owner_uid=os.getuid(),
+                            owner_gid=os.getgid(),
+                        )
+                self.assertEqual(
+                    recovered["migration_outcome"],
+                    "rolled-back-after-restart",
+                )
+                self.assertEqual(
+                    recovered["migration_control_root_cleanup"],
+                    "retained",
+                )
+                for path in fixed.values():
+                    self.assertTrue(path.exists())
+                self.assertEqual(
+                    fixed["unit"].read_text(encoding="utf-8"),
+                    "old unit\n",
+                )
+                self.assertFalse(migration_root.exists())
+
+    def test_migration_recovery_preserves_foreign_partial_target(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            install_workspace = workspace / "layout"
+            install_workspace.mkdir()
+            with patched_install_layout(install_workspace) as layout:
+                target = layout["UNIT_PATH"]
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(b"foreign target\n")
+                staged = (
+                    target.parent / (".codeskeptic-file-" + "a" * 32)
+                )
+                staged.write_bytes(b"recorded but no longer present\n")
+                metadata = staged.stat()
+                staged.unlink()
+                record = {
+                    "schema": stage.INSTALLATION_MIGRATION_TARGET_SCHEMA,
+                    "index": 0,
+                    "path": target.as_posix(),
+                    "staging": staged.as_posix(),
+                    "device": metadata.st_dev,
+                    "inode": metadata.st_ino,
+                    "type": "file",
+                    "phase": "intent",
+                }
+                with self.assertRaisesRegex(
+                    stage.StagingError, "foreign object occupies"
+                ):
+                    stage._remove_recorded_partial_targets(
+                        [record], [], {}
+                    )
+                self.assertEqual(target.read_bytes(), b"foreign target\n")
+                self.assertFalse(staged.exists())
+
+    def test_interrupted_migration_recovery_commits_rediscovered_target(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            install_workspace = workspace / "layout"
+            install_workspace.mkdir()
+            bundle = workspace / "sealed"
+            bundle.mkdir()
+            with patched_install_layout(install_workspace) as layout:
+                migration_root = (
+                    install_workspace
+                    / "var/lib/codeskeptic-p10-09-migration"
+                )
+                migration_lock = (
+                    install_workspace
+                    / "run/codeskeptic-p10-09-migration.lock"
+                )
+                fixed = {
+                    "opt": layout["AUTHORITY_ROOT"].parent,
+                    "config": layout["CONFIG_PATH"].parent,
+                    "state": layout["STATE_ROOT"],
+                    "unit": layout["UNIT_PATH"],
+                }
+                for name, path in fixed.items():
+                    if name == "unit":
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        path.write_text("old unit\n", encoding="utf-8")
+                    elif name == "opt":
+                        path.mkdir(parents=True, exist_ok=True)
+                        for child in ("authority", "operator", "installation"):
+                            (path / child).mkdir()
+                    else:
+                        path.mkdir(parents=True, exist_ok=True)
+                with (
+                    mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                    mock.patch.object(
+                        stage, "MIGRATION_LOCK_PATH", migration_lock
+                    ),
+                ):
+                    nodes = stage._migration_source_nodes()
+                    plan = stage._migration_plan(
+                        nodes,
+                        current_revision="1" * 40,
+                        current_bundle_receipt_sha256="2" * 64,
+                        current_producer_sha256="3" * 64,
+                        expected_revision="4" * 40,
+                        expected_bundle_receipt_sha256="5" * 64,
+                        systemd_version=stage.MIGRATION_SYSTEMD_VERSION,
+                    )
+                    transaction = stage._prepare_migration_transaction(
+                        plan, os.getuid(), os.getgid()
+                    )
+                    moved = []
+                    stage._move_migration_nodes(
+                        nodes,
+                        moved,
+                        owner_uid=os.getuid(),
+                        owner_gid=os.getgid(),
+                        transaction_nodes=transaction,
+                    )
+                    stage._release_created(transaction)
+                    stage._close_migration_nodes(nodes)
+                    for name, path in fixed.items():
+                        if name == "unit":
+                            path.write_text("new unit\n", encoding="utf-8")
+                        elif name == "opt":
+                            path.mkdir()
+                            for child in (
+                                "authority", "operator", "installation"
+                            ):
+                                (path / child).mkdir()
+                            layout["INSTALLATION_RECEIPT_PATH"].write_text(
+                                '{"fixture":"rediscovered"}\n',
+                                encoding="utf-8",
+                            )
+                        else:
+                            path.mkdir()
+                    target = {
+                        "bundle_revision": "4" * 40,
+                        "bundle_receipt_sha256": "5" * 64,
+                    }
+                    bundle_receipt = {"revision": "4" * 40}
+                    patches = (
+                        mock.patch.object(
+                            stage,
+                            "_assert_expected_bundle_identity",
+                            return_value=bundle_receipt,
+                        ),
+                        mock.patch.object(
+                            stage,
+                            "_verify_bundle_structure",
+                            return_value=bundle_receipt,
+                        ),
+                        mock.patch.object(
+                            stage,
+                            "_try_verify_target_installation",
+                            return_value=target,
+                        ),
+                        mock.patch.object(
+                            stage,
+                            "_ensure_migration_recovery_fence",
+                            return_value=((1, 2), False, (3, 4)),
+                        ),
+                        mock.patch.object(
+                            stage, "_release_migration_recovery_fence"
+                        ),
+                        mock.patch.object(
+                            stage,
+                            "_migration_guided_lock_at",
+                            return_value=contextlib.nullcontext(),
+                        ),
+                    )
+                    with contextlib.ExitStack() as stack:
+                        for patch in patches:
+                            stack.enter_context(patch)
+                        recovered = stage.recover_installation_migration(
+                            bundle,
+                            current_revision="1" * 40,
+                            current_bundle_receipt_sha256="2" * 64,
+                            current_producer_sha256="3" * 64,
+                            expected_revision="4" * 40,
+                            expected_bundle_receipt_sha256="5" * 64,
+                            require_root=False,
+                            owner_uid=os.getuid(),
+                            owner_gid=os.getgid(),
+                        )
+                self.assertEqual(recovered, target)
+                self.assertTrue((migration_root / "success.json").is_file())
+                self.assertFalse((migration_root / "active").exists())
+                self.assertTrue((migration_root / "retired").is_file())
+                self.assertEqual(
+                    list((migration_root / "publication-staging").iterdir()),
+                    [],
+                )
+                for name in fixed:
+                    self.assertTrue((migration_root / "backup" / name).exists())
 
     def test_authoritative_operator_uses_only_the_persistent_private_podman_environment(self) -> None:
         operator = AUTHORITATIVE.read_text(encoding="utf-8")

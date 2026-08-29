@@ -26,6 +26,7 @@ HOST_RECOVERY = OPERATOR_ROOT / "host-recovery.py"
 CONTAINER_ENTRY = OPERATOR_ROOT / "container-entry.py"
 CONTAINERS_CONF = OPERATOR_ROOT / "containers.conf"
 README = OPERATOR_ROOT / "README.md"
+TIMEOUT_OVERRIDE = OPERATOR_ROOT / "10-timeout-abort.conf"
 CONTROLLER = ROOT / "scripts" / "run_stability_campaign.py"
 
 
@@ -222,6 +223,10 @@ class StabilityWorkflowTest(unittest.TestCase):
                 self.assertNotIn(forbidden, executable_contract)
 
     def test_service_stops_fail_closed_without_restart_or_orphans(self) -> None:
+        self.assertEqual(
+            TIMEOUT_OVERRIDE.read_text(encoding="utf-8"),
+            "[Service]\nTimeoutStopFailureMode=terminate\n",
+        )
         self.assertEqual(unit_value(self.unit, "Restart"), "no")
         self.assertEqual(unit_value(self.unit, "KillMode"), "control-group")
         self.assertEqual(
@@ -1051,8 +1056,14 @@ exit 0
         self.assertIn("--property=UnitFileState", guided)
         self.assertIn('== "static"', guided)
         self.assertIn("--property=DropInPaths --value", guided)
-        self.assertIn('[[ -z "$drop_in_paths" ]]', guided)
-        self.assertIn("rejects every systemd drop-in", self.readme)
+        self.assertIn('[[ "$drop_in_paths" == "$UNIT_DROPIN_PATH" ]]', guided)
+        self.assertIn("--property=TimeoutStopFailureMode --value", guided)
+        self.assertIn('== "terminate"', guided)
+        self.assertIn('"$UNIT_DROPIN_BUNDLE_PATH" "$UNIT_DROPIN_PATH"', guided)
+        self.assertRegex(
+            self.readme,
+            r"rejects\s+every\s+non-canonical systemd drop-in",
+        )
         self.assertIn("graphical.target must be active", guided)
         self.assertIn("display-manager.service must be active/running", guided)
         self.assertNotIn("list-sessions --no-legend --no-pager", guided)

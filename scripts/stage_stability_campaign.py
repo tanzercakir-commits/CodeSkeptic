@@ -31,11 +31,23 @@ except ModuleNotFoundError:  # Windows can inspect portable source contracts.
     fcntl = None
 
 
-TOOL_VERSION = "4"
+TOOL_VERSION = "5"
 BUNDLE_RECEIPT_SCHEMA = "codeskeptic-stability-staging-bundle-v1"
 INVENTORY_SCHEMA = "codeskeptic-stability-staging-inventory-v1"
 INSTALLATION_RECEIPT_SCHEMA = "codeskeptic-stability-installation-v1"
 INSTALLATION_AUTHORITY_SCHEMA = "codeskeptic-stability-installation-authority-v1"
+INSTALLATION_MIGRATION_PLAN_SCHEMA = (
+    "codeskeptic-stability-installation-migration-plan-v1"
+)
+INSTALLATION_MIGRATION_SUCCESS_SCHEMA = (
+    "codeskeptic-stability-installation-migration-success-v1"
+)
+INSTALLATION_MIGRATION_TARGET_SCHEMA = (
+    "codeskeptic-stability-installation-migration-target-v1"
+)
+INSTALLATION_MIGRATION_CONTROL_SCHEMA = (
+    "codeskeptic-stability-installation-migration-control-root-v1"
+)
 RUNTIME_CONFIG_SCHEMA = "codeskeptic-stability-runtime-v3"
 AUTHORITY_OPERATION_MARKERS = frozenset({
     ".p10-09-authority-operation.json",
@@ -108,6 +120,21 @@ PODMAN_ENVIRONMENT_DIRECTORIES = (
 )
 PINNED_ARCHIVE_NAME = "pinned-evidence-image.oci.tar"
 UNIT_NAME = "codeskeptic-stability.service"
+UNIT_DROPIN_NAME = "10-timeout-abort.conf"
+UNIT_DROPIN_DIRECTORY = UNIT_PATH.parent / f"{UNIT_NAME}.d"
+UNIT_DROPIN_PATH = UNIT_DROPIN_DIRECTORY / UNIT_DROPIN_NAME
+UNIT_DROPIN_DATA = b"[Service]\nTimeoutStopFailureMode=terminate\n"
+MIGRATION_ROOT = Path("/var/lib/codeskeptic-p10-09-migration")
+MIGRATION_LOCK_PATH = Path("/run/codeskeptic-p10-09-migration.lock")
+MIGRATION_FENCE_DIRECTORY_NAME = "fence"
+MIGRATION_MASK_ANCHOR_NAME = "mask-anchor"
+MIGRATION_PUBLICATION_STAGING_DIRECTORY_NAME = "publication-staging"
+SYSTEMD_CONTROL_ROOT = Path("/etc/systemd/system.control")
+MIGRATION_MASK_PATH = SYSTEMD_CONTROL_ROOT / UNIT_NAME
+MIGRATION_SYSTEMD_VERSION = "systemd 259 (259.8-1.fc44)"
+SERVICE_CGROUP_PATH = Path(
+    "/sys/fs/cgroup/system.slice/codeskeptic-stability.service"
+)
 STABILITY_EXEC_START = (
     "ExecStart=/usr/bin/systemd-inhibit --what=sleep "
     "--who=CodeSkeptic-P10-09 "
@@ -898,17 +925,44 @@ def verify_static_unit(path: Path) -> None:
         raise StagingError("service unit contains a forbidden lifecycle authority")
 
 
-def reject_dropin_authority(unit_root: Path, unit_name: str) -> None:
-    if unit_name != UNIT_NAME:
-        raise StagingError("service unit identity drift")
-    dropin = unit_root / f"{unit_name}.d"
+def verify_timeout_override(path: Path) -> None:
+    if _read_regular(path) != UNIT_DROPIN_DATA:
+        raise StagingError("service timeout override contract drift")
+
+
+def verify_live_dropin_authority(
+    expected: Path, owner_uid: int, owner_gid: int,
+) -> None:
     try:
-        dropin.lstat()
-    except FileNotFoundError:
-        return
+        directory_metadata = UNIT_DROPIN_DIRECTORY.lstat()
     except OSError as error:
         raise StagingError(f"cannot inspect service drop-in authority: {error}") from error
-    raise StagingError("service drop-in authority is forbidden")
+    if (
+        not stat.S_ISDIR(directory_metadata.st_mode)
+        or directory_metadata.st_uid != owner_uid
+        or directory_metadata.st_gid != owner_gid
+        or stat.S_IMODE(directory_metadata.st_mode) != 0o555
+    ):
+        raise StagingError("service drop-in directory authority drift")
+    try:
+        names = sorted(path.name for path in UNIT_DROPIN_DIRECTORY.iterdir())
+        file_metadata = UNIT_DROPIN_PATH.lstat()
+    except OSError as error:
+        raise StagingError(f"cannot inspect service drop-in authority: {error}") from error
+    if names != [UNIT_DROPIN_NAME]:
+        raise StagingError("service drop-in directory inventory drift")
+    if (
+        not stat.S_ISREG(file_metadata.st_mode)
+        or file_metadata.st_nlink != 1
+        or file_metadata.st_uid != owner_uid
+        or file_metadata.st_gid != owner_gid
+        or stat.S_IMODE(file_metadata.st_mode) != 0o444
+    ):
+        raise StagingError("service drop-in file authority drift")
+    verify_timeout_override(expected)
+    verify_timeout_override(UNIT_DROPIN_PATH)
+    if _read_regular(UNIT_DROPIN_PATH) != _read_regular(expected):
+        raise StagingError("installed service drop-in identity drift")
 
 
 def _rename_noreplace_at(
@@ -1054,6 +1108,34 @@ class _CreatedNode:
             descriptor = self.descriptor
             self.descriptor = -1
             os.close(descriptor)
+
+
+def _prepare_created_publication(
+    created_nodes: list[_CreatedNode] | None,
+    record: _CreatedNode,
+    staging_path: Path,
+) -> None:
+    if created_nodes is None:
+        return
+    prepare = getattr(created_nodes, "prepare_publication", None)
+    if prepare is not None:
+        prepare(record, staging_path)
+
+
+def _create_publication_staging_directory(
+    destination: Path,
+    prefix: str,
+    label: str,
+    created_nodes: list[_CreatedNode] | None,
+) -> tuple[Path, os.stat_result, int]:
+    factory = getattr(created_nodes, "create_publication_staging", None)
+    if factory is not None:
+        return factory(destination, prefix, label)
+    return _create_private_temporary_directory(
+        destination.parent,
+        prefix,
+        label,
+    )
 
 
 def _remove_created_identity(
@@ -1346,10 +1428,11 @@ def _create_directory_create_new(
     """Prepare ownership off-path, then publish and immediately register."""
 
     temporary, temporary_metadata, temporary_descriptor = (
-        _create_private_temporary_directory(
-            path.parent,
+        _create_publication_staging_directory(
+            path,
             f".{path.name}.directory-",
             "private directory staging tree creation failed",
+            created_nodes,
         )
     )
     published_identity: tuple[int, int] | None = None
@@ -1375,9 +1458,22 @@ def _create_directory_create_new(
             temporary_descriptor,
         )
         temporary_descriptor = None
+        _prepare_created_publication(created_nodes, record, temporary)
+        restore_mode: int | None = None
+        if (
+            temporary.parent != path.parent
+            and not mode & stat.S_IWUSR
+        ):
+            restore_mode = mode
+            os.chmod(temporary, mode | stat.S_IWUSR | stat.S_IXUSR)
+            _fsync_directory(temporary)
+        source_parent = temporary.parent
         _rename_noreplace(temporary, path)
-        if created_nodes is not None:
-            created_nodes.append(record)
+        if restore_mode is not None:
+            os.chmod(path, restore_mode)
+            _fsync_directory(path)
+        if source_parent != path.parent:
+            _fsync_directory(source_parent)
         _fsync_directory(path.parent)
         _require_published_identity(
             path,
@@ -1386,6 +1482,8 @@ def _create_directory_create_new(
             True,
             "published private directory",
         )
+        if created_nodes is not None:
+            created_nodes.append(record)
     except BaseException as error:
         if isinstance(error, FileExistsError):
             primary = StagingError(f"directory appeared concurrently: {path}")
@@ -1471,18 +1569,33 @@ def _regular_file_create_new(
 
     if (owner_uid is None) != (owner_gid is None):
         raise StagingError("staging file ownership is incomplete")
-    temporary, temporary_metadata, temporary_descriptor = (
-        _create_private_temporary_directory(
-            destination.parent,
+    direct_factory = getattr(
+        created_nodes, "create_file_publication_staging", None
+    )
+    temporary: Path | None = None
+    temporary_metadata: os.stat_result | None = None
+    temporary_descriptor: int | None = None
+    descriptor: int | None = None
+    if direct_factory is not None:
+        staged, direct_metadata, descriptor = direct_factory(
+            destination,
             ".codeskeptic-file-",
             f"{label} private file staging creation failed",
         )
-    )
-    staged = temporary / "payload"
+    else:
+        temporary, temporary_metadata, temporary_descriptor = (
+            _create_publication_staging_directory(
+                destination,
+                ".codeskeptic-file-",
+                f"{label} private file staging creation failed",
+                created_nodes,
+            )
+        )
+        staged = temporary / "payload"
+        direct_metadata = None
     staged_identity: tuple[int, int] | None = None
     published_identity: tuple[int, int] | None = None
     record: _CreatedNode | None = None
-    descriptor: int | None = None
     primary: BaseException | None = None
     cleanup_errors: list[Exception] = []
     collision = False
@@ -1494,9 +1607,20 @@ def _regular_file_create_new(
             | getattr(os, "O_CLOEXEC", 0)
             | getattr(os, "O_NOFOLLOW", 0)
         )
-        descriptor = os.open(staged, flags, 0o600)
+        if descriptor is None:
+            descriptor = os.open(staged, flags, 0o600)
         opened = os.fstat(descriptor)
-        if not stat.S_ISREG(opened.st_mode) or opened.st_nlink != 1:
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or (
+                direct_metadata is not None
+                and (
+                    opened.st_dev != direct_metadata.st_dev
+                    or opened.st_ino != direct_metadata.st_ino
+                )
+            )
+        ):
             raise StagingError(f"{label} private file authority drift")
         staged_identity = (opened.st_dev, opened.st_ino)
         write_payload(descriptor)
@@ -1521,9 +1645,11 @@ def _regular_file_create_new(
             descriptor,
         )
         descriptor = None
+        _prepare_created_publication(created_nodes, record, staged)
+        source_parent = staged.parent
         _rename_noreplace(staged, destination)
-        if created_nodes is not None:
-            created_nodes.append(record)
+        if source_parent != destination.parent:
+            _fsync_directory(source_parent)
         _fsync_directory(destination.parent)
         _require_published_identity(
             destination,
@@ -1532,6 +1658,8 @@ def _regular_file_create_new(
             False,
             "published file",
         )
+        if created_nodes is not None:
+            created_nodes.append(record)
     except BaseException as error:
         if isinstance(error, FileExistsError):
             primary = StagingError(f"file appeared concurrently: {destination}")
@@ -1560,24 +1688,26 @@ def _regular_file_create_new(
                 )
         except Exception as cleanup_error:
             cleanup_errors.append(cleanup_error)
-    try:
+    if temporary is not None and temporary_metadata is not None:
         try:
-            remaining_temporary = temporary.lstat()
-        except FileNotFoundError:
-            remaining_temporary = None
-        if remaining_temporary is not None:
-            _remove_created_identity(
-                temporary,
-                temporary_metadata.st_dev,
-                temporary_metadata.st_ino,
-                True,
-            )
-    except Exception as cleanup_error:
-        cleanup_errors.append(cleanup_error)
-    try:
-        os.close(temporary_descriptor)
-    except OSError as cleanup_error:
-        cleanup_errors.append(cleanup_error)
+            try:
+                remaining_temporary = temporary.lstat()
+            except FileNotFoundError:
+                remaining_temporary = None
+            if remaining_temporary is not None:
+                _remove_created_identity(
+                    temporary,
+                    temporary_metadata.st_dev,
+                    temporary_metadata.st_ino,
+                    True,
+                )
+        except Exception as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+    if temporary_descriptor is not None:
+        try:
+            os.close(temporary_descriptor)
+        except OSError as cleanup_error:
+            cleanup_errors.append(cleanup_error)
     if (
         (primary is not None or cleanup_errors)
         and published_identity is not None
@@ -1726,10 +1856,11 @@ def install_tree_create_new(
     if not stat.S_ISDIR(parent_metadata.st_mode):
         raise StagingError("installation destination parent is not a directory")
     temporary, staging_metadata, staging_descriptor = (
-        _create_private_temporary_directory(
-            destination.parent,
+        _create_publication_staging_directory(
+            destination,
             f".{destination.name}.install-",
             "installation tree staging creation failed",
+            created_nodes,
         )
     )
     published_identity: tuple[int, int] | None = None
@@ -1751,7 +1882,8 @@ def install_tree_create_new(
             )
         for item in reversed(directories):
             os.chmod(temporary / item["path"], int(item["mode"], 8))
-        os.chmod(temporary, stat.S_IMODE(source.lstat().st_mode))
+        final_mode = stat.S_IMODE(source.lstat().st_mode)
+        os.chmod(temporary, final_mode)
         verify_inventory(temporary, expected)
         _verify_installed_ownership(temporary, expected, owner_uid, owner_gid)
         _fsync_tree(temporary)
@@ -1772,9 +1904,22 @@ def install_tree_create_new(
             staging_descriptor,
         )
         staging_descriptor = None
+        _prepare_created_publication(created_nodes, record, temporary)
+        restore_mode: int | None = None
+        if (
+            temporary.parent != destination.parent
+            and not final_mode & stat.S_IWUSR
+        ):
+            restore_mode = final_mode
+            os.chmod(temporary, final_mode | stat.S_IWUSR | stat.S_IXUSR)
+            _fsync_directory(temporary)
+        source_parent = temporary.parent
         _rename_noreplace(temporary, destination)
-        if created_nodes is not None:
-            created_nodes.append(record)
+        if restore_mode is not None:
+            os.chmod(destination, restore_mode)
+            _fsync_directory(destination)
+        if source_parent != destination.parent:
+            _fsync_directory(source_parent)
         _fsync_directory(destination.parent)
         _require_published_identity(
             destination,
@@ -1783,6 +1928,8 @@ def install_tree_create_new(
             True,
             "published installation tree",
         )
+        if created_nodes is not None:
+            created_nodes.append(record)
     except BaseException as error:
         if isinstance(error, FileExistsError):
             primary = StagingError(
@@ -3300,6 +3447,7 @@ def _prepare_operator(source_root: Path, output: Path) -> None:
         "run-authoritative-stability.sh": (
             systemd / "run-authoritative-stability.sh"
         ),
+        UNIT_DROPIN_NAME: systemd / UNIT_DROPIN_NAME,
         UNIT_NAME: systemd / UNIT_NAME,
         "stage_stability_campaign.py": (
             source_root / "scripts" / "stage_stability_campaign.py"
@@ -3335,6 +3483,7 @@ def _verify_operator_exact_head(
         "run-authoritative-stability.sh": (
             systemd / "run-authoritative-stability.sh"
         ),
+        UNIT_DROPIN_NAME: systemd / UNIT_DROPIN_NAME,
         UNIT_NAME: systemd / UNIT_NAME,
         "stage_stability_campaign.py": (
             source_root / "scripts" / "stage_stability_campaign.py"
@@ -3345,7 +3494,25 @@ def _verify_operator_exact_head(
         unit_names = sorted(path.name for path in retained_unit.parent.iterdir())
     except OSError as error:
         raise StagingError(f"cannot inspect exact-head operator: {error}") from error
-    if actual_names != sorted(expected) or unit_names != [UNIT_NAME]:
+    retained_dropin_directory = retained_unit.parent / f"{UNIT_NAME}.d"
+    try:
+        retained_dropin_directory_metadata = retained_dropin_directory.lstat()
+        retained_dropin_names = sorted(
+            path.name for path in retained_dropin_directory.iterdir()
+        )
+    except OSError as error:
+        raise StagingError(
+            f"cannot inspect retained service drop-in authority: {error}"
+        ) from error
+    expected_directory_mode = 0o555 if immutable else 0o700
+    if (
+        actual_names != sorted(expected)
+        or unit_names != sorted((f"{UNIT_NAME}.d", UNIT_NAME))
+        or not stat.S_ISDIR(retained_dropin_directory_metadata.st_mode)
+        or stat.S_IMODE(retained_dropin_directory_metadata.st_mode)
+        != expected_directory_mode
+        or retained_dropin_names != [UNIT_DROPIN_NAME]
+    ):
         raise StagingError("operator exact-head inventory drift")
     for name, source in expected.items():
         operator = operator_root / name
@@ -3364,9 +3531,18 @@ def _verify_operator_exact_head(
             raise StagingError(f"operator {name} mode drift")
     if _read_regular(retained_unit) != _read_regular(systemd / UNIT_NAME):
         raise StagingError("retained unit differs from exact-head source")
+    retained_dropin = retained_dropin_directory / UNIT_DROPIN_NAME
+    verify_timeout_override(systemd / UNIT_DROPIN_NAME)
+    verify_timeout_override(retained_dropin)
+    if _read_regular(retained_dropin) != _read_regular(
+        systemd / UNIT_DROPIN_NAME
+    ):
+        raise StagingError("retained service drop-in differs from exact-head source")
     expected_unit_mode = 0o444 if immutable else 0o400
     if stat.S_IMODE(retained_unit.lstat().st_mode) != expected_unit_mode:
         raise StagingError("retained unit mode drift")
+    if stat.S_IMODE(retained_dropin.lstat().st_mode) != expected_unit_mode:
+        raise StagingError("retained service drop-in mode drift")
 
 
 def prepare_staging(
@@ -3415,6 +3591,16 @@ def prepare_staging(
         _copy_regular_exact(
             staged_source / "scripts" / "stability-systemd" / UNIT_NAME,
             temporary / "unit" / UNIT_NAME,
+            0o400,
+        )
+        retained_dropin_directory = temporary / "unit" / f"{UNIT_NAME}.d"
+        retained_dropin_directory.mkdir(mode=0o700)
+        _copy_regular_exact(
+            staged_source
+            / "scripts"
+            / "stability-systemd"
+            / UNIT_DROPIN_NAME,
+            retained_dropin_directory / UNIT_DROPIN_NAME,
             0o400,
         )
         _copy_regular_exact(
@@ -5057,7 +5243,6 @@ def _preflight_installation(
             owner_uid,
             owner_gid,
         )
-    reject_dropin_authority(UNIT_PATH.parent, UNIT_NAME)
     if INSTALLATION_ROOT.exists() or INSTALLATION_ROOT.is_symlink():
         try:
             metadata = INSTALLATION_ROOT.lstat()
@@ -5085,6 +5270,7 @@ def _preflight_fresh_installation() -> None:
         OPERATOR_ROOT,
         CONFIG_PATH.parent,
         UNIT_PATH,
+        UNIT_DROPIN_DIRECTORY,
         INSTALLATION_ROOT,
         STATE_ROOT,
     }
@@ -5098,6 +5284,10 @@ def _preflight_fresh_installation() -> None:
 def _rollback_created(
     created: list[_CreatedNode],
 ) -> None:
+    rollback = getattr(created, "rollback_publications", None)
+    if rollback is not None:
+        rollback()
+        return
     failures: list[str] = []
     retained_descendants: list[Path] = []
     for record in reversed(created):
@@ -5166,6 +5356,7 @@ def _installation_manifest_from_bytes(
         f"image/{PINNED_ARCHIVE_NAME}",
         "receipt.json",
         "receipt.json.sha256",
+        f"unit/{UNIT_NAME}.d/{UNIT_DROPIN_NAME}",
         f"unit/{UNIT_NAME}",
     )
     lines: list[bytes] = []
@@ -5189,6 +5380,7 @@ def _installation_manifest(root: Path) -> bytes:
         f"image/{PINNED_ARCHIVE_NAME}",
         "receipt.json",
         "receipt.json.sha256",
+        f"unit/{UNIT_NAME}.d/{UNIT_DROPIN_NAME}",
         f"unit/{UNIT_NAME}",
     )
     return b"".join(
@@ -5311,6 +5503,7 @@ def install_bundle(
     owner_uid: int = 0,
     owner_gid: int = 0,
     temporary_root: Path | None = None,
+    migration_transaction_nodes: list[_CreatedNode] | None = None,
 ) -> dict[str, Any]:
     """Install a sealed bundle create-new, or verify an exact prior install."""
 
@@ -5376,7 +5569,13 @@ def install_bundle(
             temporary_workspace=temporary_workspace,
         )
 
-        created: list[_CreatedNode] = []
+        created: list[_CreatedNode] = (
+            _MigrationTargetLedger(
+                migration_transaction_nodes, owner_uid, owner_gid
+            )
+            if migration_transaction_nodes is not None
+            else []
+        )
         base_created = False
         persistent_store_touched = False
         verified_installation: dict[str, Any] | None = None
@@ -5429,8 +5628,26 @@ def install_bundle(
                 raise StagingError(
                     "fresh installation unexpectedly reused the live unit"
                 )
+            retained_dropin_directory = (
+                INSTALLATION_ROOT / "unit" / f"{UNIT_NAME}.d"
+            )
+            if install_tree_create_new(
+                retained_dropin_directory,
+                UNIT_DROPIN_DIRECTORY,
+                collect_inventory(retained_dropin_directory),
+                owner_uid=owner_uid,
+                owner_gid=owner_gid,
+                created_nodes=created,
+            ) != "created":
+                raise StagingError(
+                    "fresh installation unexpectedly reused the live service drop-in tree"
+                )
             _fsync_directory(UNIT_PATH.parent)
-            reject_dropin_authority(UNIT_PATH.parent, UNIT_NAME)
+            verify_live_dropin_authority(
+                retained_dropin_directory / UNIT_DROPIN_NAME,
+                owner_uid,
+                owner_gid,
+            )
 
             for private in (STATE_ROOT, PODMAN_ROOT):
                 if not _ensure_private_directory(
@@ -5752,7 +5969,14 @@ def verify_installation_filesystem(
         != stat.S_IMODE(retained_unit.lstat().st_mode)
     ):
         raise StagingError("installed live service unit authority drift")
-    reject_dropin_authority(UNIT_PATH.parent, UNIT_NAME)
+    retained_dropin = (
+        INSTALLATION_ROOT / "unit" / f"{UNIT_NAME}.d" / UNIT_DROPIN_NAME
+    )
+    if _read_regular(retained_dropin) != _read_regular(
+        OPERATOR_ROOT / UNIT_DROPIN_NAME
+    ):
+        raise StagingError("installed service drop-in bundle identity drift")
+    verify_live_dropin_authority(retained_dropin, owner_uid, owner_gid)
     _reject_operator_hooks(OPERATOR_ROOT)
     _verify_private_directory(STATE_ROOT, owner_uid, owner_gid)
     _verify_private_directory(PODMAN_ROOT, owner_uid, owner_gid)
@@ -5794,6 +6018,3081 @@ def verify_installation(
             options, AUTHORITY_ROOT, CONFIG_PATH, command_runner
         )
     return receipt
+
+
+def _single_ascii_line(data: bytes, label: str) -> str:
+    try:
+        value = data.decode("ascii", errors="strict")
+    except UnicodeDecodeError as error:
+        raise StagingError(f"{label} output is not ASCII") from error
+    if not value.endswith("\n") or "\n" in value[:-1] or "\r" in value:
+        raise StagingError(f"{label} output is not exactly one line")
+    return value[:-1]
+
+
+def _systemctl_property(
+    property_name: str, command_runner: Any | None,
+) -> str:
+    if re.fullmatch(r"[A-Za-z][A-Za-z0-9]*", property_name) is None:
+        raise StagingError("systemd property name is malformed")
+    output = _external_output(
+        [
+            "/usr/bin/systemctl", "show", f"--property={property_name}",
+            "--value", UNIT_NAME,
+        ],
+        4096,
+        command_runner,
+    )
+    return _single_ascii_line(output, f"systemd {property_name}")
+
+
+def _verify_migration_service_state(
+    expected_load_state: str,
+    expected_fragment_path: Path,
+    command_runner: Any | None,
+) -> None:
+    expected = {
+        "LoadState": expected_load_state,
+        "FragmentPath": expected_fragment_path.as_posix(),
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "Job": "",
+        "MainPID": "0",
+        "ControlPID": "0",
+    }
+    actual = {
+        name: _systemctl_property(name, command_runner)
+        for name in expected
+    }
+    if actual != expected:
+        raise StagingError(
+            "service is not quiescent for installation migration: "
+            + canonical_json(actual).decode("ascii")
+        )
+
+
+def _verify_migration_systemd_version(
+    command_runner: Any | None,
+) -> str:
+    output = _external_output(
+        ["/usr/bin/systemctl", "--version"],
+        64 * 1024,
+        command_runner,
+    )
+    try:
+        first = output.decode("ascii", errors="strict").splitlines()[0]
+    except (UnicodeDecodeError, IndexError) as error:
+        raise StagingError("systemd version output is malformed") from error
+    if first != MIGRATION_SYSTEMD_VERSION:
+        raise StagingError(
+            f"installation migration systemd version drift: {first}"
+        )
+    return first
+
+
+def _verify_service_cgroup_empty() -> None:
+    try:
+        root_metadata = SERVICE_CGROUP_PATH.lstat()
+    except FileNotFoundError:
+        return
+    except OSError as error:
+        raise StagingError(f"cannot inspect service cgroup: {error}") from error
+    if not stat.S_ISDIR(root_metadata.st_mode) or SERVICE_CGROUP_PATH.is_symlink():
+        raise StagingError("service cgroup authority drift")
+    for directory, names, _files in os.walk(
+        SERVICE_CGROUP_PATH, topdown=True, followlinks=False
+    ):
+        names.sort()
+        current = Path(directory)
+        try:
+            current_metadata = current.lstat()
+            processes = (current / "cgroup.procs").read_text(
+                encoding="ascii", errors="strict"
+            )
+        except (OSError, UnicodeError) as error:
+            raise StagingError(f"cannot inspect service cgroup tasks: {error}") from error
+        if not stat.S_ISDIR(current_metadata.st_mode) or current.is_symlink():
+            raise StagingError("service cgroup subtree authority drift")
+        if processes.strip():
+            raise StagingError("service cgroup is not empty")
+
+
+def _require_masked_start_rejection(
+    command_runner: Any | None,
+) -> None:
+    argv = ["/usr/bin/systemctl", "start", "--no-block", UNIT_NAME]
+    if command_runner is not None:
+        probe = getattr(command_runner, "expected_failure", None)
+        if probe is None:
+            raise StagingError(
+                "migration command runner omits the negative start probe"
+            )
+        try:
+            returncode = probe(
+                copy.deepcopy(argv),
+                maximum=4096,
+                timeout_seconds=EXTERNAL_COMMAND_TIMEOUT_SECONDS,
+            )
+        except Exception as error:
+            raise StagingError(
+                f"migration negative start probe failed: {error}"
+            ) from error
+        if isinstance(returncode, bool) or not isinstance(returncode, int):
+            raise StagingError(
+                "migration negative start probe returned malformed status"
+            )
+    else:
+        completed = _bounded_command(
+            argv,
+            environment={
+                "HOME": "/root",
+                "LANG": "C",
+                "LC_ALL": "C",
+                "PATH": "/usr/sbin:/usr/bin",
+            },
+            cwd=None,
+            maximum_output=4096,
+            timeout_seconds=EXTERNAL_COMMAND_TIMEOUT_SECONDS,
+        )
+        returncode = completed.returncode
+    if returncode == 0:
+        raise StagingError("migration fence allowed a manual service start")
+
+
+def _daemon_reload(command_runner: Any | None) -> None:
+    output = _external_output(
+        ["/usr/bin/systemctl", "daemon-reload"],
+        4096,
+        command_runner,
+    )
+    if output:
+        raise StagingError("systemd daemon-reload produced unexpected output")
+
+
+def _verify_control_root(owner_uid: int, owner_gid: int) -> None:
+    try:
+        metadata = SYSTEMD_CONTROL_ROOT.lstat()
+    except OSError as error:
+        raise StagingError(f"cannot inspect systemd control root: {error}") from error
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or metadata.st_uid != owner_uid
+        or metadata.st_gid != owner_gid
+        or stat.S_IMODE(metadata.st_mode) != 0o755
+    ):
+        raise StagingError("systemd control root authority drift")
+
+
+def _migration_fence_directory() -> Path:
+    return MIGRATION_ROOT / MIGRATION_FENCE_DIRECTORY_NAME
+
+
+def _migration_mask_anchor() -> Path:
+    return _migration_fence_directory() / MIGRATION_MASK_ANCHOR_NAME
+
+
+def _verify_migration_fence_authority(
+    owner_uid: int, owner_gid: int,
+) -> os.stat_result:
+    fence = _migration_fence_directory()
+    try:
+        fence_metadata = fence.lstat()
+        names = {path.name for path in fence.iterdir()}
+        anchor = _migration_mask_anchor()
+        anchor_metadata = anchor.lstat()
+        target = os.readlink(anchor)
+    except OSError as error:
+        raise StagingError(
+            f"cannot inspect migration fence authority: {error}"
+        ) from error
+    if (
+        not stat.S_ISDIR(fence_metadata.st_mode)
+        or fence_metadata.st_uid != owner_uid
+        or fence_metadata.st_gid != owner_gid
+        or stat.S_IMODE(fence_metadata.st_mode) != 0o700
+        or not stat.S_ISLNK(anchor_metadata.st_mode)
+        or anchor_metadata.st_uid != owner_uid
+        or anchor_metadata.st_gid != owner_gid
+        or anchor_metadata.st_nlink not in {1, 2}
+        or target != "/dev/null"
+        or not names <= {
+            MIGRATION_MASK_ANCHOR_NAME,
+            "control.reuse.json",
+            "control.intent.json",
+            "control.commit.json",
+        }
+        or MIGRATION_MASK_ANCHOR_NAME not in names
+    ):
+        raise StagingError("migration fence authority drift")
+    return anchor_metadata
+
+
+def _migration_control_value(
+    *,
+    phase: str,
+    staging: Path | None,
+    device: int,
+    inode: int,
+) -> dict[str, Any]:
+    if phase not in {"reuse", "intent", "commit"}:
+        raise StagingError("migration control-root phase is malformed")
+    if (phase == "reuse") != (staging is None):
+        raise StagingError("migration control-root staging authority is malformed")
+    return {
+        "schema": INSTALLATION_MIGRATION_CONTROL_SCHEMA,
+        "phase": phase,
+        "path": SYSTEMD_CONTROL_ROOT.as_posix(),
+        "staging": None if staging is None else staging.as_posix(),
+        "device": device,
+        "inode": inode,
+        "type": "directory",
+    }
+
+
+def _load_migration_control_authority(
+    owner_uid: int, owner_gid: int,
+) -> tuple[dict[str, Any] | None, bool]:
+    _verify_migration_fence_authority(owner_uid, owner_gid)
+    fence = _migration_fence_directory()
+    paths = {
+        phase: fence / f"control.{phase}.json"
+        for phase in ("reuse", "intent", "commit")
+    }
+    present = {
+        phase
+        for phase, path in paths.items()
+        if path.exists() or path.is_symlink()
+    }
+    if not present:
+        return None, False
+    if "reuse" in present:
+        if present != {"reuse"}:
+            raise StagingError(
+                "migration control-root reuse authority is ambiguous"
+            )
+        phases = ("reuse",)
+    else:
+        if "intent" not in present or not present <= {"intent", "commit"}:
+            raise StagingError(
+                "migration control-root commit omits its intent"
+            )
+        phases = tuple(sorted(present))
+    values: dict[str, dict[str, Any]] = {}
+    fields = {
+        "schema", "phase", "path", "staging", "device", "inode", "type",
+    }
+    for phase in phases:
+        path = paths[phase]
+        _verify_migration_owned_path(
+            path,
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+            mode=0o400,
+            is_directory=False,
+        )
+        value = _load_canonical_document(
+            path, "installation migration control-root journal"
+        )
+        if not isinstance(value, dict) or set(value) != fields:
+            raise StagingError("migration control-root fields drift")
+        staging_value = value.get("staging")
+        staging = (
+            Path(staging_value)
+            if isinstance(staging_value, str)
+            else None
+        )
+        expected_staging = phase != "reuse"
+        if (
+            value.get("schema") != INSTALLATION_MIGRATION_CONTROL_SCHEMA
+            or value.get("phase") != phase
+            or value.get("path") != SYSTEMD_CONTROL_ROOT.as_posix()
+            or value.get("type") != "directory"
+            or expected_staging != isinstance(staging_value, str)
+            or (
+                staging is not None
+                and (
+                    not staging.is_absolute()
+                    or staging.parent != SYSTEMD_CONTROL_ROOT.parent
+                    or not staging.name.startswith(
+                        f".{SYSTEMD_CONTROL_ROOT.name}.migration-"
+                    )
+                )
+            )
+            or isinstance(value.get("device"), bool)
+            or not isinstance(value.get("device"), int)
+            or value["device"] <= 0
+            or isinstance(value.get("inode"), bool)
+            or not isinstance(value.get("inode"), int)
+            or value["inode"] <= 0
+        ):
+            raise StagingError("migration control-root authority drift")
+        values[phase] = value
+    authority = values[phases[0]]
+    if "commit" in values:
+        expected_commit = copy.deepcopy(values["intent"])
+        expected_commit["phase"] = "commit"
+        if values["commit"] != expected_commit:
+            raise StagingError(
+                "migration control-root commit differs from intent"
+            )
+        authority = values["intent"]
+    return authority, "commit" in values
+
+
+def _write_migration_control_record(
+    value: dict[str, Any], phase: str, owner_uid: int, owner_gid: int,
+) -> None:
+    published = copy.deepcopy(value)
+    published["phase"] = phase
+    _write_migration_record(
+        _migration_fence_directory() / f"control.{phase}.json",
+        canonical_document(published),
+        owner_uid=owner_uid,
+        owner_gid=owner_gid,
+    )
+
+
+def _create_migration_control_root(
+    owner_uid: int, owner_gid: int,
+) -> tuple[bool, tuple[int, int]]:
+    authority, committed = _load_migration_control_authority(
+        owner_uid, owner_gid
+    )
+    if authority is not None:
+        identity = authority["device"], authority["inode"]
+        if authority["phase"] == "reuse":
+            _require_published_identity(
+                SYSTEMD_CONTROL_ROOT,
+                identity[0],
+                identity[1],
+                True,
+                "reused systemd control root",
+            )
+            _verify_control_root(owner_uid, owner_gid)
+            return False, identity
+        staging = Path(authority["staging"])
+        matches: list[Path] = []
+        for candidate in (SYSTEMD_CONTROL_ROOT, staging):
+            try:
+                metadata = candidate.lstat()
+            except FileNotFoundError:
+                continue
+            except OSError as error:
+                raise StagingError(
+                    f"cannot inspect journaled systemd control root: {error}"
+                ) from error
+            if (
+                stat.S_ISDIR(metadata.st_mode)
+                and metadata.st_dev == identity[0]
+                and metadata.st_ino == identity[1]
+            ):
+                matches.append(candidate)
+            else:
+                raise StagingError(
+                    "foreign object occupies a journaled systemd control-root path"
+                )
+        if len(matches) != 1:
+            raise StagingError(
+                "journaled systemd control-root identity is not unique"
+            )
+        if committed and matches[0] != SYSTEMD_CONTROL_ROOT:
+            raise StagingError(
+                "committed systemd control root is not at its fixed path"
+            )
+        if matches[0] == staging:
+            _rename_noreplace(staging, SYSTEMD_CONTROL_ROOT)
+            _fsync_directory(SYSTEMD_CONTROL_ROOT.parent)
+        _require_published_identity(
+            SYSTEMD_CONTROL_ROOT,
+            identity[0],
+            identity[1],
+            True,
+            "created systemd control root",
+        )
+        _verify_control_root(owner_uid, owner_gid)
+        if not committed:
+            _write_migration_control_record(
+                authority, "commit", owner_uid, owner_gid
+            )
+        return True, identity
+    try:
+        metadata = SYSTEMD_CONTROL_ROOT.lstat()
+    except FileNotFoundError:
+        staging: Path | None = None
+        staging_metadata: os.stat_result | None = None
+        staging_descriptor: int | None = None
+        intent_path = _migration_fence_directory() / "control.intent.json"
+        try:
+            staging, staging_metadata, staging_descriptor = (
+                _create_private_temporary_directory(
+                    SYSTEMD_CONTROL_ROOT.parent,
+                    f".{SYSTEMD_CONTROL_ROOT.name}.migration-",
+                    "systemd control-root staging creation failed",
+                )
+            )
+            os.chown(staging, owner_uid, owner_gid)
+            os.chmod(staging, 0o755)
+            _fsync_directory(staging)
+            metadata = staging.lstat()
+            if (
+                metadata.st_dev != staging_metadata.st_dev
+                or metadata.st_ino != staging_metadata.st_ino
+            ):
+                raise StagingError(
+                    "systemd control-root staging identity changed"
+                )
+            identity = staging_metadata.st_dev, staging_metadata.st_ino
+            value = _migration_control_value(
+                phase="intent",
+                staging=staging,
+                device=identity[0],
+                inode=identity[1],
+            )
+            _write_migration_control_record(
+                value, "intent", owner_uid, owner_gid
+            )
+            _rename_noreplace(staging, SYSTEMD_CONTROL_ROOT)
+            _fsync_directory(SYSTEMD_CONTROL_ROOT.parent)
+            _require_published_identity(
+                SYSTEMD_CONTROL_ROOT,
+                identity[0],
+                identity[1],
+                True,
+                "created systemd control root",
+            )
+            _verify_control_root(owner_uid, owner_gid)
+            _write_migration_control_record(
+                value, "commit", owner_uid, owner_gid
+            )
+        except BaseException as error:
+            cleanup_errors: list[Exception] = []
+            try:
+                intent_path.lstat()
+            except FileNotFoundError:
+                intent_published = False
+            except OSError as inspection_error:
+                intent_published = True
+                cleanup_errors.append(StagingError(
+                    "cannot inspect migration control-root intent after failure: "
+                    f"{inspection_error}"
+                ))
+            else:
+                intent_published = True
+            if (
+                not intent_published
+                and staging is not None
+                and staging_metadata is not None
+            ):
+                try:
+                    _remove_created_identity(
+                        staging,
+                        staging_metadata.st_dev,
+                        staging_metadata.st_ino,
+                        True,
+                    )
+                except Exception as cleanup_error:
+                    cleanup_errors.append(cleanup_error)
+            if staging_descriptor is not None:
+                try:
+                    os.close(staging_descriptor)
+                except OSError as cleanup_error:
+                    cleanup_errors.append(cleanup_error)
+            _raise_primary_and_cleanup(
+                error, cleanup_errors, "cannot create systemd control root"
+            )
+            raise AssertionError("unreachable")
+        assert staging_descriptor is not None
+        os.close(staging_descriptor)
+        return True, identity
+    except OSError as error:
+        raise StagingError(f"cannot inspect systemd control root: {error}") from error
+    _verify_control_root(owner_uid, owner_gid)
+    value = _migration_control_value(
+        phase="reuse",
+        staging=None,
+        device=metadata.st_dev,
+        inode=metadata.st_ino,
+    )
+    _write_migration_control_record(
+        value, "reuse", owner_uid, owner_gid
+    )
+    return False, (metadata.st_dev, metadata.st_ino)
+
+
+def _create_migration_mask(owner_uid: int, owner_gid: int) -> tuple[int, int]:
+    if MIGRATION_MASK_PATH.parent != SYSTEMD_CONTROL_ROOT:
+        raise StagingError("migration mask path is outside its fixed control root")
+    if MIGRATION_MASK_PATH.exists() or MIGRATION_MASK_PATH.is_symlink():
+        raise StagingError("migration control mask already exists")
+    anchor = _migration_mask_anchor()
+    anchor_metadata = _verify_migration_fence_authority(
+        owner_uid, owner_gid
+    )
+    if anchor_metadata.st_nlink != 1:
+        raise StagingError("migration mask anchor already has a published link")
+    if anchor_metadata.st_dev != SYSTEMD_CONTROL_ROOT.lstat().st_dev:
+        raise StagingError("migration mask anchor crosses a filesystem")
+    try:
+        os.link(
+            anchor,
+            MIGRATION_MASK_PATH,
+            follow_symlinks=False,
+        )
+        metadata = MIGRATION_MASK_PATH.lstat()
+        _fsync_directory(SYSTEMD_CONTROL_ROOT)
+    except FileExistsError as error:
+        raise StagingError("migration control mask appeared concurrently") from error
+    except OSError as error:
+        raise StagingError(f"cannot create migration control mask: {error}") from error
+    if (
+        not stat.S_ISLNK(metadata.st_mode)
+        or metadata.st_uid != owner_uid
+        or metadata.st_gid != owner_gid
+        or metadata.st_dev != anchor_metadata.st_dev
+        or metadata.st_ino != anchor_metadata.st_ino
+        or metadata.st_nlink != 2
+        or os.readlink(MIGRATION_MASK_PATH) != "/dev/null"
+    ):
+        raise StagingError("migration control mask authority drift")
+    linked_anchor = _verify_migration_fence_authority(owner_uid, owner_gid)
+    if (
+        linked_anchor.st_dev != metadata.st_dev
+        or linked_anchor.st_ino != metadata.st_ino
+        or linked_anchor.st_nlink != 2
+    ):
+        raise StagingError("migration control mask is not journal-linked")
+    return metadata.st_dev, metadata.st_ino
+
+
+def _remove_migration_mask(device: int, inode: int) -> None:
+    anchor = _migration_mask_anchor()
+    try:
+        metadata = MIGRATION_MASK_PATH.lstat()
+        anchor_metadata = anchor.lstat()
+    except OSError as error:
+        raise StagingError(f"cannot inspect migration control mask: {error}") from error
+    if (
+        not stat.S_ISLNK(metadata.st_mode)
+        or metadata.st_dev != device
+        or metadata.st_ino != inode
+        or metadata.st_dev != anchor_metadata.st_dev
+        or metadata.st_ino != anchor_metadata.st_ino
+        or metadata.st_nlink != 2
+        or anchor_metadata.st_nlink != 2
+        or os.readlink(MIGRATION_MASK_PATH) != "/dev/null"
+        or os.readlink(anchor) != "/dev/null"
+    ):
+        raise StagingError("migration control mask identity drift")
+    try:
+        MIGRATION_MASK_PATH.unlink()
+        _fsync_directory(SYSTEMD_CONTROL_ROOT)
+    except OSError as error:
+        raise StagingError(f"cannot remove migration control mask: {error}") from error
+    remaining = anchor.lstat()
+    if (
+        remaining.st_dev != device
+        or remaining.st_ino != inode
+        or remaining.st_nlink != 1
+    ):
+        raise StagingError("migration mask anchor release drift")
+
+
+def _remove_created_migration_control_root(
+    control_identity: tuple[int, int],
+) -> None:
+    """Remove a transaction-created empty control root by exact identity."""
+
+    try:
+        metadata = SYSTEMD_CONTROL_ROOT.lstat()
+        occupied = any(SYSTEMD_CONTROL_ROOT.iterdir())
+    except OSError as error:
+        raise StagingError(
+            f"cannot inspect transaction-created systemd control root: {error}"
+        ) from error
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or metadata.st_dev != control_identity[0]
+        or metadata.st_ino != control_identity[1]
+        or occupied
+    ):
+        raise StagingError("transaction-created systemd control root changed")
+    try:
+        SYSTEMD_CONTROL_ROOT.rmdir()
+        _fsync_directory(SYSTEMD_CONTROL_ROOT.parent)
+    except OSError as error:
+        raise StagingError(
+            f"cannot remove transaction-created systemd control root: {error}"
+        ) from error
+
+
+@contextlib.contextmanager
+def _migration_service_guard(
+    command_runner: Any | None,
+    owner_uid: int,
+    owner_gid: int,
+):
+    """Keep PID 1 unable to start either installation during the swap."""
+
+    _verify_migration_systemd_version(command_runner)
+    _verify_migration_service_state("loaded", UNIT_PATH, command_runner)
+    _verify_service_cgroup_empty()
+    control_created, control_identity = _create_migration_control_root(
+        owner_uid, owner_gid
+    )
+    mask_identity: tuple[int, int] | None = None
+    release = {
+        "ready": False,
+        "control_created": control_created,
+        "control_identity": control_identity,
+    }
+    primary: BaseException | None = None
+    try:
+        mask_identity = _create_migration_mask(owner_uid, owner_gid)
+        _daemon_reload(command_runner)
+        _verify_migration_service_state(
+            "masked", MIGRATION_MASK_PATH, command_runner
+        )
+        _require_masked_start_rejection(command_runner)
+        _verify_migration_service_state(
+            "masked", MIGRATION_MASK_PATH, command_runner
+        )
+        _verify_service_cgroup_empty()
+        yield release
+    except BaseException as error:
+        primary = error
+    cleanup_errors: list[Exception] = []
+    if release["ready"]:
+        if mask_identity is None:
+            cleanup_errors.append(StagingError("migration control mask was not created"))
+        else:
+            try:
+                _remove_migration_mask(*mask_identity)
+            except Exception as error:
+                cleanup_errors.append(error)
+        if not cleanup_errors:
+            try:
+                _daemon_reload(command_runner)
+                _verify_migration_service_state(
+                    "loaded", UNIT_PATH, command_runner
+                )
+                _verify_service_cgroup_empty()
+            except Exception as error:
+                cleanup_errors.append(error)
+    elif primary is None:
+        primary = StagingError(
+            "migration guard was not released by a verified installation"
+        )
+    _raise_primary_and_cleanup(
+        primary, cleanup_errors, "installation migration service guard failed"
+    )
+
+
+@contextlib.contextmanager
+def _migration_lock(owner_uid: int, owner_gid: int):
+    if fcntl is None:
+        raise StagingError("installation migration lock requires POSIX fcntl")
+    try:
+        parent = MIGRATION_LOCK_PATH.parent
+        parent_metadata = parent.lstat()
+        if not stat.S_ISDIR(parent_metadata.st_mode) or parent.resolve() != parent:
+            raise StagingError("migration lock parent authority drift")
+        flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_CLOEXEC", 0)
+        flags |= getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(MIGRATION_LOCK_PATH, flags, 0o600)
+    except OSError as error:
+        raise StagingError(f"cannot open installation migration lock: {error}") from error
+    locked = False
+    try:
+        os.fchown(descriptor, owner_uid, owner_gid)
+        os.fchmod(descriptor, 0o600)
+        metadata = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_nlink != 1
+            or metadata.st_uid != owner_uid
+            or metadata.st_gid != owner_gid
+            or stat.S_IMODE(metadata.st_mode) != 0o600
+        ):
+            raise StagingError("installation migration lock authority drift")
+        os.fsync(descriptor)
+        _fsync_directory(parent)
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise StagingError("installation migration is already active") from error
+        locked = True
+        yield
+    except StagingError:
+        raise
+    except OSError as error:
+        raise StagingError(f"cannot hold installation migration lock: {error}") from error
+    finally:
+        if locked:
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_UN)
+            except OSError:
+                pass
+        os.close(descriptor)
+
+
+@contextlib.contextmanager
+def _migration_guided_lock_at(
+    state_root: Path,
+    owner_uid: int,
+    owner_gid: int,
+    *,
+    allow_create: bool,
+):
+    if fcntl is None:
+        raise StagingError("guided migration lock requires POSIX fcntl")
+    if not state_root.is_absolute():
+        raise StagingError("guided migration state root must be absolute")
+    lock_path = state_root / "guided.lock"
+    try:
+        _verify_private_directory(state_root, owner_uid, owner_gid)
+        flags = os.O_RDWR | getattr(os, "O_CLOEXEC", 0)
+        if allow_create:
+            flags |= os.O_CREAT
+        flags |= getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(lock_path, flags, 0o600)
+    except OSError as error:
+        raise StagingError(f"cannot open guided migration lock: {error}") from error
+    locked = False
+    try:
+        if allow_create:
+            os.fchown(descriptor, owner_uid, owner_gid)
+            os.fchmod(descriptor, 0o600)
+        metadata = os.fstat(descriptor)
+        path_metadata = lock_path.lstat()
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or not stat.S_ISREG(path_metadata.st_mode)
+            or metadata.st_dev != path_metadata.st_dev
+            or metadata.st_ino != path_metadata.st_ino
+            or metadata.st_nlink != 1
+            or metadata.st_size != 0
+            or metadata.st_uid != owner_uid
+            or metadata.st_gid != owner_gid
+            or stat.S_IMODE(metadata.st_mode) != 0o600
+        ):
+            raise StagingError("guided migration lock authority drift")
+        os.fsync(descriptor)
+        _fsync_directory(state_root)
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise StagingError("a guided stability invocation is active") from error
+        locked = True
+        yield
+    except StagingError:
+        raise
+    except OSError as error:
+        raise StagingError(f"cannot hold guided migration lock: {error}") from error
+    finally:
+        if locked:
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_UN)
+            except OSError:
+                pass
+        os.close(descriptor)
+
+
+def _migration_guided_lock(owner_uid: int, owner_gid: int):
+    return _migration_guided_lock_at(
+        STATE_ROOT,
+        owner_uid,
+        owner_gid,
+        allow_create=True,
+    )
+
+
+def _run_current_recovery_gates(
+    command_runner: Any | None,
+) -> None:
+    post_stop = OPERATOR_ROOT / "post-stop.sh"
+    host_recovery = OPERATOR_ROOT / "host-recovery.py"
+    cgroup_authority = OPERATOR_ROOT / "cgroup-authority.py"
+    output = _external_output(
+        [os.fspath(post_stop), "--startup-recovery"],
+        64 * 1024,
+        command_runner,
+        timeout_seconds=300,
+    )
+    if output not in {b"already-clean\n", b"recovered\n"}:
+        raise StagingError("startup recovery clean-state output drift")
+    recovery = _external_output(
+        [os.fspath(host_recovery), "recover"],
+        4096,
+        command_runner,
+        timeout_seconds=300,
+    )
+    if recovery not in {b"already-clean\n", b"recovered\n"}:
+        raise StagingError("host recovery clean-state output drift")
+    cgroup = _external_output(
+        [os.fspath(cgroup_authority), "check-clean"],
+        4096,
+        command_runner,
+        timeout_seconds=300,
+    )
+    if cgroup != (
+        b"CODESKEPTIC_P10_09_CGROUP_AUTHORITY_OK "
+        b"action=check-clean result=clean\n"
+    ):
+        raise StagingError("cgroup clean-state output drift")
+
+
+def _verify_current_installation_with_producer(
+    *,
+    current_revision: str,
+    current_bundle_receipt_sha256: str,
+    current_producer_sha256: str,
+    command_runner: Any | None,
+    owner_uid: int,
+    owner_gid: int,
+) -> None:
+    producer = OPERATOR_ROOT / "stage_stability_campaign.py"
+    try:
+        metadata = producer.lstat()
+    except OSError as error:
+        raise StagingError(f"cannot inspect current installed producer: {error}") from error
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_nlink != 1
+        or metadata.st_uid != owner_uid
+        or metadata.st_gid != owner_gid
+        or stat.S_IMODE(metadata.st_mode) != 0o555
+        or _sha256_regular(producer) != current_producer_sha256
+    ):
+        raise StagingError("current installed producer authority drift")
+    expected_output = (
+        f"CODESKEPTIC_INSTALLATION_VERIFIED {INSTALLATION_RECEIPT_PATH}\n"
+    ).encode("ascii")
+    output = _external_output(
+        [
+            "/usr/bin/python3", "-B", os.fspath(producer),
+            "verify-install", "--receipt", os.fspath(INSTALLATION_RECEIPT_PATH),
+            "--expected-revision", current_revision,
+            "--expected-bundle-receipt-sha256",
+            current_bundle_receipt_sha256,
+        ],
+        4096,
+        command_runner,
+        timeout_seconds=IMAGE_LOAD_TIMEOUT_SECONDS,
+    )
+    if output != expected_output:
+        raise StagingError("current installed producer verification output drift")
+    after = producer.lstat()
+    if (
+        after.st_dev != metadata.st_dev
+        or after.st_ino != metadata.st_ino
+        or _sha256_regular(producer) != current_producer_sha256
+    ):
+        raise StagingError("current installed producer changed during verification")
+
+
+def _migration_source_nodes() -> list[dict[str, Any]]:
+    opt_root = AUTHORITY_ROOT.parent
+    expected_opt_names = {AUTHORITY_ROOT.name, OPERATOR_ROOT.name, INSTALLATION_ROOT.name}
+    try:
+        opt_names = {path.name for path in opt_root.iterdir()}
+    except OSError as error:
+        raise StagingError(f"cannot inspect installed payload base: {error}") from error
+    if opt_names != expected_opt_names:
+        raise StagingError("installed payload base inventory drift")
+    specifications = [
+        ("unit", UNIT_PATH, False),
+        ("config", CONFIG_PATH.parent, True),
+        ("state", STATE_ROOT, True),
+        ("opt", opt_root, True),
+    ]
+    if UNIT_DROPIN_DIRECTORY.exists() or UNIT_DROPIN_DIRECTORY.is_symlink():
+        specifications.insert(1, ("dropin", UNIT_DROPIN_DIRECTORY, True))
+    nodes: list[dict[str, Any]] = []
+    try:
+        for name, source, is_directory in specifications:
+            metadata = source.lstat()
+            expected_type = (
+                stat.S_ISDIR(metadata.st_mode)
+                if is_directory
+                else stat.S_ISREG(metadata.st_mode) and metadata.st_nlink == 1
+            )
+            if not expected_type:
+                raise StagingError(f"migration source {name} type drift")
+            descriptor = _open_identity_pin(
+                source,
+                metadata.st_dev,
+                metadata.st_ino,
+                is_directory,
+                f"migration source {name}",
+            )
+            nodes.append({
+                "name": name,
+                "source": source,
+                "backup": MIGRATION_ROOT / "backup" / name,
+                "device": metadata.st_dev,
+                "inode": metadata.st_ino,
+                "is_directory": is_directory,
+                "descriptor": descriptor,
+            })
+    except (OSError, StagingError) as error:
+        cleanup_errors: list[Exception] = []
+        try:
+            _close_migration_nodes(nodes)
+        except Exception as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+        primary = (
+            StagingError(f"cannot inspect migration source: {error}")
+            if isinstance(error, OSError)
+            else error
+        )
+        _raise_primary_and_cleanup(
+            primary,
+            cleanup_errors,
+            "installation migration source pinning failed",
+        )
+        raise AssertionError("unreachable")
+    return nodes
+
+
+def _close_migration_nodes(nodes: list[dict[str, Any]]) -> None:
+    failures: list[str] = []
+    for node in nodes:
+        descriptor = node.get("descriptor", -1)
+        if descriptor >= 0:
+            try:
+                os.close(descriptor)
+            except OSError as error:
+                failures.append(f"{node['name']}: {error}")
+            node["descriptor"] = -1
+    if failures:
+        raise StagingError("migration identity-pin release failed: " + "; ".join(failures))
+
+
+def _migration_plan(
+    nodes: list[dict[str, Any]],
+    *,
+    current_revision: str,
+    current_bundle_receipt_sha256: str,
+    current_producer_sha256: str,
+    expected_revision: str,
+    expected_bundle_receipt_sha256: str,
+    systemd_version: str,
+) -> dict[str, Any]:
+    return {
+        "schema": INSTALLATION_MIGRATION_PLAN_SCHEMA,
+        "current_revision": current_revision,
+        "current_bundle_receipt_sha256": current_bundle_receipt_sha256,
+        "current_producer_sha256": current_producer_sha256,
+        "target_revision": expected_revision,
+        "target_bundle_receipt_sha256": expected_bundle_receipt_sha256,
+        "systemd_version": systemd_version,
+        "paths": [
+            {
+                "name": node["name"],
+                "source": node["source"].as_posix(),
+                "backup": node["backup"].relative_to(MIGRATION_ROOT).as_posix(),
+                "device": node["device"],
+                "inode": node["inode"],
+                "type": "directory" if node["is_directory"] else "file",
+            }
+            for node in nodes
+        ],
+    }
+
+
+def _verify_migration_capacity(bundle: Path, temporary_root: Path) -> None:
+    if not temporary_root.is_absolute():
+        raise StagingError("migration temporary root must be absolute")
+    try:
+        temporary_metadata = temporary_root.lstat()
+        target_metadata = AUTHORITY_ROOT.parent.parent.lstat()
+    except OSError as error:
+        raise StagingError(f"cannot inspect migration capacity roots: {error}") from error
+    if (
+        not stat.S_ISDIR(temporary_metadata.st_mode)
+        or not stat.S_ISDIR(target_metadata.st_mode)
+    ):
+        raise StagingError("migration capacity root is not a directory")
+    bundle_bytes = _regular_tree_size(bundle)
+    temporary_bytes = _bundle_temporary_requirement(
+        bundle, include_snapshot=True
+    )
+    persistent_bytes = bundle_bytes + _bundle_temporary_requirement(
+        bundle, include_snapshot=False
+    )
+    if temporary_metadata.st_dev == target_metadata.st_dev:
+        _temporary_capacity(
+            temporary_root, temporary_bytes + persistent_bytes
+        )
+    else:
+        _temporary_capacity(temporary_root, temporary_bytes)
+        _temporary_capacity(AUTHORITY_ROOT.parent.parent, persistent_bytes)
+
+
+def _prepare_migration_transaction(
+    plan: dict[str, Any], owner_uid: int, owner_gid: int,
+) -> list[_CreatedNode]:
+    if MIGRATION_ROOT.exists() or MIGRATION_ROOT.is_symlink():
+        raise StagingError(
+            "unresolved installation migration already exists; recovery is required"
+        )
+    created: list[_CreatedNode] = []
+    staging: Path | None = None
+    try:
+        staging, metadata, descriptor = _create_private_temporary_directory(
+            MIGRATION_ROOT.parent,
+            f".{MIGRATION_ROOT.name}.prepare-",
+            "installation migration journal staging",
+        )
+        created.append(_CreatedNode(
+            staging,
+            metadata.st_dev,
+            metadata.st_ino,
+            True,
+            descriptor,
+        ))
+        if owner_uid != metadata.st_uid or owner_gid != metadata.st_gid:
+            os.chown(staging, owner_uid, owner_gid)
+        os.chmod(staging, 0o700)
+        backup = staging / "backup"
+        if not _ensure_private_directory(
+            backup,
+            owner_uid,
+            owner_gid,
+            created_nodes=created,
+        ):
+            raise StagingError("installation migration backup appeared concurrently")
+        moves = staging / "moves"
+        if not _ensure_private_directory(
+            moves,
+            owner_uid,
+            owner_gid,
+            created_nodes=created,
+        ):
+            raise StagingError("installation migration journal appeared concurrently")
+        targets = staging / "targets"
+        if not _ensure_private_directory(
+            targets,
+            owner_uid,
+            owner_gid,
+            created_nodes=created,
+        ):
+            raise StagingError(
+                "installation migration target journal appeared concurrently"
+            )
+        failed_targets = staging / "failed-targets"
+        if not _ensure_private_directory(
+            failed_targets,
+            owner_uid,
+            owner_gid,
+            created_nodes=created,
+        ):
+            raise StagingError(
+                "installation migration failed-target root appeared concurrently"
+            )
+        publication_staging = (
+            staging / MIGRATION_PUBLICATION_STAGING_DIRECTORY_NAME
+        )
+        if not _ensure_private_directory(
+            publication_staging,
+            owner_uid,
+            owner_gid,
+            created_nodes=created,
+        ):
+            raise StagingError(
+                "installation migration publication staging appeared concurrently"
+            )
+        fence = staging / MIGRATION_FENCE_DIRECTORY_NAME
+        if not _ensure_private_directory(
+            fence,
+            owner_uid,
+            owner_gid,
+            created_nodes=created,
+        ):
+            raise StagingError(
+                "installation migration fence journal appeared concurrently"
+            )
+        mask_anchor = fence / MIGRATION_MASK_ANCHOR_NAME
+        try:
+            os.symlink("/dev/null", mask_anchor)
+            os.lchown(mask_anchor, owner_uid, owner_gid)
+            anchor_metadata = mask_anchor.lstat()
+        except OSError as error:
+            raise StagingError(
+                f"cannot create migration mask anchor: {error}"
+            ) from error
+        if (
+            not stat.S_ISLNK(anchor_metadata.st_mode)
+            or anchor_metadata.st_uid != owner_uid
+            or anchor_metadata.st_gid != owner_gid
+            or anchor_metadata.st_nlink != 1
+            or os.readlink(mask_anchor) != "/dev/null"
+        ):
+            raise StagingError("migration mask anchor authority drift")
+        _write_new(
+            staging / "plan.json",
+            canonical_document(plan),
+            0o400,
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+            created_nodes=created,
+        )
+        _write_new(
+            staging / "active",
+            b"codeskeptic-installation-migration-active-v1\n",
+            0o400,
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+            created_nodes=created,
+        )
+        _fsync_directory(backup)
+        _fsync_directory(moves)
+        _fsync_directory(targets)
+        _fsync_directory(failed_targets)
+        _fsync_directory(publication_staging)
+        _fsync_directory(fence)
+        _fsync_directory(staging)
+        published_paths = [
+            (
+                MIGRATION_ROOT
+                if record.path == staging
+                else MIGRATION_ROOT / record.path.relative_to(staging)
+            )
+            for record in created
+        ]
+        _rename_noreplace(staging, MIGRATION_ROOT)
+        for record, published in zip(created, published_paths, strict=True):
+            record.path = published
+        _fsync_directory(MIGRATION_ROOT.parent)
+        _require_published_identity(
+            MIGRATION_ROOT,
+            metadata.st_dev,
+            metadata.st_ino,
+            True,
+            "installation migration journal",
+        )
+        return created
+    except BaseException as error:
+        cleanup_errors: list[Exception] = []
+        try:
+            _rollback_created(created)
+        except Exception as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+        _raise_primary_and_cleanup(
+            error, cleanup_errors, "installation migration preparation failed"
+        )
+        raise AssertionError("unreachable")
+
+
+def _retire_migration_active(created: list[_CreatedNode]) -> None:
+    active_path = MIGRATION_ROOT / "active"
+    retired_path = MIGRATION_ROOT / "retired"
+    records = [record for record in created if record.path == active_path]
+    if len(records) != 1:
+        raise StagingError("migration active-marker identity is unavailable")
+    record = records[0]
+    if retired_path.exists() or retired_path.is_symlink():
+        raise StagingError("migration retired-marker appeared concurrently")
+    _rename_noreplace(active_path, retired_path)
+    record.path = retired_path
+    _fsync_directory(MIGRATION_ROOT)
+    _require_published_identity(
+        retired_path,
+        record.device,
+        record.inode,
+        False,
+        "migration retired-marker",
+    )
+
+
+def _migration_move_value(
+    node: dict[str, Any], index: int, phase: str,
+) -> dict[str, Any]:
+    if phase not in {"intent", "commit"}:
+        raise StagingError("migration move phase is malformed")
+    return {
+        "schema": "codeskeptic-stability-installation-migration-move-v1",
+        "index": index,
+        "name": node["name"],
+        "source": node["source"].as_posix(),
+        "backup": node["backup"].relative_to(MIGRATION_ROOT).as_posix(),
+        "device": node["device"],
+        "inode": node["inode"],
+        "type": "directory" if node["is_directory"] else "file",
+        "phase": phase,
+    }
+
+
+def _write_migration_record(
+    path: Path,
+    data: bytes,
+    *,
+    owner_uid: int,
+    owner_gid: int,
+    created_nodes: list[_CreatedNode] | None = None,
+) -> None:
+    """Publish one complete journal file without staging inside authority."""
+
+    try:
+        path.relative_to(MIGRATION_ROOT)
+    except ValueError as error:
+        raise StagingError("migration record is outside its journal") from error
+    staging = (
+        MIGRATION_ROOT.parent
+        / f".{MIGRATION_ROOT.name}.record-{secrets.token_hex(16)}"
+    )
+    staged_nodes: list[_CreatedNode] = []
+    try:
+        _write_new(
+            staging,
+            data,
+            0o400,
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+            created_nodes=staged_nodes,
+        )
+        if len(staged_nodes) != 1 or staged_nodes[0].path != staging:
+            raise StagingError("migration record staging identity drift")
+        record = staged_nodes[0]
+        _rename_noreplace(staging, path)
+        record.path = path
+        _fsync_directory(path.parent)
+        _fsync_directory(MIGRATION_ROOT.parent)
+        _require_published_identity(
+            path,
+            record.device,
+            record.inode,
+            False,
+            "published migration record",
+        )
+        if created_nodes is None:
+            record.close()
+        else:
+            created_nodes.append(record)
+        staged_nodes.clear()
+    except BaseException as error:
+        cleanup_errors: list[Exception] = []
+        try:
+            _rollback_created(staged_nodes)
+        except Exception as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+        _raise_primary_and_cleanup(
+            error, cleanup_errors, "migration record publication failed"
+        )
+
+
+def _migration_install_target_paths() -> frozenset[Path]:
+    return frozenset({
+        AUTHORITY_ROOT.parent,
+        INSTALLATION_ROOT,
+        AUTHORITY_ROOT,
+        CONFIG_PATH.parent,
+        INSTALLATION_ROOT / "image",
+        OPERATOR_ROOT,
+        INSTALLATION_ROOT / "unit",
+        INSTALLATION_ROOT / "bundle",
+        UNIT_PATH,
+        UNIT_DROPIN_DIRECTORY,
+        STATE_ROOT,
+        PODMAN_ROOT,
+        INSTALLATION_AUTHORITY_PATH,
+        Path(f"{INSTALLATION_RECEIPT_PATH}.sha256"),
+        INSTALLATION_ROOT / "SHA256SUMS",
+        INSTALLATION_RECEIPT_PATH,
+    })
+
+
+def _migration_target_value(
+    record: _CreatedNode,
+    staging_path: Path,
+    index: int,
+    phase: str,
+) -> dict[str, Any]:
+    if phase not in {"intent", "commit"}:
+        raise StagingError("migration target phase is malformed")
+    return {
+        "schema": INSTALLATION_MIGRATION_TARGET_SCHEMA,
+        "index": index,
+        "path": record.path.as_posix(),
+        "staging": staging_path.as_posix(),
+        "device": record.device,
+        "inode": record.inode,
+        "type": "directory" if record.is_directory else "file",
+        "phase": phase,
+    }
+
+
+def _quarantine_migration_target(
+    source: Path,
+    *,
+    index: int,
+    device: int,
+    inode: int,
+    is_directory: bool,
+) -> Path:
+    destination = MIGRATION_ROOT / "failed-targets" / f"{index:04d}"
+    if destination.exists() or destination.is_symlink():
+        if source.exists() or source.is_symlink():
+            raise StagingError("migration target quarantine identity is not unique")
+        _require_published_identity(
+            destination,
+            device,
+            inode,
+            is_directory,
+            "quarantined migration target",
+        )
+        return destination
+    _require_published_identity(
+        source,
+        device,
+        inode,
+        is_directory,
+        "migration target before quarantine",
+    )
+    if source.parent.lstat().st_dev != destination.parent.lstat().st_dev:
+        raise StagingError("migration target quarantine crosses a filesystem")
+    original_mode: int | None = None
+    try:
+        if is_directory:
+            source_metadata = source.lstat()
+            original_mode = stat.S_IMODE(source_metadata.st_mode)
+            if not original_mode & stat.S_IWUSR:
+                # Linux requires write permission on a directory whose `..`
+                # entry changes during a cross-parent rename.  Sealed payload
+                # roots are intentionally 0500/0555, so relax only this exact
+                # journaled inode for the reparent and restore its prior mode
+                # inside the root-private failed-target quarantine.
+                os.chmod(source, original_mode | stat.S_IWUSR | stat.S_IXUSR)
+                _fsync_directory(source)
+                _require_published_identity(
+                    source,
+                    device,
+                    inode,
+                    True,
+                    "relaxed migration target before quarantine",
+                )
+            else:
+                original_mode = None
+        _rename_noreplace(source, destination)
+        _fsync_directory(source.parent)
+        _fsync_directory(destination.parent)
+        _require_published_identity(
+            destination,
+            device,
+            inode,
+            is_directory,
+            "quarantined migration target",
+        )
+        if original_mode is not None:
+            os.chmod(destination, original_mode)
+            _fsync_directory(destination)
+            _require_published_identity(
+                destination,
+                device,
+                inode,
+                True,
+                "mode-restored quarantined migration target",
+            )
+    except BaseException as error:
+        cleanup_errors: list[Exception] = []
+        if original_mode is not None:
+            for candidate in (destination, source):
+                try:
+                    metadata = candidate.lstat()
+                except FileNotFoundError:
+                    continue
+                except OSError as cleanup_error:
+                    cleanup_errors.append(cleanup_error)
+                    break
+                if (
+                    stat.S_ISDIR(metadata.st_mode)
+                    and metadata.st_dev == device
+                    and metadata.st_ino == inode
+                ):
+                    try:
+                        os.chmod(candidate, original_mode)
+                        _fsync_directory(candidate)
+                    except Exception as cleanup_error:
+                        cleanup_errors.append(cleanup_error)
+                    break
+        _raise_primary_and_cleanup(
+            error,
+            cleanup_errors,
+            "migration target quarantine failed",
+        )
+    return destination
+
+
+class _MigrationTargetLedger(list[_CreatedNode]):
+    """Durably identify every fixed target before its create-new publish."""
+
+    def __init__(
+        self,
+        transaction_nodes: list[_CreatedNode],
+        owner_uid: int,
+        owner_gid: int,
+    ) -> None:
+        super().__init__()
+        self._transaction_nodes = transaction_nodes
+        self._owner_uid = owner_uid
+        self._owner_gid = owner_gid
+        self._prepared: dict[_CreatedNode, tuple[int, Path]] = {}
+        self._paths: set[Path] = set()
+
+    def _publication_staging_root(self, destination: Path) -> Path:
+        if destination not in _migration_install_target_paths():
+            raise StagingError(
+                "migration publication staging is outside its target plan"
+            )
+        staging_root = (
+            MIGRATION_ROOT / MIGRATION_PUBLICATION_STAGING_DIRECTORY_NAME
+        )
+        staging_metadata = _verify_migration_owned_path(
+            staging_root,
+            owner_uid=self._owner_uid,
+            owner_gid=self._owner_gid,
+            mode=0o700,
+            is_directory=True,
+        )
+        try:
+            parent_metadata = destination.parent.lstat()
+        except OSError as error:
+            raise StagingError(
+                f"cannot inspect migration target parent: {error}"
+            ) from error
+        if (
+            not stat.S_ISDIR(parent_metadata.st_mode)
+            or parent_metadata.st_dev != staging_metadata.st_dev
+        ):
+            raise StagingError(
+                "migration publication staging crosses a filesystem"
+            )
+        return staging_root
+
+    def create_file_publication_staging(
+        self,
+        destination: Path,
+        prefix: str,
+        label: str,
+    ) -> tuple[Path, os.stat_result, int]:
+        """Create one pinned migration file directly in journal authority."""
+
+        if prefix != ".codeskeptic-file-":
+            raise StagingError(
+                "migration file publication staging is outside its plan"
+            )
+        staging_root = self._publication_staging_root(destination)
+        flags = (
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+        )
+        for _attempt in range(128):
+            candidate = staging_root / f"{prefix}{secrets.token_hex(16)}"
+            descriptor: int | None = None
+            metadata: os.stat_result | None = None
+            try:
+                descriptor = os.open(candidate, flags, 0o600)
+                metadata = os.fstat(descriptor)
+                if (
+                    not stat.S_ISREG(metadata.st_mode)
+                    or metadata.st_nlink != 1
+                    or metadata.st_uid != self._owner_uid
+                    or metadata.st_gid != self._owner_gid
+                    or stat.S_IMODE(metadata.st_mode) != 0o600
+                ):
+                    raise StagingError(f"{label} authority drift")
+                _fsync_directory(staging_root)
+                return candidate, metadata, descriptor
+            except FileExistsError:
+                continue
+            except BaseException as error:
+                cleanup_errors: list[Exception] = []
+                if descriptor is not None and metadata is not None:
+                    try:
+                        _remove_created_identity(
+                            candidate,
+                            metadata.st_dev,
+                            metadata.st_ino,
+                            False,
+                        )
+                    except Exception as cleanup_error:
+                        cleanup_errors.append(cleanup_error)
+                elif descriptor is not None or not isinstance(error, Exception):
+                    cleanup_errors.append(StagingError(
+                        "migration file cleanup withheld because its original "
+                        f"identity was not authenticated; retained path may be "
+                        f"{candidate}"
+                    ))
+                if descriptor is not None:
+                    try:
+                        os.close(descriptor)
+                    except OSError as cleanup_error:
+                        cleanup_errors.append(cleanup_error)
+                _raise_primary_and_cleanup(error, cleanup_errors, label)
+        raise StagingError(f"cannot allocate a unique {label}")
+
+    def create_publication_staging(
+        self,
+        destination: Path,
+        prefix: str,
+        label: str,
+    ) -> tuple[Path, os.stat_result, int]:
+        expected_prefixes = {
+            f".{destination.name}.directory-",
+            f".{destination.name}.install-",
+        }
+        if prefix not in expected_prefixes:
+            raise StagingError(
+                "migration publication staging is outside its target plan"
+            )
+        staging_root = self._publication_staging_root(destination)
+        return _create_private_temporary_directory(
+            staging_root,
+            prefix,
+            label,
+        )
+
+    def _write(
+        self,
+        record: _CreatedNode,
+        staging_path: Path,
+        index: int,
+        phase: str,
+    ) -> None:
+        target_root = MIGRATION_ROOT / "targets"
+        _write_migration_record(
+            target_root / f"{index:04d}.{phase}.json",
+            canonical_document(
+                _migration_target_value(record, staging_path, index, phase)
+            ),
+            owner_uid=self._owner_uid,
+            owner_gid=self._owner_gid,
+            created_nodes=self._transaction_nodes,
+        )
+        _fsync_directory(target_root)
+
+    def prepare_publication(
+        self, record: _CreatedNode, staging_path: Path,
+    ) -> None:
+        if (
+            record.path not in _migration_install_target_paths()
+            or record.path in self._paths
+            or record in self._prepared
+            or not staging_path.is_absolute()
+            or staging_path == record.path
+        ):
+            raise StagingError("migration target publication is outside its plan")
+        pinned = os.fstat(record.descriptor)
+        expected_type = (
+            stat.S_ISDIR(pinned.st_mode)
+            if record.is_directory
+            else stat.S_ISREG(pinned.st_mode) and pinned.st_nlink == 1
+        )
+        if (
+            not expected_type
+            or pinned.st_dev != record.device
+            or pinned.st_ino != record.inode
+        ):
+            raise StagingError("migration target staging identity drift")
+        index = len(self._prepared)
+        self._write(record, staging_path, index, "intent")
+        self._prepared[record] = (index, staging_path)
+        self._paths.add(record.path)
+
+    def append(self, record: _CreatedNode) -> None:
+        prepared = self._prepared.get(record)
+        if prepared is None or record in self:
+            raise StagingError("migration target publication omits its intent")
+        index, staging_path = prepared
+        try:
+            self._write(record, staging_path, index, "commit")
+        except BaseException as error:
+            cleanup_errors: list[Exception] = []
+            try:
+                _quarantine_migration_target(
+                    record.path,
+                    index=index,
+                    device=record.device,
+                    inode=record.inode,
+                    is_directory=record.is_directory,
+                )
+            except Exception as cleanup_error:
+                cleanup_errors.append(cleanup_error)
+            _raise_primary_and_cleanup(
+                error,
+                cleanup_errors,
+                "migration target commit journaling failed",
+            )
+        super().append(record)
+
+    def rollback_publications(self) -> None:
+        failures: list[str] = []
+        for record in reversed(self):
+            prepared = self._prepared.get(record)
+            if prepared is None:
+                failures.append(
+                    f"{record.path}: migration target intent is unavailable"
+                )
+            else:
+                index, _staging_path = prepared
+                try:
+                    _quarantine_migration_target(
+                        record.path,
+                        index=index,
+                        device=record.device,
+                        inode=record.inode,
+                        is_directory=record.is_directory,
+                    )
+                except Exception as error:
+                    failures.append(f"{record.path}: {error}")
+            try:
+                record.close()
+            except OSError as error:
+                failures.append(f"{record.path}: {error}")
+        self.clear()
+        if failures:
+            raise StagingError(
+                "migration target rollback was incomplete: "
+                + "; ".join(failures)
+            )
+
+
+def _move_migration_nodes(
+    nodes: list[dict[str, Any]],
+    moved: list[dict[str, Any]],
+    *,
+    owner_uid: int,
+    owner_gid: int,
+    transaction_nodes: list[_CreatedNode],
+) -> None:
+    backup_parent_metadata = (MIGRATION_ROOT / "backup").lstat()
+    for index, node in enumerate(nodes):
+        source = node["source"]
+        backup = node["backup"]
+        if source.parent.lstat().st_dev != backup_parent_metadata.st_dev:
+            raise StagingError("migration backup crosses a filesystem boundary")
+        prefix = f"{index:02d}-{node['name']}"
+        _write_migration_record(
+            MIGRATION_ROOT / "moves" / f"{prefix}.intent.json",
+            canonical_document(_migration_move_value(node, index, "intent")),
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+            created_nodes=transaction_nodes,
+        )
+        _fsync_directory(MIGRATION_ROOT / "moves")
+        try:
+            _rename_noreplace(source, backup)
+            moved.append(node)
+            _fsync_directory(source.parent)
+            _fsync_directory(backup.parent)
+            _require_published_identity(
+                backup,
+                node["device"],
+                node["inode"],
+                node["is_directory"],
+                f"migration backup {node['name']}",
+            )
+            _write_migration_record(
+                MIGRATION_ROOT / "moves" / f"{prefix}.commit.json",
+                canonical_document(_migration_move_value(node, index, "commit")),
+                owner_uid=owner_uid,
+                owner_gid=owner_gid,
+                created_nodes=transaction_nodes,
+            )
+            _fsync_directory(MIGRATION_ROOT / "moves")
+        except FileExistsError as error:
+            raise StagingError(
+                f"migration backup appeared concurrently: {backup}"
+            ) from error
+        except OSError as error:
+            raise StagingError(f"cannot rehome migration source: {error}") from error
+def _restore_migration_nodes(nodes: list[dict[str, Any]]) -> None:
+    failures: list[str] = []
+    for node in reversed(nodes):
+        source = node["source"]
+        backup = node["backup"]
+        try:
+            if source.exists() or source.is_symlink():
+                raise StagingError(f"migration restore target is occupied: {source}")
+            _require_published_identity(
+                backup,
+                node["device"],
+                node["inode"],
+                node["is_directory"],
+                f"migration backup {node['name']}",
+            )
+            _rename_noreplace(backup, source)
+            _fsync_directory(backup.parent)
+            _fsync_directory(source.parent)
+            _require_published_identity(
+                source,
+                node["device"],
+                node["inode"],
+                node["is_directory"],
+                f"restored installation {node['name']}",
+            )
+        except (OSError, StagingError) as error:
+            failures.append(f"{node['name']}: {error}")
+    if failures:
+        raise StagingError(
+            "installation migration rollback was incomplete: "
+            + "; ".join(failures)
+        )
+
+
+def _migration_targets_absent(nodes: list[dict[str, Any]]) -> None:
+    occupied = [
+        node["source"].as_posix()
+        for node in nodes
+        if node["source"].exists() or node["source"].is_symlink()
+    ]
+    if occupied:
+        raise StagingError(
+            "failed target installation left fixed paths occupied: "
+            + ", ".join(occupied)
+        )
+
+
+def _verify_target_publication_staging_empty(
+    owner_uid: int,
+    owner_gid: int,
+) -> None:
+    """Require successful publication to have moved every staged inode."""
+
+    staging_root = (
+        MIGRATION_ROOT / MIGRATION_PUBLICATION_STAGING_DIRECTORY_NAME
+    )
+    _verify_migration_owned_path(
+        staging_root,
+        owner_uid=owner_uid,
+        owner_gid=owner_gid,
+        mode=0o700,
+        is_directory=True,
+    )
+    try:
+        if any(staging_root.iterdir()):
+            raise StagingError(
+                "verified-target migration publication staging is not empty"
+            )
+    except OSError as error:
+        raise StagingError(
+            f"cannot recheck migration publication staging: {error}"
+        ) from error
+
+
+def _publish_migration_success(
+    installed: dict[str, Any],
+    *,
+    outcome: str,
+    current_revision: str,
+    current_bundle_receipt_sha256: str,
+    expected_revision: str,
+    expected_bundle_receipt_sha256: str,
+    owner_uid: int,
+    owner_gid: int,
+    transaction_nodes: list[_CreatedNode],
+) -> None:
+    if outcome not in {"installed", "rediscovered-after-installer-error"}:
+        raise StagingError("migration success outcome is malformed")
+    if (
+        installed.get("bundle_revision") != expected_revision
+        or installed.get("bundle_receipt_sha256")
+        != expected_bundle_receipt_sha256
+    ):
+        raise StagingError("target installation receipt authority drift")
+    _verify_target_publication_staging_empty(owner_uid, owner_gid)
+    success = {
+        "schema": INSTALLATION_MIGRATION_SUCCESS_SCHEMA,
+        "outcome": outcome,
+        "current_revision": current_revision,
+        "current_bundle_receipt_sha256": current_bundle_receipt_sha256,
+        "target_revision": expected_revision,
+        "target_bundle_receipt_sha256": expected_bundle_receipt_sha256,
+        "target_installation_receipt_sha256": _sha256_regular(
+            INSTALLATION_RECEIPT_PATH
+        ),
+    }
+    _write_migration_record(
+        MIGRATION_ROOT / "success.json",
+        canonical_document(success),
+        owner_uid=owner_uid,
+        owner_gid=owner_gid,
+        created_nodes=transaction_nodes,
+    )
+    _fsync_directory(MIGRATION_ROOT)
+    _retire_migration_active(transaction_nodes)
+
+
+def _verify_migration_owned_path(
+    path: Path,
+    *,
+    owner_uid: int,
+    owner_gid: int,
+    mode: int,
+    is_directory: bool,
+) -> os.stat_result:
+    try:
+        metadata = path.lstat()
+    except OSError as error:
+        raise StagingError(f"migration authority is unavailable: {error}") from error
+    expected_type = (
+        stat.S_ISDIR(metadata.st_mode)
+        if is_directory
+        else stat.S_ISREG(metadata.st_mode) and metadata.st_nlink == 1
+    )
+    if (
+        not expected_type
+        or metadata.st_uid != owner_uid
+        or metadata.st_gid != owner_gid
+        or stat.S_IMODE(metadata.st_mode) != mode
+    ):
+        raise StagingError(f"migration authority drift: {path}")
+    return metadata
+
+
+def _migration_staging_path_is_planned(
+    target: Path,
+    staging: Path,
+    *,
+    is_directory: bool,
+) -> bool:
+    if not staging.is_absolute() or ".." in staging.parts:
+        return False
+    staging_root = (
+        MIGRATION_ROOT / MIGRATION_PUBLICATION_STAGING_DIRECTORY_NAME
+    )
+    if is_directory:
+        prefixes = (
+            f".{target.name}.directory-",
+            f".{target.name}.install-",
+        )
+        return (
+            staging.parent == staging_root
+            and any(staging.name.startswith(prefix) for prefix in prefixes)
+        )
+    return (
+        staging.parent == staging_root
+        and re.fullmatch(r"\.codeskeptic-file-[0-9a-f]{32}", staging.name)
+        is not None
+    )
+
+
+def _load_migration_target_records(
+    *,
+    owner_uid: int,
+    owner_gid: int,
+) -> list[dict[str, Any]]:
+    target_root = MIGRATION_ROOT / "targets"
+    try:
+        paths = sorted(target_root.iterdir())
+    except OSError as error:
+        raise StagingError(
+            f"cannot inspect migration target journal: {error}"
+        ) from error
+    phases: dict[int, dict[str, dict[str, Any]]] = {}
+    fields = {
+        "schema", "index", "path", "staging", "device", "inode",
+        "type", "phase",
+    }
+    for path in paths:
+        match = re.fullmatch(r"([0-9]{4})\.(intent|commit)\.json", path.name)
+        if match is None:
+            raise StagingError("installation migration target journal name drift")
+        index = int(match.group(1))
+        phase = match.group(2)
+        _verify_migration_owned_path(
+            path,
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+            mode=0o400,
+            is_directory=False,
+        )
+        value = _load_canonical_document(
+            path, "installation migration target journal"
+        )
+        if not isinstance(value, dict) or set(value) != fields:
+            raise StagingError("installation migration target fields drift")
+        target_value = value.get("path")
+        staging_value = value.get("staging")
+        target = Path(target_value) if isinstance(target_value, str) else Path()
+        staging = (
+            Path(staging_value) if isinstance(staging_value, str) else Path()
+        )
+        is_directory = value.get("type") == "directory"
+        if (
+            value.get("schema") != INSTALLATION_MIGRATION_TARGET_SCHEMA
+            or value.get("index") != index
+            or value.get("phase") != phase
+            or value.get("type") not in {"directory", "file"}
+            or not isinstance(target_value, str)
+            or target.as_posix() != target_value
+            or not isinstance(staging_value, str)
+            or staging.as_posix() != staging_value
+            or target not in _migration_install_target_paths()
+            or not _migration_staging_path_is_planned(
+                target, staging, is_directory=is_directory
+            )
+            or isinstance(value.get("device"), bool)
+            or not isinstance(value.get("device"), int)
+            or value["device"] <= 0
+            or isinstance(value.get("inode"), bool)
+            or not isinstance(value.get("inode"), int)
+            or value["inode"] <= 0
+        ):
+            raise StagingError("installation migration target authority drift")
+        slot = phases.setdefault(index, {})
+        if phase in slot:
+            raise StagingError("duplicate installation migration target phase")
+        slot[phase] = value
+    if sorted(phases) != list(range(len(phases))):
+        raise StagingError("installation migration target index drift")
+    records: list[dict[str, Any]] = []
+    seen_targets: set[str] = set()
+    for index in sorted(phases):
+        slot = phases[index]
+        intent = slot.get("intent")
+        if intent is None:
+            raise StagingError("migration target commit omits its intent")
+        commit = slot.get("commit")
+        if commit is not None:
+            expected_commit = copy.deepcopy(intent)
+            expected_commit["phase"] = "commit"
+            if commit != expected_commit:
+                raise StagingError("migration target commit differs from intent")
+        if intent["path"] in seen_targets:
+            raise StagingError("migration target path is duplicated")
+        seen_targets.add(intent["path"])
+        records.append(intent)
+    return records
+
+
+def _load_migration_plan(
+    *,
+    current_revision: str,
+    current_bundle_receipt_sha256: str,
+    current_producer_sha256: str,
+    expected_revision: str,
+    expected_bundle_receipt_sha256: str,
+    owner_uid: int,
+    owner_gid: int,
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
+    _verify_migration_owned_path(
+        MIGRATION_ROOT,
+        owner_uid=owner_uid,
+        owner_gid=owner_gid,
+        mode=0o700,
+        is_directory=True,
+    )
+    for directory in (
+        MIGRATION_ROOT / "backup",
+        MIGRATION_ROOT / "moves",
+        MIGRATION_ROOT / "targets",
+        MIGRATION_ROOT / "failed-targets",
+        MIGRATION_ROOT / MIGRATION_PUBLICATION_STAGING_DIRECTORY_NAME,
+        _migration_fence_directory(),
+    ):
+        _verify_migration_owned_path(
+            directory,
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+            mode=0o700,
+            is_directory=True,
+        )
+    _load_migration_control_authority(owner_uid, owner_gid)
+    plan_path = MIGRATION_ROOT / "plan.json"
+    _verify_migration_owned_path(
+        plan_path,
+        owner_uid=owner_uid,
+        owner_gid=owner_gid,
+        mode=0o400,
+        is_directory=False,
+    )
+    plan = _load_canonical_document(plan_path, "installation migration plan")
+    fields = {
+        "schema", "current_revision", "current_bundle_receipt_sha256",
+        "current_producer_sha256", "target_revision",
+        "target_bundle_receipt_sha256", "systemd_version", "paths",
+    }
+    if not isinstance(plan, dict) or set(plan) != fields:
+        raise StagingError("installation migration plan fields drift")
+    expected_authority = {
+        "schema": INSTALLATION_MIGRATION_PLAN_SCHEMA,
+        "current_revision": current_revision,
+        "current_bundle_receipt_sha256": current_bundle_receipt_sha256,
+        "current_producer_sha256": current_producer_sha256,
+        "target_revision": expected_revision,
+        "target_bundle_receipt_sha256": expected_bundle_receipt_sha256,
+        "systemd_version": MIGRATION_SYSTEMD_VERSION,
+    }
+    if any(plan.get(name) != value for name, value in expected_authority.items()):
+        raise StagingError("installation migration plan authority drift")
+    path_values = plan.get("paths")
+    if not isinstance(path_values, list):
+        raise StagingError("installation migration path plan is malformed")
+    fixed = {
+        "unit": (UNIT_PATH, False),
+        "dropin": (UNIT_DROPIN_DIRECTORY, True),
+        "config": (CONFIG_PATH.parent, True),
+        "state": (STATE_ROOT, True),
+        "opt": (AUTHORITY_ROOT.parent, True),
+    }
+    expected_orders = (
+        ["unit", "config", "state", "opt"],
+        ["unit", "dropin", "config", "state", "opt"],
+    )
+    names = [
+        item.get("name") if isinstance(item, dict) else None
+        for item in path_values
+    ]
+    if names not in expected_orders:
+        raise StagingError("installation migration path order drift")
+    nodes: list[dict[str, Any]] = []
+    path_fields = {
+        "name", "source", "backup", "device", "inode", "type",
+    }
+    for item in path_values:
+        if not isinstance(item, dict) or set(item) != path_fields:
+            raise StagingError("installation migration path fields drift")
+        name = item["name"]
+        source, is_directory = fixed[name]
+        expected_type = "directory" if is_directory else "file"
+        device = item["device"]
+        inode = item["inode"]
+        if (
+            item["source"] != source.as_posix()
+            or item["backup"] != f"backup/{name}"
+            or item["type"] != expected_type
+            or isinstance(device, bool)
+            or not isinstance(device, int)
+            or device <= 0
+            or isinstance(inode, bool)
+            or not isinstance(inode, int)
+            or inode <= 0
+        ):
+            raise StagingError("installation migration path authority drift")
+        nodes.append({
+            "name": name,
+            "source": source,
+            "backup": MIGRATION_ROOT / "backup" / name,
+            "device": device,
+            "inode": inode,
+            "is_directory": is_directory,
+            "descriptor": -1,
+        })
+    try:
+        backup_names = {
+            path.name for path in (MIGRATION_ROOT / "backup").iterdir()
+        }
+        move_paths = sorted((MIGRATION_ROOT / "moves").iterdir())
+    except OSError as error:
+        raise StagingError(f"cannot inspect migration journal entries: {error}") from error
+    if not backup_names <= set(names):
+        raise StagingError("installation migration backup inventory drift")
+    observed_phases: dict[str, set[str]] = {name: set() for name in names}
+    for move_path in move_paths:
+        match = re.fullmatch(
+            r"([0-9]{2})-([a-z]+)\.(intent|commit)\.json",
+            move_path.name,
+        )
+        if match is None:
+            raise StagingError("installation migration move journal name drift")
+        index = int(match.group(1))
+        name = match.group(2)
+        phase = match.group(3)
+        if index >= len(nodes) or nodes[index]["name"] != name:
+            raise StagingError("installation migration move journal order drift")
+        _verify_migration_owned_path(
+            move_path,
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+            mode=0o400,
+            is_directory=False,
+        )
+        value = _load_canonical_document(
+            move_path, "installation migration move journal"
+        )
+        if value != _migration_move_value(nodes[index], index, phase):
+            raise StagingError("installation migration move journal drift")
+        observed_phases[name].add(phase)
+    for name, phases in observed_phases.items():
+        if "commit" in phases and "intent" not in phases:
+            raise StagingError("migration move commit omits its intent")
+        if name in backup_names and "intent" not in phases:
+            raise StagingError("migration backup omits its move intent")
+    target_records = _load_migration_target_records(
+        owner_uid=owner_uid,
+        owner_gid=owner_gid,
+    )
+    try:
+        failed_target_names = sorted(
+            path.name for path in (MIGRATION_ROOT / "failed-targets").iterdir()
+        )
+    except OSError as error:
+        raise StagingError(
+            f"cannot inspect migration failed-target inventory: {error}"
+        ) from error
+    allowed_failed_targets = {
+        f"{record['index']:04d}" for record in target_records
+    }
+    if (
+        len(failed_target_names) != len(set(failed_target_names))
+        or not set(failed_target_names) <= allowed_failed_targets
+    ):
+        raise StagingError("migration failed-target inventory drift")
+    allowed_top = {
+        "active", "retired", "backup", "moves", "targets",
+        "failed-targets", MIGRATION_FENCE_DIRECTORY_NAME,
+        MIGRATION_PUBLICATION_STAGING_DIRECTORY_NAME,
+        "plan.json", "success.json",
+    }
+    try:
+        top_names = {path.name for path in MIGRATION_ROOT.iterdir()}
+    except OSError as error:
+        raise StagingError(f"cannot inspect migration journal: {error}") from error
+    if (
+        not {
+            "backup", "moves", "targets", "failed-targets",
+            MIGRATION_FENCE_DIRECTORY_NAME,
+            MIGRATION_PUBLICATION_STAGING_DIRECTORY_NAME,
+            "plan.json",
+        } <= top_names
+        or not top_names <= allowed_top
+    ):
+        raise StagingError("installation migration journal inventory drift")
+    return plan, nodes, target_records
+
+
+def _old_migration_node_location(node: dict[str, Any]) -> str:
+    matches: list[str] = []
+    for label in ("source", "backup"):
+        path = node[label]
+        try:
+            metadata = path.lstat()
+        except FileNotFoundError:
+            continue
+        except OSError as error:
+            raise StagingError(
+                f"cannot inspect migration {label} identity: {error}"
+            ) from error
+        expected_type = (
+            stat.S_ISDIR(metadata.st_mode)
+            if node["is_directory"]
+            else stat.S_ISREG(metadata.st_mode) and metadata.st_nlink == 1
+        )
+        if (
+            expected_type
+            and metadata.st_dev == node["device"]
+            and metadata.st_ino == node["inode"]
+        ):
+            matches.append(label)
+    if len(matches) != 1:
+        raise StagingError(
+            f"old migration identity is not unique: {node['name']}"
+        )
+    return matches[0]
+
+
+def _verify_migration_active(owner_uid: int, owner_gid: int) -> os.stat_result:
+    path = MIGRATION_ROOT / "active"
+    metadata = _verify_migration_owned_path(
+        path,
+        owner_uid=owner_uid,
+        owner_gid=owner_gid,
+        mode=0o400,
+        is_directory=False,
+    )
+    if _read_regular(path) != b"codeskeptic-installation-migration-active-v1\n":
+        raise StagingError("migration active-marker content drift")
+    return metadata
+
+
+def _verify_migration_retired(owner_uid: int, owner_gid: int) -> os.stat_result:
+    path = MIGRATION_ROOT / "retired"
+    metadata = _verify_migration_owned_path(
+        path,
+        owner_uid=owner_uid,
+        owner_gid=owner_gid,
+        mode=0o400,
+        is_directory=False,
+    )
+    if _read_regular(path) != b"codeskeptic-installation-migration-active-v1\n":
+        raise StagingError("migration retired-marker content drift")
+    return metadata
+
+
+def _retire_existing_migration_active(owner_uid: int, owner_gid: int) -> None:
+    metadata = _verify_migration_active(owner_uid, owner_gid)
+    retired = MIGRATION_ROOT / "retired"
+    if retired.exists() or retired.is_symlink():
+        raise StagingError("migration retired-marker already exists")
+    _rename_noreplace(MIGRATION_ROOT / "active", retired)
+    _fsync_directory(MIGRATION_ROOT)
+    _require_published_identity(
+        retired,
+        metadata.st_dev,
+        metadata.st_ino,
+        False,
+        "migration retired-marker",
+    )
+
+
+def _migration_success_value(
+    *,
+    outcome: str,
+    current_revision: str,
+    current_bundle_receipt_sha256: str,
+    expected_revision: str,
+    expected_bundle_receipt_sha256: str,
+) -> dict[str, Any]:
+    return {
+        "schema": INSTALLATION_MIGRATION_SUCCESS_SCHEMA,
+        "outcome": outcome,
+        "current_revision": current_revision,
+        "current_bundle_receipt_sha256": current_bundle_receipt_sha256,
+        "target_revision": expected_revision,
+        "target_bundle_receipt_sha256": expected_bundle_receipt_sha256,
+        "target_installation_receipt_sha256": _sha256_regular(
+            INSTALLATION_RECEIPT_PATH
+        ),
+    }
+
+
+def _ensure_migration_recovery_fence(
+    command_runner: Any | None,
+    owner_uid: int,
+    owner_gid: int,
+) -> tuple[tuple[int, int], bool, tuple[int, int]]:
+    _verify_migration_systemd_version(command_runner)
+    control_created, control_identity = _create_migration_control_root(
+        owner_uid, owner_gid
+    )
+    anchor_metadata = _verify_migration_fence_authority(
+        owner_uid, owner_gid
+    )
+    try:
+        metadata = MIGRATION_MASK_PATH.lstat()
+    except FileNotFoundError:
+        mask_identity = _create_migration_mask(owner_uid, owner_gid)
+    except OSError as error:
+        raise StagingError(f"cannot inspect migration recovery fence: {error}") from error
+    else:
+        if (
+            not stat.S_ISLNK(metadata.st_mode)
+            or metadata.st_uid != owner_uid
+            or metadata.st_gid != owner_gid
+            or metadata.st_dev != anchor_metadata.st_dev
+            or metadata.st_ino != anchor_metadata.st_ino
+            or metadata.st_nlink != 2
+            or anchor_metadata.st_nlink != 2
+            or os.readlink(MIGRATION_MASK_PATH) != "/dev/null"
+        ):
+            raise StagingError("migration recovery fence authority drift")
+        mask_identity = metadata.st_dev, metadata.st_ino
+    _daemon_reload(command_runner)
+    _verify_migration_service_state(
+        "masked", MIGRATION_MASK_PATH, command_runner
+    )
+    _require_masked_start_rejection(command_runner)
+    _verify_migration_service_state(
+        "masked", MIGRATION_MASK_PATH, command_runner
+    )
+    _verify_service_cgroup_empty()
+    return mask_identity, control_created, control_identity
+
+
+def _release_migration_recovery_fence(
+    mask_identity: tuple[int, int],
+    command_runner: Any | None,
+) -> None:
+    _remove_migration_mask(*mask_identity)
+    _daemon_reload(command_runner)
+    _verify_migration_service_state("loaded", UNIT_PATH, command_runner)
+    _verify_service_cgroup_empty()
+
+
+def _try_verify_target_installation(
+    *,
+    expected_revision: str,
+    expected_bundle_receipt_sha256: str,
+    command_runner: Any | None,
+    owner_uid: int,
+    owner_gid: int,
+) -> dict[str, Any] | None:
+    try:
+        return verify_installation(
+            INSTALLATION_RECEIPT_PATH,
+            expected_revision=expected_revision,
+            expected_bundle_receipt_sha256=expected_bundle_receipt_sha256,
+            command_runner=command_runner,
+            require_root=False,
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+        )
+    except (OSError, StagingError):
+        return None
+
+
+def _validate_existing_migration_success(
+    *,
+    current_revision: str,
+    current_bundle_receipt_sha256: str,
+    expected_revision: str,
+    expected_bundle_receipt_sha256: str,
+    owner_uid: int,
+    owner_gid: int,
+) -> dict[str, Any]:
+    path = MIGRATION_ROOT / "success.json"
+    _verify_migration_owned_path(
+        path,
+        owner_uid=owner_uid,
+        owner_gid=owner_gid,
+        mode=0o400,
+        is_directory=False,
+    )
+    value = _load_canonical_document(path, "installation migration success")
+    allowed_outcomes = {
+        "installed", "rediscovered-after-installer-error",
+        "rediscovered-after-restart",
+    }
+    if not isinstance(value, dict) or set(value) != {
+        "schema", "outcome", "current_revision",
+        "current_bundle_receipt_sha256", "target_revision",
+        "target_bundle_receipt_sha256",
+        "target_installation_receipt_sha256",
+    }:
+        raise StagingError("installation migration success fields drift")
+    if value.get("outcome") not in allowed_outcomes:
+        raise StagingError("installation migration success outcome drift")
+    expected = _migration_success_value(
+        outcome=value["outcome"],
+        current_revision=current_revision,
+        current_bundle_receipt_sha256=current_bundle_receipt_sha256,
+        expected_revision=expected_revision,
+        expected_bundle_receipt_sha256=expected_bundle_receipt_sha256,
+    )
+    if value != expected:
+        raise StagingError("installation migration success authority drift")
+    return value
+
+
+def _write_recovered_migration_success(
+    *,
+    current_revision: str,
+    current_bundle_receipt_sha256: str,
+    expected_revision: str,
+    expected_bundle_receipt_sha256: str,
+    owner_uid: int,
+    owner_gid: int,
+) -> None:
+    value = _migration_success_value(
+        outcome="rediscovered-after-restart",
+        current_revision=current_revision,
+        current_bundle_receipt_sha256=current_bundle_receipt_sha256,
+        expected_revision=expected_revision,
+        expected_bundle_receipt_sha256=expected_bundle_receipt_sha256,
+    )
+    _write_migration_record(
+        MIGRATION_ROOT / "success.json",
+        canonical_document(value),
+        owner_uid=owner_uid,
+        owner_gid=owner_gid,
+    )
+    _fsync_directory(MIGRATION_ROOT)
+
+
+def _remove_rolled_back_migration_root(
+    owner_uid: int,
+    owner_gid: int,
+    *,
+    expected_identity: tuple[int, int] | None = None,
+) -> None:
+    metadata = _verify_migration_owned_path(
+        MIGRATION_ROOT,
+        owner_uid=owner_uid,
+        owner_gid=owner_gid,
+        mode=0o700,
+        is_directory=True,
+    )
+    if expected_identity is not None and (
+        metadata.st_dev != expected_identity[0]
+        or metadata.st_ino != expected_identity[1]
+    ):
+        raise StagingError("rolled-back migration journal identity drift")
+    try:
+        backup_names = list((MIGRATION_ROOT / "backup").iterdir())
+        top_names = {path.name for path in MIGRATION_ROOT.iterdir()}
+    except OSError as error:
+        raise StagingError(f"cannot inspect rolled-back migration: {error}") from error
+    if backup_names or not top_names <= {
+        "active", "backup", "moves", "targets", "failed-targets",
+        MIGRATION_FENCE_DIRECTORY_NAME,
+        MIGRATION_PUBLICATION_STAGING_DIRECTORY_NAME,
+        "plan.json",
+    }:
+        raise StagingError("rolled-back migration journal inventory drift")
+    _remove_created_identity(
+        MIGRATION_ROOT, metadata.st_dev, metadata.st_ino, True
+    )
+    _fsync_directory(MIGRATION_ROOT.parent)
+
+
+def _metadata_matches_migration_identity(
+    metadata: os.stat_result,
+    *,
+    device: int,
+    inode: int,
+    is_directory: bool,
+) -> bool:
+    expected_type = (
+        stat.S_ISDIR(metadata.st_mode)
+        if is_directory
+        else stat.S_ISREG(metadata.st_mode) and metadata.st_nlink == 1
+    )
+    return (
+        expected_type
+        and metadata.st_dev == device
+        and metadata.st_ino == inode
+    )
+
+
+def _remove_recorded_partial_targets(
+    records: list[dict[str, Any]],
+    nodes: list[dict[str, Any]],
+    locations: dict[str, str],
+) -> None:
+    """Remove only installer-created inodes named by the durable journal."""
+
+    old_sources = {
+        node["source"]: node
+        for node in nodes
+        if locations[node["name"]] == "source"
+    }
+    for record in reversed(records):
+        target = Path(record["path"])
+        staging = Path(record["staging"])
+        quarantine = (
+            MIGRATION_ROOT / "failed-targets" / f"{record['index']:04d}"
+        )
+        is_directory = record["type"] == "directory"
+        matches: list[Path] = []
+        observed: dict[Path, os.stat_result] = {}
+        for candidate in (target, staging, quarantine):
+            try:
+                metadata = candidate.lstat()
+            except FileNotFoundError:
+                continue
+            except OSError as error:
+                raise StagingError(
+                    f"cannot inspect recorded migration target: {error}"
+                ) from error
+            observed[candidate] = metadata
+            if _metadata_matches_migration_identity(
+                metadata,
+                device=record["device"],
+                inode=record["inode"],
+                is_directory=is_directory,
+            ):
+                matches.append(candidate)
+        if len(matches) > 1:
+            raise StagingError("migration target identity is not unique")
+        if matches:
+            owned = matches[0]
+            old = old_sources.get(owned)
+            if old is not None and _metadata_matches_migration_identity(
+                observed[owned],
+                device=old["device"],
+                inode=old["inode"],
+                is_directory=old["is_directory"],
+            ):
+                raise StagingError(
+                    "migration target journal overlaps the retained old identity"
+                )
+            if owned != quarantine:
+                _quarantine_migration_target(
+                    owned,
+                    index=record["index"],
+                    device=record["device"],
+                    inode=record["inode"],
+                    is_directory=is_directory,
+                )
+        for candidate, metadata in observed.items():
+            if candidate in matches:
+                continue
+            old = old_sources.get(candidate)
+            if old is not None and _metadata_matches_migration_identity(
+                metadata,
+                device=old["device"],
+                inode=old["inode"],
+                is_directory=old["is_directory"],
+            ):
+                continue
+            raise StagingError(
+                f"foreign object occupies a recorded migration path: {candidate}"
+            )
+
+
+def migrate_installation(
+    bundle: Path,
+    *,
+    current_revision: str,
+    current_bundle_receipt_sha256: str,
+    current_producer_sha256: str,
+    expected_revision: str,
+    expected_bundle_receipt_sha256: str,
+    temporary_root: Path,
+    command_runner: Any | None = None,
+    require_root: bool = True,
+    owner_uid: int = 0,
+    owner_gid: int = 0,
+) -> dict[str, Any]:
+    """Verify, rehome, replace, and retain one exact fixed installation."""
+
+    if require_root:
+        _require_root()
+    current_revision = _valid_git_sha1(
+        current_revision, "current bundle revision"
+    )
+    current_bundle_receipt_sha256 = _valid_sha256(
+        current_bundle_receipt_sha256,
+        "current bundle receipt checksum",
+    )
+    current_producer_sha256 = _valid_sha256(
+        current_producer_sha256,
+        "current installed producer checksum",
+    )
+    expected_revision = _valid_git_sha1(
+        expected_revision, "expected bundle revision"
+    )
+    expected_bundle_receipt_sha256 = _valid_sha256(
+        expected_bundle_receipt_sha256,
+        "expected bundle receipt checksum",
+    )
+    if current_revision == expected_revision:
+        raise StagingError("installation migration revisions must differ")
+    verify_bundle(
+        bundle,
+        expected_revision=expected_revision,
+        expected_bundle_receipt_sha256=expected_bundle_receipt_sha256,
+        command_runner=command_runner,
+        temporary_root=temporary_root,
+    )
+    _verify_migration_capacity(bundle, temporary_root)
+    with _migration_lock(owner_uid, owner_gid):
+        with _migration_guided_lock(owner_uid, owner_gid):
+            _verify_current_installation_with_producer(
+                current_revision=current_revision,
+                current_bundle_receipt_sha256=current_bundle_receipt_sha256,
+                current_producer_sha256=current_producer_sha256,
+                command_runner=command_runner,
+                owner_uid=owner_uid,
+                owner_gid=owner_gid,
+            )
+            _run_current_recovery_gates(command_runner)
+            _verify_current_installation_with_producer(
+                current_revision=current_revision,
+                current_bundle_receipt_sha256=current_bundle_receipt_sha256,
+                current_producer_sha256=current_producer_sha256,
+                command_runner=command_runner,
+                owner_uid=owner_uid,
+                owner_gid=owner_gid,
+            )
+            systemd_version = _verify_migration_systemd_version(
+                command_runner
+            )
+            nodes = _migration_source_nodes()
+            plan = _migration_plan(
+                nodes,
+                current_revision=current_revision,
+                current_bundle_receipt_sha256=(
+                    current_bundle_receipt_sha256
+                ),
+                current_producer_sha256=current_producer_sha256,
+                expected_revision=expected_revision,
+                expected_bundle_receipt_sha256=(
+                    expected_bundle_receipt_sha256
+                ),
+                systemd_version=systemd_version,
+            )
+            try:
+                transaction_nodes = _prepare_migration_transaction(
+                    plan, owner_uid, owner_gid
+                )
+            except BaseException:
+                _close_migration_nodes(nodes)
+                raise
+            moved: list[dict[str, Any]] = []
+            target_committed = False
+            deferred_primary: BaseException | None = None
+            deferred_cleanup_errors: list[Exception] = []
+            try:
+                with _migration_service_guard(
+                    command_runner, owner_uid, owner_gid
+                ) as guard:
+                    try:
+                        _verify_current_installation_with_producer(
+                            current_revision=current_revision,
+                            current_bundle_receipt_sha256=(
+                                current_bundle_receipt_sha256
+                            ),
+                            current_producer_sha256=current_producer_sha256,
+                            command_runner=command_runner,
+                            owner_uid=owner_uid,
+                            owner_gid=owner_gid,
+                        )
+                        _move_migration_nodes(
+                            nodes,
+                            moved,
+                            owner_uid=owner_uid,
+                            owner_gid=owner_gid,
+                            transaction_nodes=transaction_nodes,
+                        )
+                        installed = install_bundle(
+                            bundle,
+                            expected_revision=expected_revision,
+                            expected_bundle_receipt_sha256=(
+                                expected_bundle_receipt_sha256
+                            ),
+                            temporary_root=temporary_root,
+                            command_runner=command_runner,
+                            require_root=False,
+                            owner_uid=owner_uid,
+                            owner_gid=owner_gid,
+                            migration_transaction_nodes=transaction_nodes,
+                        )
+                        _publish_migration_success(
+                            installed,
+                            outcome="installed",
+                            current_revision=current_revision,
+                            current_bundle_receipt_sha256=(
+                                current_bundle_receipt_sha256
+                            ),
+                            expected_revision=expected_revision,
+                            expected_bundle_receipt_sha256=(
+                                expected_bundle_receipt_sha256
+                            ),
+                            owner_uid=owner_uid,
+                            owner_gid=owner_gid,
+                            transaction_nodes=transaction_nodes,
+                        )
+                        target_committed = True
+                        if isinstance(guard, dict):
+                            guard["ready"] = True
+                        _release_created(transaction_nodes)
+                        _close_migration_nodes(nodes)
+                        return installed
+                    except BaseException as primary:
+                        cleanup_errors: list[Exception] = []
+                        if not target_committed:
+                            rediscovered: dict[str, Any] | None = None
+                            if len(moved) == len(nodes):
+                                try:
+                                    candidate = verify_installation(
+                                        INSTALLATION_RECEIPT_PATH,
+                                        expected_revision=expected_revision,
+                                        expected_bundle_receipt_sha256=(
+                                            expected_bundle_receipt_sha256
+                                        ),
+                                        command_runner=command_runner,
+                                        require_root=False,
+                                        owner_uid=owner_uid,
+                                        owner_gid=owner_gid,
+                                    )
+                                    _publish_migration_success(
+                                        candidate,
+                                        outcome=(
+                                            "rediscovered-after-installer-error"
+                                        ),
+                                        current_revision=current_revision,
+                                        current_bundle_receipt_sha256=(
+                                            current_bundle_receipt_sha256
+                                        ),
+                                        expected_revision=expected_revision,
+                                        expected_bundle_receipt_sha256=(
+                                            expected_bundle_receipt_sha256
+                                        ),
+                                        owner_uid=owner_uid,
+                                        owner_gid=owner_gid,
+                                        transaction_nodes=transaction_nodes,
+                                    )
+                                    rediscovered = candidate
+                                except Exception:
+                                    rediscovered = None
+                            if rediscovered is not None:
+                                target_committed = True
+                                if isinstance(guard, dict):
+                                    guard["ready"] = True
+                                _release_created(transaction_nodes)
+                                _close_migration_nodes(nodes)
+                                return rediscovered
+                        if not target_committed:
+                            try:
+                                _migration_targets_absent(moved)
+                                _restore_migration_nodes(moved)
+                                _verify_current_installation_with_producer(
+                                    current_revision=current_revision,
+                                    current_bundle_receipt_sha256=(
+                                        current_bundle_receipt_sha256
+                                    ),
+                                    current_producer_sha256=(
+                                        current_producer_sha256
+                                    ),
+                                    command_runner=command_runner,
+                                    owner_uid=owner_uid,
+                                    owner_gid=owner_gid,
+                                )
+                                _run_current_recovery_gates(command_runner)
+                                _verify_current_installation_with_producer(
+                                    current_revision=current_revision,
+                                    current_bundle_receipt_sha256=(
+                                        current_bundle_receipt_sha256
+                                    ),
+                                    current_producer_sha256=(
+                                        current_producer_sha256
+                                    ),
+                                    command_runner=command_runner,
+                                    owner_uid=owner_uid,
+                                    owner_gid=owner_gid,
+                                )
+                                if isinstance(guard, dict):
+                                    guard["ready"] = True
+                            except Exception as error:
+                                cleanup_errors.append(error)
+                            if not cleanup_errors:
+                                deferred_primary = primary
+                                deferred_cleanup_errors = cleanup_errors
+                        else:
+                            try:
+                                _release_created(transaction_nodes)
+                            except Exception as error:
+                                cleanup_errors.append(error)
+                        if deferred_primary is None:
+                            try:
+                                _close_migration_nodes(nodes)
+                            except Exception as error:
+                                cleanup_errors.append(error)
+                            _raise_primary_and_cleanup(
+                                primary,
+                                cleanup_errors,
+                                "installation migration failed",
+                            )
+                            raise AssertionError("unreachable")
+                if deferred_primary is not None:
+                    journal_removed = False
+                    root_records = [
+                        record
+                        for record in transaction_nodes
+                        if record.path == MIGRATION_ROOT and record.is_directory
+                    ]
+                    if len(root_records) != 1:
+                        deferred_cleanup_errors.append(StagingError(
+                            "migration journal identity-pin is unavailable"
+                        ))
+                    else:
+                        root_record = root_records[0]
+                        try:
+                            _remove_rolled_back_migration_root(
+                                owner_uid,
+                                owner_gid,
+                                expected_identity=(
+                                    root_record.device,
+                                    root_record.inode,
+                                ),
+                            )
+                        except Exception as error:
+                            deferred_cleanup_errors.append(error)
+                        else:
+                            journal_removed = True
+                    try:
+                        _release_created(transaction_nodes)
+                    except Exception as error:
+                        deferred_cleanup_errors.append(error)
+                    if (
+                        journal_removed
+                        and isinstance(guard, dict)
+                        and guard.get("control_created") is True
+                    ):
+                        try:
+                            _remove_created_migration_control_root(
+                                guard["control_identity"]
+                            )
+                        except Exception as error:
+                            deferred_cleanup_errors.append(error)
+                    try:
+                        _close_migration_nodes(nodes)
+                    except Exception as error:
+                        deferred_cleanup_errors.append(error)
+                    _raise_primary_and_cleanup(
+                        deferred_primary,
+                        deferred_cleanup_errors,
+                        "installation migration failed",
+                    )
+                    raise AssertionError("unreachable")
+            except BaseException:
+                if transaction_nodes:
+                    _release_created(transaction_nodes)
+                _close_migration_nodes(nodes)
+                raise
+
+
+def _resolve_interrupted_migration(
+    nodes: list[dict[str, Any]],
+    locations: dict[str, str],
+    target_records: list[dict[str, Any]],
+    *,
+    current_revision: str,
+    current_bundle_receipt_sha256: str,
+    current_producer_sha256: str,
+    expected_revision: str,
+    expected_bundle_receipt_sha256: str,
+    mask_identity: tuple[int, int],
+    control_created: bool,
+    control_identity: tuple[int, int],
+    command_runner: Any | None,
+    owner_uid: int,
+    owner_gid: int,
+) -> dict[str, Any]:
+    """Resolve one verified journal while its fence and old lock are held."""
+
+    success_exists = (
+        (MIGRATION_ROOT / "success.json").exists()
+        or (MIGRATION_ROOT / "success.json").is_symlink()
+    )
+    active_exists = (
+        (MIGRATION_ROOT / "active").exists()
+        or (MIGRATION_ROOT / "active").is_symlink()
+    )
+    retired_exists = (
+        (MIGRATION_ROOT / "retired").exists()
+        or (MIGRATION_ROOT / "retired").is_symlink()
+    )
+    if active_exists and retired_exists:
+        raise StagingError("migration has both active and retired authority")
+    target = _try_verify_target_installation(
+        expected_revision=expected_revision,
+        expected_bundle_receipt_sha256=expected_bundle_receipt_sha256,
+        command_runner=command_runner,
+        owner_uid=owner_uid,
+        owner_gid=owner_gid,
+    )
+    if target is not None:
+        try:
+            failed_targets_present = any(
+                (MIGRATION_ROOT / "failed-targets").iterdir()
+            )
+        except OSError as error:
+            raise StagingError(
+                f"cannot inspect migration failed targets: {error}"
+            ) from error
+        if failed_targets_present:
+            raise StagingError(
+                "verified target coexists with a failed-target quarantine"
+            )
+        if any(location != "backup" for location in locations.values()):
+            raise StagingError(
+                "verified target overlaps an old fixed-path identity"
+            )
+        _verify_target_publication_staging_empty(owner_uid, owner_gid)
+        if success_exists:
+            _validate_existing_migration_success(
+                current_revision=current_revision,
+                current_bundle_receipt_sha256=current_bundle_receipt_sha256,
+                expected_revision=expected_revision,
+                expected_bundle_receipt_sha256=(
+                    expected_bundle_receipt_sha256
+                ),
+                owner_uid=owner_uid,
+                owner_gid=owner_gid,
+            )
+            if active_exists:
+                _verify_migration_active(owner_uid, owner_gid)
+            elif retired_exists:
+                _verify_migration_retired(owner_uid, owner_gid)
+            else:
+                raise StagingError(
+                    "migration success omits its lifecycle marker"
+                )
+        elif active_exists and not retired_exists:
+            _verify_migration_active(owner_uid, owner_gid)
+            _write_recovered_migration_success(
+                current_revision=current_revision,
+                current_bundle_receipt_sha256=current_bundle_receipt_sha256,
+                expected_revision=expected_revision,
+                expected_bundle_receipt_sha256=(
+                    expected_bundle_receipt_sha256
+                ),
+                owner_uid=owner_uid,
+                owner_gid=owner_gid,
+            )
+        else:
+            raise StagingError(
+                "verified target has neither active nor success authority"
+            )
+        if active_exists:
+            _retire_existing_migration_active(owner_uid, owner_gid)
+        _release_migration_recovery_fence(
+            mask_identity,
+            command_runner,
+        )
+        return target
+
+    if success_exists:
+        raise StagingError(
+            "migration success authority exists without its exact target"
+        )
+    if not active_exists:
+        raise StagingError("unresolved migration omits its active authority")
+    if retired_exists:
+        raise StagingError("unresolved migration has a retired authority")
+    _verify_migration_active(owner_uid, owner_gid)
+    _remove_recorded_partial_targets(target_records, nodes, locations)
+    backed_up = [
+        node for node in nodes if locations[node["name"]] == "backup"
+    ]
+    for node in backed_up:
+        source = node["source"]
+        if source.exists() or source.is_symlink():
+            raise StagingError(
+                f"partial target obstructs old restore: {source}"
+            )
+    if "dropin" not in locations and (
+        UNIT_DROPIN_DIRECTORY.exists()
+        or UNIT_DROPIN_DIRECTORY.is_symlink()
+    ):
+        raise StagingError(
+            "partial target service drop-in obstructs old restore"
+        )
+    _restore_migration_nodes(backed_up)
+    _verify_current_installation_with_producer(
+        current_revision=current_revision,
+        current_bundle_receipt_sha256=current_bundle_receipt_sha256,
+        current_producer_sha256=current_producer_sha256,
+        command_runner=command_runner,
+        owner_uid=owner_uid,
+        owner_gid=owner_gid,
+    )
+    _run_current_recovery_gates(command_runner)
+    _verify_current_installation_with_producer(
+        current_revision=current_revision,
+        current_bundle_receipt_sha256=current_bundle_receipt_sha256,
+        current_producer_sha256=current_producer_sha256,
+        command_runner=command_runner,
+        owner_uid=owner_uid,
+        owner_gid=owner_gid,
+    )
+    _release_migration_recovery_fence(
+        mask_identity,
+        command_runner,
+    )
+    _remove_rolled_back_migration_root(owner_uid, owner_gid)
+    control_root_cleanup = "reused"
+    if control_created:
+        try:
+            _remove_created_migration_control_root(control_identity)
+        except StagingError:
+            control_root_cleanup = "retained"
+        else:
+            control_root_cleanup = "removed"
+    return {
+        "bundle_revision": current_revision,
+        "bundle_receipt_sha256": current_bundle_receipt_sha256,
+        "migration_outcome": "rolled-back-after-restart",
+        "migration_control_root_cleanup": control_root_cleanup,
+    }
+
+
+def recover_installation_migration(
+    bundle: Path,
+    *,
+    current_revision: str,
+    current_bundle_receipt_sha256: str,
+    current_producer_sha256: str,
+    expected_revision: str,
+    expected_bundle_receipt_sha256: str,
+    command_runner: Any | None = None,
+    require_root: bool = True,
+    owner_uid: int = 0,
+    owner_gid: int = 0,
+) -> dict[str, Any]:
+    """Resolve a durable migration journal after interruption or restart."""
+
+    if require_root:
+        _require_root()
+    current_revision = _valid_git_sha1(
+        current_revision, "current bundle revision"
+    )
+    current_bundle_receipt_sha256 = _valid_sha256(
+        current_bundle_receipt_sha256,
+        "current bundle receipt checksum",
+    )
+    current_producer_sha256 = _valid_sha256(
+        current_producer_sha256,
+        "current installed producer checksum",
+    )
+    expected_revision = _valid_git_sha1(
+        expected_revision, "expected bundle revision"
+    )
+    expected_bundle_receipt_sha256 = _valid_sha256(
+        expected_bundle_receipt_sha256,
+        "expected bundle receipt checksum",
+    )
+    trusted = _assert_expected_bundle_identity(
+        bundle, expected_revision, expected_bundle_receipt_sha256
+    )
+    if _verify_bundle_structure(bundle) != trusted:
+        raise StagingError("recovery bundle authority changed during verification")
+    with _migration_lock(owner_uid, owner_gid):
+        _plan, nodes, target_records = _load_migration_plan(
+            current_revision=current_revision,
+            current_bundle_receipt_sha256=current_bundle_receipt_sha256,
+            current_producer_sha256=current_producer_sha256,
+            expected_revision=expected_revision,
+            expected_bundle_receipt_sha256=(
+                expected_bundle_receipt_sha256
+            ),
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+        )
+        locations = {
+            node["name"]: _old_migration_node_location(node)
+            for node in nodes
+        }
+        mask_identity, control_created, control_identity = (
+            _ensure_migration_recovery_fence(
+                command_runner, owner_uid, owner_gid
+            )
+        )
+        state_nodes = [node for node in nodes if node["name"] == "state"]
+        if len(state_nodes) != 1:
+            raise StagingError("migration state authority is not unique")
+        state_node = state_nodes[0]
+        old_state_root = state_node[locations["state"]]
+        with _migration_guided_lock_at(
+            old_state_root,
+            owner_uid,
+            owner_gid,
+            allow_create=False,
+        ):
+            return _resolve_interrupted_migration(
+                nodes,
+                locations,
+                target_records,
+                current_revision=current_revision,
+                current_bundle_receipt_sha256=current_bundle_receipt_sha256,
+                current_producer_sha256=current_producer_sha256,
+                expected_revision=expected_revision,
+                expected_bundle_receipt_sha256=(
+                    expected_bundle_receipt_sha256
+                ),
+                mask_identity=mask_identity,
+                control_created=control_created,
+                control_identity=control_identity,
+                command_runner=command_runner,
+                owner_uid=owner_uid,
+                owner_gid=owner_gid,
+            )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -5838,6 +9137,41 @@ def build_parser() -> argparse.ArgumentParser:
         "--expected-bundle-receipt-sha256", required=True
     )
     install.add_argument("--temporary-root", type=Path, required=True)
+
+    migrate_install = commands.add_parser(
+        "migrate-install",
+        help="replace one exact fixed installation while retaining its backup",
+    )
+    migrate_install.add_argument("--bundle", type=Path, required=True)
+    migrate_install.add_argument("--current-revision", required=True)
+    migrate_install.add_argument(
+        "--current-bundle-receipt-sha256", required=True
+    )
+    migrate_install.add_argument("--current-producer-sha256", required=True)
+    migrate_install.add_argument("--expected-revision", required=True)
+    migrate_install.add_argument(
+        "--expected-bundle-receipt-sha256", required=True
+    )
+    migrate_install.add_argument(
+        "--temporary-root", type=Path, required=True
+    )
+
+    recover_migration = commands.add_parser(
+        "recover-install-migration",
+        help="resolve an interrupted fixed-installation migration",
+    )
+    recover_migration.add_argument("--bundle", type=Path, required=True)
+    recover_migration.add_argument("--current-revision", required=True)
+    recover_migration.add_argument(
+        "--current-bundle-receipt-sha256", required=True
+    )
+    recover_migration.add_argument(
+        "--current-producer-sha256", required=True
+    )
+    recover_migration.add_argument("--expected-revision", required=True)
+    recover_migration.add_argument(
+        "--expected-bundle-receipt-sha256", required=True
+    )
 
     verify_install = commands.add_parser(
         "verify-install", help="verify the fixed installed receipt"
@@ -5912,6 +9246,43 @@ def main(argv: list[str] | None = None) -> int:
                 temporary_root=arguments.temporary_root,
             )
             print(f"CODESKEPTIC_STAGING_INSTALLED {INSTALLATION_RECEIPT_PATH}")
+            return 0
+        if arguments.command == "migrate-install":
+            migrate_installation(
+                arguments.bundle,
+                current_revision=arguments.current_revision,
+                current_bundle_receipt_sha256=(
+                    arguments.current_bundle_receipt_sha256
+                ),
+                current_producer_sha256=arguments.current_producer_sha256,
+                expected_revision=arguments.expected_revision,
+                expected_bundle_receipt_sha256=(
+                    arguments.expected_bundle_receipt_sha256
+                ),
+                temporary_root=arguments.temporary_root,
+            )
+            print(
+                "CODESKEPTIC_STAGING_MIGRATED "
+                f"{INSTALLATION_RECEIPT_PATH}"
+            )
+            return 0
+        if arguments.command == "recover-install-migration":
+            recovered = recover_installation_migration(
+                arguments.bundle,
+                current_revision=arguments.current_revision,
+                current_bundle_receipt_sha256=(
+                    arguments.current_bundle_receipt_sha256
+                ),
+                current_producer_sha256=arguments.current_producer_sha256,
+                expected_revision=arguments.expected_revision,
+                expected_bundle_receipt_sha256=(
+                    arguments.expected_bundle_receipt_sha256
+                ),
+            )
+            print(
+                "CODESKEPTIC_STAGING_MIGRATION_RECOVERED "
+                f"{recovered['bundle_revision']}"
+            )
             return 0
         if arguments.command == "verify-install":
             verify_installation(
