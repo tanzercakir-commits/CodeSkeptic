@@ -1,0 +1,7 @@
+Test project /Users/runner/work/CodeSkeptic/CodeSkeptic/build
+    Start 1296: AnalyzerBuildAuthorityContract
+1/1 Test #1296: AnalyzerBuildAuthorityContract ...   Passed   56.75 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Total Test time (real) =  56.77 sec
