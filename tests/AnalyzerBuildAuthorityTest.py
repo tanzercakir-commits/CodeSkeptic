@@ -513,7 +513,7 @@ class AnalyzerBuildAuthorityTest(unittest.TestCase):
             )
             with (
                 mock.patch.object(
-                    authority, "RUNTIME_IDENTITY_TIMEOUT_SECONDS", 0.05
+                    authority, "RUNTIME_IDENTITY_TIMEOUT_SECONDS", 2.0
                 ),
                 self.assertRaisesRegex(
                     authority.BuildAuthorityError, "Podman identity timed out"
@@ -535,18 +535,23 @@ class AnalyzerBuildAuthorityTest(unittest.TestCase):
                 podman,
                 "#!/usr/bin/python3\n"
                 "import os\n"
-                "import sys\n"
                 "import time\n"
                 "from pathlib import Path\n"
-                "if sys.argv[1:] == ['--version']:\n"
-                "    print('podman version timeout-fixture')\n"
-                "    raise SystemExit(0)\n"
                 f"Path({str(process_id)!r}).write_text(str(os.getpid()))\n"
                 "time.sleep(60)\n",
             )
             with (
                 mock.patch.object(
-                    authority, "RUNTIME_IDENTITY_TIMEOUT_SECONDS", 0.05
+                    authority,
+                    "_tool_record",
+                    return_value={
+                        "path": str(podman.absolute()),
+                        "sha256": "0" * 64,
+                        "version": "podman version inspect-timeout-fixture",
+                    },
+                ),
+                mock.patch.object(
+                    authority, "RUNTIME_IDENTITY_TIMEOUT_SECONDS", 2.0
                 ),
                 self.assertRaisesRegex(
                     authority.BuildAuthorityError,
