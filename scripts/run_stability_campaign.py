@@ -10519,6 +10519,7 @@ def _validate_cleanup_record(
     command_runner: HostCommandRunner | None = None,
     live_cgroup_root: Path = Path("/sys/fs/cgroup"),
     live_state_root: Path = Path("/var/lib/codeskeptic-p10-09"),
+    live_run_root: Path = Path("/run/codeskeptic-p10-09"),
 ) -> tuple[
     dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]
 ]:
@@ -10778,12 +10779,30 @@ def _validate_cleanup_record(
         raise StabilityError("host cleanup gate is not passing")
     if verify_live:
         for item, label in (
-            (container["cidfile"], "container ID file"),
-            (verifier_container["cidfile"], "verifier container ID file"),
-            (runtime["tree"], "campaign runtime"),
-            (runtime["identity_marker"], "campaign runtime identity"),
+            (
+                live_run_root / Path(container["cidfile"]).name,
+                "container ID file",
+            ),
+            (
+                live_run_root / Path(verifier_container["cidfile"]).name,
+                "verifier container ID file",
+            ),
         ):
-            if not _path_absent(Path(item)):
+            if not _path_absent(item):
+                raise StabilityError(f"{label} survived cleanup")
+        for item, label in (
+            (
+                live_state_root / "runtime" / session_root.name,
+                "campaign runtime",
+            ),
+            (
+                live_state_root
+                / "runtime-identities"
+                / f"{session_root.name}.json",
+                "campaign runtime identity",
+            ),
+        ):
+            if not _path_absent(item):
                 raise StabilityError(f"{label} survived cleanup")
         for marker_name in ("marker", "temporary_marker"):
             marker = live_state_root / Path(cgroup_authority[marker_name]).name
@@ -10878,6 +10897,7 @@ def _build_operator_receipt(
     cleanup_command_runner: HostCommandRunner | None = None,
     cleanup_live_cgroup_root: Path = Path("/sys/fs/cgroup"),
     cleanup_live_state_root: Path = Path("/var/lib/codeskeptic-p10-09"),
+    cleanup_live_run_root: Path = Path("/run/codeskeptic-p10-09"),
 ) -> dict[str, Any]:
     if not isinstance(boot_id, str) or BOOT_ID.fullmatch(boot_id) is None:
         raise StabilityError("operator receipt boot identity is malformed")
@@ -10976,6 +10996,7 @@ def _build_operator_receipt(
         command_runner=cleanup_command_runner,
         live_cgroup_root=cleanup_live_cgroup_root,
         live_state_root=cleanup_live_state_root,
+        live_run_root=cleanup_live_run_root,
     )
     del cleanup
 
@@ -11115,6 +11136,7 @@ def seal_operator_evidence(
     cleanup_command_runner: HostCommandRunner | None = None,
     cleanup_live_cgroup_root: Path = Path("/sys/fs/cgroup"),
     cleanup_live_state_root: Path = Path("/var/lib/codeskeptic-p10-09"),
+    cleanup_live_run_root: Path = Path("/run/codeskeptic-p10-09"),
 ) -> dict[str, Any]:
     for reserved in ("receipt.json", "receipt.json.sha256", "SHA256SUMS"):
         if (session_root / reserved).exists() or (session_root / reserved).is_symlink():
@@ -11126,6 +11148,7 @@ def seal_operator_evidence(
         cleanup_command_runner=cleanup_command_runner,
         cleanup_live_cgroup_root=cleanup_live_cgroup_root,
         cleanup_live_state_root=cleanup_live_state_root,
+        cleanup_live_run_root=cleanup_live_run_root,
     )
     receipt_data = canonical_document(receipt)
     _atomic_create(session_root / "receipt.json", receipt_data)

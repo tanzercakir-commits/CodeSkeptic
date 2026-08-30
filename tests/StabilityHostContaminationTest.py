@@ -1280,8 +1280,10 @@ class StabilityHostContaminationTest(unittest.TestCase):
             )
             live_cgroup_root = base / "cgroup"
             live_state_root = base / "state"
+            live_run_root = base / "run"
             write_restored_cgroup_tree(live_cgroup_root)
             live_state_root.mkdir()
+            live_run_root.mkdir()
             inner = write_inner_campaign(root, "f" * 64, launch_sha)
             inner_sha = stability.sha256_file(root / "campaign" / "receipt.json")
             (root / "host" / "inner-verification.log").write_text(
@@ -1313,6 +1315,7 @@ class StabilityHostContaminationTest(unittest.TestCase):
                         cleanup_command_runner=runner,
                         cleanup_live_cgroup_root=live_cgroup_root,
                         cleanup_live_state_root=live_state_root,
+                        cleanup_live_run_root=live_run_root,
                     )
                 shutil.rmtree(root / "campaign")
                 (root / "host" / "inner-verification.log").unlink()
@@ -1331,6 +1334,7 @@ class StabilityHostContaminationTest(unittest.TestCase):
                     cleanup_command_runner=runner,
                     cleanup_live_cgroup_root=live_cgroup_root,
                     cleanup_live_state_root=live_state_root,
+                    cleanup_live_run_root=live_run_root,
                 )
                 self.assertEqual(receipt["status"], "accepted")
                 host_recovery_path = (
@@ -1603,40 +1607,72 @@ class StabilityHostContaminationTest(unittest.TestCase):
                     )
 
     def test_cleanup_live_restoration_rejects_survivors_and_cpuset_drift(self) -> None:
+        session_name = f"20260823T000000Z-{BOOT_ID}-{NONCE}"
+
+        def retain_runtime_tree(
+            state: Path, _cgroup: Path, _run: Path
+        ) -> None:
+            (state / "runtime" / session_name).mkdir(parents=True)
+
+        def retain_runtime_identity(
+            state: Path, _cgroup: Path, _run: Path
+        ) -> None:
+            path = state / "runtime-identities" / f"{session_name}.json"
+            path.parent.mkdir(parents=True)
+            path.write_text("survived\n", encoding="ascii")
+
+        def retain_container_cidfile(
+            _state: Path, _cgroup: Path, run: Path
+        ) -> None:
+            (run / f"{session_name}.cid").write_text(
+                "survived\n", encoding="ascii"
+            )
+
+        def retain_verifier_cidfile(
+            _state: Path, _cgroup: Path, run: Path
+        ) -> None:
+            (run / f"{session_name}.verifier.cid").write_text(
+                "survived\n", encoding="ascii"
+            )
+
         mutations = (
+            ("runtime tree", retain_runtime_tree),
+            ("runtime identity", retain_runtime_identity),
+            ("container ID file", retain_container_cidfile),
+            ("verifier container ID file", retain_verifier_cidfile),
             (
                 "durable marker",
-                lambda state, cgroup: (
+                lambda state, cgroup, run: (
                     state / Path(stability.CGROUP_AUTHORITY_MARKER).name
                 ).write_text("survived\n", encoding="ascii"),
             ),
             (
                 "temporary marker",
-                lambda state, cgroup: (
+                lambda state, cgroup, run: (
                     state / Path(stability.CGROUP_AUTHORITY_MARKER_TEMP).name
                 ).write_text("survived\n", encoding="ascii"),
             ),
             (
                 "host recovery marker",
-                lambda state, cgroup: (
+                lambda state, cgroup, run: (
                     state / Path(stability.HOST_RECOVERY_MARKER).name
                 ).write_text("survived\n", encoding="ascii"),
             ),
             (
                 "host recovery temporary marker",
-                lambda state, cgroup: (
+                lambda state, cgroup, run: (
                     state / Path(stability.HOST_RECOVERY_MARKER_TEMP).name
                 ).write_text("survived\n", encoding="ascii"),
             ),
             (
                 "root isolated CPUs",
-                lambda state, cgroup: (cgroup / "cpuset.cpus.isolated").write_text(
-                    "0-3\n", encoding="ascii"
-                ),
+                lambda state, cgroup, run: (
+                    cgroup / "cpuset.cpus.isolated"
+                ).write_text("0-3\n", encoding="ascii"),
             ),
             (
                 "service exclusive CPUs",
-                lambda state, cgroup: (
+                lambda state, cgroup, run: (
                     cgroup
                     / "system.slice/codeskeptic-stability.service"
                     / "cpuset.cpus.exclusive"
@@ -1644,7 +1680,7 @@ class StabilityHostContaminationTest(unittest.TestCase):
             ),
             (
                 "system slice effective CPUs",
-                lambda state, cgroup: (
+                lambda state, cgroup, run: (
                     cgroup / "system.slice" / "cpuset.cpus.effective"
                 ).write_text("4-11\n", encoding="ascii"),
             ),
@@ -1652,15 +1688,17 @@ class StabilityHostContaminationTest(unittest.TestCase):
         for label, mutate in mutations:
             with self.subTest(label=label), tempfile.TemporaryDirectory() as temporary:
                 base = Path(temporary)
-                root = base / f"20260823T000000Z-{BOOT_ID}-{NONCE}"
+                root = base / session_name
                 (root / "host").mkdir(parents=True)
                 operator = base / "operator" / "run.sh"
                 write_cleanup(root, operator)
                 cgroup_root = base / "cgroup"
                 state_root = base / "state"
+                run_root = base / "run"
                 write_restored_cgroup_tree(cgroup_root)
                 state_root.mkdir()
-                mutate(state_root, cgroup_root)
+                run_root.mkdir()
+                mutate(state_root, cgroup_root, run_root)
                 with self.assertRaises(stability.StabilityError):
                     stability._validate_cleanup_record(
                         root / "host" / "cleanup.json",
@@ -1675,6 +1713,7 @@ class StabilityHostContaminationTest(unittest.TestCase):
                         command_runner=FakeHostRunner(),
                         live_cgroup_root=cgroup_root,
                         live_state_root=state_root,
+                        live_run_root=run_root,
                     )
 
     def test_live_cleanup_uses_authorized_marker_bounded_recovery(self) -> None:
@@ -1686,8 +1725,10 @@ class StabilityHostContaminationTest(unittest.TestCase):
             write_cleanup(root, operator)
             cgroup_root = base / "cgroup"
             state_root = base / "state"
+            run_root = base / "run"
             write_restored_cgroup_tree(cgroup_root)
             state_root.mkdir()
+            run_root.mkdir()
             runner = FakeHostRunner()
 
             stability._validate_cleanup_record(
@@ -1703,6 +1744,7 @@ class StabilityHostContaminationTest(unittest.TestCase):
                 command_runner=runner,
                 live_cgroup_root=cgroup_root,
                 live_state_root=state_root,
+                live_run_root=run_root,
             )
 
             recovery_calls = [
@@ -1723,6 +1765,68 @@ class StabilityHostContaminationTest(unittest.TestCase):
                 any("/usr/bin/podman" in call for call in runner.calls)
             )
 
+    def test_live_cleanup_projects_checks_into_injected_live_roots(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = base / f"20260823T000000Z-{BOOT_ID}-{NONCE}"
+            (root / "host").mkdir(parents=True)
+            operator = base / "operator" / "run.sh"
+            write_cleanup(root, operator)
+            cgroup_root = base / "cgroup"
+            state_root = base / "state"
+            run_root = base / "run"
+            write_restored_cgroup_tree(cgroup_root)
+            state_root.mkdir()
+            run_root.mkdir()
+
+            with mock.patch.object(
+                stability, "_path_absent", return_value=True
+            ) as absent:
+                stability._validate_cleanup_record(
+                    root / "host" / "cleanup.json",
+                    session_root=root,
+                    boot_id=BOOT_ID,
+                    session_nonce=NONCE,
+                    target_user=USER,
+                    target_uid=UID,
+                    operator_path=operator,
+                    verify_live=True,
+                    **cleanup_validation_authority(),
+                    command_runner=FakeHostRunner(),
+                    live_cgroup_root=cgroup_root,
+                    live_state_root=state_root,
+                    live_run_root=run_root,
+                )
+
+            inspected = [call.args[0] for call in absent.call_args_list]
+            self.assertIn(run_root / f"{root.name}.cid", inspected)
+            self.assertIn(run_root / f"{root.name}.verifier.cid", inspected)
+            self.assertIn(state_root / "runtime" / root.name, inspected)
+            self.assertIn(
+                state_root / "runtime-identities" / f"{root.name}.json",
+                inspected,
+            )
+            self.assertNotIn(
+                Path("/var/lib/codeskeptic-p10-09/runtime") / root.name,
+                inspected,
+            )
+            self.assertNotIn(
+                Path("/var/lib/codeskeptic-p10-09/runtime-identities")
+                / f"{root.name}.json",
+                inspected,
+            )
+            self.assertNotIn(
+                Path("/run/codeskeptic-p10-09") / f"{root.name}.cid",
+                inspected,
+            )
+            self.assertNotIn(
+                Path("/run/codeskeptic-p10-09")
+                / f"{root.name}.verifier.cid",
+                inspected,
+            )
+
     def test_live_cleanup_rejects_incomplete_recovery_attestation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
@@ -1732,8 +1836,10 @@ class StabilityHostContaminationTest(unittest.TestCase):
             write_cleanup(root, operator)
             cgroup_root = base / "cgroup"
             state_root = base / "state"
+            run_root = base / "run"
             write_restored_cgroup_tree(cgroup_root)
             state_root.mkdir()
+            run_root.mkdir()
 
             with self.assertRaisesRegex(
                 stability.StabilityError, "live host recovery revalidation"
@@ -1753,6 +1859,7 @@ class StabilityHostContaminationTest(unittest.TestCase):
                     ),
                     live_cgroup_root=cgroup_root,
                     live_state_root=state_root,
+                    live_run_root=run_root,
                 )
 
 

@@ -70,6 +70,11 @@
   requires the larger phase peak instead of summing two stores that cannot
   coexist. The trusted snapshot, complete installed bundle, conservative
   ten-times image allowance, and recovery reserve remain fully counted.
+- Isolated synthetic host-cleanup tests from root-owned live state. Canonical
+  `/var/lib/codeskeptic-p10-09` and `/run/codeskeptic-p10-09` claims remain
+  exact evidence contracts, while live probes can be projected into explicit
+  test roots; regressions now reject retained runtime trees, identity markers,
+  campaign CID files, and verifier CID files without consulting host state.
 - Removed the hand-authored hosted gate selection from the authority path. The
   capture now deterministically selects attempt-one successful runs and their
   exact check suites from complete provider API snapshots, prefers `push` over
