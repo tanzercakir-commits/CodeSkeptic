@@ -210,11 +210,16 @@ capacity proof, journal creation, and installation. Before any journal or
 systemd mutation it also requires the temporary root, `/opt`, `/etc`,
 `/etc/systemd`, `/etc/systemd/system`, `/var/lib`, and an already-existing
 `/etc/systemd/system.control` publication parent to report one device, then
-applies one aggregate free-space gate for both the temporary workspace and the
-retained-old-plus-new persistent footprint. Different device identities are
-rejected rather than treated as proof of independent capacity; this avoids
-double-counting one Btrfs pool whose subvolumes expose different `st_dev`
-values.
+applies one free-space gate to the larger of two incremental phase peaks. The
+verification peak contains the trusted bundle snapshot plus the private VFS
+image store. That VFS store is fully reset and removed before installation
+starts. The later installation peak therefore contains the still-live trusted
+snapshot, one complete new installed bundle, and the persistent Overlay image
+store; it does not add the already-removed VFS store. Both peaks retain the
+same conservative image expansion allowance and recovery reserve. Different
+device identities are rejected rather than treated as proof of independent
+capacity; this avoids double-counting one Btrfs pool whose subvolumes expose
+different `st_dev` values.
 
 The one-time Fedora migration fence is deliberately host-version-specific. On
 the qualified `systemd 259 (259.8-1.fc44)` host it create-new publishes

@@ -7056,13 +7056,23 @@ def _verify_migration_capacity_topology(temporary_root: Path) -> None:
 def _verify_migration_capacity(bundle: Path, temporary_root: Path) -> None:
     _verify_migration_capacity_topology(temporary_root)
     bundle_bytes = _regular_tree_size(bundle)
-    temporary_bytes = _bundle_temporary_requirement(
+    verification_peak_bytes = _bundle_temporary_requirement(
         bundle, include_snapshot=True
     )
-    persistent_bytes = bundle_bytes + _bundle_temporary_requirement(
+    # install_bundle tears down its private VFS verification store before it
+    # creates the persistent overlay store. Those two image stores therefore
+    # never consume capacity concurrently. The later installation phase does
+    # retain the trusted bundle snapshot while it publishes one complete copy
+    # of the bundle, so count both bundle copies in that phase. Keep the same
+    # conservative archive expansion and recovery reserve in each individual
+    # phase, then gate on the larger incremental peak instead of their sum.
+    installation_peak_bytes = 2 * bundle_bytes + _bundle_temporary_requirement(
         bundle, include_snapshot=False
     )
-    _temporary_capacity(temporary_root, temporary_bytes + persistent_bytes)
+    _temporary_capacity(
+        temporary_root,
+        max(verification_peak_bytes, installation_peak_bytes),
+    )
 
 
 def _verify_migration_temporary_root_authority(

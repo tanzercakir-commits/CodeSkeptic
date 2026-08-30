@@ -64,6 +64,12 @@
   budget plus cleanup reserve, and identity-bind both publication and removal.
   This prevents the pinned multi-gigabyte archive from exhausting the host's
   tmpfs and remains reliable across `sudo` environment filtering.
+- Corrected the same-filesystem migration capacity gate to model the actual
+  sequential lifecycle. The private VFS verification store is reset and
+  removed before the persistent Overlay store is created, so the gate now
+  requires the larger phase peak instead of summing two stores that cannot
+  coexist. The trusted snapshot, complete installed bundle, conservative
+  ten-times image allowance, and recovery reserve remain fully counted.
 - Removed the hand-authored hosted gate selection from the authority path. The
   capture now deterministically selects attempt-one successful runs and their
   exact check suites from complete provider API snapshots, prefers `push` over

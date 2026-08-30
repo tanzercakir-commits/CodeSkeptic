@@ -4001,6 +4001,51 @@ while True:
                     "tampered\n",
                 )
 
+    def test_install_removes_private_vfs_store_before_persistent_overlay_load(
+        self,
+    ) -> None:
+        assert stage is not None
+        with sealed_bundle_fixture() as fixture:
+            workspace, _prepared, _revision, sealed, _receipt = fixture
+            install_workspace = workspace / "ordered-store-root"
+            install_workspace.mkdir()
+            runner = FakeCommandRunner()
+            storage_drivers: list[str] = []
+            private_vfs_runtime: Path | None = None
+            real_load = stage._load_and_verify_image_archive
+
+            def ordered_load(*args, **kwargs):
+                nonlocal private_vfs_runtime
+                storage_driver = kwargs["storage_driver"]
+                storage_drivers.append(storage_driver)
+                podman_root = Path(kwargs["podman_root"])
+                if storage_driver == "vfs":
+                    self.assertIsNone(private_vfs_runtime)
+                    private_vfs_runtime = podman_root.parent
+                elif storage_driver == "overlay":
+                    self.assertIsNotNone(private_vfs_runtime)
+                    assert private_vfs_runtime is not None
+                    self.assertFalse(private_vfs_runtime.exists())
+                return real_load(*args, **kwargs)
+
+            with (
+                patched_install_layout(install_workspace),
+                mock.patch.object(
+                    stage,
+                    "_load_and_verify_image_archive",
+                    side_effect=ordered_load,
+                ),
+            ):
+                stage.install_bundle(
+                    sealed,
+                    **bundle_authority(sealed),
+                    command_runner=runner,
+                    require_root=False,
+                    owner_uid=os.getuid(),
+                    owner_gid=os.getgid(),
+                )
+            self.assertEqual(storage_drivers, ["vfs", "overlay"])
+
     def test_live_timeout_override_rejects_mode_and_hardlink_drift(self) -> None:
         assert stage is not None
         with tempfile.TemporaryDirectory() as temporary:
@@ -4824,7 +4869,7 @@ while True:
             arguments.expected_bundle_receipt_sha256, "5" * 64
         )
 
-    def test_migration_capacity_uses_one_aggregate_fixed_filesystem_gate(
+    def test_migration_capacity_uses_one_sequential_peak_filesystem_gate(
         self,
     ) -> None:
         assert stage is not None
@@ -4851,7 +4896,7 @@ while True:
                     "_bundle_temporary_requirement",
                     side_effect=(
                         lambda *_args, include_snapshot: (
-                            20 if include_snapshot else 30
+                            40 if include_snapshot else 30
                         )
                     ),
                 )
@@ -4865,7 +4910,7 @@ while True:
                     ),
                     requirements,
                     mock.patch.object(
-                        stage, "_temporary_available_bytes", return_value=59
+                        stage, "_temporary_available_bytes", return_value=49
                     ),
                     self.assertRaisesRegex(
                         stage.StagingError, "insufficient free space"
@@ -4885,12 +4930,83 @@ while True:
                         "_bundle_temporary_requirement",
                         side_effect=(
                             lambda *_args, include_snapshot: (
-                                20 if include_snapshot else 30
+                                40 if include_snapshot else 30
                             )
                         ),
                     ),
                     mock.patch.object(
-                        stage, "_temporary_available_bytes", return_value=60
+                        stage, "_temporary_available_bytes", return_value=50
+                    ) as available,
+                ):
+                    stage._verify_migration_capacity(bundle, temporary_root)
+                available.assert_called_once_with(temporary_root)
+
+    def test_migration_capacity_preserves_larger_verification_peak(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            install_workspace = workspace / "layout"
+            install_workspace.mkdir()
+            bundle = workspace / "sealed"
+            bundle.mkdir()
+            with patched_install_layout(install_workspace) as _layout:
+                migration_root = (
+                    install_workspace
+                    / "var/lib/codeskeptic-p10-09-migration"
+                )
+                temporary_root = (
+                    migration_root.parent / f"{migration_root.name}-temporary"
+                )
+                temporary_root.mkdir(mode=0o700)
+                control_root = (
+                    install_workspace / "etc/systemd/system.control"
+                )
+                with (
+                    mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                    mock.patch.object(
+                        stage, "SYSTEMD_CONTROL_ROOT", control_root
+                    ),
+                    mock.patch.object(
+                        stage, "_regular_tree_size", return_value=10
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "_bundle_temporary_requirement",
+                        side_effect=(
+                            lambda *_args, include_snapshot: (
+                                70 if include_snapshot else 20
+                            )
+                        ),
+                    ),
+                    mock.patch.object(
+                        stage, "_temporary_available_bytes", return_value=69
+                    ),
+                    self.assertRaisesRegex(
+                        stage.StagingError, "insufficient free space"
+                    ),
+                ):
+                    stage._verify_migration_capacity(bundle, temporary_root)
+                with (
+                    mock.patch.object(stage, "MIGRATION_ROOT", migration_root),
+                    mock.patch.object(
+                        stage, "SYSTEMD_CONTROL_ROOT", control_root
+                    ),
+                    mock.patch.object(
+                        stage, "_regular_tree_size", return_value=10
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "_bundle_temporary_requirement",
+                        side_effect=(
+                            lambda *_args, include_snapshot: (
+                                70 if include_snapshot else 20
+                            )
+                        ),
+                    ),
+                    mock.patch.object(
+                        stage, "_temporary_available_bytes", return_value=70
                     ) as available,
                 ):
                     stage._verify_migration_capacity(bundle, temporary_root)
