@@ -6691,48 +6691,130 @@ def _migration_service_guard(
 def _migration_lock(owner_uid: int, owner_gid: int):
     if fcntl is None:
         raise StagingError("installation migration lock requires POSIX fcntl")
+    descriptor = -1
+    created = False
+    existing_before_open: os.stat_result | None = None
     try:
         parent = MIGRATION_LOCK_PATH.parent
         parent_metadata = parent.lstat()
         if not stat.S_ISDIR(parent_metadata.st_mode) or parent.resolve() != parent:
             raise StagingError("migration lock parent authority drift")
-        flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_CLOEXEC", 0)
-        flags |= getattr(os, "O_NOFOLLOW", 0)
-        descriptor = os.open(MIGRATION_LOCK_PATH, flags, 0o600)
+        common_flags = os.O_RDWR | getattr(os, "O_CLOEXEC", 0)
+        common_flags |= getattr(os, "O_NOFOLLOW", 0)
+        try:
+            descriptor = os.open(
+                MIGRATION_LOCK_PATH,
+                common_flags | os.O_CREAT | os.O_EXCL,
+                0o600,
+            )
+            created = True
+        except FileExistsError:
+            existing = MIGRATION_LOCK_PATH.lstat()
+            if (
+                not stat.S_ISREG(existing.st_mode)
+                or existing.st_nlink != 1
+                or existing.st_uid != owner_uid
+                or existing.st_gid != owner_gid
+                or stat.S_IMODE(existing.st_mode) != 0o600
+                or existing.st_size != 0
+            ):
+                raise StagingError("installation migration lock authority drift")
+            existing_before_open = existing
+            descriptor = os.open(MIGRATION_LOCK_PATH, common_flags)
     except OSError as error:
         raise StagingError(f"cannot open installation migration lock: {error}") from error
     locked = False
+    entered = False
+    primary: BaseException | None = None
     try:
-        os.fchown(descriptor, owner_uid, owner_gid)
-        os.fchmod(descriptor, 0o600)
+        if created:
+            os.fchown(descriptor, owner_uid, owner_gid)
+            os.fchmod(descriptor, 0o600)
         metadata = os.fstat(descriptor)
+        visible = MIGRATION_LOCK_PATH.lstat()
         if (
             not stat.S_ISREG(metadata.st_mode)
             or metadata.st_nlink != 1
             or metadata.st_uid != owner_uid
             or metadata.st_gid != owner_gid
             or stat.S_IMODE(metadata.st_mode) != 0o600
+            or metadata.st_size != 0
+            or _stat_fingerprint(metadata) != _stat_fingerprint(visible)
+            or (
+                existing_before_open is not None
+                and _stat_fingerprint(metadata)
+                != _stat_fingerprint(existing_before_open)
+            )
         ):
             raise StagingError("installation migration lock authority drift")
         os.fsync(descriptor)
         _fsync_directory(parent)
+        baseline = _stat_fingerprint(os.fstat(descriptor))
         try:
             fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:
             raise StagingError("installation migration is already active") from error
         locked = True
-        yield
-    except StagingError:
-        raise
+        acquired = os.fstat(descriptor)
+        rebound = MIGRATION_LOCK_PATH.lstat()
+        if (
+            _stat_fingerprint(acquired) != baseline
+            or _stat_fingerprint(rebound) != baseline
+            or acquired.st_uid != owner_uid
+            or acquired.st_gid != owner_gid
+            or rebound.st_uid != owner_uid
+            or rebound.st_gid != owner_gid
+            or parent.resolve() != parent
+            or not _same_file_identity(parent_metadata, parent.lstat())
+        ):
+            raise StagingError("installation migration lock changed while acquiring")
+        entered = True
+        try:
+            yield
+        except BaseException as error:
+            primary = error
+    except StagingError as error:
+        primary = error
     except OSError as error:
-        raise StagingError(f"cannot hold installation migration lock: {error}") from error
-    finally:
-        if locked:
-            try:
-                fcntl.flock(descriptor, fcntl.LOCK_UN)
-            except OSError:
-                pass
-        os.close(descriptor)
+        primary = StagingError(f"cannot hold installation migration lock: {error}")
+    cleanup_errors: list[Exception] = []
+    if entered:
+        try:
+            released = os.fstat(descriptor)
+            visible_after = MIGRATION_LOCK_PATH.lstat()
+            parent_after = parent.lstat()
+            if (
+                _stat_fingerprint(released) != baseline
+                or _stat_fingerprint(visible_after) != baseline
+                or released.st_uid != owner_uid
+                or released.st_gid != owner_gid
+                or visible_after.st_uid != owner_uid
+                or visible_after.st_gid != owner_gid
+                or parent.resolve() != parent
+                or not _same_file_identity(parent_metadata, parent_after)
+            ):
+                raise StagingError("installation migration lock changed while held")
+        except Exception as error:
+            cleanup_errors.append(error)
+    if locked:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+        except OSError as error:
+            cleanup_errors.append(
+                StagingError(f"cannot unlock installation migration lock: {error}")
+            )
+    if descriptor >= 0:
+        try:
+            os.close(descriptor)
+        except OSError as error:
+            cleanup_errors.append(
+                StagingError(f"cannot close installation migration lock: {error}")
+            )
+    _raise_primary_and_cleanup(
+        primary,
+        cleanup_errors,
+        "installation migration lock lifecycle failed",
+    )
 
 
 @contextlib.contextmanager

@@ -1246,6 +1246,236 @@ while True:
             self.assertTrue(original_lock.is_file())
             self.assertTrue(lock_path.is_file())
 
+    def test_migration_lock_creates_and_retains_exact_empty_lock(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            lock_path = Path(temporary) / "migration.lock"
+            with mock.patch.object(stage, "MIGRATION_LOCK_PATH", lock_path):
+                with stage._migration_lock(os.getuid(), os.getgid()):
+                    metadata = lock_path.lstat()
+                    self.assertTrue(stat.S_ISREG(metadata.st_mode))
+                    self.assertEqual(stat.S_IMODE(metadata.st_mode), 0o600)
+                    self.assertEqual(metadata.st_size, 0)
+                retained = lock_path.lstat()
+                self.assertTrue(stat.S_ISREG(retained.st_mode))
+                self.assertEqual(stat.S_IMODE(retained.st_mode), 0o600)
+                self.assertEqual(retained.st_size, 0)
+
+    def test_migration_lock_reuses_exact_existing_without_normalizing(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            lock_path = Path(temporary) / "migration.lock"
+            lock_path.write_bytes(b"")
+            lock_path.chmod(0o600)
+            identity = (lock_path.stat().st_dev, lock_path.stat().st_ino)
+            with (
+                mock.patch.object(stage, "MIGRATION_LOCK_PATH", lock_path),
+                mock.patch.object(stage.os, "fchown", wraps=os.fchown) as chown,
+                mock.patch.object(stage.os, "fchmod", wraps=os.fchmod) as chmod,
+            ):
+                with stage._migration_lock(os.getuid(), os.getgid()):
+                    self.assertEqual(
+                        (lock_path.stat().st_dev, lock_path.stat().st_ino),
+                        identity,
+                    )
+            chown.assert_not_called()
+            chmod.assert_not_called()
+
+    def test_migration_lock_rejects_nonempty_existing_without_mutation(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            lock_path = Path(temporary) / "migration.lock"
+            lock_path.write_bytes(b"foreign\n")
+            lock_path.chmod(0o600)
+            before = lock_path.lstat()
+            with (
+                mock.patch.object(stage, "MIGRATION_LOCK_PATH", lock_path),
+                self.assertRaisesRegex(
+                    stage.StagingError, "migration lock authority drift"
+                ),
+            ):
+                with stage._migration_lock(os.getuid(), os.getgid()):
+                    self.fail("nonempty lock reached the protected migration")
+            after = lock_path.lstat()
+            self.assertEqual(lock_path.read_bytes(), b"foreign\n")
+            self.assertEqual(stat.S_IMODE(after.st_mode), 0o600)
+            self.assertEqual((after.st_dev, after.st_ino), (before.st_dev, before.st_ino))
+
+    def test_migration_lock_rejects_mode_drift_without_normalizing(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            lock_path = Path(temporary) / "migration.lock"
+            lock_path.write_bytes(b"")
+            lock_path.chmod(0o644)
+            with (
+                mock.patch.object(stage, "MIGRATION_LOCK_PATH", lock_path),
+                self.assertRaisesRegex(
+                    stage.StagingError, "migration lock authority drift"
+                ),
+            ):
+                with stage._migration_lock(os.getuid(), os.getgid()):
+                    self.fail("wrong-mode lock reached the protected migration")
+            self.assertEqual(stat.S_IMODE(lock_path.lstat().st_mode), 0o644)
+
+    def test_migration_lock_rejects_path_replacement_after_flock(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            lock_path = parent / "migration.lock"
+            original = parent / "migration-original.lock"
+            replacement = parent / "migration-replacement.lock"
+            lock_path.write_bytes(b"")
+            lock_path.chmod(0o600)
+            replacement.write_bytes(b"")
+            replacement.chmod(0o600)
+            original_inode = lock_path.stat().st_ino
+            replacement_inode = replacement.stat().st_ino
+            real_flock = stage.fcntl.flock
+            exclusive = stage.fcntl.LOCK_EX | stage.fcntl.LOCK_NB
+            replaced = False
+
+            def replace_after_flock(descriptor: int, operation: int):
+                nonlocal replaced
+                result = real_flock(descriptor, operation)
+                if not replaced and operation == exclusive:
+                    replaced = True
+                    lock_path.rename(original)
+                    replacement.rename(lock_path)
+                return result
+
+            with (
+                mock.patch.object(stage, "MIGRATION_LOCK_PATH", lock_path),
+                mock.patch.object(
+                    stage.fcntl, "flock", side_effect=replace_after_flock
+                ),
+                self.assertRaisesRegex(
+                    stage.StagingError, "migration lock changed while acquiring"
+                ),
+            ):
+                with stage._migration_lock(os.getuid(), os.getgid()):
+                    self.fail("replacement reached the protected migration")
+            self.assertTrue(replaced)
+            self.assertEqual(original.stat().st_ino, original_inode)
+            self.assertEqual(lock_path.stat().st_ino, replacement_inode)
+
+    def test_migration_lock_rejects_replacement_between_lstat_and_open(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            lock_path = parent / "migration.lock"
+            original = parent / "migration-original.lock"
+            replacement = parent / "migration-replacement.lock"
+            lock_path.write_bytes(b"")
+            lock_path.chmod(0o600)
+            replacement.write_bytes(b"")
+            replacement.chmod(0o600)
+            original_inode = lock_path.stat().st_ino
+            replacement_inode = replacement.stat().st_ino
+            real_open = stage.os.open
+            replaced = False
+
+            def replace_before_existing_open(path, flags, *args, **kwargs):
+                nonlocal replaced
+                if (
+                    not replaced
+                    and Path(path) == lock_path
+                    and not (flags & os.O_EXCL)
+                ):
+                    replaced = True
+                    lock_path.rename(original)
+                    replacement.rename(lock_path)
+                return real_open(path, flags, *args, **kwargs)
+
+            with (
+                mock.patch.object(stage, "MIGRATION_LOCK_PATH", lock_path),
+                mock.patch.object(
+                    stage.os, "open", side_effect=replace_before_existing_open
+                ),
+                self.assertRaisesRegex(
+                    stage.StagingError, "migration lock authority drift"
+                ),
+            ):
+                with stage._migration_lock(os.getuid(), os.getgid()):
+                    self.fail("replacement reached the protected migration")
+            self.assertTrue(replaced)
+            self.assertEqual(original.stat().st_ino, original_inode)
+            self.assertEqual(lock_path.stat().st_ino, replacement_inode)
+
+    def test_migration_lock_combines_body_failure_and_held_replacement(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            lock_path = parent / "migration.lock"
+            original = parent / "migration-original.lock"
+            replacement = parent / "migration-replacement.lock"
+            lock_path.write_bytes(b"")
+            lock_path.chmod(0o600)
+            replacement.write_bytes(b"")
+            replacement.chmod(0o600)
+            with (
+                mock.patch.object(stage, "MIGRATION_LOCK_PATH", lock_path),
+                self.assertRaisesRegex(
+                    stage.StagingError,
+                    "primary failure: body failed; cleanup failure: "
+                    "installation migration lock changed while held",
+                ),
+            ):
+                with stage._migration_lock(os.getuid(), os.getgid()):
+                    lock_path.rename(original)
+                    replacement.rename(lock_path)
+                    raise RuntimeError("body failed")
+            self.assertTrue(original.is_file())
+            self.assertTrue(lock_path.is_file())
+
+    def test_migration_lock_revalidates_parent_after_body(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            parent = workspace / "run"
+            parent.mkdir()
+            original_parent = workspace / "run-original"
+            lock_path = parent / "migration.lock"
+            lock_path.write_bytes(b"")
+            lock_path.chmod(0o600)
+            with (
+                mock.patch.object(stage, "MIGRATION_LOCK_PATH", lock_path),
+                self.assertRaisesRegex(
+                    stage.StagingError, "migration lock changed while held"
+                ),
+            ):
+                with stage._migration_lock(os.getuid(), os.getgid()):
+                    parent.rename(original_parent)
+                    parent.mkdir()
+                    (original_parent / lock_path.name).rename(lock_path)
+            self.assertTrue(lock_path.is_file())
+            self.assertTrue(original_parent.is_dir())
+
+    def test_migration_lock_rejects_holder_and_releases_after_exit(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            lock_path = Path(temporary) / "migration.lock"
+            lock_path.write_bytes(b"")
+            lock_path.chmod(0o600)
+            holder = os.open(lock_path, os.O_RDWR)
+            try:
+                stage.fcntl.flock(
+                    holder, stage.fcntl.LOCK_EX | stage.fcntl.LOCK_NB
+                )
+                with (
+                    mock.patch.object(stage, "MIGRATION_LOCK_PATH", lock_path),
+                    self.assertRaisesRegex(
+                        stage.StagingError, "migration is already active"
+                    ),
+                ):
+                    with stage._migration_lock(os.getuid(), os.getgid()):
+                        self.fail("held lock reached the protected migration")
+            finally:
+                stage.fcntl.flock(holder, stage.fcntl.LOCK_UN)
+                os.close(holder)
+            with mock.patch.object(stage, "MIGRATION_LOCK_PATH", lock_path):
+                with stage._migration_lock(os.getuid(), os.getgid()):
+                    pass
+
     def test_prepare_creates_a_fresh_exact_head_layout_and_never_overwrites(self) -> None:
         assert stage is not None
         temporary = tempfile.TemporaryDirectory()
