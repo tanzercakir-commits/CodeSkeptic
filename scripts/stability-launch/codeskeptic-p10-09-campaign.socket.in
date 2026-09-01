@@ -1,0 +1,26 @@
+[Unit]
+Description=CodeSkeptic P10-09 fixed campaign launch socket
+Documentation=file:/opt/codeskeptic-p10-09-launch/README.md
+Before=shutdown.target rescue.target emergency.target
+Conflicts=shutdown.target rescue.target emergency.target
+IgnoreOnIsolate=yes
+StartLimitIntervalSec=0
+
+[Socket]
+ListenStream=/run/codeskeptic-p10-09-launch/campaign.sock
+DirectoryMode=0755
+SocketUser=root
+SocketGroup=@OPERATOR_GROUP@
+SocketMode=0660
+Accept=yes
+AcceptFileDescriptors=no
+Backlog=1
+MaxConnections=1
+MaxConnectionsPerSource=1
+RemoveOnStop=yes
+TriggerLimitIntervalSec=0
+PollLimitIntervalSec=2s
+PollLimitBurst=4
+
+[Install]
+WantedBy=sockets.target

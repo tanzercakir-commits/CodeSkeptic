@@ -1,0 +1,43 @@
+[Unit]
+Description=CodeSkeptic P10-09 fixed probe launch broker
+Documentation=file:/opt/codeskeptic-p10-09-launch/README.md
+After=local-fs.target
+Before=shutdown.target rescue.target emergency.target
+Conflicts=shutdown.target rescue.target emergency.target
+IgnoreOnIsolate=yes
+RefuseManualStart=yes
+CollectMode=inactive-or-failed
+
+[Service]
+Type=exec
+User=root
+Group=root
+UMask=0077
+ExecStart=/usr/bin/python3 -I -B /opt/codeskeptic-p10-09-launch/launch-broker.py probe
+StandardInput=socket
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=15min
+RuntimeMaxSec=16min
+Restart=no
+KillMode=control-group
+RuntimeDirectory=codeskeptic-p10-09
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectHostname=yes
+ProtectClock=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=no
+PrivateTmp=yes
+PrivateNetwork=yes
+PrivateDevices=no
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+ReadOnlyPaths=/opt/codeskeptic-p10-09 /opt/codeskeptic-p10-09-launch -/etc/codeskeptic-p10-09
+ReadWritePaths=-/var/lib/codeskeptic-p10-09 /run/codeskeptic-p10-09 /sys/fs/cgroup
