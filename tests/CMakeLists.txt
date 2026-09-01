@@ -142,6 +142,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     add_test(NAME StabilityWorkflowContract
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/StabilityWorkflowTest.py)
+    add_test(NAME StabilityLaunchBrokerContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/StabilityLaunchBrokerTest.py)
     add_test(NAME StabilityStagingProducerContract
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/StabilityStagingProducerTest.py)
