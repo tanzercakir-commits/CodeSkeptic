@@ -6806,39 +6806,308 @@ def _migration_guided_lock(owner_uid: int, owner_gid: int):
     )
 
 
+def _remove_exact_empty_private_directory(
+    path: Path,
+    *,
+    device: int,
+    inode: int,
+    owner_uid: int,
+    owner_gid: int,
+    label: str,
+) -> None:
+    """Remove one exact empty private directory without recursive deletion."""
+
+    parent_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    parent_flags |= getattr(os, "O_DIRECTORY", 0)
+    parent_flags |= getattr(os, "O_NOFOLLOW", 0)
+    child_flags = parent_flags
+    parent_descriptor: int | None = None
+    child_descriptor: int | None = None
+    quarantine_name: str | None = None
+    primary: BaseException | None = None
+    try:
+        parent_descriptor = os.open(path.parent, parent_flags)
+        child_descriptor = os.open(
+            path.name, child_flags, dir_fd=parent_descriptor
+        )
+        opened = os.fstat(child_descriptor)
+        visible = os.stat(
+            path.name, dir_fd=parent_descriptor, follow_symlinks=False
+        )
+        if (
+            not stat.S_ISDIR(opened.st_mode)
+            or not stat.S_ISDIR(visible.st_mode)
+            or opened.st_dev != device
+            or opened.st_ino != inode
+            or visible.st_dev != device
+            or visible.st_ino != inode
+            or opened.st_uid != owner_uid
+            or opened.st_gid != owner_gid
+            or visible.st_uid != owner_uid
+            or visible.st_gid != owner_gid
+            or stat.S_IMODE(opened.st_mode) != 0o700
+            or stat.S_IMODE(visible.st_mode) != 0o700
+        ):
+            raise StagingError(f"{label} identity or authority drift")
+        if os.listdir(child_descriptor):
+            raise StagingError(f"{label} is not empty")
+        for _attempt in range(128):
+            candidate = f".codeskeptic-empty-cleanup-{secrets.token_hex(16)}"
+            try:
+                _rename_noreplace_at(
+                    parent_descriptor,
+                    path.name,
+                    parent_descriptor,
+                    candidate,
+                )
+            except FileExistsError:
+                continue
+            quarantine_name = candidate
+            break
+        if quarantine_name is None:
+            raise StagingError(f"{label} cleanup quarantine budget exhausted")
+        os.fsync(parent_descriptor)
+        quarantined = os.stat(
+            quarantine_name,
+            dir_fd=parent_descriptor,
+            follow_symlinks=False,
+        )
+        pinned = os.fstat(child_descriptor)
+        if (
+            not stat.S_ISDIR(quarantined.st_mode)
+            or quarantined.st_dev != device
+            or quarantined.st_ino != inode
+            or quarantined.st_uid != owner_uid
+            or quarantined.st_gid != owner_gid
+            or stat.S_IMODE(quarantined.st_mode) != 0o700
+            or pinned.st_dev != device
+            or pinned.st_ino != inode
+            or pinned.st_uid != owner_uid
+            or pinned.st_gid != owner_gid
+            or stat.S_IMODE(pinned.st_mode) != 0o700
+        ):
+            raise StagingError(f"{label} identity changed during quarantine")
+        if os.listdir(child_descriptor):
+            raise StagingError(f"{label} became nonempty during cleanup")
+        os.rmdir(quarantine_name, dir_fd=parent_descriptor)
+        quarantine_name = None
+        os.fsync(parent_descriptor)
+    except BaseException as error:
+        primary = error
+    cleanup_errors: list[Exception] = []
+    if quarantine_name is not None and parent_descriptor is not None:
+        try:
+            _rename_noreplace_at(
+                parent_descriptor,
+                quarantine_name,
+                parent_descriptor,
+                path.name,
+            )
+            quarantine_name = None
+            os.fsync(parent_descriptor)
+        except Exception as error:
+            cleanup_errors.append(error)
+    for descriptor, descriptor_label in (
+        (child_descriptor, f"{label} identity pin"),
+        (parent_descriptor, f"{label} parent"),
+    ):
+        if descriptor is not None:
+            try:
+                os.close(descriptor)
+            except OSError as error:
+                cleanup_errors.append(
+                    StagingError(f"cannot close {descriptor_label}: {error}")
+                )
+    _raise_primary_and_cleanup(primary, cleanup_errors, f"{label} cleanup failed")
+
+
+@contextlib.contextmanager
+def _current_recovery_runtime_root(owner_uid: int, owner_gid: int):
+    """Reproduce systemd's RuntimeDirectory contract for standalone recovery."""
+
+    runtime_root = PODMAN_RUNROOT.parent
+    created: list[_CreatedNode] = []
+    runtime_descriptor: int | None = None
+    runtime_identity: tuple[int, int] | None = None
+    runroot_descriptor: int | None = None
+    runroot_identity: tuple[int, int] | None = None
+    runtime_created = False
+    recovery_started = False
+    primary: BaseException | None = None
+    try:
+        runtime_created = _ensure_private_directory(
+            runtime_root,
+            owner_uid,
+            owner_gid,
+            created_nodes=created,
+        )
+        if len(created) != (1 if runtime_created else 0):
+            raise StagingError("recovery runtime root creation ledger drift")
+        metadata = runtime_root.lstat()
+        runtime_identity = (metadata.st_dev, metadata.st_ino)
+        runtime_descriptor = _open_identity_pin(
+            runtime_root,
+            metadata.st_dev,
+            metadata.st_ino,
+            True,
+            "recovery runtime root",
+        )
+        if PODMAN_RUNROOT.exists() or PODMAN_RUNROOT.is_symlink():
+            raise StagingError(
+                "recovery Podman runroot must be previously absent"
+            )
+        if not _ensure_private_directory(
+            PODMAN_RUNROOT,
+            owner_uid,
+            owner_gid,
+            created_nodes=created,
+        ):
+            raise StagingError(
+                "recovery Podman runroot appeared concurrently"
+            )
+        if len(created) != (2 if runtime_created else 1):
+            raise StagingError("recovery Podman runroot creation ledger drift")
+        runroot = PODMAN_RUNROOT.lstat()
+        runroot_identity = (runroot.st_dev, runroot.st_ino)
+        runroot_descriptor = _open_identity_pin(
+            PODMAN_RUNROOT,
+            runroot.st_dev,
+            runroot.st_ino,
+            True,
+            "recovery Podman runroot",
+        )
+        recovery_started = True
+        yield
+    except BaseException as error:
+        primary = error
+    cleanup_errors: list[Exception] = []
+    runtime_binding_valid = False
+    if runtime_descriptor is not None and runtime_identity is not None:
+        try:
+            opened = os.fstat(runtime_descriptor)
+            visible = runtime_root.lstat()
+            if (
+                not stat.S_ISDIR(opened.st_mode)
+                or not stat.S_ISDIR(visible.st_mode)
+                or (opened.st_dev, opened.st_ino) != runtime_identity
+                or (visible.st_dev, visible.st_ino) != runtime_identity
+                or opened.st_uid != owner_uid
+                or opened.st_gid != owner_gid
+                or visible.st_uid != owner_uid
+                or visible.st_gid != owner_gid
+                or stat.S_IMODE(opened.st_mode) != 0o700
+                or stat.S_IMODE(visible.st_mode) != 0o700
+            ):
+                raise StagingError("recovery runtime root identity drift")
+            runtime_binding_valid = True
+        except Exception as error:
+            cleanup_errors.append(error)
+    runroot_cleanup_safe = runtime_binding_valid
+    if (
+        recovery_started
+        and runtime_binding_valid
+        and runroot_descriptor is not None
+        and runroot_identity is not None
+    ):
+        try:
+            opened = os.fstat(runroot_descriptor)
+            visible = PODMAN_RUNROOT.lstat()
+            if (
+                not stat.S_ISDIR(opened.st_mode)
+                or not stat.S_ISDIR(visible.st_mode)
+                or (opened.st_dev, opened.st_ino) != runroot_identity
+                or (visible.st_dev, visible.st_ino) != runroot_identity
+                or opened.st_uid != owner_uid
+                or opened.st_gid != owner_gid
+                or visible.st_uid != owner_uid
+                or visible.st_gid != owner_gid
+                or stat.S_IMODE(opened.st_mode) != 0o700
+                or stat.S_IMODE(visible.st_mode) != 0o700
+            ):
+                raise StagingError("recovery Podman runroot identity drift")
+            _remove_exact_empty_private_directory(
+                PODMAN_RUNROOT,
+                device=runroot_identity[0],
+                inode=runroot_identity[1],
+                owner_uid=owner_uid,
+                owner_gid=owner_gid,
+                label="recovery Podman runroot",
+            )
+        except Exception as error:
+            runroot_cleanup_safe = False
+            cleanup_errors.append(error)
+    elif recovery_started:
+        runroot_cleanup_safe = False
+        cleanup_errors.append(
+            StagingError("recovery Podman runroot identity pin is unavailable")
+        )
+    if runtime_created and runtime_binding_valid and runroot_cleanup_safe:
+        try:
+            assert runtime_identity is not None
+            _remove_exact_empty_private_directory(
+                runtime_root,
+                device=runtime_identity[0],
+                inode=runtime_identity[1],
+                owner_uid=owner_uid,
+                owner_gid=owner_gid,
+                label="recovery runtime root",
+            )
+        except Exception as error:
+            cleanup_errors.append(error)
+    for descriptor in (runroot_descriptor, runtime_descriptor):
+        if descriptor is None:
+            continue
+        try:
+            os.close(descriptor)
+        except OSError as error:
+            cleanup_errors.append(error)
+    try:
+        _release_created(created)
+    except Exception as error:
+        cleanup_errors.append(error)
+    _raise_primary_and_cleanup(
+        primary,
+        cleanup_errors,
+        "current recovery runtime lifecycle failed",
+    )
+
+
 def _run_current_recovery_gates(
     command_runner: Any | None,
+    owner_uid: int = 0,
+    owner_gid: int = 0,
 ) -> None:
-    post_stop = OPERATOR_ROOT / "post-stop.sh"
-    host_recovery = OPERATOR_ROOT / "host-recovery.py"
-    cgroup_authority = OPERATOR_ROOT / "cgroup-authority.py"
-    output = _external_output(
-        [os.fspath(post_stop), "--startup-recovery"],
-        64 * 1024,
-        command_runner,
-        timeout_seconds=300,
-    )
-    if output not in {b"already-clean\n", b"recovered\n"}:
-        raise StagingError("startup recovery clean-state output drift")
-    recovery = _external_output(
-        [os.fspath(host_recovery), "recover"],
-        4096,
-        command_runner,
-        timeout_seconds=300,
-    )
-    if recovery not in {b"already-clean\n", b"recovered\n"}:
-        raise StagingError("host recovery clean-state output drift")
-    cgroup = _external_output(
-        [os.fspath(cgroup_authority), "check-clean"],
-        4096,
-        command_runner,
-        timeout_seconds=300,
-    )
-    if cgroup != (
-        b"CODESKEPTIC_P10_09_CGROUP_AUTHORITY_OK "
-        b"action=check-clean result=clean\n"
-    ):
-        raise StagingError("cgroup clean-state output drift")
+    with _current_recovery_runtime_root(owner_uid, owner_gid):
+        post_stop = OPERATOR_ROOT / "post-stop.sh"
+        host_recovery = OPERATOR_ROOT / "host-recovery.py"
+        cgroup_authority = OPERATOR_ROOT / "cgroup-authority.py"
+        output = _external_output(
+            [os.fspath(post_stop), "--startup-recovery"],
+            64 * 1024,
+            command_runner,
+            timeout_seconds=300,
+        )
+        if output not in {b"already-clean\n", b"recovered\n"}:
+            raise StagingError("startup recovery clean-state output drift")
+        recovery = _external_output(
+            [os.fspath(host_recovery), "recover"],
+            4096,
+            command_runner,
+            timeout_seconds=300,
+        )
+        if recovery not in {b"already-clean\n", b"recovered\n"}:
+            raise StagingError("host recovery clean-state output drift")
+        cgroup = _external_output(
+            [os.fspath(cgroup_authority), "check-clean"],
+            4096,
+            command_runner,
+            timeout_seconds=300,
+        )
+        if cgroup != (
+            b"CODESKEPTIC_P10_09_CGROUP_AUTHORITY_OK "
+            b"action=check-clean result=clean\n"
+        ):
+            raise StagingError("cgroup clean-state output drift")
 
 
 def _verify_current_installation_with_producer(
@@ -8771,7 +9040,9 @@ def _migrate_installation_pinned(
                 owner_uid=owner_uid,
                 owner_gid=owner_gid,
             )
-            _run_current_recovery_gates(command_runner)
+            _run_current_recovery_gates(
+                command_runner, owner_uid, owner_gid
+            )
             _verify_current_installation_with_producer(
                 current_revision=current_revision,
                 current_bundle_receipt_sha256=current_bundle_receipt_sha256,
@@ -8937,7 +9208,9 @@ def _migrate_installation_pinned(
                                     owner_uid=owner_uid,
                                     owner_gid=owner_gid,
                                 )
-                                _run_current_recovery_gates(command_runner)
+                                _run_current_recovery_gates(
+                                    command_runner, owner_uid, owner_gid
+                                )
                                 _verify_current_installation_with_producer(
                                     current_revision=current_revision,
                                     current_bundle_receipt_sha256=(
@@ -9210,7 +9483,7 @@ def _resolve_interrupted_migration(
         owner_uid=owner_uid,
         owner_gid=owner_gid,
     )
-    _run_current_recovery_gates(command_runner)
+    _run_current_recovery_gates(command_runner, owner_uid, owner_gid)
     _verify_current_installation_with_producer(
         current_revision=current_revision,
         current_bundle_receipt_sha256=current_bundle_receipt_sha256,

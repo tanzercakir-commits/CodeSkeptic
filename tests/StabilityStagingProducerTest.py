@@ -3553,6 +3553,505 @@ while True:
                 marker.read_text(encoding="utf-8"), "preserve\n"
             )
 
+    @unittest.skipUnless(
+        sys.platform.startswith("linux"),
+        "recovery runtime transaction requires Linux renameat2",
+    )
+    def test_current_recovery_gates_own_ephemeral_runtime_root_across_verify(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            runtime_parent = workspace / "run"
+            runtime_parent.mkdir(mode=0o700)
+            runtime_root = runtime_parent / "codeskeptic-p10-09"
+            podman_runroot = runtime_root / "podman-runroot"
+            commands: list[str] = []
+
+            def recovery_output(arguments, *_args, **_kwargs):
+                command = Path(arguments[0]).name
+                commands.append(command)
+                metadata = runtime_root.lstat()
+                self.assertTrue(stat.S_ISDIR(metadata.st_mode))
+                self.assertEqual(stat.S_IMODE(metadata.st_mode), 0o700)
+                self.assertEqual(metadata.st_uid, os.getuid())
+                self.assertEqual(metadata.st_gid, os.getgid())
+                if command == "post-stop.sh":
+                    self.assertTrue(podman_runroot.is_dir())
+                    return b"already-clean\n"
+                if command == "host-recovery.py":
+                    self.assertTrue(podman_runroot.is_dir())
+                    return b"already-clean\n"
+                if command == "cgroup-authority.py":
+                    self.assertTrue(podman_runroot.is_dir())
+                    return (
+                        b"CODESKEPTIC_P10_09_CGROUP_AUTHORITY_OK "
+                        b"action=check-clean result=clean\n"
+                    )
+                self.fail(f"unexpected recovery command: {arguments}")
+
+            with (
+                mock.patch.object(stage, "PODMAN_RUNROOT", podman_runroot),
+                mock.patch.object(
+                    stage, "_external_output", side_effect=recovery_output
+                ),
+            ):
+                stage._run_current_recovery_gates(
+                    None, os.getuid(), os.getgid()
+                )
+                self.assertEqual(commands, [
+                    "post-stop.sh",
+                    "host-recovery.py",
+                    "cgroup-authority.py",
+                ])
+                self.assertFalse(podman_runroot.exists())
+                self.assertFalse(runtime_root.exists())
+
+                # The immediately following verify-install lifecycle must be
+                # able to establish the same fixed lexical runroot itself.
+                with stage._fixed_podman_runroot(
+                    os.getuid(), os.getgid()
+                ) as verify_runroot:
+                    self.assertEqual(verify_runroot, podman_runroot)
+                    self.assertTrue(verify_runroot.is_dir())
+                self.assertFalse(podman_runroot.exists())
+                self.assertFalse(runtime_root.exists())
+
+    @unittest.skipUnless(
+        sys.platform.startswith("linux"),
+        "recovery runtime transaction requires Linux renameat2",
+    )
+    def test_current_recovery_gates_retain_preexisting_runtime_root(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime_root = Path(temporary) / "codeskeptic-p10-09"
+            runtime_root.mkdir(mode=0o700)
+            root_before = runtime_root.lstat()
+            podman_runroot = runtime_root / "podman-runroot"
+            commands: list[str] = []
+
+            def recovery_output(arguments, *_args, **_kwargs):
+                command = Path(arguments[0]).name
+                commands.append(command)
+                if command == "post-stop.sh":
+                    self.assertTrue(podman_runroot.is_dir())
+                    return b"already-clean\n"
+                if command == "host-recovery.py":
+                    return b"already-clean\n"
+                if command == "cgroup-authority.py":
+                    return (
+                        b"CODESKEPTIC_P10_09_CGROUP_AUTHORITY_OK "
+                        b"action=check-clean result=clean\n"
+                    )
+                self.fail(f"unexpected recovery command: {arguments}")
+
+            with (
+                mock.patch.object(stage, "PODMAN_RUNROOT", podman_runroot),
+                mock.patch.object(
+                    stage, "_external_output", side_effect=recovery_output
+                ),
+            ):
+                stage._run_current_recovery_gates(
+                    None, os.getuid(), os.getgid()
+                )
+            root_after = runtime_root.lstat()
+            self.assertEqual(commands, [
+                "post-stop.sh",
+                "host-recovery.py",
+                "cgroup-authority.py",
+            ])
+            self.assertEqual(
+                (root_after.st_dev, root_after.st_ino),
+                (root_before.st_dev, root_before.st_ino),
+            )
+            self.assertFalse(podman_runroot.exists())
+            self.assertEqual(list(runtime_root.iterdir()), [])
+
+    @unittest.skipUnless(
+        sys.platform.startswith("linux"),
+        "recovery runtime transaction requires Linux renameat2",
+    )
+    def test_current_recovery_cleanup_preserves_unexpected_runtime_sibling(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime_root = Path(temporary) / "codeskeptic-p10-09"
+            podman_runroot = runtime_root / "podman-runroot"
+            marker = runtime_root / "unexpected" / "preserve"
+            commands: list[str] = []
+
+            def recovery_output(arguments, *_args, **_kwargs):
+                command = Path(arguments[0]).name
+                commands.append(command)
+                if command == "post-stop.sh":
+                    self.assertTrue(podman_runroot.is_dir())
+                    marker.parent.mkdir(mode=0o700)
+                    marker.write_text("foreign\n", encoding="utf-8")
+                    return b"already-clean\n"
+                if command == "host-recovery.py":
+                    return b"already-clean\n"
+                if command == "cgroup-authority.py":
+                    return (
+                        b"CODESKEPTIC_P10_09_CGROUP_AUTHORITY_OK "
+                        b"action=check-clean result=clean\n"
+                    )
+                self.fail(f"unexpected recovery command: {arguments}")
+
+            with (
+                mock.patch.object(stage, "PODMAN_RUNROOT", podman_runroot),
+                mock.patch.object(
+                    stage, "_external_output", side_effect=recovery_output
+                ),
+                self.assertRaisesRegex(
+                    stage.StagingError, "cleanup failure|not empty"
+                ),
+            ):
+                stage._run_current_recovery_gates(
+                    None, os.getuid(), os.getgid()
+                )
+            self.assertEqual(commands, [
+                "post-stop.sh",
+                "host-recovery.py",
+                "cgroup-authority.py",
+            ])
+            self.assertFalse(podman_runroot.exists())
+            self.assertTrue(runtime_root.is_dir())
+            self.assertEqual(
+                marker.read_text(encoding="utf-8"), "foreign\n"
+            )
+
+    @unittest.skipUnless(
+        sys.platform.startswith("linux"),
+        "recovery runtime transaction requires Linux renameat2",
+    )
+    def test_current_recovery_cleanup_rejects_created_runroot_drift(
+        self,
+    ) -> None:
+        assert stage is not None
+        for variant in ("nonempty", "wrong-mode", "symlink"):
+            with (
+                self.subTest(variant=variant),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                workspace = Path(temporary)
+                runtime_root = workspace / "codeskeptic-p10-09"
+                podman_runroot = runtime_root / "podman-runroot"
+                marker: Path | None = None
+                commands: list[str] = []
+
+                def recovery_output(arguments, *_args, **_kwargs):
+                    nonlocal marker
+                    command = Path(arguments[0]).name
+                    commands.append(command)
+                    if command == "post-stop.sh":
+                        if variant == "symlink":
+                            displaced = workspace / "pinned-podman-runroot"
+                            podman_runroot.rename(displaced)
+                            target = workspace / "foreign-target"
+                            target.mkdir(mode=0o700)
+                            marker = target / "preserve"
+                            marker.write_text("foreign\n", encoding="utf-8")
+                            podman_runroot.symlink_to(
+                                target, target_is_directory=True
+                            )
+                        else:
+                            self.assertTrue(podman_runroot.is_dir())
+                            if variant == "nonempty":
+                                marker = podman_runroot / "preserve"
+                                marker.write_text(
+                                    "foreign\n", encoding="utf-8"
+                                )
+                            else:
+                                podman_runroot.chmod(0o755)
+                        return b"already-clean\n"
+                    if command == "host-recovery.py":
+                        return b"already-clean\n"
+                    if command == "cgroup-authority.py":
+                        return (
+                            b"CODESKEPTIC_P10_09_CGROUP_AUTHORITY_OK "
+                            b"action=check-clean result=clean\n"
+                        )
+                    self.fail(f"unexpected recovery command: {arguments}")
+
+                with (
+                    mock.patch.object(
+                        stage, "PODMAN_RUNROOT", podman_runroot
+                    ),
+                    mock.patch.object(
+                        stage,
+                        "_external_output",
+                        side_effect=recovery_output,
+                    ),
+                    self.assertRaises(stage.StagingError),
+                ):
+                    stage._run_current_recovery_gates(
+                        None, os.getuid(), os.getgid()
+                    )
+                self.assertEqual(commands, [
+                    "post-stop.sh",
+                    "host-recovery.py",
+                    "cgroup-authority.py",
+                ])
+                self.assertTrue(
+                    podman_runroot.exists() or podman_runroot.is_symlink()
+                )
+                self.assertTrue(runtime_root.is_dir())
+                if variant == "symlink":
+                    displaced = workspace / "pinned-podman-runroot"
+                    self.assertTrue(displaced.is_dir())
+                    self.assertEqual(list(displaced.iterdir()), [])
+                if marker is not None:
+                    self.assertEqual(
+                        marker.read_text(encoding="utf-8"), "foreign\n"
+                    )
+
+    @unittest.skipUnless(
+        sys.platform.startswith("linux"),
+        "recovery runtime transaction requires Linux renameat2",
+    )
+    def test_current_recovery_cleanup_preserves_exact_runroot_replacement(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            runtime_root = workspace / "codeskeptic-p10-09"
+            podman_runroot = runtime_root / "podman-runroot"
+            displaced_runroot = workspace / "pinned-podman-runroot"
+            identities: dict[str, tuple[int, int]] = {}
+            commands: list[str] = []
+
+            def recovery_output(arguments, *_args, **_kwargs):
+                command = Path(arguments[0]).name
+                commands.append(command)
+                if command == "post-stop.sh":
+                    pinned = podman_runroot.lstat()
+                    identities["pinned"] = (pinned.st_dev, pinned.st_ino)
+                    podman_runroot.rename(displaced_runroot)
+                    podman_runroot.mkdir(mode=0o700)
+                    foreign = podman_runroot.lstat()
+                    identities["foreign"] = (
+                        foreign.st_dev, foreign.st_ino
+                    )
+                    return b"already-clean\n"
+                if command == "host-recovery.py":
+                    return b"already-clean\n"
+                if command == "cgroup-authority.py":
+                    return (
+                        b"CODESKEPTIC_P10_09_CGROUP_AUTHORITY_OK "
+                        b"action=check-clean result=clean\n"
+                    )
+                self.fail(f"unexpected recovery command: {arguments}")
+
+            with (
+                mock.patch.object(stage, "PODMAN_RUNROOT", podman_runroot),
+                mock.patch.object(
+                    stage, "_external_output", side_effect=recovery_output
+                ),
+                self.assertRaisesRegex(
+                    stage.StagingError, "runroot identity drift|cleanup failure"
+                ),
+            ):
+                stage._run_current_recovery_gates(
+                    None, os.getuid(), os.getgid()
+                )
+            self.assertEqual(commands, [
+                "post-stop.sh",
+                "host-recovery.py",
+                "cgroup-authority.py",
+            ])
+            self.assertNotEqual(identities["pinned"], identities["foreign"])
+            self.assertTrue(displaced_runroot.is_dir())
+            self.assertTrue(podman_runroot.is_dir())
+            displaced_after = displaced_runroot.lstat()
+            foreign_after = podman_runroot.lstat()
+            self.assertEqual(
+                (displaced_after.st_dev, displaced_after.st_ino),
+                identities["pinned"],
+            )
+            self.assertEqual(
+                (foreign_after.st_dev, foreign_after.st_ino),
+                identities["foreign"],
+            )
+            self.assertEqual(list(displaced_runroot.iterdir()), [])
+            self.assertEqual(list(podman_runroot.iterdir()), [])
+            self.assertEqual(
+                stat.S_IMODE(podman_runroot.lstat().st_mode), 0o700
+            )
+
+    @unittest.skipUnless(
+        sys.platform.startswith("linux"),
+        "recovery runtime transaction requires Linux renameat2",
+    )
+    def test_current_recovery_gates_reject_foreign_runroot_inventory(
+        self,
+    ) -> None:
+        assert stage is not None
+        variants = ("empty", "nonempty", "wrong-mode", "symlink")
+        for variant in variants:
+            with (
+                self.subTest(variant=variant),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                workspace = Path(temporary)
+                runtime_root = workspace / "codeskeptic-p10-09"
+                runtime_root.mkdir(mode=0o700)
+                podman_runroot = runtime_root / "podman-runroot"
+                marker: Path | None = None
+                if variant == "symlink":
+                    target = workspace / "foreign-target"
+                    target.mkdir(mode=0o700)
+                    marker = target / "preserve"
+                    marker.write_text("foreign\n", encoding="utf-8")
+                    podman_runroot.symlink_to(target, target_is_directory=True)
+                else:
+                    podman_runroot.mkdir(mode=0o700)
+                    if variant == "nonempty":
+                        marker = podman_runroot / "preserve"
+                        marker.write_text("foreign\n", encoding="utf-8")
+                    elif variant == "wrong-mode":
+                        podman_runroot.chmod(0o755)
+
+                with (
+                    mock.patch.object(stage, "PODMAN_RUNROOT", podman_runroot),
+                    mock.patch.object(stage, "_external_output") as external,
+                    self.assertRaises(stage.StagingError),
+                ):
+                    stage._run_current_recovery_gates(
+                        None, os.getuid(), os.getgid()
+                    )
+                external.assert_not_called()
+                self.assertTrue(
+                    podman_runroot.exists() or podman_runroot.is_symlink()
+                )
+                if marker is not None:
+                    self.assertEqual(
+                        marker.read_text(encoding="utf-8"), "foreign\n"
+                    )
+
+    @unittest.skipUnless(
+        sys.platform.startswith("linux"),
+        "recovery runtime transaction requires Linux renameat2",
+    )
+    def test_current_recovery_runtime_cleanup_preserves_replacement(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            runtime_root = workspace / "codeskeptic-p10-09"
+            displaced_root = workspace / "displaced-runtime-root"
+            podman_runroot = runtime_root / "podman-runroot"
+            marker = runtime_root / "foreign-data"
+
+            def replace_runtime_root(arguments, *_args, **_kwargs):
+                command = Path(arguments[0]).name
+                if command == "post-stop.sh":
+                    runtime_root.rename(displaced_root)
+                    runtime_root.mkdir(mode=0o700)
+                    marker.write_text("preserve\n", encoding="utf-8")
+                    return b"already-clean\n"
+                if command == "host-recovery.py":
+                    return b"already-clean\n"
+                if command == "cgroup-authority.py":
+                    return (
+                        b"CODESKEPTIC_P10_09_CGROUP_AUTHORITY_OK "
+                        b"action=check-clean result=clean\n"
+                    )
+                self.fail(f"unexpected recovery command: {arguments}")
+
+            with (
+                mock.patch.object(stage, "PODMAN_RUNROOT", podman_runroot),
+                mock.patch.object(
+                    stage,
+                    "_external_output",
+                    side_effect=replace_runtime_root,
+                ),
+                self.assertRaisesRegex(stage.StagingError, "identity|cleanup"),
+            ):
+                stage._run_current_recovery_gates(
+                    None, os.getuid(), os.getgid()
+                )
+            self.assertEqual(
+                marker.read_text(encoding="utf-8"), "preserve\n"
+            )
+
+    @unittest.skipUnless(
+        sys.platform.startswith("linux"),
+        "recovery runtime transaction requires Linux renameat2",
+    )
+    def test_current_recovery_runtime_cleanup_runs_after_primary_failure(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime_root = Path(temporary) / "codeskeptic-p10-09"
+            podman_runroot = runtime_root / "podman-runroot"
+
+            def fail_after_empty_runroot(arguments, *_args, **_kwargs):
+                self.assertEqual(Path(arguments[0]).name, "post-stop.sh")
+                self.assertTrue(podman_runroot.is_dir())
+                raise stage.StagingError("fixture primary failure")
+
+            with (
+                mock.patch.object(stage, "PODMAN_RUNROOT", podman_runroot),
+                mock.patch.object(
+                    stage,
+                    "_external_output",
+                    side_effect=fail_after_empty_runroot,
+                ),
+                self.assertRaisesRegex(
+                    stage.StagingError, "fixture primary failure"
+                ),
+            ):
+                stage._run_current_recovery_gates(
+                    None, os.getuid(), os.getgid()
+                )
+            self.assertFalse(podman_runroot.exists())
+            self.assertFalse(runtime_root.exists())
+
+    @unittest.skipUnless(
+        sys.platform.startswith("linux"),
+        "recovery runtime transaction requires Linux renameat2",
+    )
+    def test_current_recovery_reports_primary_and_unsafe_cleanup_failure(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime_root = Path(temporary) / "codeskeptic-p10-09"
+            podman_runroot = runtime_root / "podman-runroot"
+            marker = podman_runroot / "foreign-data"
+
+            def fail_with_nonempty_runroot(arguments, *_args, **_kwargs):
+                self.assertEqual(Path(arguments[0]).name, "post-stop.sh")
+                self.assertTrue(podman_runroot.is_dir())
+                marker.write_text("preserve\n", encoding="utf-8")
+                raise stage.StagingError("fixture primary failure")
+
+            with (
+                mock.patch.object(stage, "PODMAN_RUNROOT", podman_runroot),
+                mock.patch.object(
+                    stage,
+                    "_external_output",
+                    side_effect=fail_with_nonempty_runroot,
+                ),
+                self.assertRaisesRegex(
+                    stage.StagingError,
+                    "primary failure: fixture primary failure; cleanup failure:",
+                ),
+            ):
+                stage._run_current_recovery_gates(
+                    None, os.getuid(), os.getgid()
+                )
+            self.assertEqual(
+                marker.read_text(encoding="utf-8"), "preserve\n"
+            )
+
     def test_file_publication_interrupt_preserves_foreign_collision(self) -> None:
         assert stage is not None
         marker = b"FOREIGN\n"
