@@ -1,0 +1,69 @@
+Test project /Users/runner/work/CodeSkeptic/CodeSkeptic/build
+    Start 1281: StatusAutomationContract
+1/2 Test #1281: StatusAutomationContract ...........***Failed   11.59 sec
+.......F............................................
+======================================================================
+FAIL: test_docs_guard_has_no_network_fetch_fallback (__main__.ProgressStatusTest.test_docs_guard_has_no_network_fetch_fallback)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/StatusAutomationTest.py", line 369, in test_docs_guard_has_no_network_fetch_fallback
+    self.assertEqual(
+    ~~~~~~~~~~~~~~~~^
+        completed.returncode,
+        ^^^^^^^^^^^^^^^^^^^^^
+        0,
+        ^^
+        completed.stdout + completed.stderr,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+AssertionError: 1 != 0 : work ref accepted: phase-determinism-kernel-bound-authority
+FAIL: verified progress/state could not be proven under CI.
+ok: capability registry, README, and rule docs are in sync
+REALWORLD_LEDGER_OK projects=11 campaigns=3 path=/Users/runner/work/CodeSkeptic/CodeSkeptic/scripts/realworld_manifest.json
+UPSTREAM_CANDIDATE_EVIDENCE_OK batch=2026-08-12-a projects=11
+progress status error: docs/TODO.md generated queue is stale; run progress_status.py sync
+
+
+----------------------------------------------------------------------
+Ran 52 tests in 11.452s
+
+FAILED (failures=1)
+
+    Start 1297: DeterminismQualificationContract
+2/2 Test #1297: DeterminismQualificationContract ...***Failed   14.88 sec
+...........................................F............
+======================================================================
+FAIL: test_required_baseline_preflight_precedes_release_preparation (__main__.DeterminismQualificationTest.test_required_baseline_preflight_precedes_release_preparation)
+----------------------------------------------------------------------
+run_determinism_qualification.QualificationError: repository or build directory is missing
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/DeterminismQualificationTest.py", line 1204, in test_required_baseline_preflight_precedes_release_preparation
+    with self.assertRaisesRegex(
+         ~~~~~~~~~~~~~~~~~~~~~~^
+        qualification.QualificationError,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "baseline OS, hardware, or toolchain inventory drift",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+AssertionError: "baseline OS, hardware, or toolchain inventory drift" does not match "repository or build directory is missing"
+
+----------------------------------------------------------------------
+Ran 56 tests in 14.715s
+
+FAILED (failures=1)
+DETERMINISM_REJECTED_EVIDENCE_OK mode=verify
+
+
+0% tests passed, 2 tests failed out of 2
+
+Total Test time (real) =  26.52 sec
+
+The following tests FAILED:
+	1281 - StatusAutomationContract (Failed)
+	1297 - DeterminismQualificationContract (Failed)
+Errors while running CTest
