@@ -1,0 +1,69 @@
+Test project /Users/runner/work/CodeSkeptic/CodeSkeptic/build
+    Start 1281: StatusAutomationContract
+1/2 Test #1281: StatusAutomationContract .........***Failed   17.20 sec
+.......F............................................
+======================================================================
+FAIL: test_docs_guard_has_no_network_fetch_fallback (__main__.ProgressStatusTest.test_docs_guard_has_no_network_fetch_fallback)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/StatusAutomationTest.py", line 369, in test_docs_guard_has_no_network_fetch_fallback
+    self.assertEqual(
+    ~~~~~~~~~~~~~~~~^
+        completed.returncode,
+        ^^^^^^^^^^^^^^^^^^^^^
+        0,
+        ^^
+        completed.stdout + completed.stderr,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+AssertionError: 1 != 0 : work ref accepted: phase-determinism-affinity-source-authority
+FAIL: verified progress/state could not be proven under CI.
+ok: capability registry, README, and rule docs are in sync
+REALWORLD_LEDGER_OK projects=11 campaigns=3 path=/Users/runner/work/CodeSkeptic/CodeSkeptic/scripts/realworld_manifest.json
+UPSTREAM_CANDIDATE_EVIDENCE_OK batch=2026-08-12-a projects=11
+progress status error: docs/TODO.md generated queue is stale; run progress_status.py sync
+
+
+----------------------------------------------------------------------
+Ran 52 tests in 17.068s
+
+FAILED (failures=1)
+
+    Start 1289: StressMatrixContract
+2/2 Test #1289: StressMatrixContract .............***Failed    2.38 sec
+....F.
+======================================================================
+FAIL: test_retained_receipt_binds_current_source_and_complete_matrix (__main__.StressMatrixContractTest.test_retained_receipt_binds_current_source_and_complete_matrix)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/StressMatrixTest.py", line 100, in test_retained_receipt_binds_current_source_and_complete_matrix
+    self.assertEqual(receipt["source"]["manifest"],
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                     matrix.source_manifest())
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: {'alg[15 chars]6', 'digest': 'a902a872bfccbb1dc47335811987db1[49 chars] 380} != {'alg[15 chars]6', 'file_count': 386, 'digest': 'efb09d3f5875[49 chars]841'}
+  {'algorithm': 'sha256',
+-  'digest': 'a902a872bfccbb1dc47335811987db1d085cb8d4e3d8e8a1c4eb1b485e374c0e',
++  'digest': 'efb09d3f58758ff08b7c70d15ea2360fabcb2611e3d90f643d65bc0e312d2841',
+-  'file_count': 380}
+?                  ^
+
++  'file_count': 386}
+?                  ^
+
+
+----------------------------------------------------------------------
+Ran 6 tests in 2.298s
+
+FAILED (failures=1)
+
+
+0% tests passed, 2 tests failed out of 2
+
+Total Test time (real) =  19.61 sec
+
+The following tests FAILED:
+	1281 - StatusAutomationContract (Failed)
+	1289 - StressMatrixContract (Failed)
+Errors while running CTest
