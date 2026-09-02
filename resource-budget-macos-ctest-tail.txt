@@ -1,0 +1,40 @@
+Test project /Users/runner/work/CodeSkeptic/CodeSkeptic/build
+    Start 1281: StatusAutomationContract
+1/1 Test #1281: StatusAutomationContract .........***Failed    7.86 sec
+.......F............................................
+======================================================================
+FAIL: test_docs_guard_has_no_network_fetch_fallback (__main__.ProgressStatusTest.test_docs_guard_has_no_network_fetch_fallback)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/StatusAutomationTest.py", line 369, in test_docs_guard_has_no_network_fetch_fallback
+    self.assertEqual(
+    ~~~~~~~~~~~~~~~~^
+        completed.returncode,
+        ^^^^^^^^^^^^^^^^^^^^^
+        0,
+        ^^
+        completed.stdout + completed.stderr,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+AssertionError: 1 != 0 : work ref accepted: phase-determinism-uclamp-source-authority
+FAIL: verified progress/state could not be proven under CI.
+ok: capability registry, README, and rule docs are in sync
+REALWORLD_LEDGER_OK projects=11 campaigns=3 path=/Users/runner/work/CodeSkeptic/CodeSkeptic/scripts/realworld_manifest.json
+UPSTREAM_CANDIDATE_EVIDENCE_OK batch=2026-08-12-a projects=11
+progress status error: docs/TODO.md generated queue is stale; run progress_status.py sync
+
+
+----------------------------------------------------------------------
+Ran 52 tests in 7.785s
+
+FAILED (failures=1)
+
+
+0% tests passed, 1 tests failed out of 1
+
+Total Test time (real) =   7.88 sec
+
+The following tests FAILED:
+	1281 - StatusAutomationContract (Failed)
+Errors while running CTest
