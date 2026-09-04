@@ -599,21 +599,20 @@ public:
                 if (op->getOpcode() == BO_Assign)
                     value = rangeOf(op->getRHS(), input, ctx);
                 else if (op->getOpcode() == BO_AddAssign &&
-                         isWideVar(directIntegerVar(op->getLHS()), ctx))
+                         wideVar(op->getLHS(), ctx))
                     value = add(rangeOf(op->getLHS(), input, ctx),
                                 rangeOf(op->getRHS(), input, ctx));
-                invalidateEscapes(out);
-                if (const auto* var = directIntegerVar(op->getLHS());
-                    isWideVar(var, ctx))
+                invalidateWrite(out, op->getLHS());
+                if (const auto* var = wideVar(op->getLHS(), ctx))
                     put(out, var, value);
             }
         } else if (const auto* op = llvm::dyn_cast<UnaryOperator>(stmt)) {
             if (op->isIncrementDecrementOp()) {
-                const auto* var = directIntegerVar(op->getSubExpr());
-                const Range value = op->isIncrementOp() && isWideVar(var, ctx)
+                const auto* var = wideVar(op->getSubExpr(), ctx);
+                const Range value = op->isIncrementOp() && var
                                         ? add(get(input, var), {1, 1}) : Range{};
-                invalidateEscapes(out);
-                if (isWideVar(var, ctx)) put(out, var, value);
+                invalidateWrite(out, op->getSubExpr());
+                if (var) put(out, var, value);
             }
         } else if (llvm::isa<CallExpr>(stmt) || llvm::isa<AsmStmt>(stmt)) {
             invalidateEscapes(out);
@@ -719,22 +718,20 @@ public:
             auto constant = constantUnsigned(offset, 64, ctx);
             if (!constant || constant->isZero()) return false;
             std::optional<llvm::APInt> upper;
-            if (hasSignedUntrustedOrigin(value, untrusted, definitions))
+            const bool signedOrigin =
+                hasSignedUntrustedOrigin(value, untrusted, definitions);
+            if (signedOrigin)
                 upper = signedOriginUpperCorner(
                     value, numeric, untrusted, definitions, 64, ctx);
             else
                 upper = unsignedUpperCorner(value, numeric, 64, ctx);
-            if (const auto* var = wideVar(value, ctx)) {
-                const llvm::APInt wideUpper(64, get(found->second, var).hi);
-                // An aliased write can invalidate the shared numeric bound;
-                // use this domain's invalidated bound in that case. Preserve
-                // the signed-origin model's explicit unsupported boundary.
-                if (!hasSignedUntrustedOrigin(value, untrusted, definitions) &&
-                    escaped_.count(var))
-                    upper = wideUpper;
-                else if (upper && wideUpper.ult(*upper))
-                    upper = wideUpper;
-            }
+            const llvm::APInt wideUpper(64, rangeOf(value, found->second, ctx).hi);
+            // Preserve bounds for compound operands as well as direct aliases.
+            // An aliased write can invalidate the shared numeric bound, even
+            // when that stale value occurs inside n*constant or n+constant.
+            // The signed-origin model's unsupported cases remain unsupported.
+            if (!signedOrigin && referencesEscape(value)) upper = wideUpper;
+            else if (upper && wideUpper.ult(*upper)) upper = wideUpper;
             return upper &&
                    (upper->zext(128) + constant->zext(128))
                        .ugt(llvm::APInt::getMaxValue(64).zext(128));
@@ -785,6 +782,12 @@ private:
         if (lo.lshr(64) != hi.lshr(64)) return {};
         return {lo.trunc(64).getZExtValue(), hi.trunc(64).getZExtValue()};
     }
+    static Range multiply(Range lhs, Range rhs) {
+        const llvm::APInt lo = llvm::APInt(128, lhs.lo) * llvm::APInt(128, rhs.lo);
+        const llvm::APInt hi = llvm::APInt(128, lhs.hi) * llvm::APInt(128, rhs.hi);
+        if (lo.lshr(64) != hi.lshr(64)) return {};
+        return {lo.trunc(64).getZExtValue(), hi.trunc(64).getZExtValue()};
+    }
     static Range rangeOf(const Expr* expr, const State& state, ASTContext& ctx) {
         if (!expr) return {};
         if (auto constant = constantUnsigned(expr, 64, ctx)) {
@@ -792,12 +795,6 @@ private:
             return {value, value};
         }
         if (auto* var = wideVar(expr, ctx)) return get(state, var);
-        if (const auto* op = llvm::dyn_cast<BinaryOperator>(expr->IgnoreParens());
-            op && op->getOpcode() == BO_Add &&
-            op->getType()->isUnsignedIntegerType() &&
-            ctx.getIntWidth(op->getType()) == 64)
-            return add(rangeOf(op->getLHS(), state, ctx),
-                       rangeOf(op->getRHS(), state, ctx));
         // Preserve the real width through unsigned widening conversions.
         const Expr* source = expr->IgnoreParens();
         while (const auto* cast = llvm::dyn_cast<CastExpr>(source)) {
@@ -808,6 +805,17 @@ private:
                 break;
             source = sub;
         }
+        if (source != expr->IgnoreParens()) return rangeOf(source, state, ctx);
+        if (const auto* op = llvm::dyn_cast<BinaryOperator>(source);
+            op && op->getType()->isUnsignedIntegerType() &&
+            ctx.getIntWidth(op->getType()) == 64) {
+            if (op->getOpcode() == BO_Add)
+                return add(rangeOf(op->getLHS(), state, ctx),
+                           rangeOf(op->getRHS(), state, ctx));
+            if (op->getOpcode() == BO_Mul)
+                return multiply(rangeOf(op->getLHS(), state, ctx),
+                                rangeOf(op->getRHS(), state, ctx));
+        }
         if (source->getType()->isUnsignedIntegerType()) {
             unsigned width = ctx.getIntWidth(source->getType());
             if (width && width < 64)
@@ -817,6 +825,26 @@ private:
     }
     void invalidateEscapes(State& state) const {
         for (const auto* var : escaped_) state.ranges.erase(var);
+    }
+    void invalidateWrite(State& state, const Expr* lhs) const {
+        if (const auto* ref = llvm::dyn_cast<DeclRefExpr>(lhs->IgnoreParens())) {
+            const auto* var = llvm::dyn_cast<VarDecl>(ref->getDecl());
+            if (var && !var->getType()->isReferenceType()) {
+                state.ranges.erase(var);
+                return; // A direct store cannot write an unrelated escaped n.
+            }
+        }
+        if (const auto* target = directIntegerVar(lhs)) state.ranges.erase(target);
+        invalidateEscapes(state);
+    }
+    bool referencesEscape(const Stmt* stmt) const {
+        if (!stmt) return false;
+        if (const auto* ref = llvm::dyn_cast<DeclRefExpr>(stmt))
+            if (const auto* var = llvm::dyn_cast<VarDecl>(ref->getDecl());
+                var && escaped_.count(var)) return true;
+        for (const Stmt* child : stmt->children())
+            if (referencesEscape(child)) return true;
+        return false;
     }
     std::set<const VarDecl*> escaped_;
     std::map<const Stmt*, State> atStmt_;
