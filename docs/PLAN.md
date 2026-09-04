@@ -1,6 +1,6 @@
 # CodeSkeptic — CWE Ürün Planı
 
-Sürüm: 1. Eski planın devamı değil; main tabanlı yeni program.
+Sürüm: 2. Eski planın devamı değil; main tabanlı yeni program.
 
 PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.
 
@@ -298,10 +298,11 @@ PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. G
 - CWE-125 okuma ile CWE-787 yazma farklı açıklanır; her bounds bulgusu aynı CWE'ye yanlış eşlenmez.
 - Existing supported/experimental durumu ölçümsüz yükseltilmez.
 - JSON/SARIF metadata ve CLI capability listesi registry ile tutarlıdır.
+- Aritmetik pozitif taşma ile negatif sınır taşması doğru mesajla ayrılır; 64-bit çıkarmada upward overflow underflow diye sunulmaz.
 
 **Test bütçesi:** T1
 **Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/core/RuleCapabilities.def, src/core/Capabilities*, src/core/Diagnostic.h, src/core/AnalysisResult.h, src/reporter/*, src/rules/*, tests/SarifReporterTest.cpp, tests/CapabilitiesTest.cpp, docs/capabilities.md
+**Kapsam:** src/core/RuleCapabilities.def, src/core/Capabilities*, src/core/Diagnostic.h, src/core/AnalysisResult.h, src/reporter/*, src/rules/*, tests/SarifReporterTest.cpp, tests/CapabilitiesTest.cpp, docs/capabilities.md, src/core/Messages.*, tests/IntOverflowRuleTest.cpp, tests/JsonReporterTest.cpp, tests/CapabilitiesCliTest.py, README.md, scripts/check_capabilities_sync.py
 **Bağımlılıklar:** Yok
 
 #### CS3-CH03-S01-U002 — CLI/JSON/SARIF/HTML bulgu ve verdict tutarlılığını sabitle
