@@ -151,7 +151,7 @@ std::vector<ArithSite> collectArithSites(const FunctionDecl* fn,
 
 // 64-bit escape proof: both operand intervals fully bounded, each
 // corner computed with checked int64 arithmetic (checkedAdd64/
-// checkedMul64 — Interval.h, MSVC-portable; __int128 is a GCC/Clang
+// checkedSub64/checkedMul64 — Interval.h, MSVC-portable; __int128 is a GCC/Clang
 // extension). Escape iff a corner leaves int64 — exactly the case the
 // int64-based Interval must collapse to top(). Equivalent to the
 // previous __int128 hull check: the hull's max exceeds INT64_MAX iff
@@ -164,7 +164,7 @@ bool evalEscapes64(const BinaryOperator* op,
     if (l.isEmpty() || r.isEmpty()) return false;
     if (l.loIsInf() || l.hiIsInf() || r.loIsInf() || r.hiIsInf())
         return false;
-    const bool isMul = op->getOpcode() == BO_Mul;
+    const auto opcode = op->getOpcode();
     const int64_t lhs[4] = {l.lo(), l.lo(), l.hi(), l.hi()};
     const int64_t rhs[4] = {r.lo(), r.hi(), r.lo(), r.hi()};
     // Same evidence bar as the sub-64 path: the proven range REACHES
@@ -172,8 +172,10 @@ bool evalEscapes64(const BinaryOperator* op,
     // entirely outside it.
     for (int i = 0; i < 4; ++i) {
         int64_t out;
-        const bool fits = isMul
+        const bool fits = opcode == BO_Mul
             ? codeskeptic::checkedMul64(lhs[i], rhs[i], &out)
+            : opcode == BO_Sub
+            ? codeskeptic::checkedSub64(lhs[i], rhs[i], &out)
             : codeskeptic::checkedAdd64(lhs[i], rhs[i], &out);
         if (!fits) return true;
     }

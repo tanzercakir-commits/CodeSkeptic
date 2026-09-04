@@ -622,3 +622,126 @@ TEST(IntOverflowRuleTest, UnsignedSubtractionNotThisRule) {
     )");
     EXPECT_EQ(results.size(), 0u);
 }
+
+// CS3-CH01-S01-U001: 64-bit subtraction needs checked subtraction, not
+// checked addition. Keep safe extrema beside the overflow witnesses.
+TEST(IntOverflowRuleTest, Signed64SubtractionUnderflow) {
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        long long f() {
+            long long a = (-9223372036854775807LL - 1);
+            long long b = 1;
+            return a - b;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "int-overflow");
+}
+
+TEST(IntOverflowRuleTest, Signed64SubtractionOverflow) {
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        long long f() {
+            long long a = 9223372036854775807LL;
+            long long b = -1;
+            return a - b;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "int-overflow");
+}
+
+TEST(IntOverflowRuleTest, Signed64SubtractionMaximumMinusOneClean) {
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        long long f() {
+            long long a = 9223372036854775807LL;
+            long long b = 1;
+            return a - b;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(IntOverflowRuleTest, Signed64SubtractionMinimumMinusNegativeOneClean) {
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        long long f() {
+            long long a = (-9223372036854775807LL - 1);
+            long long b = -1;
+            return a - b;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(IntOverflowRuleTest, Signed64SubtractionMinimumRhsClean) {
+    // -1 - MIN == MAX; do not implement subtraction by negating MIN.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        long long f() {
+            long long a = -1;
+            long long b = (-9223372036854775807LL - 1);
+            return a - b;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(IntOverflowRuleTest, Signed64SubtractionMinimumRhsOverflows) {
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        long long f() {
+            long long a = 0;
+            long long b = (-9223372036854775807LL - 1);
+            return a - b;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "int-overflow");
+}
+
+TEST(IntOverflowRuleTest, Signed64SubtractionUnknownSilent) {
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        long long f(long long a, long long b) { return a - b; }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(IntOverflowRuleTest, Signed64SubtractionGuardedClean) {
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        long long f(long long a) {
+            if (a < 1 || a > 1000) return 0;
+            return a - 500;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(IntOverflowRuleTest, Signed64SubtractionFiniteCornerOverflows) {
+    // Only the MAX - (-1) corner overflows; the other three are safe.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        long long f(long long a, long long b) {
+            if (a < 9223372036854775806LL || a > 9223372036854775807LL) return 0;
+            if (b < -1 || b > 0) return 0;
+            return a - b;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "int-overflow");
+}
+
+TEST(IntOverflowRuleTest, Signed64SubtractionFiniteCornersClean) {
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        long long f(long long a, long long b) {
+            if (a < 9223372036854775806LL || a > 9223372036854775807LL) return 0;
+            if (b < 0 || b > 1) return 0;
+            return a - b;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
