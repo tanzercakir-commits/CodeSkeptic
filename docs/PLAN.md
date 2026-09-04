@@ -1,6 +1,6 @@
 # CodeSkeptic — CWE Ürün Planı
 
-Sürüm: 2. Eski planın devamı değil; main tabanlı yeni program.
+Sürüm: 3. Eski planın devamı değil; main tabanlı yeni program.
 
 PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.
 
@@ -186,6 +186,24 @@ PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. G
 **Kontroller:** focused-tests, cli-smoke, queue-check
 **Kapsam:** src/rules/SignConversionRule.cpp, src/rules/SignConversionRule.h, tests/SignConversionRuleTest.cpp
 **Bağımlılıklar:** Yok
+
+### CH01-S06 — Beyan edilmiş boyut kaynağının genişlik sınırı
+
+#### CS3-CH01-S06-U001 — uint64 out-param kaynak kökenini sayısal aralıktan ayır
+
+**Sonuç:** Beyan edilmiş kaynağın doğrudan uint64 pointer/reference çıktısı, signed interval üst sınırı gösterilemiyor diye güvenilir kabul edilmez.
+
+**Kabul:**
+
+- U002 sırasında kaynak incelemesinde görülen doğrudan uint64 out-param eksikliği önce değişikliksiz RED ile doğrulanır; C &n ve C++ non-const reference ayrı sınanır.
+- n+header ve n*constant için taşan pozitif ile gerçek SIZE_MAX korumalı negatif örnekler vardır; origin işareti ile top/finite aralık birbirine karıştırılmaz.
+- 32-bit kaynak, signed kaynak, scanf, return-value/alias kökeni ve unknown mutation sınırları korunur; desteklenmeyen pointer-alias kaynağı çözüldü diye sunulmaz.
+- Ortak transfer değişikliği tam Linux suite ve ilgili allocation/source corpus dilimi ile doğrulanır; eksik araç veya koşturulmayan kontrol PASS değildir.
+
+**Test bütçesi:** T2
+**Kontroller:** linux-suite, relevant-corpus, queue-check
+**Kapsam:** src/engine/IntervalEval.cpp, src/engine/IntervalEval.h, tests/IntervalAnalysisTest.cpp, tests/AllocSizeOverflowRuleTest.cpp, tests/IntOverflowRuleTest.cpp, tests/SignConversionRuleTest.cpp
+**Bağımlılıklar:** CS3-CH01-S01-U002
 
 ## CH02 — Güvenilir analiz girdisi ve kapsam
 
