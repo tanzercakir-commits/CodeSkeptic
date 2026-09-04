@@ -181,9 +181,286 @@ TEST(AllocSizeOverflowRuleTest, SizeT64ConstantMultiply_Reports) {
     EXPECT_EQ(results[0].rule_id, "alloc-size-overflow");
 }
 
+// CS3-CH01-S01-U002: unsigned 64-bit allocation sums. MAX-offset is
+// larger than INT64_MAX: a small-value guard alone does not test this case.
+TEST(AllocSizeOverflowRuleTest, SizeT64AdditionConstant_Reports) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* f(void) {
+            size_t n = read_size();
+            return malloc(n + 16);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "alloc-size-overflow");
+}
+
+TEST(AllocSizeOverflowRuleTest, SizeT64AdditionSizeofLeft_Reports) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        struct Header { char bytes[16]; };
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* f(void) {
+            size_t n = read_size();
+            return malloc(sizeof(Header) + n);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "alloc-size-overflow");
+}
+
+TEST(AllocSizeOverflowRuleTest, SizeT64AdditionZero_Silent) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* f(void) {
+            size_t n = read_size();
+            return malloc(n + 0);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocSizeOverflowRuleTest, SizeT64AdditionExactFitGuard_Silent) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* f(void) {
+            size_t n = read_size();
+            if (n > ((size_t)-1) - 16) return 0;
+            return malloc(n + 16);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocSizeOverflowRuleTest, SizeT64AdditionInsufficientGuard_Reports) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* f(void) {
+            size_t n = read_size();
+            if (n > ((size_t)-1) - 15) return 0;
+            return malloc(n + 16);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "alloc-size-overflow");
+}
+
+TEST(AllocSizeOverflowRuleTest, SizeT64AdditionReversedSizeofGuard_Silent) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        struct Header { char bytes[16]; };
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* f(void) {
+            size_t n = read_size();
+            if (((size_t)-1) - sizeof(Header) < n) return 0;
+            return malloc(sizeof(Header) + n);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocSizeOverflowRuleTest, SizeT64AdditionNarrowOperand_Silent) {
+    SourceScope scope({"read_u32"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern unsigned int read_u32(void);
+        void* f(void) {
+            unsigned int n = read_u32();
+            return malloc((size_t)n + 16);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocSizeOverflowRuleTest, SizeT64AdditionUnknownAddend_Silent) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        extern size_t runtime_header(void);
+        void* f(void) {
+            size_t n = read_size();
+            return malloc(n + runtime_header());
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocSizeOverflowRuleTest, SizeT64AdditionUndeclaredSource_Silent) {
+    SourceScope scope({});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* f(void) { size_t n = read_size(); return malloc(n + 16); }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocSizeOverflowRuleTest, SizeT64AdditionNotAllocator_Silent) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern size_t read_size(void);
+        size_t f(void) { size_t n = read_size(); return n + 16; }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocSizeOverflowRuleTest, SizeT64AdditionGuardThenReassignment_Reports) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* f(void) {
+            size_t n = read_size();
+            if (n > ((size_t)-1) - 16) return 0;
+            n = read_size();
+            return malloc(n + 16);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "alloc-size-overflow");
+}
+
+TEST(AllocSizeOverflowRuleTest, SizeT64AdditionGuardOnlyOnOneBranch_Reports) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* f(bool check) {
+            size_t n = read_size();
+            if (check) {
+                if (n > ((size_t)-1) - 16) return 0;
+            }
+            return malloc(n + 16);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "alloc-size-overflow");
+}
+
 // The canonical checked-multiply guard narrows n to SIZE_MAX / factor.
 // Its quotient fits int64 for every factor greater than one, so the
 // existing path-sensitive interval state can prove the product safe.
+TEST(AllocSizeOverflowRuleTest, SizeT64AdditionGuardEdgesAndMutation) {
+    SourceScope scope({"read_size", "read_u32"});
+    struct Case { const char* name; const char* body; unsigned reports; };
+    const Case cases[] = {
+        {"maximum singleton overflows", "if (n != MAX) return 0; return malloc(n + 1);", 1},
+        {"exact fit singleton", "if (n != MAX-16) return 0; return malloc(n + 16);", 0},
+        {"strict lower edge", "if (n < MAX) return 0; return malloc(n + 1);", 1},
+        {"strict upper edge", "if (n >= MAX-15) return 0; return malloc(n + 16);", 0},
+        {"negated guard", "if (!(n <= MAX-16)) return 0; return malloc(n + 16);", 0},
+        {"or rejection", "if (n > MAX-16 || flag) return 0; return malloc(n + 16);", 0},
+        {"and rejection insufficient", "if (n > MAX-16 && flag) return 0; return malloc(n + 16);", 1},
+        {"negated conjunction", "if (!(n <= MAX-16 && flag)) return 0; return malloc(n + 16);", 0},
+        {"narrowing guard not a wide proof", "if ((unsigned int)n > 15) return 0; return malloc(n + 16);", 1},
+        {"signed cast guard not a wide proof", "if ((long long)n > 16) return 0; return malloc(n + 16);", 1},
+        {"impossible unsigned edge", "if (n > MAX) return malloc(n + 16); return 0;", 0},
+        {"zero plus maximum fits", "if (n != 0) return 0; return malloc(n + MAX);", 0},
+        {"one plus maximum overflows", "if (n != 1) return 0; return malloc(n + MAX);", 1},
+        {"copied source", "size_t alias=n; return malloc(alias + 16);", 1},
+        {"copy after guard", "if (n > MAX-16) return 0; size_t alias=n; return malloc(alias + 16);", 0},
+        {"narrow source through alias", "n=read_u32(); return malloc(n + 16);", 0},
+        {"small compound update safe", "if (n > 100) return 0; n+=1; return malloc(n + 16);", 0},
+        {"wide compound update invalidates", "if (n > MAX-16) return 0; n+=1; return malloc(n + 16);", 1},
+        {"pointer alias invalidates old small guard", "size_t* p=&n; if (n>100) return 0; *p=read_size(); return malloc(n+16);", 1},
+        {"reference alias invalidates old small guard", "size_t& alias=n; if (n>100) return 0; alias=read_size(); return malloc(n+16);", 1},
+        {"conditional reference alias invalidates", "size_t other=0; size_t& alias=flag?n:other; if(n>100) return 0; alias=read_size(); return malloc(n+16);", 1},
+        {"guard after alias mutation", "size_t* p=&n; *p=read_size(); if (n>MAX-16) return 0; return malloc(n+16);", 0},
+        {"loop may invalidate guard", "if(n>MAX-16) return 0; while(flag) {n=read_size(); flag=0;} return malloc(n+16);", 1},
+        {"guard after loop", "while(flag) {n=read_size(); flag=0;} if(n>MAX-16) return 0; return malloc(n+16);", 0},
+        // Silent here means unsupported origin, not a proof of safety. The
+        // existing provenance policy discards an unknown reference mutation.
+        {"unknown reference provenance", "mutate(n); return malloc(n+16);", 0},
+        {"indirect unknown reference provenance", "void (*m)(size_t&)=mutate; m(n); return malloc(n+16);", 0},
+    };
+    for (const auto& item : cases) {
+        SCOPED_TRACE(item.name);
+        AllocSizeOverflowRule rule;
+        auto results = runRule(rule, std::string(R"(
+            typedef __SIZE_TYPE__ size_t;
+            #define MAX ((size_t)-1)
+            extern void* malloc(size_t);
+            extern size_t read_size(void);
+            extern unsigned int read_u32(void);
+            extern void mutate(size_t&);
+            void* f(int flag) { size_t n=read_size();
+        )") + item.body + "}");
+        EXPECT_EQ(results.size(), item.reports);
+        for (const auto& result : results)
+            EXPECT_EQ(result.rule_id, "alloc-size-overflow");
+    }
+}
+
+TEST(AllocSizeOverflowRuleTest, SizeT64AdditionSignedOriginAndWideAliasGuard) {
+    SourceScope scope({"read_signed"});
+    for (bool guarded : {false, true}) {
+        SCOPED_TRACE(guarded);
+        AllocSizeOverflowRule rule;
+        auto results = runRule(rule, std::string(R"(
+            typedef __SIZE_TYPE__ size_t;
+            extern void* malloc(size_t);
+            extern long long read_signed(void);
+            void* f(void) { size_t n=read_signed();
+        )") + (guarded ? "if(n>((size_t)-1)-16) return 0;" : "") +
+            "return malloc(n+16); }");
+        EXPECT_EQ(results.size(), guarded ? 0u : 1u);
+    }
+}
+
+TEST(AllocSizeOverflowRuleTest, SizeT64AdditionNarrowedSignedResidue) {
+    SourceScope scope({"read_signed"});
+    for (bool overflowing : {false, true}) {
+        SCOPED_TRACE(overflowing);
+        AllocSizeOverflowRule rule;
+        auto results = runRule(rule, std::string(R"(
+            typedef __SIZE_TYPE__ size_t;
+            extern void* malloc(size_t);
+            extern long long read_signed(void);
+            void* f(void) {
+                long long raw=read_signed();
+                if(raw < -256 || raw > -255) return 0;
+                unsigned char narrowed=(unsigned char)raw;
+                return malloc((size_t)narrowed +
+        )") + (overflowing ? "((size_t)-1)" : "(((size_t)-1)-1)") + "); }");
+        EXPECT_EQ(results.size(), overflowing ? 1u : 0u);
+    }
+}
+
 TEST(AllocSizeOverflowRuleTest, SizeT64DivisionGuard_Silent) {
     SourceScope scope({"read_size"});
     AllocSizeOverflowRule rule;

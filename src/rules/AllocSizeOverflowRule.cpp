@@ -3,6 +3,7 @@
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
 #include "engine/AllocFunctions.h"
+#include "engine/CallRefArgs.h"
 #include "engine/CoverageReport.h"
 #include "engine/DataflowEngine.h"
 #include "engine/FunctionSummary.h"
@@ -23,7 +24,10 @@
 #include <llvm/ADT/APInt.h>
 #include <llvm/ADT/APSInt.h>
 
+#include <algorithm>
+#include <cstdint>
 #include <functional>
+#include <limits>
 #include <map>
 #include <optional>
 #include <set>
@@ -368,8 +372,9 @@ llvm::APInt signedIntervalUpperModulo(const codeskeptic::Interval& range,
     const llvm::APInt upper64(
         64, static_cast<uint64_t>(range.hi()));
     const llvm::APInt span = upper64.sext(128) - lower64.sext(128);
-    const llvm::APInt lowerResidue(
-        bits, static_cast<uint64_t>(range.lo()));
+    // APInt's constructor checks that the input already fits. Narrowing a
+    // negative signed endpoint therefore needs an explicit modular truncation.
+    const llvm::APInt lowerResidue = lower64.zextOrTrunc(bits);
     const llvm::APInt maximum = llvm::APInt::getMaxValue(bits);
     const llvm::APInt distance = (maximum - lowerResidue).zext(128);
     if (span.uge(distance)) return maximum;
@@ -496,6 +501,326 @@ bool wrapsUnsigned64Multiply(
     return multiplyCornerExceeds(op->getLHS(), op->getRHS(), kBits, state,
                                  untrusted, definitions, ctx);
 }
+
+// MAX64-offset cannot be represented by the shared signed interval domain.
+// Keep a small unsigned domain local to allocation addition: no changes to
+// multiplication, shared provenance, or checked-arithmetic builtin semantics.
+class AllocationAddRanges {
+    static constexpr uint64_t kMax = std::numeric_limits<uint64_t>::max();
+    struct Range {
+        uint64_t lo = 0, hi = kMax;
+        bool operator==(const Range& other) const {
+            return lo == other.lo && hi == other.hi;
+        }
+    };
+
+public:
+    struct State {
+        // Absence is the full unsigned range, NOT an unreachable predecessor.
+        std::map<const VarDecl*, Range> ranges;
+        bool unreachable = false;
+        bool operator!=(const State& other) const {
+            return unreachable != other.unreachable || ranges != other.ranges;
+        }
+    };
+
+    explicit AllocationAddRanges(const FunctionDecl* fn) {
+        // An alias can write long after it is formed. Every later call or
+        // indirect write invalidates bounds for possibly escaped variables.
+        // This index carries no initializer/range facts across CFG edges.
+        struct Escapes : RecursiveASTVisitor<Escapes> {
+            std::set<const VarDecl*>& vars;
+            explicit Escapes(std::set<const VarDecl*>& out) : vars(out) {}
+            void referenceTargets(const Stmt* stmt) {
+                if (!stmt) return;
+                if (const auto* ref = llvm::dyn_cast<DeclRefExpr>(stmt))
+                    if (auto* var = llvm::dyn_cast<VarDecl>(ref->getDecl());
+                        var && var->getType()->isIntegerType())
+                        vars.insert(var);
+                for (const auto* child : stmt->children()) referenceTargets(child);
+            }
+            bool VisitUnaryOperator(UnaryOperator* op) {
+                if (op->getOpcode() == UO_AddrOf)
+                    if (auto* var = directIntegerVar(op->getSubExpr()))
+                        vars.insert(var);
+                return true;
+            }
+            bool VisitVarDecl(VarDecl* var) {
+                if (var->getType()->isReferenceType() && var->hasInit())
+                    referenceTargets(var->getInit());
+                return true;
+            }
+            bool VisitCallExpr(CallExpr* call) {
+                codeskeptic::forEachNonConstRefArg(call, [&](const Expr* arg) {
+                    referenceTargets(arg);
+                });
+                return true;
+            }
+            bool VisitLambdaExpr(LambdaExpr* expr) {
+                for (const auto& capture : expr->captures())
+                    if (capture.capturesVariable() &&
+                        capture.getCaptureKind() == LCK_ByRef)
+                        if (auto* var = llvm::dyn_cast<VarDecl>(capture.getCapturedVar()))
+                            vars.insert(var);
+                return true;
+            }
+        } visitor(escaped_);
+        visitor.TraverseStmt(fn->getBody());
+    }
+
+    State initialState() const { return {}; }
+    unsigned latticeHeight() const { return 8; }
+
+    State merge(const State& lhs, const State& rhs) const {
+        if (lhs.unreachable) return rhs;
+        if (rhs.unreachable) return lhs;
+        State result;
+        for (const auto& [var, range] : lhs.ranges) {
+            auto other = rhs.ranges.find(var);
+            if (other != rhs.ranges.end())
+                put(result, var, {std::min(range.lo, other->second.lo),
+                                  std::max(range.hi, other->second.hi)});
+        }
+        return result;
+    }
+
+    State transfer(const Stmt* stmt, const State& input, ASTContext& ctx) const {
+        State out = input;
+        if (out.unreachable) return out;
+        if (const auto* decl = llvm::dyn_cast<DeclStmt>(stmt)) {
+            for (const Decl* item : decl->decls()) {
+                const auto* var = llvm::dyn_cast<VarDecl>(item);
+                if (isWideVar(var, ctx))
+                    put(out, var, rangeOf(var->getInit(), out, ctx));
+            }
+        } else if (const auto* op = llvm::dyn_cast<BinaryOperator>(stmt)) {
+            if (op->isAssignmentOp()) {
+                Range value;
+                if (op->getOpcode() == BO_Assign)
+                    value = rangeOf(op->getRHS(), input, ctx);
+                else if (op->getOpcode() == BO_AddAssign &&
+                         isWideVar(directIntegerVar(op->getLHS()), ctx))
+                    value = add(rangeOf(op->getLHS(), input, ctx),
+                                rangeOf(op->getRHS(), input, ctx));
+                invalidateEscapes(out);
+                if (const auto* var = directIntegerVar(op->getLHS());
+                    isWideVar(var, ctx))
+                    put(out, var, value);
+            }
+        } else if (const auto* op = llvm::dyn_cast<UnaryOperator>(stmt)) {
+            if (op->isIncrementDecrementOp()) {
+                const auto* var = directIntegerVar(op->getSubExpr());
+                const Range value = op->isIncrementOp() && isWideVar(var, ctx)
+                                        ? add(get(input, var), {1, 1}) : Range{};
+                invalidateEscapes(out);
+                if (isWideVar(var, ctx)) put(out, var, value);
+            }
+        } else if (llvm::isa<CallExpr>(stmt) || llvm::isa<AsmStmt>(stmt)) {
+            invalidateEscapes(out);
+        }
+        return out;
+    }
+
+    void widen(State& state) const {
+        // Widening must never turn an unknown/loop-mutated value into a bound.
+        state.ranges.clear();
+    }
+
+    void refineOnEdge(const Stmt* condition, bool isTrue, State& state,
+                      ASTContext& ctx) const {
+        if (state.unreachable) return;
+        const auto* expr = llvm::dyn_cast_or_null<Expr>(condition);
+        if (!expr) return;
+        expr = expr->IgnoreParens();
+        if (const auto* unary = llvm::dyn_cast<UnaryOperator>(expr)) {
+            if (unary->getOpcode() == UO_LNot)
+                refineOnEdge(unary->getSubExpr(), !isTrue, state, ctx);
+            return;
+        }
+        const auto* compare = llvm::dyn_cast<BinaryOperator>(expr);
+        if (!compare) return;
+        auto opcode = compare->getOpcode();
+        if ((opcode == BO_LAnd && isTrue) || (opcode == BO_LOr && !isTrue)) {
+            refineOnEdge(compare->getLHS(), isTrue, state, ctx);
+            refineOnEdge(compare->getRHS(), isTrue, state, ctx);
+            return;
+        }
+        if (!compare->isComparisonOp()) return;
+        const VarDecl* var = wideVar(compare->getLHS(), ctx);
+        const Expr* constant = compare->getRHS();
+        if (!var) {
+            var = wideVar(compare->getRHS(), ctx);
+            constant = compare->getLHS();
+            switch (opcode) {
+                case BO_LT: opcode = BO_GT; break;
+                case BO_LE: opcode = BO_GE; break;
+                case BO_GT: opcode = BO_LT; break;
+                case BO_GE: opcode = BO_LE; break;
+                default: break;
+            }
+        }
+        // Do not strip narrowing/signed casts: those comparisons do not
+        // constrain the original uint64 variable in the same ordering.
+        if (!var) return;
+        auto limit = constantUnsigned(constant, 64, ctx);
+        if (!limit) return;
+        if (!isTrue) {
+            switch (opcode) {
+                case BO_LT: opcode = BO_GE; break;
+                case BO_LE: opcode = BO_GT; break;
+                case BO_GT: opcode = BO_LE; break;
+                case BO_GE: opcode = BO_LT; break;
+                case BO_EQ: opcode = BO_NE; break;
+                case BO_NE: opcode = BO_EQ; break;
+                default: break;
+            }
+        }
+        const uint64_t bound = limit->getZExtValue();
+        Range range = get(state, var);
+        switch (opcode) {
+            case BO_LT:
+                if (bound == 0) { makeUnreachable(state); return; }
+                range.hi = std::min(range.hi, bound - 1); break;
+            case BO_LE: range.hi = std::min(range.hi, bound); break;
+            case BO_GT:
+                if (bound == kMax) { makeUnreachable(state); return; }
+                range.lo = std::max(range.lo, bound + 1); break;
+            case BO_GE: range.lo = std::max(range.lo, bound); break;
+            case BO_EQ:
+                range.lo = std::max(range.lo, bound);
+                range.hi = std::min(range.hi, bound); break;
+            case BO_NE:
+                if (range.lo == bound) {
+                    if (bound == kMax) { makeUnreachable(state); return; }
+                    ++range.lo;
+                }
+                if (range.hi == bound) {
+                    if (bound == 0) { makeUnreachable(state); return; }
+                    --range.hi;
+                }
+                break;
+            default: return;
+        }
+        if (range.lo > range.hi) makeUnreachable(state);
+        else put(state, var, range);
+    }
+
+    void onStatement(const Stmt* stmt, const State& before,
+                     const State&, ASTContext&) { atStmt_[stmt] = before; }
+
+    bool wraps(const BinaryOperator* op, const codeskeptic::IntervalMap& numeric,
+               const std::set<const VarDecl*>& untrusted,
+               const DefinitionIndex& definitions, ASTContext& ctx) const {
+        auto found = atStmt_.find(op);
+        if (found == atStmt_.end() || found->second.unreachable) return false;
+        const auto exceeds = [&](const Expr* value, const Expr* offset) {
+            if (!codeskeptic::exprDerivesFromUntrusted(value, untrusted))
+                return false;
+            auto constant = constantUnsigned(offset, 64, ctx);
+            if (!constant || constant->isZero()) return false;
+            std::optional<llvm::APInt> upper;
+            if (hasSignedUntrustedOrigin(value, untrusted, definitions))
+                upper = signedOriginUpperCorner(
+                    value, numeric, untrusted, definitions, 64, ctx);
+            else
+                upper = unsignedUpperCorner(value, numeric, 64, ctx);
+            if (const auto* var = wideVar(value, ctx)) {
+                const llvm::APInt wideUpper(64, get(found->second, var).hi);
+                // An aliased write can invalidate the shared numeric bound;
+                // use this domain's invalidated bound in that case. Preserve
+                // the signed-origin model's explicit unsupported boundary.
+                if (!hasSignedUntrustedOrigin(value, untrusted, definitions) &&
+                    escaped_.count(var))
+                    upper = wideUpper;
+                else if (upper && wideUpper.ult(*upper))
+                    upper = wideUpper;
+            }
+            return upper &&
+                   (upper->zext(128) + constant->zext(128))
+                       .ugt(llvm::APInt::getMaxValue(64).zext(128));
+        };
+        return exceeds(op->getLHS(), op->getRHS()) ||
+               exceeds(op->getRHS(), op->getLHS());
+    }
+
+private:
+    static bool isWideVar(const VarDecl* var, ASTContext& ctx) {
+        return var && var->getType()->isUnsignedIntegerType() &&
+               !var->getType().isVolatileQualified() &&
+               ctx.getIntWidth(var->getType()) == 64;
+    }
+    static const VarDecl* wideVar(const Expr* expr, ASTContext& ctx) {
+        if (!expr) return nullptr;
+        expr = expr->IgnoreParens();
+        while (const auto* cast = llvm::dyn_cast<CastExpr>(expr)) {
+            const Expr* sub = cast->getSubExpr()->IgnoreParens();
+            if (!cast->getType()->isUnsignedIntegerType() ||
+                !sub->getType()->isUnsignedIntegerType() ||
+                ctx.getIntWidth(cast->getType()) != 64 ||
+                ctx.getIntWidth(sub->getType()) != 64)
+                return nullptr;
+            expr = sub;
+        }
+        const auto* ref = llvm::dyn_cast<DeclRefExpr>(expr);
+        const auto* var = ref ? llvm::dyn_cast<VarDecl>(ref->getDecl()) : nullptr;
+        return isWideVar(var, ctx) ? var : nullptr;
+    }
+    static Range get(const State& state, const VarDecl* var) {
+        auto it = state.ranges.find(var);
+        return it == state.ranges.end() ? Range{} : it->second;
+    }
+    static void put(State& state, const VarDecl* var, Range range) {
+        if (range.lo == 0 && range.hi == kMax) state.ranges.erase(var);
+        else state.ranges[var] = range;
+    }
+    static void makeUnreachable(State& state) {
+        state.unreachable = true;
+        state.ranges.clear();
+    }
+    static Range add(Range lhs, Range rhs) {
+        const llvm::APInt lo = llvm::APInt(128, lhs.lo) + llvm::APInt(128, rhs.lo);
+        const llvm::APInt hi = llvm::APInt(128, lhs.hi) + llvm::APInt(128, rhs.hi);
+        // Crossing the modular cut produces two intervals; keep the full
+        // range. If both endpoints wrap, their residues are ordered again.
+        if (lo.lshr(64) != hi.lshr(64)) return {};
+        return {lo.trunc(64).getZExtValue(), hi.trunc(64).getZExtValue()};
+    }
+    static Range rangeOf(const Expr* expr, const State& state, ASTContext& ctx) {
+        if (!expr) return {};
+        if (auto constant = constantUnsigned(expr, 64, ctx)) {
+            const uint64_t value = constant->getZExtValue();
+            return {value, value};
+        }
+        if (auto* var = wideVar(expr, ctx)) return get(state, var);
+        if (const auto* op = llvm::dyn_cast<BinaryOperator>(expr->IgnoreParens());
+            op && op->getOpcode() == BO_Add &&
+            op->getType()->isUnsignedIntegerType() &&
+            ctx.getIntWidth(op->getType()) == 64)
+            return add(rangeOf(op->getLHS(), state, ctx),
+                       rangeOf(op->getRHS(), state, ctx));
+        // Preserve the real width through unsigned widening conversions.
+        const Expr* source = expr->IgnoreParens();
+        while (const auto* cast = llvm::dyn_cast<CastExpr>(source)) {
+            const Expr* sub = cast->getSubExpr()->IgnoreParens();
+            if (!cast->getType()->isUnsignedIntegerType() ||
+                !sub->getType()->isUnsignedIntegerType() ||
+                ctx.getIntWidth(sub->getType()) > ctx.getIntWidth(cast->getType()))
+                break;
+            source = sub;
+        }
+        if (source->getType()->isUnsignedIntegerType()) {
+            unsigned width = ctx.getIntWidth(source->getType());
+            if (width && width < 64)
+                return {0, llvm::APInt::getMaxValue(width).getZExtValue()};
+        }
+        return {};
+    }
+    void invalidateEscapes(State& state) const {
+        for (const auto* var : escaped_) state.ranges.erase(var);
+    }
+    std::set<const VarDecl*> escaped_;
+    std::map<const Stmt*, State> atStmt_;
+};
 
 bool isAllocatorSizeArgument(const CallExpr* call, unsigned index) {
     if (!call || index >= call->getNumArgs()) return false;
@@ -1104,6 +1429,20 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         codeskeptic::CoverageReport::instance().recordDataflowFailure(
             fn->getQualifiedNameAsString(), df.failure);
 
+    std::optional<AllocationAddRanges> addRanges;
+    bool addConverged = false;
+    if (std::any_of(inventory.arithmetic.begin(), inventory.arithmetic.end(),
+                    [](const SizeSite& site) {
+                        return site.bits == 64 && site.op->getOpcode() == BO_Add;
+                    })) {
+        addRanges.emplace(fn);
+        auto addDf = codeskeptic::runDataflow(fn, ctx, *addRanges);
+        addConverged = addDf.converged && df.converged;
+        if (!addDf.converged)
+            codeskeptic::CoverageReport::instance().recordDataflowFailure(
+                fn->getQualifiedNameAsString(), addDf.failure);
+    }
+
     CheckedMulAnalysis checkedAnalysis;
     bool checkedRan = false;
     if (inventory.hasMulOverflow && !inventory.checked.empty()) {
@@ -1168,6 +1507,9 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         if (!wraps && site.bits == 64)
             wraps = wrapsUnsigned64Multiply(
                 site.op, *state, *untrusted, definitions, ctx);
+        if (!wraps && site.bits == 64 && site.op->getOpcode() == BO_Add &&
+            addConverged)
+            wraps = addRanges->wraps(site.op, *state, *untrusted, definitions, ctx);
         if (!wraps) continue;
         report(site.op->getOperatorLoc(), site.op->getType(),
                site.allocator, site.op, *untrusted);
