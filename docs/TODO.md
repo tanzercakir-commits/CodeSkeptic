@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH01-S01-U001
-
-### CS3-CH01-S01-U001 — 64-bit signed çıkarma taşmasını doğru hesapla
-
-**Sonuç:** Çıkarma toplama gibi hesaplanmaz; kanıtlanabilir 64-bit overflow/underflow doğru raporlanır.
-
-**Kabul:**
-
-- Mevcut davranış önce değişikliksiz RED fixture ile doğrulanır; kaynak şüphesi tek başına hata/PASS sayılmaz.
-- LLONG_MIN−1 ve LLONG_MAX−(−1) bulunur; LLONG_MAX−1 ve LLONG_MIN−(−1) temiz kalır.
-- Unknown değerler, guard'lar ve 32-bit arithmetic davranışı korunur; ilgili IntOverflow regression ve gerçek CLI smoke geçer.
-
-**Test bütçesi:** T1
-**Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/rules/IntOverflowRule.cpp, tests/IntOverflowRuleTest.cpp, scripts/local_test.sh
-**Bağımlılıklar:** CS3-CH00-S01-U001
+## FRONT — CS3-CH01-S01-U002
 
 ### CS3-CH01-S01-U002 — 64-bit allocation-size toplamayı denetle
 

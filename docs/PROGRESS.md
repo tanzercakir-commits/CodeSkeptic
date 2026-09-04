@@ -2,6 +2,19 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH01-S01-U001 — 64-bit signed çıkarma taşmasını doğru hesapla
+
+- Commit: `ae6ced3c2f1c4efba2a2208a7f1c288266f229f5`
+- Dal: `agent/cs3-ch01-s01-u001-int64-subtraction`
+- Implementer: `root-cs3-ch01-s01-u001-20260905`
+- Bağımsız denetçi: `independent-cwe-ch01-s01-u001-ae6ced3-20260905`
+- İnceleme SHA-256: `e3a4af4a0d99f7567863dac1e7dda890bc9d851f31a8af7ed543151a7ae080b3`
+- Tarih: 2026-09-04T22:20:38.489790+00:00
+- Sonuç: Çıkarma toplama gibi hesaplanmaz; kanıtlanabilir 64-bit overflow/underflow doğru raporlanır.
+- focused-tests: PASS; SHA-256 `1507cdc33967f09f93a280f10e3c1b703ff8118e6674ddc514f32611dfc87ae1`; `bash scripts/local_test.sh build && bash scripts/local_test.sh focused 'IntOverflowRuleTest.*:ReadmeCompareTest.DemoC_AtoiOverflow:UntrustedIntSourceTest.*:IntervalTest.*'`
+- cli-smoke: PASS; SHA-256 `fee9031e76a57ddfd9f1a77b86c1e146cdaab1fc12f82996f5a39015fc88fecb`; `bash scripts/local_test.sh smoke && bash scripts/local_test.sh int64-smoke`
+- queue-check: PASS; SHA-256 `b5050a02ffdbe6f4f57cf7c4c9084649bb40c9f740fac2a6d95eee6f397a8ddb`; `PYTHONDONTWRITEBYTECODE=1 bash scripts/check_docs_sync.sh && PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/project_queue.py guard --base d6b266e9701984e7d276b8af8aeb90502f19dabf`
+
 ## CS3-CH00-S01-U001 — Main tabanlı kitabı ve çalışan FIFO/POP sistemini kur
 
 - Commit: `977cdf84cb20a937cdf0bb41beabd283a44be5df`
