@@ -2,6 +2,19 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH01-S01-U002 — 64-bit allocation-size toplamayı denetle
+
+- Commit: `a3fb412a19dfdc34e853fce7f6fc0e7c2c18c1d1`
+- Dal: `agent/cs3-ch01-s01-u002-uint64-allocation-add`
+- Implementer: `root-cs3-ch01-s01-u002-20260905`
+- Bağımsız denetçi: `independent-cwe-ch01-s01-u002-a3fb412-20260905`
+- İnceleme SHA-256: `bf3008ea32e9ae80f903152edfbf99ca19296b3e06823159c373aa11545175c7`
+- Tarih: 2026-09-04T23:13:45.092195+00:00
+- Sonuç: n+header gibi allocation boyutlarında unsigned sarma mevcut çarpım modeline eklenir.
+- focused-tests: PASS; SHA-256 `b172ca3588ebafaf4855996f4d6e79354ce52af740c367741ce3ddd26c8fb1d3`; `bash scripts/local_test.sh build && bash scripts/local_test.sh focused 'AllocSizeOverflowRuleTest.*:IntOverflowRuleTest.*:IntervalTest.*:IntervalAnalysisTest.*'`
+- cli-smoke: PASS; SHA-256 `6d512174c7cb3060dfce35913b39f8b2bf4dc68edf775c0316bdf0d80e39bbc9`; `PYTHONDONTWRITEBYTECODE=1 python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH01-S01-U002/cli_smoke.py && bash scripts/local_test.sh smoke`
+- queue-check: PASS; SHA-256 `28d25eca46741baae51482f751501db7d40ed1038a138a506307c7a7fe2c21a3`; `PYTHONDONTWRITEBYTECODE=1 bash scripts/check_docs_sync.sh && PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/project_queue.py guard --base 200054c898836137f9247676eb82beaf89393293`
+
 ## CS3-CH01-S01-U001 — 64-bit signed çıkarma taşmasını doğru hesapla
 
 - Commit: `ae6ced3c2f1c4efba2a2208a7f1c288266f229f5`

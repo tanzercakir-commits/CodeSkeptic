@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH01-S01-U002
-
-### CS3-CH01-S01-U002 — 64-bit allocation-size toplamayı denetle
-
-**Sonuç:** n+header gibi allocation boyutlarında unsigned sarma mevcut çarpım modeline eklenir.
-
-**Kabul:**
-
-- SIZE_MAX sınırı, exact fit, korumalı toplam ve taşan toplam karşılaştırılır.
-- Mevcut 64-bit multiplication ve trusted/unknown kaynak sınırları bozulmaz.
-- CWE-131/190 bulgusu gerçek ayırma boyutuna bağlıdır; bütün unsigned toplamalar uyarılmaz.
-
-**Test bütçesi:** T1
-**Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/rules/AllocSizeOverflowRule.cpp, tests/AllocSizeOverflowRuleTest.cpp
-**Bağımlılıklar:** Yok
+## FRONT — CS3-CH01-S01-U003
 
 ### CS3-CH01-S01-U003 — Checked-add overflow sonucunun kullanımını izle
 
