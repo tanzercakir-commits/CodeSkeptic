@@ -602,6 +602,10 @@ public:
                          wideVar(op->getLHS(), ctx))
                     value = add(rangeOf(op->getLHS(), input, ctx),
                                 rangeOf(op->getRHS(), input, ctx));
+                else if (op->getOpcode() == BO_MulAssign &&
+                         wideVar(op->getLHS(), ctx))
+                    value = multiply(rangeOf(op->getLHS(), input, ctx),
+                                     rangeOf(op->getRHS(), input, ctx));
                 invalidateWrite(out, op->getLHS());
                 if (const auto* var = wideVar(op->getLHS(), ctx))
                     put(out, var, value);
