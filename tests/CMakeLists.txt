@@ -70,6 +70,11 @@ gtest_discover_tests(codeskeptic_tests)
 # every platform. In particular, its synthetic Windows compile-command paths
 # pin bugs that the POSIX-only end-to-end review fixture cannot exercise.
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
+if(UNIX)
+    add_test(NAME ProjectQueueContract
+             COMMAND ${Python3_EXECUTABLE} -B
+                     ${CMAKE_CURRENT_SOURCE_DIR}/test_project_queue.py)
+endif()
 add_test(NAME StatusAutomationContract
          COMMAND ${Python3_EXECUTABLE}
                  ${CMAKE_CURRENT_SOURCE_DIR}/StatusAutomationTest.py)

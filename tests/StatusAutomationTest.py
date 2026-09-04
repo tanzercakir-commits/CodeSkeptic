@@ -75,6 +75,17 @@ class RepositoryFixture:
 
 
 class ProgressStatusTest(unittest.TestCase):
+    def test_legacy_writer_cannot_overwrite_book_queue(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = RepositoryFixture(Path(temporary))
+            book_path = fixture.root / "docs" / "BOOK.json"
+            book_path.write_text("{}\n", encoding="utf-8")
+            before = (fixture.root / "docs" / "TODO.md").read_bytes()
+            with self.assertRaises(progress_status.ProgressStatusError):
+                progress_status.sync_repository(fixture.root, "origin/main")
+            self.assertEqual((fixture.root / "docs" / "TODO.md").read_bytes(), before)
+            self.assertFalse((fixture.root / "docs" / "PROGRESS.md").exists())
+
     def test_sync_is_append_only_and_never_promotes_phase_work(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)

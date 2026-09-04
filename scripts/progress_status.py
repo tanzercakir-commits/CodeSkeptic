@@ -275,6 +275,8 @@ def _write_atomic(path: Path, content: str) -> None:
 
 
 def sync_repository(root: Path, base_ref: str) -> DerivedStatus:
+    if (root / "docs" / "BOOK.json").exists():
+        raise ProgressStatusError("Legacy writer retired: use scripts/project_queue.py")
     status = derive_status(root, base_ref, bootstrap=True)
     _write_atomic(root / PROGRESS_REL, status.progress)
     _write_atomic(root / TODO_REL, status.todo)

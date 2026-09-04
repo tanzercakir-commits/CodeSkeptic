@@ -1,102 +1,14 @@
 #!/usr/bin/env bash
-# Doc-hygiene guard (2026-07-30). Mechanically enforces the working
-# agreement so it does not rest on memory:
-#   1. the canonical planning/progress files exist and are non-empty;
-#   2. no scattered per-feature PLAN-*.md briefs (fold into PLAN.md);
-#   3. a src/ change ships with a changelog entry (progress is logged).
-#   6. append-only protected-main progress and TODO state agree with git.
-#   7. the executable real-world replay ledger is internally consistent.
-# Runs in the required build-and-test lane, so a miss blocks merge.
-#
-# --fix appends verified protected-main transitions and regenerates the
-# derivable TODO state view (check 6) instead of only
-# complaining about it: the guard alone catches forgetting but does not
-# undo it, and a generator alone drifts whenever nobody runs it. Both
-# together close the hole.
+# Local FIFO replaces the retired phase ledger. No network or implicit fixes.
+# Preserve existing capability, version, measurement and real-world guards.
 set -uo pipefail
+export PYTHONDONTWRITEBYTECODE=1
 fail=0
-mode="${1:-check}"
-
-# 1. Canonical plan, compass, verified ledger, and detailed history.
-for f in docs/PLAN.md docs/TODO.md docs/PROGRESS.md docs/devlog/changelog.md; do
-    if [ ! -s "$f" ]; then
-        echo "FAIL: missing or empty canonical file: $f"
-        fail=1
-    fi
-done
-
-# 2. No scattered plan briefs — the whole plan lives in one PLAN.md.
-briefs=$(ls docs/PLAN-*.md 2>/dev/null || true)
-if [ -n "$briefs" ]; then
-    echo "FAIL: scattered plan briefs found (fold into docs/PLAN.md, delete these):"
-    echo "$briefs" | sed 's/^/  /'
-    fail=1
+if [ "${1:-check}" != "check" ]; then
+    echo 'FAIL: no manual --fix; use project_queue.py finalize/amend/recover'
+    exit 1
 fi
-
-# 3. changelog freshness: a src/ change must be logged. Best-effort —
-#    silently skipped when no shared base is available (shallow clone,
-#    first commit), never a false failure.
-base=""
-if git rev-parse --verify -q origin/main >/dev/null 2>&1; then
-    base=origin/main
-elif git fetch -q --depth=50 origin main 2>/dev/null; then
-    base=FETCH_HEAD
-fi
-if [ -n "$base" ] && git merge-base "$base" HEAD >/dev/null 2>&1; then
-    mb=$(git merge-base "$base" HEAD)
-    changed=$(git diff --name-only "$mb" HEAD)
-    if echo "$changed" | grep -qE '^src/' &&
-       ! echo "$changed" | grep -qxF 'docs/devlog/changelog.md'; then
-        echo "FAIL: src/ changed but docs/devlog/changelog.md was not updated."
-        echo "      Every code change logs its rationale in the changelog."
-        fail=1
-    fi
-elif [ -n "${GITHUB_ACTIONS:-}" ]; then
-    # In CI a base is always obtainable, so failing to find one means the
-    # checkout is shallow and checks 3 and 6 are about to no-op. That is
-    # how they ran from c8ca617 to 2026-08-01: lane green, guard never
-    # executed. A guard that cannot check must say so loudly, not pass.
-    echo "FAIL: no shared base with main, so the changelog-freshness and"
-    echo "      state-block checks cannot run. Under CI that is a broken"
-    echo "      guard, not a soft skip — check out with fetch-depth: 0."
-    fail=1
-else
-    echo "note: changelog-freshness check skipped (no shared base — local shallow clone)"
-fi
-
-# --fix: append only transitions already reachable from protected main and
-# regenerate the marked TODO state view. Everything else in TODO.md remains
-# judgment and is never touched.
-if [ "$mode" = "--fix" ]; then
-    python3 scripts/progress_status.py sync \
-        --base-ref "${base:-origin/main}" || exit 1
-    echo "fixed: verified progress appended and TODO state regenerated"
-    exit 0
-fi
-
-# 6. PROGRESS/TODO <-> protected-main reality. The ledger is append-only and
-#    may call a transition MERGED only after the commit is reachable from
-#    main. TODO's marked view binds the ledger digest, verified main, branch
-#    base, and live phase refs. Main cannot record its own merge commit in the
-#    same tree, so enforcement belongs to phase branches and PR head refs.
-cur_ref="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null)}}"
-is_phase=0
-case "$cur_ref" in phase-*) is_phase=1 ;; esac
-if [ "$is_phase" = 0 ]; then
-    echo "progress/state check n/a on '$cur_ref' (enforced on phase* branches)"
-fi
-if [ -n "$base" ] && [ "$is_phase" = 1 ]; then
-    if python3 scripts/progress_status.py check --base-ref "$base"; then
-        :
-    elif [ -n "${GITHUB_ACTIONS:-}" ]; then
-        echo "FAIL: verified progress/state could not be proven under CI."
-        fail=1
-    else
-        echo "FAIL: verified progress/state is stale or unavailable."
-        echo "      Refresh it: scripts/check_docs_sync.sh --fix"
-        fail=1
-    fi
-fi
+python3 -B scripts/project_queue.py check || fail=1
 
 # 4. Rule registry <-> README Rules table: every finding rule_id the
 #    code can emit must appear in README.md, so a shipped rule can never
@@ -162,5 +74,5 @@ if ! python3 scripts/check_realworld_ledger.py; then
     fail=1
 fi
 
-[ "$fail" -eq 0 ] && echo "ok: docs in sync (canonical files, no scatter, changelog fresh, rules listed, versions pinned)"
+[ "$fail" -eq 0 ] && echo "ok: FIFO views, rules, capabilities, versions and measurement contracts agree"
 exit "$fail"
