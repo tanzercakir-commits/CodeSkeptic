@@ -654,6 +654,124 @@ TEST(AllocSizeOverflowRuleTest, SizeT64SignedAliasGuarded_Silent) {
     EXPECT_EQ(results.size(), 0u);
 }
 
+// CS3-CH01-S01-U003: a checked result is safe only on a proven success path.
+// Replacing a status is not the same as replacing the computed output.
+TEST(AllocSizeOverflowRuleTest, BuiltinAddOverflowUseAndStatus) {
+    SourceScope scope({"read_size"});
+    struct Case { const char* name; const char* body; unsigned reports; };
+    const Case cases[] = {
+        {"ignored result", "__builtin_add_overflow(n,16,&bytes); return malloc(bytes);", 1},
+        {"direct success check", "if(__builtin_add_overflow(n,16,&bytes)) return 0; return malloc(bytes);", 0},
+        {"direct negated success", "if(!__builtin_add_overflow(n,16,&bytes)) return malloc(bytes); return 0;", 0},
+        {"overflow branch consumes output", "if(__builtin_add_overflow(n,16,&bytes)) return malloc(bytes); return 0;", 1},
+        {"saved status", "bool overflow=__builtin_add_overflow(n,16,&bytes); if(overflow) return 0; return malloc(bytes);", 0},
+        {"status reassigned before check", "bool overflow=__builtin_add_overflow(n,16,&bytes); overflow=false; if(overflow) return 0; return malloc(bytes);", 1},
+        {"status escaped before check", "bool overflow=__builtin_add_overflow(n,16,&bytes); mutate_status(overflow); if(overflow) return 0; return malloc(bytes);", 1},
+        {"indirect status escape", "bool overflow=__builtin_add_overflow(n,16,&bytes); void(*m)(bool&)=mutate_status; m(overflow); if(overflow) return 0; return malloc(bytes);", 1},
+        {"negated status success", "bool ok=!__builtin_add_overflow(n,16,&bytes); if(!ok) return 0; return malloc(bytes);", 0},
+        {"negated status failure", "bool ok=!__builtin_add_overflow(n,16,&bytes); if(ok) return 0; return malloc(bytes);", 1},
+        {"comma result is not status", "bool overflow=(__builtin_add_overflow(n,16,&bytes),false); if(overflow) return 0; return malloc(bytes);", 1},
+        {"status belongs to previous output", "bool overflow=__builtin_add_overflow(n,16,&bytes); __builtin_add_overflow(n,32,&bytes); if(overflow) return 0; return malloc(bytes);", 1},
+        {"output reassigned", "__builtin_add_overflow(n,16,&bytes); bytes=16; return malloc(bytes);", 0},
+        {"output escaped", "__builtin_add_overflow(n,16,&bytes); mutate_output(bytes); return malloc(bytes);", 0},
+        {"input reassigned after calculation", "__builtin_add_overflow(n,16,&bytes); n=0; return malloc(bytes);", 1},
+        {"exact fit input guard", "if(n>((size_t)-1)-16) return 0; __builtin_add_overflow(n,16,&bytes); return malloc(bytes);", 0},
+        {"insufficient input guard", "if(n>((size_t)-1)-15) return 0; __builtin_add_overflow(n,16,&bytes); return malloc(bytes);", 1},
+        {"zero addend", "__builtin_add_overflow(n,0,&bytes); return malloc(bytes);", 0},
+        {"unknown addend", "__builtin_add_overflow(n,runtime_header(),&bytes); return malloc(bytes);", 0},
+        {"copied status", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool copy=overflow; if(copy) return 0; return malloc(bytes);", 0},
+        {"zero comparison status", "bool ok=(__builtin_add_overflow(n,16,&bytes)==0); if(!ok) return 0; return malloc(bytes);", 0},
+        {"one comparison status", "bool overflow=__builtin_add_overflow(n,16,&bytes); if(overflow==1) return 0; return malloc(bytes);", 0},
+        {"status pointer alias invalidates", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool* p=&overflow; *p=false; if(overflow) return 0; return malloc(bytes);", 1},
+        {"status pointer offset invalidates", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool* p=&overflow; *(p+0)=false; if(overflow) return 0; return malloc(bytes);", 1},
+        {"status escapes through global pointer", "bool overflow=__builtin_add_overflow(n,16,&bytes); saved_status=&overflow; mutate_saved(); if(overflow) return 0; return malloc(bytes);", 1},
+        {"status reference alias invalidates", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool& alias=overflow; alias=false; if(overflow) return 0; return malloc(bytes);", 1},
+        {"status pointer passed to callee", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool* p=&overflow; mutate_status_ptr(p); if(overflow) return 0; return malloc(bytes);", 1},
+        {"retained status pointer", "bool overflow=false; mutate_status_ptr(&overflow); overflow=__builtin_add_overflow(n,16,&bytes); mutate_saved(); if(overflow) return 0; return malloc(bytes);", 1},
+        {"global status can change on call", "global_status=__builtin_add_overflow(n,16,&bytes); mutate_saved(); if(global_status) return 0; return malloc(bytes);", 1},
+        {"output pointer alias invalidates", "size_t* p=&bytes; __builtin_add_overflow(n,16,&bytes); *p=16; return malloc(bytes);", 0},
+        {"indirect output reference escape", "__builtin_add_overflow(n,16,&bytes); void(*m)(size_t&)=mutate_output; m(bytes); return malloc(bytes);", 0},
+        {"output copy retains unchecked origin", "__builtin_add_overflow(n,16,&bytes); size_t copy=bytes; bytes=0; return malloc(copy);", 1},
+        {"output copy retains success", "if(__builtin_add_overflow(n,16,&bytes)) return 0; size_t copy=bytes; return malloc(copy);", 0},
+        {"one path replaces output", "__builtin_add_overflow(n,16,&bytes); if(runtime_header()) bytes=16; return malloc(bytes);", 1},
+        {"safe checked path joins constant output", "if(runtime_header()) {if(__builtin_add_overflow(n,16,&bytes)) return 0;} else bytes=16; return malloc(bytes);", 0},
+    };
+    for (const auto& item : cases) {
+        SCOPED_TRACE(item.name);
+        AllocSizeOverflowRule rule;
+        auto results = runRule(rule, std::string(R"(
+            typedef __SIZE_TYPE__ size_t;
+            extern void* malloc(size_t);
+            extern size_t read_size(void);
+            extern size_t runtime_header(void);
+            extern void mutate_output(size_t&);
+            extern void mutate_status(bool&);
+            extern void mutate_status_ptr(bool*);
+            extern void mutate_saved(void);
+            bool global_status=false;
+            bool* saved_status=nullptr;
+            void* f(void) { size_t n=read_size(), bytes=0;
+        )") + item.body + "}");
+        EXPECT_EQ(results.size(), item.reports);
+        for (const auto& result : results)
+            EXPECT_EQ(result.rule_id, "alloc-size-overflow");
+    }
+}
+
+TEST(AllocSizeOverflowRuleTest, BuiltinAddOverflowUnsigned32Boundary) {
+    SourceScope scope({"read_u32"});
+    for (bool guarded : {false, true}) {
+        SCOPED_TRACE(guarded);
+        AllocSizeOverflowRule rule;
+        auto results = runRule(rule, std::string(R"(
+            typedef __SIZE_TYPE__ size_t;
+            extern void* malloc(size_t);
+            extern unsigned int read_u32(void);
+            void* f(void) { unsigned int n=read_u32(), bytes=0;
+        )") + (guarded ? "if(n>4294967295U-16) return 0;" : "") +
+            "__builtin_add_overflow(n,16,&bytes); return malloc(bytes); }");
+        EXPECT_EQ(results.size(), guarded ? 0u : 1u);
+    }
+}
+
+TEST(AllocSizeOverflowRuleTest, BuiltinAddOverflowMathematicalOperands) {
+    SourceScope scope({"read_signed", "read_size"});
+    struct Case { const char* name; const char* body; unsigned reports; };
+    const Case cases[] = {
+        {"generic negative cancels", "long long n=read_signed(); if(n != -1) return 0; __builtin_add_overflow(n,16ULL,&bytes);", 0},
+        {"generic negative underflow", "long long n=read_signed(); if(n != -17) return 0; __builtin_add_overflow(n,16ULL,&bytes);", 1},
+        {"fixed unsigned converts inputs first", "long long n=read_signed(); if(n != -1) return 0; __builtin_uaddll_overflow(n,16ULL,&bytes);", 1},
+        {"fixed unsigned converted sum fits", "long long n=read_signed(); if(n != -17) return 0; __builtin_uaddll_overflow(n,16ULL,&bytes);", 0},
+        {"guarded positive signed input", "long long n=read_signed(); if(n<16) return 0; __builtin_add_overflow(n,-16LL,&bytes);", 0},
+        {"unsigned subtracting offset guarded", "size_t n=read_size(); if(n<16) return 0; __builtin_add_overflow(n,-16LL,&bytes);", 0},
+        {"unsigned subtracting offset may underflow", "size_t n=read_size(); __builtin_add_overflow(n,-16LL,&bytes);", 1},
+        {"explicit cast bounded positive", "long long n=read_signed(); if(n<16) return 0; __builtin_add_overflow((size_t)n,-16LL,&bytes);", 0},
+        {"unsigned alias guarded", "long long raw=read_signed(); size_t n=raw; if(n>((size_t)-1)-16) return 0; __builtin_add_overflow(n,16,&bytes);", 0},
+        {"constant not truncated to output", "size_t n=read_size(); if(n!=0) return 0; unsigned int small=0; __builtin_add_overflow(n,4294967296ULL,&small); bytes=small;", 1},
+        {"wide input not truncated to output", "size_t n=read_size(); unsigned int small=0; __builtin_add_overflow(n,1,&small); bytes=small;", 1},
+        {"narrow signed-origin alias guarded", "long long raw=read_signed(); unsigned int n=(unsigned int)raw; if(n>1000U) return 0; unsigned int small=0; __builtin_add_overflow(n,16U,&small); bytes=small;", 0},
+        {"narrow signed-origin alias insufficient guard", "long long raw=read_signed(); unsigned int n=(unsigned int)raw; if(n>4294967295U-15) return 0; unsigned int small=0; __builtin_add_overflow(n,16U,&small); bytes=small;", 1},
+        {"nonzero boolean conversion", "long long n=read_signed(); if(n<1) return 0; __builtin_add_overflow((bool)n,-1LL,&bytes);", 0},
+        {"zero boolean conversion", "long long n=read_signed(); if(n!=0) return 0; __builtin_add_overflow((bool)n,18446744073709551615ULL,&bytes);", 0},
+        {"unknown boolean can underflow", "long long n=read_signed(); __builtin_add_overflow((bool)n,-1LL,&bytes);", 1},
+        {"nonzero boolean can overflow", "long long n=read_signed(); if(n<1) return 0; __builtin_add_overflow((bool)n,18446744073709551615ULL,&bytes);", 1},
+        {"generic wide operand retains width", "size_t n=read_size(); if(n!=4294967296ULL) return 0; unsigned int small=0; __builtin_add_overflow(n,1U,&small); bytes=small;", 1},
+        {"fixed narrow operand converts first", "size_t n=read_size(); if(n!=4294967296ULL) return 0; unsigned int small=0; __builtin_uadd_overflow(n,1U,&small); bytes=small;", 0},
+    };
+    for (const auto& item : cases) {
+        SCOPED_TRACE(item.name);
+        AllocSizeOverflowRule rule;
+        auto results = runRule(rule, std::string(R"(
+            typedef __SIZE_TYPE__ size_t;
+            extern void* malloc(size_t);
+            extern long long read_signed(void);
+            extern size_t read_size(void);
+            void* f(void) { unsigned long long bytes=0;
+        )") + item.body + "return malloc(bytes); }");
+        EXPECT_EQ(results.size(), item.reports);
+    }
+}
+
 // Ignoring the checked-multiply status still feeds the wrapped output to the
 // allocator. The finite untrusted corner proves that overflow is reachable.
 TEST(AllocSizeOverflowRuleTest, BuiltinMulOverflowIgnored_Reports) {

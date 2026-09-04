@@ -70,6 +70,7 @@ struct SizeInventory {
     std::vector<SizeSite> arithmetic;
     std::vector<CheckedSizeSite> checked;
     bool hasMulOverflow = false;
+    bool hasAddOverflow = false;
 };
 
 // Does the true (unbounded) result of this unsigned arithmetic PROVABLY
@@ -163,6 +164,7 @@ bool isWritableReferenceArgument(const CallExpr* call, unsigned index) {
 
 bool isMulOverflowBuiltin(const CallExpr* call) {
     const FunctionDecl* callee = call ? call->getDirectCallee() : nullptr;
+    if (!callee || !callee->getBuiltinID()) return false;
     const IdentifierInfo* id = callee ? callee->getIdentifier() : nullptr;
     if (!id) return false;
     const llvm::StringRef name = id->getName();
@@ -175,26 +177,27 @@ bool isMulOverflowBuiltin(const CallExpr* call) {
            name == "__builtin_umulll_overflow";
 }
 
-const CallExpr* findMulOverflowCall(const Stmt* root) {
-    const CallExpr* found = nullptr;
-    bool ambiguous = false;
-    std::function<void(const Stmt*)> visit = [&](const Stmt* stmt) {
-        if (!stmt || ambiguous) return;
-        if (const auto* call = llvm::dyn_cast<CallExpr>(stmt);
-            call && isMulOverflowBuiltin(call)) {
-            if (found && found != call)
-                ambiguous = true;
-            else
-                found = call;
-        }
-        for (const Stmt* child : stmt->children()) visit(child);
-    };
-    visit(root);
-    return ambiguous ? nullptr : found;
+bool isAddOverflowBuiltin(const CallExpr* call) {
+    const FunctionDecl* callee = call ? call->getDirectCallee() : nullptr;
+    if (!callee || !callee->getBuiltinID()) return false;
+    const IdentifierInfo* id = callee ? callee->getIdentifier() : nullptr;
+    if (!id) return false;
+    const llvm::StringRef name = id->getName();
+    return name == "__builtin_add_overflow" ||
+           name == "__builtin_sadd_overflow" ||
+           name == "__builtin_saddl_overflow" ||
+           name == "__builtin_saddll_overflow" ||
+           name == "__builtin_uadd_overflow" ||
+           name == "__builtin_uaddl_overflow" ||
+           name == "__builtin_uaddll_overflow";
 }
 
-const VarDecl* mulOverflowOutput(const CallExpr* call) {
-    if (!isMulOverflowBuiltin(call) || call->getNumArgs() < 3)
+bool isCheckedOverflowBuiltin(const CallExpr* call) {
+    return isMulOverflowBuiltin(call) || isAddOverflowBuiltin(call);
+}
+
+const VarDecl* checkedOverflowOutput(const CallExpr* call) {
+    if (!isCheckedOverflowBuiltin(call) || call->getNumArgs() < 3)
         return nullptr;
     const VarDecl* output = addressedIntegerVar(call->getArg(2));
     return output && output->getType()->isUnsignedIntegerType()
@@ -744,7 +747,134 @@ public:
                exceeds(op->getRHS(), op->getLHS());
     }
 
+    bool checkedAddOverflows(const CallExpr* call, unsigned outputBits,
+                             const codeskeptic::IntervalMap& numeric,
+                             const std::set<const VarDecl*>& untrusted,
+                             const DefinitionIndex& definitions,
+                             ASTContext& ctx) const {
+        if (!call || call->getNumArgs() != 3 || outputBits == 0 || outputBits > 64)
+            return false;
+        auto snapshot = atStmt_.find(call);
+        if (snapshot == atStmt_.end() || snapshot->second.unreachable) return false;
+        const auto exceeds = [&](const Expr* value, const Expr* offset) {
+            if (!codeskeptic::exprDerivesFromUntrusted(value, untrusted)) return false;
+            auto constant = mathematicalConstant(offset, ctx);
+            if (!constant) return false; // A second unknown is not a finite witness.
+            auto input = checkedInputRange(value, snapshot->second, numeric,
+                                            untrusted, definitions, ctx);
+            if (!input) return false;
+            const llvm::APInt lower = input->lo + *constant;
+            const llvm::APInt upper = input->hi + *constant;
+            const llvm::APInt maximum = llvm::APInt::getMaxValue(outputBits).zext(128);
+            // Generic builtin operands retain their signedness/width until
+            // AFTER the infinite-precision sum. Do not truncate to outputBits.
+            return lower.isNegative() || upper.sgt(maximum);
+        };
+        return exceeds(call->getArg(0), call->getArg(1)) ||
+               exceeds(call->getArg(1), call->getArg(0));
+    }
+
 private:
+    struct MathematicalRange { llvm::APInt lo, hi; };
+
+    static std::optional<llvm::APInt> mathematicalConstant(const Expr* expr,
+                                                           ASTContext& ctx) {
+        if (!expr || !expr->getType()->isIntegerType() ||
+            ctx.getIntWidth(expr->getType()) > 64) return std::nullopt;
+        Expr::EvalResult result;
+        if (!expr->EvaluateAsInt(result, ctx) || !result.Val.isInt()) return std::nullopt;
+        const llvm::APSInt& value = result.Val.getInt();
+        return value.isSigned() ? value.sext(128) : value.zext(128);
+    }
+
+    std::optional<MathematicalRange> checkedInputRange(
+        const Expr* expr, const State& state, const codeskeptic::IntervalMap& numeric,
+        const std::set<const VarDecl*>& untrusted, const DefinitionIndex& definitions,
+        ASTContext& ctx, bool requireStable = false, unsigned depth = 0) const {
+        if (!expr || depth > 16 || !expr->getType()->isIntegerType()) return std::nullopt;
+        const unsigned bits = ctx.getIntWidth(expr->getType());
+        if (bits == 0 || bits > 64) return std::nullopt;
+        if (auto constant = mathematicalConstant(expr, ctx))
+            return MathematicalRange{*constant, *constant};
+        expr = expr->IgnoreParens();
+        if (const auto* cast = llvm::dyn_cast<CastExpr>(expr)) {
+            auto input = checkedInputRange(cast->getSubExpr(), state, numeric,
+                untrusted, definitions, ctx, requireStable, depth + 1);
+            if (!input) return std::nullopt;
+            if (cast->getCastKind() == CK_LValueToRValue || cast->getCastKind() == CK_NoOp)
+                return input;
+            if (cast->getCastKind() == CK_IntegralToBoolean) {
+                const llvm::APInt zero(128, 0), one(128, 1);
+                if (input->lo.isZero() && input->hi.isZero())
+                    return MathematicalRange{zero, zero};
+                if (input->lo.sgt(zero) || input->hi.slt(zero))
+                    return MathematicalRange{one, one};
+                return MathematicalRange{zero, one};
+            }
+            if (cast->getCastKind() != CK_IntegralCast) return std::nullopt;
+            const bool isUnsigned = cast->getType()->isUnsignedIntegerType();
+            const llvm::APInt low = isUnsigned ? input->lo.trunc(bits).zext(128)
+                                               : input->lo.trunc(bits).sext(128);
+            const llvm::APInt high = isUnsigned ? input->hi.trunc(bits).zext(128)
+                                                : input->hi.trunc(bits).sext(128);
+            const llvm::APInt span = input->hi - input->lo;
+            if (span.ult(llvm::APInt::getMaxValue(bits).zext(128)) && low.sle(high))
+                return MathematicalRange{low, high};
+            return isUnsigned
+                ? MathematicalRange{llvm::APInt(128, 0), llvm::APInt::getMaxValue(bits).zext(128)}
+                : MathematicalRange{llvm::APInt::getSignedMinValue(bits).sext(128),
+                                    llvm::APInt::getSignedMaxValue(bits).sext(128)};
+        }
+        if (const auto* ref = llvm::dyn_cast<DeclRefExpr>(expr)) {
+            const auto* var = llvm::dyn_cast<VarDecl>(ref->getDecl());
+            if (var && requireStable &&
+                (definitions.unstable.count(var) || escaped_.count(var))) return std::nullopt;
+            if (var && expr->getType()->isUnsignedIntegerType() &&
+                hasSignedUntrustedOrigin(expr, untrusted, definitions)) {
+                const Expr* init = definitions.stableInitializer(var);
+                if (!init) return std::nullopt;
+                auto range = checkedInputRange(init, state, numeric, untrusted,
+                    definitions, ctx, true, depth + 1);
+                if (range) {
+                    Range bound = rangeOf(expr, state, ctx);
+                    // Narrow unsigned aliases get path guards from the shared
+                    // numeric domain; the uint64 sidecar alone cannot retain them.
+                    const auto interval = codeskeptic::evalInterval(expr, numeric, &ctx);
+                    if (interval.isEmpty()) return std::nullopt;
+                    if (!referencesEscape(expr)) {
+                        if (!interval.loIsInf() && interval.lo() >= 0)
+                            bound.lo = std::max(bound.lo, static_cast<uint64_t>(interval.lo()));
+                        if (!interval.hiIsInf() && interval.hi() >= 0)
+                            bound.hi = std::min(bound.hi, static_cast<uint64_t>(interval.hi()));
+                    }
+                    const llvm::APInt low(128, bound.lo), high(128, bound.hi);
+                    if (low.sgt(range->lo)) range->lo = low;
+                    if (high.slt(range->hi)) range->hi = high;
+                    if (range->lo.sgt(range->hi)) return std::nullopt;
+                }
+                return range;
+            }
+        }
+        const auto interval = codeskeptic::evalInterval(expr, numeric, &ctx);
+        if (interval.isEmpty()) return std::nullopt;
+        if (expr->getType()->isUnsignedIntegerType()) {
+            Range range = rangeOf(expr, state, ctx);
+            if (!referencesEscape(expr)) {
+                if (!interval.loIsInf() && interval.lo() >= 0)
+                    range.lo = std::max(range.lo, static_cast<uint64_t>(interval.lo()));
+                if (!interval.hiIsInf() && interval.hi() >= 0)
+                    range.hi = std::min(range.hi, static_cast<uint64_t>(interval.hi()));
+            }
+            if (range.lo > range.hi) return std::nullopt;
+            return MathematicalRange{llvm::APInt(128, range.lo), llvm::APInt(128, range.hi)};
+        }
+        if (referencesEscape(expr) || interval.loIsInf() || interval.hiIsInf())
+            return std::nullopt;
+        return MathematicalRange{
+            llvm::APInt(64, static_cast<uint64_t>(interval.lo())).sext(128),
+            llvm::APInt(64, static_cast<uint64_t>(interval.hi())).sext(128)};
+    }
+
     static bool isWideVar(const VarDecl* var, ASTContext& ctx) {
         return var && var->getType()->isUnsignedIntegerType() &&
                !var->getType().isVolatileQualified() &&
@@ -880,6 +1010,8 @@ SizeInventory collectSizeInventory(const FunctionDecl* fn,
         bool VisitCallExpr(CallExpr* call) {
             if (isMulOverflowBuiltin(call))
                 inventory.hasMulOverflow = true;
+            if (isAddOverflowBuiltin(call))
+                inventory.hasAddOverflow = true;
             for (unsigned i = 0; i < call->getNumArgs(); ++i) {
                 if (!isAllocatorSizeArgument(call, i)) continue;
                 const Expr* argument = call->getArg(i);
@@ -1081,156 +1213,317 @@ private:
     std::map<const Stmt*, State> atStmt_;
 };
 
-// Tracks only the exact relation created by a compiler checked-multiply
-// builtin. A no-overflow edge records safety; every redefinition or address
-// escape kills the relation. Missing evidence therefore stays silent.
-class CheckedMulAnalysis {
+// Checked calls own outputs; status variables only identify the matching call
+// and polarity. Capture calls at their actual CFG element, never by searching
+// an arbitrary enclosing initializer (which may negate/discard the result).
+class CheckedArithmeticAnalysis {
 public:
+    struct Status {
+        const CallExpr* call;
+        bool trueMeansOverflow;
+        bool operator==(const Status& other) const {
+            return call == other.call && trueMeansOverflow == other.trueMeansOverflow;
+        }
+    };
+    using Origins = std::map<const CallExpr*, bool>; // true = proved safe
+    using Targets = std::set<const VarDecl*>;
     struct State {
-        std::map<const VarDecl*, const CallExpr*> outputs;
-        std::map<const VarDecl*, const CallExpr*> statuses;
-        std::set<const CallExpr*> safe;
-
+        std::map<const VarDecl*, Origins> outputs;
+        std::map<const VarDecl*, Status> statuses;
+        std::map<const VarDecl*, Targets> aliases;
+        Targets escaped;
         bool operator==(const State& other) const {
             return outputs == other.outputs && statuses == other.statuses &&
-                   safe == other.safe;
+                   aliases == other.aliases && escaped == other.escaped;
         }
-        bool operator!=(const State& other) const {
-            return !(*this == other);
-        }
+        bool operator!=(const State& other) const { return !(*this == other); }
     };
 
     State initialState() const { return {}; }
     unsigned latticeHeight() const { return 32; }
 
     State merge(const State& lhs, const State& rhs) const {
-        State merged;
-        for (const auto& [var, call] : lhs.outputs) {
-            auto found = rhs.outputs.find(var);
-            if (found != rhs.outputs.end() && found->second == call)
-                merged.outputs[var] = call;
-        }
-        for (const auto& [var, call] : lhs.statuses) {
+        State result = lhs;
+        // An output may originate from a checked call on only one path. Keep
+        // that possible origin, with safety required on every path carrying it.
+        for (const auto& [var, origins] : rhs.outputs)
+            for (const auto& [call, safe] : origins) {
+                auto& merged = result.outputs[var];
+                auto found = merged.find(call);
+                if (found == merged.end()) merged[call] = safe;
+                else found->second = found->second && safe;
+            }
+        result.statuses.clear();
+        for (const auto& [var, status] : lhs.statuses) {
             auto found = rhs.statuses.find(var);
-            if (found != rhs.statuses.end() && found->second == call)
-                merged.statuses[var] = call;
+            if (found != rhs.statuses.end() && found->second == status)
+                result.statuses.emplace(var, status);
         }
-        for (const CallExpr* call : lhs.safe)
-            if (rhs.safe.count(call)) merged.safe.insert(call);
-        return merged;
+        for (const auto& [var, targets] : rhs.aliases)
+            result.aliases[var].insert(targets.begin(), targets.end());
+        result.escaped.insert(rhs.escaped.begin(), rhs.escaped.end());
+        return result;
     }
 
-    State transfer(const Stmt* stmt, const State& input,
-                   ASTContext&) const {
-        State output = input;
+    State transfer(const Stmt* stmt, const State& input, ASTContext& ctx) const {
+        State out = input;
         const auto forget = [&](const VarDecl* var) {
-            if (!var) return;
-            output.outputs.erase(var);
-            output.statuses.erase(var);
+            out.outputs.erase(var);
+            out.statuses.erase(var);
+        };
+        const auto write = [&](const Expr* lhs) {
+            Targets targets = writtenTargets(lhs, input);
+            if (targets.empty() && !plainStorage(lhs))
+                targets = input.escaped;
+            for (const auto* var : targets) forget(var);
+            return targets;
+        };
+        const auto bindValue = [&](const VarDecl* var, const Expr* value) {
+            if (!var || var->getType().isVolatileQualified()) return;
+            if (var->hasGlobalStorage()) out.escaped.insert(var);
+            if (auto status = statusFor(value, input, ctx)) out.statuses.emplace(var, *status);
+            if (var->getType()->isUnsignedIntegerType())
+                if (const auto* origin = copiedOutput(value, input, ctx, var->getType()))
+                    out.outputs[var] = *origin;
+        };
+        const auto bindAlias = [&](const VarDecl* var, Targets targets) {
+            if (var->hasGlobalStorage())
+                out.escaped.insert(targets.begin(), targets.end());
+            out.aliases[var] = std::move(targets);
         };
 
-        if (const auto* decls = llvm::dyn_cast<DeclStmt>(stmt))
-            for (const Decl* decl : decls->decls())
-                if (const auto* var = llvm::dyn_cast<VarDecl>(decl))
-                    forget(var);
-        if (const auto* assign = llvm::dyn_cast<BinaryOperator>(stmt);
-            assign && assign->isAssignmentOp())
-            forget(directIntegerVar(assign->getLHS()));
-        if (const auto* unary = llvm::dyn_cast<UnaryOperator>(stmt);
-            unary && unary->isIncrementDecrementOp())
-            forget(directIntegerVar(unary->getSubExpr()));
-
-        if (const auto* call = llvm::dyn_cast<CallExpr>(stmt);
-            call && !isMulOverflowBuiltin(call)) {
-            for (unsigned i = 0; i < call->getNumArgs(); ++i) {
-                const Expr* arg = call->getArg(i);
-                forget(addressedIntegerVar(arg));
-                if (isWritableReferenceArgument(call, i))
-                    forget(directIntegerVar(arg));
+        if (const auto* call = llvm::dyn_cast<CallExpr>(stmt)) {
+            if (isCheckedOverflowBuiltin(call)) {
+                // A loop can execute the same AST call again. Old status or
+                // copied-output facts must not certify the new invocation.
+                for (auto it = out.statuses.begin(); it != out.statuses.end();)
+                    if (it->second.call == call) it = out.statuses.erase(it);
+                    else ++it;
+                for (auto& [var, origins] : out.outputs) origins.erase(call);
+                if (const VarDecl* output = checkedOverflowOutput(call)) {
+                    forget(output);
+                    out.outputs[output] = {{call, false}};
+                    if (output->hasGlobalStorage()) out.escaped.insert(output);
+                } else if (call->getNumArgs() >= 3) {
+                    for (const auto* var : pointedTargets(call->getArg(2), input)) forget(var);
+                }
+            } else {
+                // A callee may retain an escaped pointer/reference and write
+                // it on a later call, even after a fresh checked result exists.
+                for (const auto* var : input.escaped) forget(var);
+                Targets targets;
+                for (const Expr* arg : call->arguments()) {
+                    auto current = pointedTargets(arg, input);
+                    targets.insert(current.begin(), current.end());
+                }
+                codeskeptic::forEachNonConstRefArg(call, [&](const Expr* arg) {
+                    auto current = writtenTargets(arg, input);
+                    targets.insert(current.begin(), current.end());
+                });
+                for (const auto* var : targets) forget(var);
+                out.escaped.insert(targets.begin(), targets.end());
             }
+        } else if (const auto* decls = llvm::dyn_cast<DeclStmt>(stmt)) {
+            for (const Decl* decl : decls->decls()) {
+                const auto* var = llvm::dyn_cast<VarDecl>(decl);
+                if (!var) continue;
+                forget(var);
+                if (var->getType()->isPointerType())
+                    bindAlias(var, pointedTargets(var->getInit(), input));
+                else if (var->getType()->isReferenceType())
+                    bindAlias(var, writtenTargets(var->getInit(), input));
+                else if (var->hasInit())
+                    bindValue(var, var->getInit());
+            }
+        } else if (const auto* assign = llvm::dyn_cast<BinaryOperator>(stmt);
+                   assign && assign->isAssignmentOp()) {
+            Targets targets = write(assign->getLHS());
+            if (assign->getOpcode() == BO_Assign) {
+                if (const auto* var = plainStorage(assign->getLHS());
+                    var && var->getType()->isPointerType())
+                    bindAlias(var, pointedTargets(assign->getRHS(), input));
+                if (targets.size() == 1)
+                    bindValue(*targets.begin(), assign->getRHS());
+            }
+        } else if (const auto* unary = llvm::dyn_cast<UnaryOperator>(stmt);
+                   unary && unary->isIncrementDecrementOp()) {
+            write(unary->getSubExpr());
+        } else if (llvm::isa<AsmStmt>(stmt)) {
+            out.outputs.clear();
+            out.statuses.clear();
         }
-
-        const CallExpr* checked = findMulOverflowCall(stmt);
-        const VarDecl* result = mulOverflowOutput(checked);
-        if (checked && result) {
-            output.outputs[result] = checked;
-            output.safe.erase(checked);
-
-            if (const auto* decls = llvm::dyn_cast<DeclStmt>(stmt))
-                for (const Decl* decl : decls->decls())
-                    if (const auto* var = llvm::dyn_cast<VarDecl>(decl);
-                        var && var->hasInit() &&
-                        findMulOverflowCall(var->getInit()) == checked)
-                        output.statuses[var] = checked;
-            if (const auto* assign = llvm::dyn_cast<BinaryOperator>(stmt);
-                assign && assign->getOpcode() == BO_Assign &&
-                findMulOverflowCall(assign->getRHS()) == checked)
-                if (const VarDecl* status =
-                        directIntegerVar(assign->getLHS()))
-                    output.statuses[status] = checked;
-        }
-        return output;
+        return out;
     }
 
-    void refineOnEdge(const Stmt* condition, bool isTrueBranch,
-                      State& state, ASTContext& ctx) const {
+    void refineOnEdge(const Stmt* condition, bool isTrue, State& state,
+                      ASTContext& ctx) const {
         const auto* expr = llvm::dyn_cast_or_null<Expr>(condition);
         if (!expr) return;
         expr = expr->IgnoreParenImpCasts();
-        const CallExpr* call = nullptr;
-        bool trueMeansOverflow = true;
-
-        if (const auto* direct = llvm::dyn_cast<CallExpr>(expr);
-            direct && isMulOverflowBuiltin(direct)) {
-            call = direct;
-        } else if (const VarDecl* status = directIntegerVar(expr)) {
-            auto found = state.statuses.find(status);
-            if (found != state.statuses.end()) call = found->second;
-        } else if (const auto* compare =
-                       llvm::dyn_cast<BinaryOperator>(expr);
-                   compare && (compare->getOpcode() == BO_EQ ||
-                               compare->getOpcode() == BO_NE)) {
-            const auto isZero = [&](const Expr* value) {
-                Expr::EvalResult result;
-                return value && value->EvaluateAsInt(result, ctx) &&
-                       result.Val.isInt() &&
-                       result.Val.getInt() == 0;
-            };
-            const VarDecl* status = nullptr;
-            if (isZero(compare->getRHS()))
-                status = directIntegerVar(compare->getLHS());
-            else if (isZero(compare->getLHS()))
-                status = directIntegerVar(compare->getRHS());
-            if (status) {
-                auto found = state.statuses.find(status);
-                if (found != state.statuses.end()) {
-                    call = found->second;
-                    trueMeansOverflow = compare->getOpcode() == BO_NE;
-                }
-            }
+        if (const auto* logic = llvm::dyn_cast<BinaryOperator>(expr);
+            logic && ((logic->getOpcode() == BO_LAnd && isTrue) ||
+                      (logic->getOpcode() == BO_LOr && !isTrue))) {
+            refineOnEdge(logic->getLHS(), isTrue, state, ctx);
+            refineOnEdge(logic->getRHS(), isTrue, state, ctx);
+            return;
         }
-
-        if (!call) return;
-        const bool overflowEdge = isTrueBranch == trueMeansOverflow;
-        if (overflowEdge)
-            state.safe.erase(call);
-        else
-            state.safe.insert(call);
+        auto status = statusFor(expr, state, ctx);
+        if (!status) return;
+        const bool safe = isTrue != status->trueMeansOverflow;
+        for (auto& [var, origins] : state.outputs) {
+            auto found = origins.find(status->call);
+            if (found != origins.end()) found->second = safe;
+        }
     }
 
-    void widen(State& state) const { state = {}; }
-
-    void onStatement(const Stmt* stmt, const State& before,
-                     const State&, ASTContext&) {
+    void widen(State& state) const {
+        state.outputs.clear();
+        state.statuses.clear();
+        // Alias/escape sets are finite may-facts; forgetting them could make a
+        // later aliased write incorrectly preserve a newly created status.
+    }
+    void onStatement(const Stmt* stmt, const State& before, const State&, ASTContext&) {
         atStmt_[stmt] = before;
     }
-
     const State* stateAt(const Stmt* stmt) const {
         auto found = atStmt_.find(stmt);
         return found == atStmt_.end() ? nullptr : &found->second;
     }
 
 private:
+    static const VarDecl* plainStorage(const Expr* expr) {
+        if (!expr) return nullptr;
+        const auto* ref = llvm::dyn_cast<DeclRefExpr>(expr->IgnoreParenImpCasts());
+        const auto* var = ref ? llvm::dyn_cast<VarDecl>(ref->getDecl()) : nullptr;
+        return var && !var->getType()->isReferenceType() ? var : nullptr;
+    }
+    static Targets writtenTargets(const Expr* expr, const State& state) {
+        if (!expr) return {};
+        expr = expr->IgnoreParenCasts();
+        if (const auto* ref = llvm::dyn_cast<DeclRefExpr>(expr)) {
+            const auto* var = llvm::dyn_cast<VarDecl>(ref->getDecl());
+            if (!var) return {};
+            if (var->getType()->isIntegerType()) return {var};
+            auto alias = state.aliases.find(var);
+            return var->getType()->isReferenceType() && alias != state.aliases.end()
+                       ? alias->second : Targets{};
+        }
+        if (const auto* op = llvm::dyn_cast<UnaryOperator>(expr);
+            op && op->getOpcode() == UO_Deref) return pointedTargets(op->getSubExpr(), state);
+        if (const auto* subscript = llvm::dyn_cast<ArraySubscriptExpr>(expr))
+            return pointedTargets(subscript->getBase(), state);
+        if (const auto* select = llvm::dyn_cast<ConditionalOperator>(expr)) {
+            auto result = writtenTargets(select->getTrueExpr(), state);
+            auto other = writtenTargets(select->getFalseExpr(), state);
+            result.insert(other.begin(), other.end());
+            return result;
+        }
+        return {};
+    }
+    static Targets pointedTargets(const Expr* expr, const State& state) {
+        if (!expr || !expr->getType()->isPointerType()) return {};
+        expr = expr->IgnoreParenCasts();
+        if (const auto* op = llvm::dyn_cast<UnaryOperator>(expr);
+            op && op->getOpcode() == UO_AddrOf) return writtenTargets(op->getSubExpr(), state);
+        if (const auto* ref = llvm::dyn_cast<DeclRefExpr>(expr)) {
+            const auto* var = llvm::dyn_cast<VarDecl>(ref->getDecl());
+            auto alias = state.aliases.find(var);
+            return alias == state.aliases.end() ? Targets{} : alias->second;
+        }
+        if (const auto* select = llvm::dyn_cast<ConditionalOperator>(expr)) {
+            auto result = pointedTargets(select->getTrueExpr(), state);
+            auto other = pointedTargets(select->getFalseExpr(), state);
+            result.insert(other.begin(), other.end());
+            return result;
+        }
+        if (const auto* comma = llvm::dyn_cast<BinaryOperator>(expr);
+            comma && comma->getOpcode() == BO_Comma)
+            return pointedTargets(comma->getRHS(), state);
+        if (const auto* offset = llvm::dyn_cast<BinaryOperator>(expr);
+            offset && (offset->getOpcode() == BO_Add || offset->getOpcode() == BO_Sub)) {
+            // Keep may-alias targets through pointer offsets, including p+0.
+            auto result = pointedTargets(offset->getLHS(), state);
+            auto other = pointedTargets(offset->getRHS(), state);
+            result.insert(other.begin(), other.end());
+            return result;
+        }
+        return {};
+    }
+    static const Origins* copiedOutput(const Expr* expr, const State& state,
+                                       ASTContext& ctx, QualType destination) {
+        if (!expr || !destination->isUnsignedIntegerType()) return nullptr;
+        expr = expr->IgnoreParens();
+        while (const auto* cast = llvm::dyn_cast<CastExpr>(expr)) {
+            const Expr* sub = cast->getSubExpr()->IgnoreParens();
+            if (!cast->getType()->isUnsignedIntegerType() ||
+                !sub->getType()->isUnsignedIntegerType() ||
+                ctx.getIntWidth(cast->getType()) < ctx.getIntWidth(sub->getType()))
+                return nullptr;
+            expr = sub;
+        }
+        if (!expr->getType()->isUnsignedIntegerType() ||
+            ctx.getIntWidth(destination) < ctx.getIntWidth(expr->getType())) return nullptr;
+        const auto targets = writtenTargets(expr, state);
+        if (targets.size() != 1) return nullptr;
+        auto found = state.outputs.find(*targets.begin());
+        return found == state.outputs.end() ? nullptr : &found->second;
+    }
+    static std::optional<Status> statusFor(const Expr* expr, const State& state,
+                                           ASTContext& ctx, unsigned depth = 0) {
+        if (!expr || depth > 24) return std::nullopt;
+        expr = expr->IgnoreParens();
+        if (expr->getType().isVolatileQualified()) return std::nullopt;
+        if (const auto* cast = llvm::dyn_cast<CastExpr>(expr)) {
+            const auto kind = cast->getCastKind();
+            if (kind != CK_LValueToRValue && kind != CK_NoOp &&
+                kind != CK_IntegralCast && kind != CK_IntegralToBoolean) return std::nullopt;
+            return statusFor(cast->getSubExpr(), state, ctx, depth + 1);
+        }
+        if (const auto* call = llvm::dyn_cast<CallExpr>(expr);
+            call && checkedOverflowOutput(call)) {
+            for (const auto& [var, origins] : state.outputs)
+                if (origins.count(call)) return Status{call, true};
+            return std::nullopt;
+        }
+        if (llvm::isa<DeclRefExpr>(expr)) {
+            auto targets = writtenTargets(expr, state);
+            if (targets.size() != 1) return std::nullopt;
+            auto found = state.statuses.find(*targets.begin());
+            if (found != state.statuses.end()) return found->second;
+        }
+        if (const auto* unary = llvm::dyn_cast<UnaryOperator>(expr);
+            unary && unary->getOpcode() == UO_LNot) {
+            auto status = statusFor(unary->getSubExpr(), state, ctx, depth + 1);
+            if (status) status->trueMeansOverflow = !status->trueMeansOverflow;
+            return status;
+        }
+        if (const auto* compare = llvm::dyn_cast<BinaryOperator>(expr)) {
+            if (compare->getOpcode() == BO_Comma)
+                return statusFor(compare->getRHS(), state, ctx, depth + 1);
+            if (compare->getOpcode() != BO_EQ && compare->getOpcode() != BO_NE)
+                return std::nullopt;
+            const auto bit = [&](const Expr* value) -> std::optional<bool> {
+                Expr::EvalResult result;
+                if (value->EvaluateAsInt(result, ctx) && result.Val.isInt()) {
+                    if (result.Val.getInt() == 0) return false;
+                    if (result.Val.getInt() == 1) return true;
+                }
+                return std::nullopt;
+            };
+            auto constant = bit(compare->getRHS());
+            auto status = statusFor(compare->getLHS(), state, ctx, depth + 1);
+            if (!constant || !status) {
+                constant = bit(compare->getLHS());
+                status = statusFor(compare->getRHS(), state, ctx, depth + 1);
+            }
+            if (constant && status) {
+                const bool preserves = (compare->getOpcode() == BO_EQ) == *constant;
+                if (!preserves) status->trueMeansOverflow = !status->trueMeansOverflow;
+                return status;
+            }
+        }
+        return std::nullopt;
+    }
     std::map<const Stmt*, State> atStmt_;
 };
 
@@ -1463,7 +1756,8 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
 
     std::optional<AllocationAddRanges> addRanges;
     bool addConverged = false;
-    if (std::any_of(inventory.arithmetic.begin(), inventory.arithmetic.end(),
+    if (inventory.hasAddOverflow ||
+        std::any_of(inventory.arithmetic.begin(), inventory.arithmetic.end(),
                     [](const SizeSite& site) {
                         return site.bits == 64 && site.op->getOpcode() == BO_Add;
                     })) {
@@ -1475,12 +1769,12 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
                 fn->getQualifiedNameAsString(), addDf.failure);
     }
 
-    CheckedMulAnalysis checkedAnalysis;
+    CheckedArithmeticAnalysis checkedAnalysis;
     bool checkedRan = false;
-    if (inventory.hasMulOverflow && !inventory.checked.empty()) {
+    if ((inventory.hasMulOverflow || inventory.hasAddOverflow) && !inventory.checked.empty()) {
         auto checkedDf =
             codeskeptic::runDataflow(fn, ctx, checkedAnalysis);
-        checkedRan = true;
+        checkedRan = checkedDf.converged && df.converged;
         if (!checkedDf.converged)
             codeskeptic::CoverageReport::instance().recordDataflowFailure(
                 fn->getQualifiedNameAsString(), checkedDf.failure);
@@ -1549,36 +1843,42 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
 
     if (!checkedRan) return;
     for (const CheckedSizeSite& site : inventory.checked) {
-        const CheckedMulAnalysis::State* relationState =
+        const CheckedArithmeticAnalysis::State* relationState =
             checkedAnalysis.stateAt(site.allocator);
         if (!relationState) continue;
         auto relation = relationState->outputs.find(site.sizeVar);
         if (relation == relationState->outputs.end()) continue;
-        const CallExpr* checked = relation->second;
-        if (!checked || checked->getNumArgs() < 3 ||
-            relationState->safe.count(checked))
-            continue;
+        for (const auto& [checked, safe] : relation->second) {
+            if (!checked || checked->getNumArgs() < 3 || safe)
+                continue;
 
-        const Stmt* keys[3] = {
-            checked, checked->getArg(0), checked->getArg(1)};
-        const codeskeptic::IntervalMap* state = nullptr;
-        const std::set<const VarDecl*>* untrusted = nullptr;
-        for (const Stmt* key : keys) {
-            if (!state) state = analysis.stateAt(key);
-            if (!untrusted) untrusted = analysis.untrustedAt(key);
+            const Stmt* keys[3] = {
+                checked, checked->getArg(0), checked->getArg(1)};
+            const codeskeptic::IntervalMap* state = nullptr;
+            const std::set<const VarDecl*>* untrusted = nullptr;
+            for (const Stmt* key : keys) {
+                if (!state) state = analysis.stateAt(key);
+                if (!untrusted) untrusted = analysis.untrustedAt(key);
+            }
+            if (!state) continue;
+            if (!untrusted) untrusted = &kNoUntrusted;
+
+            const VarDecl* originalOutput = checkedOverflowOutput(checked);
+            if (!originalOutput) continue;
+            QualType resultType = originalOutput->getType();
+            if (!resultType->isUnsignedIntegerType()) continue;
+            const unsigned bits = ctx.getIntWidth(resultType);
+            bool overflow = false;
+            if (isMulOverflowBuiltin(checked))
+                overflow = multiplyCornerExceeds(checked->getArg(0), checked->getArg(1),
+                    bits, *state, *untrusted, definitions, ctx);
+            else if (isAddOverflowBuiltin(checked) && addConverged)
+                overflow = addRanges->checkedAddOverflows(checked, bits, *state,
+                    *untrusted, definitions, ctx);
+            if (!overflow) continue;
+            report(checked->getExprLoc(), resultType, site.allocator,
+                   checked, *untrusted);
         }
-        if (!state) continue;
-        if (!untrusted) untrusted = &kNoUntrusted;
-
-        QualType resultType = site.sizeVar->getType();
-        if (!resultType->isUnsignedIntegerType()) continue;
-        const unsigned bits = ctx.getIntWidth(resultType);
-        if (!multiplyCornerExceeds(
-                checked->getArg(0), checked->getArg(1), bits, *state,
-                *untrusted, definitions, ctx))
-            continue;
-        report(checked->getExprLoc(), resultType, site.allocator,
-               checked, *untrusted);
     }
 }
 class AllocSizeOverflowCallback : public MatchFinder::MatchCallback {
