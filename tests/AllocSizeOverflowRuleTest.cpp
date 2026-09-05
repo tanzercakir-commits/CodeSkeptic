@@ -235,6 +235,91 @@ TEST(AllocSizeOverflowRuleTest, Uint64OutParamUnknownAndNonOutputBoundaries) {
     EXPECT_TRUE(results.empty());
 }
 
+TEST(AllocSizeOverflowRuleTest, Uint64OutParamEmptyConstObserversPreserveGuards) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    for (bool reference : {false, true}) {
+        const std::string parameter = reference ? "&" : "*";
+        const std::string argument = reference ? "n" : "&n";
+        const std::string prelude = "typedef __SIZE_TYPE__ size_t;extern void* malloc(size_t);"
+            "extern void read_size(size_t" + parameter + ");"
+            "static void observe(const size_t" + parameter + " value){}"
+            "void* f(){size_t n=0;read_size(" + argument + ");";
+        struct Case { const char* guard; const char* size; size_t count; };
+        const Case cases[] = {
+            {"if(n>100)return 0;", "n+16", 0},
+            {"if(n>100)return 0;", "n*4", 0},
+            {"if(n>((size_t)-1)-16)return 0;", "n+16", 0},
+            {"if(n>((size_t)-1)-15)return 0;", "n+16", 1},
+            {"if(n>((size_t)-1)/4)return 0;", "n*4", 0},
+            {"if(n>((size_t)-1)/4+1)return 0;", "n*4", 1},
+            {"", "n+16", 1}, {"", "n*4", 1},
+        };
+        for (const auto& item : cases) {
+            SCOPED_TRACE(reference ? "reference" : "pointer");
+            SCOPED_TRACE(item.guard);
+            SCOPED_TRACE(item.size);
+            const auto results = runRule(rule, prelude + item.guard + "observe(" + argument +
+                ");return malloc(" + item.size + ");}", reference ? "observer.cpp" : "observer.c");
+            EXPECT_EQ(results.size(), item.count);
+        }
+    }
+}
+
+TEST(AllocSizeOverflowRuleTest, Uint64OutParamConstObserverIsNotGeneralPurityProof) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    const std::string prelude = R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern void read_size(size_t*);
+        static void observe(const size_t*){}
+        static void write_const(const size_t* p){*const_cast<size_t*>(p)=(size_t)-1;}
+        extern void opaque(const size_t*);
+        extern void opaque_ref(const size_t&);
+        extern void tick();
+        void* f(void (*indirect)(const size_t*)){
+            size_t n=0;read_size(&n);size_t* alias=&n;if(n>100)return 0;
+    )";
+    for (const char* action : {"write_const(&n);", "opaque(&n);", "indirect(&n);",
+                              "observe(&n);opaque_ref(n);", "observe(&n);opaque(alias);",
+                              "observe(&n);tick();", "observe(&n);*alias=(size_t)-1;"}) {
+        for (const char* size : {"n+16", "n*4"}) {
+            SCOPED_TRACE(action);
+            SCOPED_TRACE(size);
+            EXPECT_EQ(runRule(rule, prelude + action + "return malloc(" + size + ");}").size(), 1u);
+        }
+    }
+}
+
+TEST(AllocSizeOverflowRuleTest, Uint64OutParamEmptyBodyVlaParameterCanMutate) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    const auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern void read_size(size_t*);
+        static size_t* retained;
+        static void observe(const size_t*);
+        static void observe(const size_t values[(*retained=(size_t)-1,1)]){}
+        void* f(){size_t n=0;read_size(&n);retained=&n;if(n>100)return 0;
+            observe(&n);return malloc(n+16);}
+    )", "observer_vla.c");
+    EXPECT_EQ(results.size(), 1u);
+}
+
+TEST(AllocSizeOverflowRuleTest, Uint64OutParamMultiplyKeepsMorePreciseNumericProofs) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    for (const char* expression : {"n&255", "n%256"}) {
+        SCOPED_TRACE(expression);
+        EXPECT_TRUE(runRule(rule, std::string(
+            "typedef __SIZE_TYPE__ size_t;extern void* malloc(size_t);"
+            "extern void read_size(size_t*);void* f(){size_t n=0;read_size(&n);n=") +
+            expression + ";return malloc(n*4);}").empty());
+    }
+}
+
 // Phase 6.1: a 64-bit allocation-size expression needs operand-corner
 // reasoning because the mathematical product does not fit the int64
 // interval domain. A declared untrusted size_t and a finite factor are

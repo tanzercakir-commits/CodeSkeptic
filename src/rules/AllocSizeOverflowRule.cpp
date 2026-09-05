@@ -14,6 +14,7 @@
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
+#include <clang/AST/DeclCXX.h>
 #include <clang/AST/Expr.h>
 #include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/AST/Stmt.h>
@@ -37,6 +38,32 @@ using namespace clang;
 using namespace clang::ast_matchers;
 
 namespace {
+
+// A const signature alone does not prove absence of alias writes. Admit only
+// a visible, empty internal free function with inert original parameters and
+// arguments. In C, an adjusted pointer parameter can hide an evaluated VLA
+// bound, so inspect the definition's original type, not a prior prototype.
+bool isEmptyConstObserver(const CallExpr* call, ASTContext& ctx) {
+    const auto* callee = call ? call->getDirectCallee() : nullptr;
+    const auto* definition = callee ? callee->getDefinition() : nullptr;
+    if (!definition || llvm::isa<CXXMethodDecl>(definition) ||
+        definition->getFormalLinkage() != Linkage::Internal ||
+        !definition->getReturnType()->isVoidType() || definition->isVariadic() ||
+        definition->getNumParams() != call->getNumArgs() ||
+        !llvm::isa<DeclRefExpr>(call->getCallee()->IgnoreParenImpCasts()))
+        return false;
+    const auto* body = llvm::dyn_cast<CompoundStmt>(definition->getBody());
+    if (!body || !body->body_empty()) return false;
+    for (unsigned i = 0; i < call->getNumArgs(); ++i) {
+        const QualType original = definition->getParamDecl(i)->getOriginalType();
+        if ((!original->isPointerType() && !original->isReferenceType()) ||
+            original->isVariablyModifiedType()) return false;
+        const QualType value = original->getPointeeType();
+        if (!value.isConstQualified() || !value->isIntegerType() ||
+            call->getArg(i)->HasSideEffects(ctx)) return false;
+    }
+    return true;
+}
 
 std::set<const VarDecl*> collectIntVars(const FunctionDecl* fn) {
     struct V : RecursiveASTVisitor<V> {
@@ -506,8 +533,9 @@ bool wrapsUnsigned64Multiply(
 }
 
 // MAX64-offset cannot be represented by the shared signed interval domain.
-// Keep a small unsigned domain local to allocation addition: no changes to
-// multiplication, shared provenance, or checked-arithmetic builtin semantics.
+// Keep a small unsigned domain local to allocation addition. Also reuse its
+// safe bound for direct escaped uint64 multiplication; never replace existing
+// numeric multiplication evidence with an imprecise full-width range.
 class AllocationAddRanges {
     static constexpr uint64_t kMax = std::numeric_limits<uint64_t>::max();
     struct Range {
@@ -621,7 +649,9 @@ public:
                 invalidateWrite(out, op->getSubExpr());
                 if (var) put(out, var, value);
             }
-        } else if (llvm::isa<CallExpr>(stmt) || llvm::isa<AsmStmt>(stmt)) {
+        } else if (const auto* call = llvm::dyn_cast<CallExpr>(stmt)) {
+            if (!isEmptyConstObserver(call, ctx)) invalidateEscapes(out);
+        } else if (llvm::isa<AsmStmt>(stmt)) {
             invalidateEscapes(out);
         }
         return out;
@@ -745,6 +775,26 @@ public:
         };
         return exceeds(op->getLHS(), op->getRHS()) ||
                exceeds(op->getRHS(), op->getLHS());
+    }
+
+    bool provesEscapedMultiplySafe(const BinaryOperator* op,
+                                   const std::set<const VarDecl*>& untrusted,
+                                   const DefinitionIndex& definitions,
+                                   ASTContext& ctx) const {
+        if (!op || op->getOpcode() != BO_Mul) return false;
+        const auto snapshot = atStmt_.find(op);
+        if (snapshot == atStmt_.end() || snapshot->second.unreachable) return false;
+        const auto safe = [&](const Expr* value, const Expr* factor) {
+            const auto* var = wideVar(value, ctx);
+            if (!var || !escaped_.count(var) ||
+                !codeskeptic::exprDerivesFromUntrusted(value, untrusted) ||
+                hasSignedUntrustedOrigin(value, untrusted, definitions)) return false;
+            const auto constant = constantUnsigned(factor, 64, ctx);
+            if (!constant) return false;
+            const llvm::APInt upper(128, get(snapshot->second, var).hi);
+            return (upper * constant->zext(128)).ule(llvm::APInt(128, kMax));
+        };
+        return safe(op->getLHS(), op->getRHS()) || safe(op->getRHS(), op->getLHS());
     }
 
     bool checkedAddOverflows(const CallExpr* call, unsigned outputBits,
@@ -1849,7 +1899,7 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
     if (inventory.hasAddOverflow ||
         std::any_of(inventory.arithmetic.begin(), inventory.arithmetic.end(),
                     [](const SizeSite& site) {
-                        return site.bits == 64 && site.op->getOpcode() == BO_Add;
+                        return site.bits == 64;
                     })) {
         addRanges.emplace(fn);
         auto addDf = codeskeptic::runDataflow(fn, ctx, *addRanges);
@@ -1923,6 +1973,10 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         if (!wraps && site.bits == 64)
             wraps = wrapsUnsigned64Multiply(
                 site.op, *state, *untrusted, definitions, ctx);
+        if (wraps && site.bits == 64 && site.op->getOpcode() == BO_Mul &&
+            addConverged && addRanges->provesEscapedMultiplySafe(
+                site.op, *untrusted, definitions, ctx))
+            wraps = false;
         if (!wraps && site.bits == 64 && site.op->getOpcode() == BO_Add &&
             addConverged)
             wraps = addRanges->wraps(site.op, *state, *untrusted, definitions, ctx);
