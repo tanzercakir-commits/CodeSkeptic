@@ -701,6 +701,10 @@ TEST(AllocSizeOverflowRuleTest, BuiltinAddOverflowUseAndStatus) {
         {"partly unknown alias retains possible origin", "__builtin_add_overflow(n,16,&bytes); size_t* p=runtime_header()?&bytes:unknown_size_pointer(); *p=16; return malloc(bytes);", 1},
         {"branch partly unknown alias retains origin", "__builtin_add_overflow(n,16,&bytes); size_t* p=unknown_size_pointer(); if(runtime_header()) p=&bytes; *p=16; return malloc(bytes);", 1},
         {"may-alias status write invalidates proof", "bool overflow=__builtin_add_overflow(n,16,&bytes), other=true; bool* p=runtime_header()?&overflow:&other; *p=false; if(overflow) return 0; return malloc(bytes);", 1},
+        {"unknown pointer write invalidates escaped status", "bool overflow=false; bool* p=passthrough(&overflow); overflow=__builtin_add_overflow(n,16,&bytes); *p=false; if(overflow) return 0; return malloc(bytes);", 1},
+        {"fresh escaped status without write remains valid", "bool overflow=false; bool* p=passthrough(&overflow); overflow=__builtin_add_overflow(n,16,&bytes); if(overflow) return 0; return malloc(bytes);", 0},
+        {"indirect builtin may-write retains old output", "size_t other=0; __builtin_add_overflow(n,16,&bytes); size_t* p=runtime_header()?&bytes:&other; __builtin_add_overflow(0,16,p); return malloc(bytes);", 1},
+        {"indirect builtin definite write replaces old output", "__builtin_add_overflow(n,16,&bytes); size_t* p=&bytes; __builtin_add_overflow(0,16,p); return malloc(bytes);", 0},
         {"status escapes through global pointer", "bool overflow=__builtin_add_overflow(n,16,&bytes); saved_status=&overflow; mutate_saved(); if(overflow) return 0; return malloc(bytes);", 1},
         {"status reference alias invalidates", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool& alias=overflow; alias=false; if(overflow) return 0; return malloc(bytes);", 1},
         {"status pointer passed to callee", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool* p=&overflow; mutate_status_ptr(p); if(overflow) return 0; return malloc(bytes);", 1},
@@ -731,6 +735,7 @@ TEST(AllocSizeOverflowRuleTest, BuiltinAddOverflowUseAndStatus) {
             extern void mutate_status_ptr(bool*);
             extern void mutate_status_chain(bool**);
             extern size_t* unknown_size_pointer(void);
+            extern bool* passthrough(bool*);
             extern void mutate_saved(void);
             bool global_status=false;
             bool* saved_status=nullptr;

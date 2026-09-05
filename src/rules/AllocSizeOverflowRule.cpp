@@ -1279,17 +1279,19 @@ public:
             out.outputs.erase(var);
             out.statuses.erase(var);
         };
-        const auto write = [&](const Expr* lhs) {
-            Targets targets = writtenTargets(lhs, input);
-            if (targets.empty() && !plainStorage(lhs)) {
-                targets = input.escaped;
-                targets.insert(nullptr);
-            }
+        const auto invalidateTargets = [&](Targets targets) {
+            if (targets.count(nullptr))
+                targets.insert(input.escaped.begin(), input.escaped.end());
             for (const auto* var : targets) {
                 out.statuses.erase(var); // A possible write invalidates must-proof.
                 if (targets.size() == 1 && var) out.outputs.erase(var);
             }
             return targets;
+        };
+        const auto write = [&](const Expr* lhs) {
+            Targets targets = writtenTargets(lhs, input);
+            if (targets.empty() && !plainStorage(lhs)) targets.insert(nullptr);
+            return invalidateTargets(std::move(targets));
         };
         const auto bindValue = [&](const VarDecl* var, const Expr* value) {
             if (!var || var->getType().isVolatileQualified()) return;
@@ -1323,7 +1325,7 @@ public:
                     out.outputs[output] = {{call, {false, true}}};
                     if (output->hasGlobalStorage()) out.escaped.insert(output);
                 } else if (call->getNumArgs() >= 3) {
-                    for (const auto* var : pointedTargets(call->getArg(2), input)) forget(var);
+                    invalidateTargets(pointedTargets(call->getArg(2), input));
                 }
             } else {
                 // A callee may retain an escaped pointer/reference and write
