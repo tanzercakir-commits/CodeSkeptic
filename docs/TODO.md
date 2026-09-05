@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH02-S01-U002
-
-### CS3-CH02-S01-U002 — Config ve target-scope güncellemelerini işlemsel yap
-
-**Sonuç:** Geçersiz config/scope girdisi önceki geçerli durumu kısmen değiştirmez.
-
-**Kabul:**
-
-- Malformed, overflow, delimiter-only ve conflict girdilerinde state byte-equivalent kalır.
-- Bozuk kapsam analizi genişletmez veya güvenilir temiz hüküm üretmez.
-- CLI ve MCP girişleri aynı structured reason sözleşmesini uygular.
-
-**Test bütçesi:** T1
-**Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/config/Config*, src/source_manager/SourceManager*, src/core/Messages*, src/server/McpServer*, tests/ConfigTest.cpp, tests/SourceManagerTest.cpp, tests/McpServerTest.cpp, tests/CMakeLists.txt
-**Bağımlılıklar:** Yok
+## FRONT — CS3-CH02-S01-U003
 
 ### CS3-CH02-S01-U003 — Çoklu producer kural seçimini diagnostic ID ile tutarlı uygula
 

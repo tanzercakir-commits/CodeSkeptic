@@ -2,6 +2,19 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH02-S01-U002 — Config ve target-scope güncellemelerini işlemsel yap
+
+- Commit: `464546bd478245e14c80984c5011524a79025e13`
+- Dal: `agent/cs3-ch02-s01-u002-transactional-config`
+- Implementer: `root-cs3-ch02-s01-u002-20260906`
+- Bağımsız denetçi: `independent-cwe-ch02-s01-u002-464546b-20260906`
+- İnceleme SHA-256: `b266abcb3834bb82176801f0e5a7e4d41e5acf823517d0cc2421f08bb35eafe2`
+- Tarih: 2026-09-05T23:18:03.129792+00:00
+- Sonuç: Geçersiz config/scope girdisi önceki geçerli durumu kısmen değiştirmez.
+- focused-tests: PASS; SHA-256 `96eaef52de33139d5be74e6b99f023eb4ddafc46b899b6dff2eccc9baaca0bd2`; `bash scripts/local_test.sh focused 'ConfigTest.*:SourceManagerTargetTest.*:McpServerTest.*:ReportPathsTest.*:FunctionFilterTest.*:BrokenTuTest.*:VerdictIntegrityTest.*'`
+- cli-smoke: PASS; SHA-256 `1e5e98603942173179634fdf6fbda2ca606f8cf660652818372fc196996b9d81`; `Bounded rootless offline exact-head binary: codeskeptic --version; python3 -B tests/CompilationDatabaseCliTest.py <binary>; retained CS3-CH02-S01-U002/input_cli_smoke.py <binary> for 11 exact CLI/MCP error pairs and same-process valid-invalid-valid isolation; bash scripts/local_test.sh smoke.`
+- queue-check: PASS; SHA-256 `f147a4a24beffe72306c51082891bef48abb8fe1bde794b28c41d69bf37f5f7f`; `python3 -B scripts/project_queue.py check; python3 -B scripts/project_queue.py guard --base HEAD^; bash scripts/check_docs_sync.sh; git diff --check; git rev-parse HEAD; git status --short --branch`
+
 ## CS3-CH02-S01-U001 — Compilation database keşfi ve doctor komutunu yeniden uygula
 
 - Commit: `9bb1b1983a0e1849313f3df9d443f9d7c2fe1a67`
