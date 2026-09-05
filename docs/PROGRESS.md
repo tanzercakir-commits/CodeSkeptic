@@ -2,6 +2,19 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH02-S01-U001 — Compilation database keşfi ve doctor komutunu yeniden uygula
+
+- Commit: `9bb1b1983a0e1849313f3df9d443f9d7c2fe1a67`
+- Dal: `agent/cs3-ch02-s01-u001-compilation-database-doctor`
+- Implementer: `root-cs3-ch02-s01-u001-20260906`
+- Bağımsız denetçi: `independent-cwe-ch02-s01-u001-9bb1b19-20260906`
+- İnceleme SHA-256: `28e52b8283aa999e081868680a3230c17a5ef0c13456dbba830d58c84752de12`
+- Tarih: 2026-09-05T22:27:14.427633+00:00
+- Sonuç: Kullanıcı doğru database'i veya düzeltilebilir açık hatayı görür.
+- focused-tests: PASS; SHA-256 `d8eb4867cea1b83e9ceb699b58fe280832444eaa7a9fe5ed680434c45585e8db`; `bash scripts/local_test.sh focused 'ConfigTest.*:BrokenTuTest.*:VerdictIntegrityTest.*:McpServerTest.*:SummaryPersistTest.*:LibraryModelFileTest.*:ReturnAliasSummaryTest.*:FunctionPointerSummaryTest.*:AllocatorSizeSummaryTest.*'`
+- cli-smoke: PASS; SHA-256 `5388ce2ffdb35d2db5922c09ac401ff6e609f0bebe0ae432fb152d45404d1a5e`; `Bounded rootless offline container image 25640c190484acc04e0dab2c64f8683668ad33930a3670900ff407023efc7fc5: /workspace/build/src/codeskeptic --version && python3 -B tests/CompilationDatabaseCliTest.py /workspace/build/src/codeskeptic; then bash scripts/local_test.sh smoke.`
+- queue-check: PASS; SHA-256 `f9ba089c2685f2ad687a11f61b297ca8a7f8cf794097c44571c3fa70774e59bc`; `python3 -B tests/WorkflowPolicyTest.py; /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH01-S07-U001/971d8c8/actionlint -shellcheck= -pyflakes= .github/workflows/windows.yml; python3 -B scripts/project_queue.py check; python3 -B scripts/project_queue.py guard --base HEAD^; bash scripts/check_docs_sync.sh; git diff --check; git rev-parse HEAD; git status --short --branch`
+
 ## CS3-CH01-S07-U003 — İlk hosted regresyon checkpoint'ini gerçek exact-head kanıtıyla kapat
 
 - Commit: `caa389100f6bc60f1736581c571dd2e3677790ed`

@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH02-S01-U001
-
-### CS3-CH02-S01-U001 — Compilation database keşfi ve doctor komutunu yeniden uygula
-
-**Sonuç:** Kullanıcı doğru database'i veya düzeltilebilir açık hatayı görür.
-
-**Kabul:**
-
-- Eski 060bf4b yalnız fikir/dar kod kaynağıdır; dosyalar topluca kopyalanmaz.
-- CMake/Ninja fixture, boş repo, iki database, bozuk JSON ve single-file kapsanır.
-- Sessiz yanlış database/fallback yoktur; doctor ile gerçek analiz aynı seçim sonucunu kullanır.
-
-**Test bütçesi:** T1
-**Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/source_manager/CompilationDatabaseDiscovery*, src/source_manager/SourceManager*, src/config/Config*, src/analyzer/StaticAnalyzer*, src/core/Messages*, src/main.cpp, src/CMakeLists.txt, tests/CompilationDatabaseCliTest.py, tests/ConfigTest.cpp, tests/CMakeLists.txt, docs/first-scan.md, .github/workflows/windows.yml, tests/WorkflowPolicyTest.py, docs/windows-support.md
-**Bağımlılıklar:** Yok
+## FRONT — CS3-CH02-S01-U002
 
 ### CS3-CH02-S01-U002 — Config ve target-scope güncellemelerini işlemsel yap
 
