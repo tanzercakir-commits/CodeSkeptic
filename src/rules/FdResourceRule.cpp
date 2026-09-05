@@ -500,9 +500,45 @@ void discardImpossibleEquality(const VarDecl* resourceVar,
 }
 
 struct ResourceInventory : RecursiveASTVisitor<ResourceInventory> {
+    explicit ResourceInventory(ASTContext& ctx) : context(ctx) {}
+    ASTContext& context;
     std::vector<Origin> origins;
     std::map<Origin, std::string> names;
+    std::set<const Stmt*> returnedValues;
     unsigned integerVariables = 0;
+
+    bool carriesDescriptor(QualType type) const {
+        if (!isFdIntegerType(type) || type->isEnumeralType()) return false;
+        // Every successful POSIX fd is a nonnegative int. Only an integer
+        // value capable of preserving that entire range can transfer it.
+        const unsigned needed = context.getIntWidth(context.IntTy) - 1;
+        const unsigned available = context.getIntWidth(type) - (type->isSignedIntegerType() ? 1 : 0);
+        return available >= needed;
+    }
+
+    void collectReturnedValue(const Expr* expr, unsigned depth = 0) {
+        if (!expr || depth >= 128 || !carriesDescriptor(expr->getType())) return;
+        if (const auto* paren = dyn_cast<ParenExpr>(expr)) {
+            collectReturnedValue(paren->getSubExpr(), depth + 1);
+        } else if (const auto* cast = dyn_cast<CastExpr>(expr)) {
+            if (cast->getCastKind() == CK_NoOp || cast->getCastKind() == CK_LValueToRValue ||
+                cast->getCastKind() == CK_IntegralCast)
+                collectReturnedValue(cast->getSubExpr(), depth + 1);
+        } else if (const auto* choice = dyn_cast<ConditionalOperator>(expr)) {
+            collectReturnedValue(choice->getTrueExpr(), depth + 1);
+            collectReturnedValue(choice->getFalseExpr(), depth + 1);
+        } else if (const auto* comma = dyn_cast<BinaryOperator>(expr);
+                   comma && comma->getOpcode() == BO_Comma) {
+            collectReturnedValue(comma->getRHS(), depth + 1);
+        } else {
+            returnedValues.insert(expr);
+        }
+    }
+
+    bool VisitReturnStmt(ReturnStmt* ret) {
+        collectReturnedValue(ret->getRetValue());
+        return true;
+    }
 
     bool VisitCallExpr(CallExpr* call) {
         if (isAcquisitionCall(call)) origins.push_back(call);
@@ -533,9 +569,11 @@ class FdAnalysis {
 public:
     using State = ::State;
 
-    FdAnalysis(std::vector<Origin> origins, unsigned integerVariables)
+    FdAnalysis(std::vector<Origin> origins, unsigned integerVariables,
+               std::set<const Stmt*> returnedValues)
         : origins_(std::move(origins)),
-          integerVariables_(integerVariables) {}
+          integerVariables_(integerVariables),
+          returnedValues_(std::move(returnedValues)) {}
 
     State initialState() const { return {}; }
 
@@ -553,6 +591,19 @@ public:
     State transfer(const Stmt* stmt, const State& in,
                    ASTContext&) const {
         State out = in;
+        auto finish = [&]() {
+            // A selected return value executes in its own CFG arm BEFORE
+            // the arms join. Transferring at the final ReturnStmt loses that
+            // association; escaping both arms there would hide real leaks.
+            if (returnedValues_.count(stmt)) {
+                const auto* value = dyn_cast<Expr>(stmt);
+                if (Origin origin = acquisition(value))
+                    out.resources[origin] = ResourceLife::Returned;
+                else
+                    returnOwnership(bindingFor(value, out), out);
+            }
+            return out;
+        };
 
         if (const auto* declaration = dyn_cast<DeclStmt>(stmt)) {
             for (const Decl* decl : declaration->decls()) {
@@ -574,11 +625,11 @@ public:
                     out.bindings[var] = binding;
                 }
             }
-            return out;
+            return finish();
         }
 
         if (const auto* assignment = dyn_cast<BinaryOperator>(stmt)) {
-            if (assignment->getOpcode() != BO_Assign) return out;
+            if (assignment->getOpcode() != BO_Assign) return finish();
             const Expr* rhs = assignment->getRHS();
             const VarDecl* target = asVar(assignment->getLHS());
             if (isTrackableLocal(target)) {
@@ -601,16 +652,7 @@ public:
             } else {
                 escape(bindingFor(rhs, out), out);
             }
-            return out;
-        }
-
-        if (const auto* ret = dyn_cast<ReturnStmt>(stmt)) {
-            if (Origin origin = acquisition(ret->getRetValue())) {
-                out.resources[origin] = ResourceLife::Returned;
-            } else {
-                returnOwnership(bindingFor(ret->getRetValue(), out), out);
-            }
-            return out;
+            return finish();
         }
 
         if (const auto* call = dyn_cast<CallExpr>(stmt)) {
@@ -628,7 +670,7 @@ public:
             // shutdown intentionally has no ownership effect: POSIX still
             // requires close() to release the descriptor itself.
         }
-        return out;
+        return finish();
     }
 
     void refineOnEdge(const Stmt* condition, bool isTrueBranch,
@@ -655,6 +697,7 @@ public:
 private:
     std::vector<Origin> origins_;
     unsigned integerVariables_;
+    std::set<const Stmt*> returnedValues_;
 };
 
 void reportLeaks(const FunctionDecl* function,
@@ -690,13 +733,13 @@ void reportLeaks(const FunctionDecl* function,
 void analyzeFunction(const FunctionDecl* function,
                      ASTContext& context,
                      codeskeptic::DiagnosticList& results) {
-    ResourceInventory inventory;
+    ResourceInventory inventory(context);
     inventory.TraverseStmt(const_cast<Stmt*>(function->getBody()));
     if (inventory.origins.empty()) return;
 
     FdAnalysis analysis(
         inventory.origins,
-        inventory.integerVariables + function->getNumParams());
+        inventory.integerVariables + function->getNumParams(), inventory.returnedValues);
     auto dataflow = codeskeptic::runDataflow(function, context, analysis);
     if (!dataflow.converged)
         codeskeptic::CoverageReport::instance().recordDataflowFailure(

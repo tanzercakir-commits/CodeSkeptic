@@ -168,6 +168,46 @@ TEST(FdResourceRuleTest, AcceptConditionalReturnDoesNotHideOtherPathLeak) {
     }
 }
 
+TEST(FdResourceRuleTest, AcceptSelectedReturnValueTransfersOnItsOwnPath) {
+    for (const auto* acquisition : {"accept(listener,0,0)", "accept4(listener,0,0,0)"}) {
+        SCOPED_TRACE(acquisition);
+        const auto prefix = std::string("int f(int listener,int condition){int fd=") + acquisition + ";";
+        for (const auto* finish : {
+            "return fd<0 ? -1 : fd;", "return fd>=0 ? fd : -1;", "return (0,fd);",
+            "return condition ? fd : fd;", "return (condition?0:1,fd);"}) {
+            SCOPED_TRACE(finish);
+            EXPECT_TRUE(runFdRule(prefix + finish + "}").empty());
+        }
+        for (const auto* finish : {
+            "return condition ? fd : 0;", "return fd<0 ? fd : -1;", "return (fd,0);"}) {
+            SCOPED_TRACE(finish);
+            expectSingleResourceLeak(runFdRule(prefix + finish + "}"));
+        }
+        const auto two = runFdRule(std::string("int f(int listener,int condition){int fd=") +
+            acquisition + ";int second=" + acquisition + ";return condition?fd:second;}");
+        EXPECT_EQ(two.size(), 2u);
+    }
+}
+
+TEST(FdResourceRuleTest, AcceptReturnedValueMustPreserveDescriptorRange) {
+    for (const auto* code : {
+        "int f(int listener){int fd=accept(listener,0,0);return static_cast<int>(fd);}",
+        "long f(int listener){int fd=accept(listener,0,0);return fd;}",
+        "unsigned f(int listener){int fd=accept(listener,0,0);return fd;}",
+        "long f(int listener){int fd=accept(listener,0,0);return static_cast<long>(fd);}"}) {
+        SCOPED_TRACE(code);
+        EXPECT_TRUE(runFdRule(code).empty());
+    }
+    for (const auto* code : {
+        "bool f(int listener){int fd=accept(listener,0,0);return fd;}",
+        "short f(int listener){int fd=accept(listener,0,0);return fd;}",
+        "int f(int listener){int fd=accept(listener,0,0);return static_cast<short>(fd);}",
+        "int f(int listener,int c){int fd=accept(listener,0,0);return c?static_cast<bool>(fd):fd;}"}) {
+        SCOPED_TRACE(code);
+        expectSingleResourceLeak(runFdRule(code));
+    }
+}
+
 TEST(FdResourceRuleTest, AcceptSignatureLookalikesAreNotProducers) {
     for (const auto* code : {
         "int accept(int);void f(){int x=accept(1);(void)x;}",
