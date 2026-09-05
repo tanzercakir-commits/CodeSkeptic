@@ -26,6 +26,7 @@ namespace codeskeptic {
 // Definite source over-read is Error, still subject to the rule's experimental
 // report-only capability. Unknown capacities, flexible pointer-based tails,
 // ambiguous pointer bindings and non-definite length ranges stay silent.
+// Contradictory paths stay infeasible through later assignments and loops.
 // memset does not read a source; strncpy's termination/padding differs and is
 // not part of the source-read model. Pointer-offset capacity is a separate unit.
 class BoundsRule : public Rule {

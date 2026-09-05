@@ -19,6 +19,7 @@
 #include <clang/ASTMatchers/ASTMatchers.h>
 #include <clang/Basic/SourceManager.h>
 
+#include <algorithm>
 #include <iostream>
 #include <set>
 #include <string>
@@ -539,6 +540,50 @@ codeskeptic::Interval sourceByteCapacity(const Expr* source,
     return bytes.isEmpty() || bytes.loIsInf() || bytes.lo() < 0 ? Interval::top() : bytes;
 }
 
+// Keep infeasibility explicit for the new source model. A constant copy size
+// does not inherit an unrelated variable's empty interval. Nor can a later
+// assignment or loop widening make a contradictory path executable again.
+// This adapter leaves the existing destination analysis/semantics untouched.
+class SourceReadAnalysis : public codeskeptic::IntervalAnalysis {
+    using Base = codeskeptic::IntervalAnalysis;
+public:
+    using Base::Base;
+    struct State {
+        codeskeptic::IntervalState numeric;
+        bool feasible = true;
+        bool operator==(const State& other) const {
+            return feasible == other.feasible && (!feasible || numeric == other.numeric);
+        }
+        bool operator!=(const State& other) const { return !(*this == other); }
+    };
+    static State checked(codeskeptic::IntervalState numeric) {
+        const bool feasible = std::none_of(numeric.iv.begin(), numeric.iv.end(),
+            [](const auto& entry) { return entry.second.isEmpty(); });
+        return {std::move(numeric), feasible};
+    }
+    State initialState() const { return checked(Base::initialState()); }
+    State merge(const State& a, const State& b) const {
+        if (!a.feasible) return b;
+        if (!b.feasible) return a;
+        return checked(Base::merge(a.numeric, b.numeric));
+    }
+    State transfer(const Stmt* stmt, const State& in, ASTContext& ctx) const {
+        return in.feasible ? checked(Base::transfer(stmt, in.numeric, ctx)) : in;
+    }
+    void refineOnEdge(const Stmt* cond, bool truth, State& state, ASTContext& ctx) const {
+        if (!state.feasible) return;
+        Base::refineOnEdge(cond, truth, state.numeric, ctx);
+        state = checked(std::move(state.numeric));
+    }
+    void widen(State& state) const {
+        if (state.feasible) Base::widen(state.numeric);
+    }
+    void onStatement(const Stmt* stmt, const State& before, const State& after,
+                     ASTContext& ctx) {
+        if (before.feasible) Base::onStatement(stmt, before.numeric, after.numeric, ctx);
+    }
+};
+
 void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
                      const codeskeptic::ParamIntervalMap& paramMap,
                      codeskeptic::DiagnosticList& results) {
@@ -666,13 +711,20 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
 
     // Source over-read is independent of destination capacity/diagnostics.
     // Only definite reads are reported; partial overlap or unknown stays silent.
-    if (df.converged) {
+    if (df.converged && std::any_of(copies.begin(), copies.end(),
+                                  [&](const CallExpr* call) { return isSourceCopy(call, ctx); })) {
+        SourceReadAnalysis sourceAnalysis(collectIntVars(fn),
+                                          codeskeptic::paramSeeds(paramMap, fn));
+        const auto sourceDf = codeskeptic::runDataflow(fn, ctx, sourceAnalysis);
+        if (!sourceDf.converged)
+            codeskeptic::CoverageReport::instance().recordDataflowFailure(
+                fn->getQualifiedNameAsString(), sourceDf.failure);
         SourceBindings bindings;
         bindings.TraverseStmt(fn->getBody());
         std::set<const CallExpr*> sourceReported;
         for (const auto* call : copies) {
-            if (!isSourceCopy(call, ctx)) continue;
-            const auto* state = analysis.stateAt(call);
+            if (!sourceDf.converged || !isSourceCopy(call, ctx)) continue;
+            const auto* state = sourceAnalysis.stateAt(call);
             if (!state) continue;
             const auto capacity = sourceByteCapacity(call->getArg(1), bindings, ctx);
             const auto size = codeskeptic::evalSizeInterval(call->getArg(2), ctx, *state);

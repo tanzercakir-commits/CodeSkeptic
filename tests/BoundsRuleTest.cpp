@@ -435,6 +435,27 @@ TEST(BoundsRuleTest, SourceReadDoesNotHideDestinationOrSameLineCalls) {
     EXPECT_NE(sameLine[0].column, sameLine[1].column);
 }
 
+TEST(BoundsRuleTest, SourceReadSkipsInfeasibleStates) {
+    struct Case { const char* body; unsigned reports; };
+    const Case cases[] = {
+        {"if(n>4)return; if(n<8)return; memcpy(dst,src,8);", 0},
+        {"if(n>4)return; if(n<8)return; n=0; memcpy(dst,src,8);", 0},
+        {"if(n>4)return; if(n<8)return; for(int i=0;i<2;++i){} memcpy(dst,src,8);", 0},
+        {"if(n>8)return; if(n<4)return; memcpy(dst,src,8);", 1},
+        {"if(n>8)return; if(n<4)return; n=0; memcpy(dst,src,8);", 1},
+        {"if(n>4){if(n<8)return;} memcpy(dst,src,8);", 1},
+        {"unsigned count=8; if(n>8){if(n<4){count=0;}} memcpy(dst,src,count);", 1},
+    };
+    for (const auto& item : cases) {
+        SCOPED_TRACE(item.body);
+        BoundsRule rule;
+        auto results = runRule(rule, copy(
+            std::string("void f(unsigned n){char dst[64]={},src[4]={};") +
+            item.body + "}"));
+        EXPECT_EQ(results.size(), item.reports);
+    }
+}
+
 TEST(BoundsRuleTest, MemcpyPastFixedArray) {
     // 50 bytes into a 16-byte buffer.
     BoundsRule rule;
