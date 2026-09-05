@@ -2,6 +2,20 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH01-S06-U001 — uint64 out-param kaynak kökenini sayısal aralıktan ayır
+
+- Commit: `c0b14253d08cb144f56e496f5dbd9d3fde73f450`
+- Dal: `agent/cs3-ch01-s06-u001-uint64-outparam-origin`
+- Implementer: `root-cs3-ch01-s06-u001-20260905`
+- Bağımsız denetçi: `independent-cwe-ch01-s06-u001-c0b1425-20260905`
+- İnceleme SHA-256: `e833cb4ea6e281c2d242bb92080f10301814cbb1190aa059c0127d7dea623256`
+- Tarih: 2026-09-05T10:32:09.269606+00:00
+- Sonuç: Beyan edilmiş kaynağın doğrudan uint64 pointer/reference çıktısı, signed interval üst sınırı gösterilemiyor diye güvenilir kabul edilmez.
+- linux-suite: PASS; SHA-256 `a172c66c1dcf609cdd839c4f9d3d3d235f8ba3a1066afca48c266dcfc0a3a62a`; `bash scripts/local_test.sh full`
+- relevant-corpus: PASS; SHA-256 `aca79c3114775957b394aacb04fd6a4599207e29c16a8b2413d3db53c1b07af3`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH01-S06-U001/corpus.py`
+- queue-check: PASS; SHA-256 `48807a4102f5ee6e356a9920981a1225f14f56d954ddabbd12c90f447f88557b`; `python3 -B scripts/project_queue.py check && python3 -B scripts/project_queue.py guard --base d07f12d`
+- independent-focused: PASS; SHA-256 `00af96f80c883b283d0887b823f09206fb519c0190a6b79212c5b1eb2c65578a`; `/workspace/build/tests/codeskeptic_tests --gtest_filter=AllocSizeOverflowRuleTest.*:IntOverflowRuleTest.*:SignConversionRuleTest.*:IntervalTest.*:IntervalAnalysisTest.*:UntrustedIntSourceTest.*`
+
 ## CS3-CH01-S05-U001 — Uzunluk ve index sink'lerinde kanıtlı narrowing kaybını raporla
 
 - Commit: `8359ce4804ad04a7e13da69c84dbb2d4e2e3550f`
