@@ -16,6 +16,7 @@ add_executable(codeskeptic_tests
     CapabilitiesTest.cpp
     FindingFingerprintTest.cpp
     ConfigTest.cpp
+    SourceManagerTest.cpp
     VerdictIntegrityTest.cpp
     JsonReporterTest.cpp
     UninitPointerRuleExTest.cpp

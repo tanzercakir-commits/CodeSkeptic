@@ -30,6 +30,42 @@ std::string writeConfig(const char* name, const char* content) {
     return path.string();
 }
 
+std::string snapshot(const Config& c) {
+    auto strings = [](const auto& source) {
+        llvm::json::Array values;
+        for (const auto& value : source) values.push_back(value);
+        return values;
+    };
+    llvm::json::Array lines;
+    for (auto range : c.lines()) lines.push_back(llvm::json::Array{range.first, range.second});
+    llvm::json::Object pairs;
+    for (const auto& entry : c.allocatorPairs()) pairs[entry.first] = strings(entry.second);
+    llvm::json::Object state{
+        {"source", c.sourcePath()}, {"files", strings(c.sourceFiles())},
+        {"build", c.buildPath()}, {"explicit_build", c.buildPathSpecified()},
+        {"explicit_files", c.fileListSpecified()}, {"doctor", c.doctor()},
+        {"format", c.outputFormat()}, {"json", c.jsonOutputPath()},
+        {"sarif", c.sarifOutputPath()}, {"html", c.htmlOutputPath()},
+        {"baseline", c.baselinePath()}, {"write_baseline", c.writeBaselinePath()},
+        {"lang", c.lang()}, {"severity", static_cast<int>(c.minSeverity())},
+        {"functions", strings(c.functions())}, {"lines", std::move(lines)},
+        {"fatal", strings(c.fatalAsserts())}, {"asserts", strings(c.assertMacros())},
+        {"negative_asserts", strings(c.negativeAssertMacros())},
+        {"alloc", strings(c.allocFunctions())}, {"free", strings(c.freeFunctions())},
+        {"pairs", std::move(pairs)}, {"owners", strings(c.owningPointers())},
+        {"untrusted", strings(c.untrustedIntSources())}, {"paths", strings(c.reportPaths())},
+        {"policies", strings(c.policies())}, {"models", strings(c.modelFiles())},
+        {"summary_in", c.summaryIn()}, {"summary_out", c.summaryOut()},
+        {"diff_old", c.summaryDiffOld()}, {"diff_new", c.summaryDiffNew()},
+        {"gate", c.summaryDiffGate()}, {"serve", c.serve()},
+        {"whole", c.wholeProgram()}, {"broken", c.analyzeBrokenTUs()},
+        {"partial", c.acceptPartialCoverage()}, {"assumptions", c.assumptions()},
+        {"recovery", c.assertRecovery()}, {"cache", c.warmCache()},
+        {"help", c.helpRequested()}, {"off_rule", c.isRuleEnabled("off-rule")},
+        {"on_rule", c.isRuleEnabled("on-rule")}};
+    return llvm::formatv("{0}", llvm::json::Value(std::move(state))).str();
+}
+
 } // anonymous namespace
 
 TEST(ConfigTest, RejectsUnknownOptionAndMissingValue) {
@@ -170,6 +206,73 @@ TEST(ConfigTest, DiscoveryRetainsExplicitBuildAndFileListProvenance) {
     ASSERT_TRUE(parse(listed, {"codeskeptic", "--doctor", "--files", list.c_str()}));
     EXPECT_TRUE(listed.fileListSpecified());
     EXPECT_TRUE(listed.sourceFiles().empty());
+}
+
+TEST(ConfigTest, FailedCliUpdatePreservesCompleteObservableState) {
+    Config c;
+    ASSERT_TRUE(parse(c, {"codeskeptic", "--source", "kept.cpp", "--build-path", "kept-build",
+                         "--function", "kept", "--lines", "5-9", "--lang", "tr",
+                         "--disable-rule", "off-rule", "--json", "kept.json"}));
+    c.setWarmCache(true);
+    const auto before = snapshot(c);
+    EXPECT_FALSE(parse(c, {"codeskeptic", "--source", "new.cpp", "--build-path", "new-build",
+                          "--function", "new_function", "--json", "new.json", "--lang", "de"}));
+    EXPECT_EQ(snapshot(c), before);
+    EXPECT_FALSE(parse(c, {"codeskeptic", "--doctor", "--serve", "--whole-program",
+                          "--no-assert-recovery", "--gate", "warn", "--model-file", "new.model",
+                          "--accept-partial-coverage", "--lines", "10,4294967296"}));
+    EXPECT_EQ(snapshot(c), before);
+    EXPECT_FALSE(parse(c, {"codeskeptic", "--source", "new.cpp", "second.cpp"}));
+    EXPECT_EQ(snapshot(c), before);
+    ASSERT_TRUE(parse(c, {"codeskeptic", "--lang", "en"}));
+    EXPECT_EQ(c.sourcePath(), "kept.cpp");
+    EXPECT_EQ(c.lang(), "en");
+}
+
+TEST(ConfigTest, FailedConfigLoadPreservesStateAcrossAllLines) {
+    Config c;
+    ASSERT_TRUE(parse(c, {"codeskeptic", "--source", "kept.cpp", "--function", "kept"}));
+    const auto before = snapshot(c);
+    const auto path = writeConfig("transactional_config_bad.conf",
+        "source_path=new.cpp\nbuild_path=new-build\nlang=tr\nfunction=new\n"
+        "alloc_functions=new_alloc\nmodel_file=new.model\n"
+        "min_severity=invalid\nfree_functions=new_free\n");
+    EXPECT_FALSE(c.loadFromFile(path));
+    EXPECT_EQ(snapshot(c), before);
+}
+
+TEST(ConfigTest, LineListFailureNeverPublishesValidPrefix) {
+    Config c;
+    ASSERT_TRUE(c.addLines("2-4"));
+    const auto before = snapshot(c);
+    for (const char* invalid : {"10,bad", "10,4294967296", "10,18446744073709551616",
+                                "10,", "10,0", "10,9-2", "1 0", "1\t0", ",,", "+2"}) {
+        SCOPED_TRACE(invalid);
+        EXPECT_FALSE(c.addLines(invalid));
+        EXPECT_EQ(snapshot(c), before);
+    }
+}
+
+TEST(ConfigTest, InvalidNameListsDoNotBroadenScopeOrPartiallyApply) {
+    for (const char* option : {"--function", "--fatal-asserts", "--assert-macros",
+                              "--negative-assert-macros", "--alloc-functions", "--free-functions",
+                              "--owning-pointers", "--untrusted-int-sources", "--policy"}) {
+        for (const char* invalid : {",, ", "\t", "valid,,other", "valid,"}) {
+            SCOPED_TRACE(std::string(option) + ":" + invalid);
+            Config c;
+            ASSERT_TRUE(parse(c, {"codeskeptic", "--function", "kept", "kept.cpp"}));
+            const auto before = snapshot(c);
+            EXPECT_FALSE(parse(c, {"codeskeptic", option, invalid}));
+            EXPECT_EQ(snapshot(c), before);
+        }
+    }
+}
+
+TEST(ConfigTest, ConflictingOutputSelectorsDoNotSilentlyDiscardRequestedOutput) {
+    Config c;
+    const auto before = snapshot(c);
+    EXPECT_FALSE(parse(c, {"codeskeptic", "--json", "one.json", "--sarif", "two.sarif", "x.cpp"}));
+    EXPECT_EQ(snapshot(c), before);
 }
 
 TEST(ConfigTest, ChangedCompilationCommandsInvalidateWarmAstCache) {

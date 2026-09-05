@@ -2,6 +2,8 @@
 
 #include "core/FunctionFilter.h"
 #include "source_manager/SourceManager.h"
+#include <llvm/Support/JSON.h>
+#include <llvm/Support/FormatVariadic.h>
 
 #include <fstream>
 #include <filesystem>
@@ -137,6 +139,36 @@ TEST(McpServerTest, FilterStateResetAfterScopedAnalyze) {
 
     EXPECT_TRUE(codeskeptic::functionFilter().empty());
     EXPECT_TRUE(codeskeptic::lineRanges().empty());
+}
+
+TEST(McpServerTest, InvalidTextScopeFailsBeforePublishingGlobalsOrCache) {
+    const auto path = writeTempSource("mcp_atomic_input.cpp",
+        "void first(){int* a;int x=*a;(void)x;}\n"
+        "void second(){int* b;int y=*b;(void)y;}\n");
+    for (const char* value : {",, ", "\t", "second,,first"}) {
+        SCOPED_TRACE(value);
+        llvm::json::Object request{
+            {"jsonrpc", "2.0"}, {"id", 77}, {"method", "tools/call"},
+            {"params", llvm::json::Object{{"name", "analyze"},
+                {"arguments", llvm::json::Object{{"path", path}, {"functions", value}}}}}};
+        const auto functions = functionFilter();
+        const auto ranges = lineRanges();
+        const auto hits = SourceManager::warmCacheHits();
+        const auto misses = SourceManager::warmCacheMisses();
+        const auto response = handleMcpMessage(llvm::formatv("{0}", llvm::json::Value(std::move(request))).str());
+        auto parsed = llvm::json::parse(response);
+        ASSERT_TRUE(static_cast<bool>(parsed));
+        const auto* object = parsed->getAsObject();
+        ASSERT_NE(object, nullptr);
+        EXPECT_EQ(object->get("result"), nullptr);
+        const auto* error = object->getObject("error");
+        EXPECT_NE(error, nullptr) << response;
+        if (error) EXPECT_EQ(error->getInteger("code"), -32602);
+        EXPECT_EQ(functionFilter(), functions);
+        EXPECT_EQ(lineRanges(), ranges);
+        EXPECT_EQ(SourceManager::warmCacheHits(), hits);
+        EXPECT_EQ(SourceManager::warmCacheMisses(), misses);
+    }
 }
 
 namespace {
