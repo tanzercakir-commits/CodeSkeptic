@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH01-S03-U002
-
-### CS3-CH01-S03-U002 — Scalar initialization durumunu CFG birleşimlerinde koru
-
-**Sonuç:** Branch/loop birleşimlerinde definitely-initialized ile possibly-uninitialized ayrılır.
-
-**Kabul:**
-
-- Her iki branch atama güvenlidir; yalnız bir branch atama gerçek okumada bulgu üretir.
-- Loop zero-iteration, break/continue ve erken dönüş fixture'ları vardır.
-- Kapsam yerel integer/bool'dur; struct/heap/exception tam desteği iddia edilmez.
-
-**Test bütçesi:** T1
-**Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/rules/UninitScalarRule*, tests/UninitScalarRuleTest.cpp
-**Bağımlılıklar:** CS3-CH01-S03-U001
+## FRONT — CS3-CH01-S04-U001
 
 ### CS3-CH01-S04-U001 — accept/accept4 descriptor sahipliğini modelle
 

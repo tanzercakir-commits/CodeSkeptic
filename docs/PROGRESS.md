@@ -2,6 +2,21 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH01-S03-U002 — Scalar initialization durumunu CFG birleşimlerinde koru
+
+- Commit: `51a20952deae5ec9520d680d8312816c823a5b83`
+- Dal: `agent/cs3-ch01-s03-u002-scalar-cfg-joins`
+- Implementer: `root-cs3-ch01-s03-u002-20260905`
+- Bağımsız denetçi: `independent-cwe-ch01-s03-u002-51a2095-20260905`
+- İnceleme SHA-256: `f7e657c634b8cf8dcf9054fd7065a6c9889dc10d57a1d101d40316a8b57c76dd`
+- Tarih: 2026-09-05T03:53:16.900897+00:00
+- Sonuç: Branch/loop birleşimlerinde definitely-initialized ile possibly-uninitialized ayrılır.
+- focused-tests: PASS; SHA-256 `48bbe8f1261b78eaba94487f3fde1fb9dedd182d2e3fb3f0109b9cac89fe5a41`; `bash scripts/local_test.sh focused 'UninitScalarRuleTest.*:UninitPointerRuleExTest.*:CapabilitiesTest.*:FunctionFilterTest.*:McpServerTest.*'`
+- cli-smoke: PASS; SHA-256 `af96a43aeb3b75f8211ce3cd7dfed00cbc700e98d8ef90ae662bb386aa608d5a`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH01-S03-U002/cli_smoke.py`
+- queue-check: PASS; SHA-256 `4dc69f85bbb00e3cc72e6bbdeec3d404a10549b28f2377855bae5c340e77f3fd`; `python3 -B scripts/project_queue.py check && python3 -B scripts/project_queue.py guard --base bf03da4634a52d1e241b74c6708e1f0b1d52fb1e && python3 -B scripts/check_capabilities_sync.py`
+- cli-u001-regression: PASS; SHA-256 `776622323623ba1a6ed9d346ba332bf1433ff7e7eb4729ffb56426fabf61c3a7`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH01-S03-U001/cli_smoke.py`
+- generic-cli-smoke: PASS; SHA-256 `b0344728a94d7c433b70b506caa35bbfb15ff4b610968b541dbb12afbf1e20d3`; `bash scripts/local_test.sh smoke`
+
 ## CS3-CH01-S03-U001 — Yerel scalar uninitialized-read kuralını ekle
 
 - Commit: `e637439dc55d42a4565e32afcad5023e57eb1806`
