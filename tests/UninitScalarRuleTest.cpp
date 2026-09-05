@@ -96,12 +96,10 @@ TEST(UninitScalarRuleTest, NonScalarStorageNotClaimed) {
     }
 }
 
-TEST(UninitScalarRuleTest, UnsupportedControlDoesNotForgeStraightLineProof) {
+TEST(UninitScalarRuleTest, SafeControlAndUnsupportedSequencingDoNotForgeProof) {
     for (const auto* code : {
         "int f(int c){int x;if(c)x=1;else x=2;return x;}",
         "int f(int c){int x;c?(x=1):(x=2);return x;}",
-        "int f(int c){int x;c&&(x=1);return x;}",
-        "int f(int c){int x;while(c--)x=1;return x;}",
         "void sink(int,int);void f(){int x;sink(x=1,x);}",
         "int f(){int x;return (x=1)+x;}",
         "int f(){int x;auto init=[&](){x=1;};init();return x;}",
@@ -255,4 +253,131 @@ TEST(UninitScalarRuleTest, ZeroArraysAndNonOwningBindingsHaveNoDestructorCall) {
     EXPECT_EQ(result[0].function, "bad_zero_dtor");
     EXPECT_EQ(result[1].function, "bad_zero_ctor");
     EXPECT_EQ(result[2].function, "bad_reference");
+}
+
+TEST(UninitScalarRuleTest, CFGBranchInitialization) {
+    struct Case { const char* code; unsigned count; Severity severity; };
+    for (const auto& test : {
+        Case{"int f(int c){int x;if(c)x=1;return x;}", 1, Severity::Warning},
+        Case{"int f(int c){int x;if(c){}else x=1;return x;}", 1, Severity::Warning},
+        Case{"int f(){int x;if(x)return 1;return 0;}", 1, Severity::Error},
+        Case{"int f(int c){int x;if(c)x=1;else x=2;return x;}", 0, Severity::Error},
+        Case{"int f(int c){int x;if(!c)return 0;x=1;return x;}", 0, Severity::Error},
+        Case{"int f(int c,int d){int x;if(c){if(d)x=1;}else x=2;return x;}", 1, Severity::Warning},
+        Case{"int f(int c){int x,y;if(c)x=1;else y=1;return x+y;}", 2, Severity::Warning},
+        Case{"int f(){if(false){int x;return x;}return 0;}", 0, Severity::Error}}) {
+        SCOPED_TRACE(test.code);
+        UninitScalarRule rule;
+        const auto result = runRule(rule, test.code);
+        EXPECT_EQ(result.size(), test.count);
+        for (const auto& diagnostic : result) {
+            EXPECT_EQ(diagnostic.rule_id, "uninit-scalar");
+            EXPECT_EQ(diagnostic.severity, test.severity);
+        }
+    }
+}
+
+TEST(UninitScalarRuleTest, CFGLoopInitializationAndEarlyExits) {
+    struct Case { const char* code; unsigned count; Severity severity; };
+    for (const auto& test : {
+        Case{"int f(int c){int x;while(c--)x=1;return x;}", 1, Severity::Warning},
+        Case{"int f(int c){int x;while(1){if(c)break;x=1;break;}return x;}", 1, Severity::Warning},
+        Case{"int f(int c){int x;do{x=1;}while(c--);return x;}", 0, Severity::Error},
+        Case{"int f(int c){int x;do{if(c)continue;x=1;}while(0);return x;}", 1, Severity::Warning},
+        Case{"int f(){int x;while(1){x=1;break;}return x;}", 0, Severity::Error},
+        Case{"int f(int c){int x;while(c){return 0;}x=1;return x;}", 0, Severity::Error},
+        Case{"void use(int);void f(int c){int x;while(c--){use(x);x=1;}}", 1, Severity::Warning},
+        Case{"[[noreturn]]void die();int f(int c){int x;if(c)die();else x=1;return x;}", 0, Severity::Error}}) {
+        SCOPED_TRACE(test.code);
+        UninitScalarRule rule;
+        const auto result = runRule(rule, test.code);
+        EXPECT_EQ(result.size(), test.count);
+        for (const auto& diagnostic : result) {
+            EXPECT_EQ(diagnostic.rule_id, "uninit-scalar");
+            EXPECT_EQ(diagnostic.severity, test.severity);
+        }
+    }
+}
+
+TEST(UninitScalarRuleTest, CFGShortCircuitAndArgumentReads) {
+    struct Case { const char* code; unsigned count; Severity severity; };
+    for (const auto& test : {
+        Case{"int f(int c){int x;c&&(x=1);return x;}", 1, Severity::Warning},
+        Case{"int f(int c){int x;c||(x=1);return x;}", 1, Severity::Warning},
+        Case{"int f(int c){int x;c?(x=1):(x=2);return x;}", 0, Severity::Error},
+        Case{"void use(int*,int);void f(int c){int x;if(c)x=1;use(&x,x);}", 1, Severity::Warning},
+        Case{"void use(int&,int);void f(int c){int x;if(c)x=1;use(x,x);}", 1, Severity::Warning},
+        Case{"void use(int*,int);void f(int c){int x;if(c)x=1;else x=2;use(&x,x);}", 0, Severity::Error},
+        Case{"[[noreturn]]void stop(int);void f(int c){int x;if(c)stop(x);}", 1, Severity::Error},
+        Case{"int f(int c){int x;if(c)x=1;else __builtin_assume(0);return x;}", 0, Severity::Error},
+        Case{"int f(int c){int x;if(c)++x;return 0;}", 1, Severity::Error},
+        Case{"void set(int*);int f(int c){int x;if(c)set(&x);return x;}", 0, Severity::Error},
+        Case{"void set(int*);int f(int c){int x;if(c)set(&x);x=1;return x;}", 0, Severity::Error},
+        Case{"int f(int c){int x;if(c)__builtin_assume(x=1);return x;}", 1, Severity::Error}}) {
+        SCOPED_TRACE(test.code);
+        UninitScalarRule rule;
+        const auto result = runRule(rule, test.code);
+        EXPECT_EQ(result.size(), test.count);
+        for (const auto& diagnostic : result) EXPECT_EQ(diagnostic.severity, test.severity);
+    }
+}
+
+TEST(UninitScalarRuleTest, CFGDeclarationLifetimesAndSplitDeclarations) {
+    struct Case { const char* code; unsigned count; Severity severity; };
+    for (const auto& test : {
+        Case{"int f(int c){int x=1,y=x;if(c)y=2;return x+y;}", 0, Severity::Error},
+        Case{"int f(int c){int x,y=1;if(c)y=2;return x+y;}", 1, Severity::Error},
+        Case{"void use(int);void f(int c){while(c--){int x=x;use(x);}}", 1, Severity::Error},
+        Case{"void use(int);void f(int c){while(c--){int x;use(x);x=1;}}", 1, Severity::Error},
+        Case{"void use(int);void f(int c){while(c--){int x=1;use(x);}}", 0, Severity::Error},
+        Case{"int f(int c){int x=0;while(c--){int x;x=1;}return x;}", 0, Severity::Error},
+        Case{"int f(int c){int x;for(int i=0;i<c;++i)x=1;return x;}", 1, Severity::Warning},
+        Case{"int f(int c){int x=0;for(int i=0;i<c;++i){if(i)continue;x=1;}return x;}", 0, Severity::Error},
+        Case{"int f(){int x;for(;;){x=1;break;}return x;}", 0, Severity::Error}}) {
+        SCOPED_TRACE(test.code);
+        UninitScalarRule rule;
+        const auto result = runRule(rule, test.code);
+        EXPECT_EQ(result.size(), test.count);
+        for (const auto& diagnostic : result) EXPECT_EQ(diagnostic.severity, test.severity);
+    }
+}
+
+TEST(UninitScalarRuleTest, CFGBoundariesRemainDeferred) {
+    for (const auto* code : {
+        "void use(int,int);int f(int c){int x;if(c)use(x=1,x);return x;}",
+        "int f(int c){int x;if(c)return (x=1)+x;return 0;}",
+        "int f(int c){while(c--){int x=(x=1,x);return x;}return 0;}",
+        "struct D{[[noreturn]]~D();};int f(int c){if(c){D stop;int x;return x;}return 0;}",
+        "struct D{[[noreturn]]~D();};int f(int c){if(c)D{};int x;return x;}",
+        "int f(int c){int x;if(c){auto init=[&](){x=1;};init();}return x;}",
+        "int f(int c){int x;if(c)asm(\"\" : \"=r\"(x));return x;}",
+        "int f(int c){int x;try{if(c)x=1;}catch(...){x=2;}return x;}"}) {
+        SCOPED_TRACE(code);
+        UninitScalarRule rule;
+        EXPECT_TRUE(runRule(rule, code).empty());
+    }
+}
+
+TEST(UninitScalarRuleTest, CFGSelectedStorageDoesNotBecomeDefiniteUninitialized) {
+    // This unit does not model the identity of a selected lvalue/alias. In
+    // particular, ignoring its store must not leave x "definitely" untouched.
+    for (const auto* code : {
+        "int f(int c){int x,y;(c?x:y)=1;return x;}",
+        "int f(int c){int x,y;int& r=c?x:y;r=1;return x;}",
+        "void set(int*);int f(int c){int x,y;set(&(c?x:y));return x;}",
+        "int f(int c){int x,y;(c?x:y)++;return x;}"}) {
+        SCOPED_TRACE(code);
+        UninitScalarRule rule;
+        EXPECT_TRUE(runRule(rule, code).empty());
+    }
+}
+
+TEST(UninitScalarRuleTest, CFGIndirectReferenceCallsEscapeAtInvocation) {
+    UninitScalarRule rule;
+    EXPECT_TRUE(runRule(rule,
+        "int f(int c,void(*set)(int&)){int x;if(c)x=1;set(x);return x;}").empty());
+    const auto result = runRule(rule,
+        "void f(int c,void(*use)(int&,int)){int x;if(c)x=1;use(x,x);}");
+    ASSERT_EQ(result.size(), 1u);
+    EXPECT_EQ(result[0].severity, Severity::Warning);
 }
