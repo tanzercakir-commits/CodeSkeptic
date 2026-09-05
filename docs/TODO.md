@@ -16,7 +16,7 @@ Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter aç
 
 **Test bütçesi:** T1
 **Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/source_manager/CompilationDatabaseDiscovery*, src/source_manager/SourceManager*, src/config/Config*, src/analyzer/StaticAnalyzer*, src/core/Messages*, src/main.cpp, src/CMakeLists.txt, tests/CompilationDatabaseCliTest.py, tests/ConfigTest.cpp, tests/CMakeLists.txt, docs/first-scan.md
+**Kapsam:** src/source_manager/CompilationDatabaseDiscovery*, src/source_manager/SourceManager*, src/config/Config*, src/analyzer/StaticAnalyzer*, src/core/Messages*, src/main.cpp, src/CMakeLists.txt, tests/CompilationDatabaseCliTest.py, tests/ConfigTest.cpp, tests/CMakeLists.txt, docs/first-scan.md, .github/workflows/windows.yml, tests/WorkflowPolicyTest.py, docs/windows-support.md
 **Bağımlılıklar:** Yok
 
 ### CS3-CH02-S01-U002 — Config ve target-scope güncellemelerini işlemsel yap

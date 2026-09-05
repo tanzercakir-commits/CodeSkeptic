@@ -1,6 +1,6 @@
 # CodeSkeptic — CWE Ürün Planı
 
-Sürüm: 13. Eski planın devamı değil; main tabanlı yeni program.
+Sürüm: 14. Eski planın devamı değil; main tabanlı yeni program.
 
 PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.
 
@@ -308,7 +308,7 @@ PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. G
 
 **Test bütçesi:** T1
 **Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/source_manager/CompilationDatabaseDiscovery*, src/source_manager/SourceManager*, src/config/Config*, src/analyzer/StaticAnalyzer*, src/core/Messages*, src/main.cpp, src/CMakeLists.txt, tests/CompilationDatabaseCliTest.py, tests/ConfigTest.cpp, tests/CMakeLists.txt, docs/first-scan.md
+**Kapsam:** src/source_manager/CompilationDatabaseDiscovery*, src/source_manager/SourceManager*, src/config/Config*, src/analyzer/StaticAnalyzer*, src/core/Messages*, src/main.cpp, src/CMakeLists.txt, tests/CompilationDatabaseCliTest.py, tests/ConfigTest.cpp, tests/CMakeLists.txt, docs/first-scan.md, .github/workflows/windows.yml, tests/WorkflowPolicyTest.py, docs/windows-support.md
 **Bağımlılıklar:** Yok
 
 #### CS3-CH02-S01-U002 — Config ve target-scope güncellemelerini işlemsel yap
