@@ -2495,24 +2495,52 @@ FdReturnState mergeFdReturnState(FdReturnState lhs,
     return FdReturnState::Unknown;
 }
 
+struct FdReturnValue {
+    FdReturnState kind = FdReturnState::Unknown;
+    // May-alias provenance survives an Unknown join. Otherwise closing that
+    // merged alias could leave a different copy falsely proven Owned.
+    std::set<const CallExpr*> origins;
+
+    bool operator==(const FdReturnValue& other) const {
+        return kind == other.kind && origins == other.origins;
+    }
+    bool operator!=(const FdReturnValue& other) const { return !(*this == other); }
+};
+
+FdReturnValue mergeFdReturnValue(FdReturnValue lhs, const FdReturnValue& rhs) {
+    lhs.kind = mergeFdReturnState(lhs.kind, rhs.kind);
+    lhs.origins.insert(rhs.origins.begin(), rhs.origins.end());
+    return lhs;
+}
+
 class FdReturnOwnershipAnalysis {
 public:
-    using State = std::map<const VarDecl*, FdReturnState>;
+    using State = std::map<const VarDecl*, FdReturnValue>;
 
     FdReturnOwnershipAnalysis(std::vector<const VarDecl*> trackedVars,
                               const SummaryTable& previous,
-                              const ASTContext& ctx)
+                              const ASTContext& ctx, const Stmt* body)
         : previous_(previous), context_(ctx) {
         for (const VarDecl* var : trackedVars)
-            initial_[var] = isa<ParmVarDecl>(var)
-                                ? FdReturnState::Borrowed
-                                : FdReturnState::Unknown;
+            initial_[var].kind = isa<ParmVarDecl>(var)
+                                    ? FdReturnState::Borrowed
+                                    : FdReturnState::Unknown;
+        // Bound the expanded product lattice by the finite number of call
+        // sites. A loop reusing one site remains conservative, not unbounded.
+        std::vector<const Stmt*> pending{body};
+        while (!pending.empty()) {
+            const Stmt* stmt = pending.back();
+            pending.pop_back();
+            if (!stmt) continue;
+            if (isa<CallExpr>(stmt)) ++originCount_;
+            for (const Stmt* child : stmt->children()) pending.push_back(child);
+        }
     }
 
     State initialState() const { return initial_; }
 
     unsigned latticeHeight() const {
-        return static_cast<unsigned>(initial_.size()) * 4 + 4;
+        return static_cast<unsigned>(initial_.size()) * (originCount_ + 4) + 4;
     }
 
     State merge(const State& lhs, const State& rhs) const {
@@ -2522,7 +2550,7 @@ public:
             if (it == out.end())
                 out[var] = value;
             else
-                it->second = mergeFdReturnState(it->second, value);
+                it->second = mergeFdReturnValue(it->second, value);
         }
         return out;
     }
@@ -2533,11 +2561,16 @@ public:
         if (const auto* declaration = dyn_cast<DeclStmt>(stmt)) {
             for (const Decl* decl : declaration->decls()) {
                 const auto* var = dyn_cast<VarDecl>(decl);
+                // References are outside this value-copy model. Their
+                // initializer may later be closed or rewritten through the
+                // reference, so never keep a strong return-ownership proof.
+                if (var && var->getType()->isReferenceType() && var->hasInit())
+                    kill(var->getInit(), out);
                 auto it = var ? out.find(var) : out.end();
                 if (it == out.end()) continue;
                 it->second = var->hasInit()
-                                 ? ownershipOf(var->getInit(), in)
-                                 : FdReturnState::Unknown;
+                                 ? ownershipOf(var->getInit(), out)
+                                 : FdReturnValue{};
             }
         } else if (const auto* assignment =
                        dyn_cast<BinaryOperator>(stmt)) {
@@ -2548,12 +2581,16 @@ public:
                 if (it != out.end())
                     it->second = assignment->getOpcode() == BO_Assign
                                      ? ownershipOf(assignment->getRHS(), in)
-                                     : FdReturnState::Unknown;
+                                     : FdReturnValue{};
             }
         } else if (const auto* unary = dyn_cast<UnaryOperator>(stmt)) {
-            if (unary->isIncrementDecrementOp() ||
-                unary->getOpcode() == UO_AddrOf)
-                kill(asVarOrParam(unary->getSubExpr()), out);
+            if (unary->isIncrementDecrementOp()) {
+                const auto* var = dyn_cast_or_null<VarDecl>(asVarOrParam(unary->getSubExpr()));
+                auto it = var ? out.find(var) : out.end();
+                if (it != out.end()) it->second = FdReturnValue{};
+            } else if (unary->getOpcode() == UO_AddrOf) {
+                kill(unary->getSubExpr(), out);
+            }
         } else if (const auto* call = dyn_cast<CallExpr>(stmt)) {
             applyCallEffects(call, out);
         }
@@ -2567,39 +2604,58 @@ public:
         const auto* ret = dyn_cast<ReturnStmt>(stmt);
         if (ret && ret->getRetValue())
             contributions.push_back(
-                ownershipOf(ret->getRetValue(), before));
+                ownershipOf(ret->getRetValue(), before).kind);
     }
 
     std::vector<FdReturnState> contributions;
 
 private:
-    FdReturnState ownershipOf(const Expr* expr,
-                              const State& state) const {
-        if (!expr) return FdReturnState::Unknown;
-        if (isMinusOneFdFailure(expr, context_)) return FdReturnState::Failure;
-        expr = descriptorValue(expr, context_);
-        if (!expr) return FdReturnState::Unknown;
+    FdReturnValue ownershipOf(const Expr* expr, const State& state) const {
+        if (!expr) return {};
+        if (isMinusOneFdFailure(expr, context_)) return {FdReturnState::Failure, {}};
+        const bool preserves = descriptorValue(expr, context_) != nullptr;
+        const auto qualify = [preserves](FdReturnValue value) {
+            if (!preserves) value.kind = FdReturnState::Unknown;
+            return value;
+        };
+        // Numeric narrowing cannot prove ownership, but can still hold the
+        // original descriptor for some inputs. Retain its possible origins
+        // solely to invalidate other copies on a subsequent close/escape.
+        expr = expr->IgnoreParenCasts();
         if (const auto* var = dyn_cast_or_null<VarDecl>(
                 asVarOrParam(expr))) {
             auto it = state.find(var);
-            return it == state.end() ? FdReturnState::Borrowed
-                                     : it->second;
+            return qualify(it == state.end() ? FdReturnValue{FdReturnState::Borrowed, {}}
+                                            : it->second);
         }
         if (const auto* conditional = dyn_cast<ConditionalOperator>(expr))
-            return mergeFdReturnState(
+            return qualify(mergeFdReturnValue(
                 ownershipOf(conditional->getTrueExpr(), state),
-                ownershipOf(conditional->getFalseExpr(), state));
+                ownershipOf(conditional->getFalseExpr(), state)));
+        const Expr* resultExpr = nullptr;
+        if (const auto* binary = dyn_cast<BinaryOperator>(expr)) {
+            if (binary->getOpcode() == BO_Comma || binary->getOpcode() == BO_Assign)
+                resultExpr = binary->getRHS();
+        } else if (const auto* unary = dyn_cast<UnaryOperator>(expr)) {
+            if (unary->getOpcode() == UO_Plus) resultExpr = unary->getSubExpr();
+        }
+        if (resultExpr) {
+            auto value = ownershipOf(resultExpr, state);
+            value.kind = FdReturnState::Unknown;
+            return value;
+        }
         const auto* call = dyn_cast<CallExpr>(expr);
         if (!call || !isFdIntegerType(call->getType()))
-            return FdReturnState::Unknown;
-        if (codeskeptic::isNativeFdAcquisition(call)) return FdReturnState::Owned;
+            return {};
+        if (codeskeptic::isNativeFdAcquisition(call))
+            return qualify({FdReturnState::Owned, {call}});
         const auto summary = lookupPrev(previous_, call);
-        if (!summary) return FdReturnState::Unknown;
+        if (!summary) return {};
         if (summary->returnOwnership == ReturnOwnership::Owned)
-            return FdReturnState::Owned;
+            return qualify({FdReturnState::Owned, {call}});
         if (summary->returnOwnership == ReturnOwnership::Borrowed)
-            return FdReturnState::Borrowed;
-        return FdReturnState::Unknown;
+            return qualify({FdReturnState::Borrowed, {}});
+        return {};
     }
 
     void applyCallEffects(const CallExpr* call, State& state) const {
@@ -2612,25 +2668,36 @@ private:
             const unsigned paramIndex = argIndex - offset;
             if (isKnownFdPrimitive(call)) {
                 if (direct == "close" && paramIndex == 0)
-                    kill(asVarOrParam(call->getArg(argIndex)), state);
+                    kill(call->getArg(argIndex), state);
                 continue;
             }
             if (!summary ||
                 summary->paramOwnership(paramIndex) !=
                     ParamOwnership::Borrowed)
-                kill(asVarOrParam(call->getArg(argIndex)), state);
+                kill(call->getArg(argIndex), state);
         }
     }
 
-    static void kill(const ValueDecl* value, State& state) {
-        const auto* var = dyn_cast_or_null<VarDecl>(value);
-        auto it = var ? state.find(var) : state.end();
-        if (it != state.end()) it->second = FdReturnState::Unknown;
+    void kill(const Expr* expr, State& state) const {
+        const auto killed = ownershipOf(expr, state).origins;
+        const auto* target = dyn_cast_or_null<VarDecl>(asVarOrParam(expr));
+        for (auto& [var, value] : state) {
+            // Address escape must also invalidate a previously known -1 or
+            // borrowed value that has no acquisition origin at all.
+            if (var == target) value.kind = FdReturnState::Unknown;
+            for (const CallExpr* origin : killed) {
+                if (value.origins.count(origin)) {
+                    value.kind = FdReturnState::Unknown;
+                    break;
+                }
+            }
+        }
     }
 
     const SummaryTable& previous_;
     const ASTContext& context_;
     State initial_;
+    unsigned originCount_ = 0;
 };
 
 ReturnOwnership computeFdReturnOwnership(const FunctionDecl* func,
@@ -2642,7 +2709,7 @@ ReturnOwnership computeFdReturnOwnership(const FunctionDecl* func,
         collectTypedVars(func, [](QualType type) {
             return isFdIntegerType(type);
         }),
-        previous, ctx);
+        previous, ctx, func->getBody());
     auto result = codeskeptic::runDataflow(func, ctx, analysis);
     if (!result.converged || analysis.contributions.empty())
         return ReturnOwnership::Unknown;
@@ -2678,9 +2745,12 @@ enum class FdParamEffect { None, Consumed, Transferred, Unknown };
 struct FdParamState {
     std::map<const VarDecl*, FdParamBinding> bindings;
     std::vector<FdParamEffect> effects;
+    std::vector<bool> observedBorrow;
+    std::vector<bool> borrowEscaped;
 
     bool operator==(const FdParamState& other) const {
-        return bindings == other.bindings && effects == other.effects;
+        return bindings == other.bindings && effects == other.effects &&
+               observedBorrow == other.observedBorrow && borrowEscaped == other.borrowEscaped;
     }
     bool operator!=(const FdParamState& other) const {
         return !(*this == other);
@@ -2730,6 +2800,8 @@ public:
                              const SummaryTable& previous)
         : previous_(previous) {
         initial_.effects.assign(func->getNumParams(), FdParamEffect::None);
+        initial_.observedBorrow.assign(func->getNumParams(), false);
+        initial_.borrowEscaped.assign(func->getNumParams(), false);
         for (unsigned i = 0; i < func->getNumParams(); ++i) {
             const ParmVarDecl* param = func->getParamDecl(i);
             if (isFdIntegerType(param->getType()))
@@ -2746,9 +2818,14 @@ public:
     State merge(const State& lhs, const State& rhs) const {
         State out;
         out.effects.resize(lhs.effects.size(), FdParamEffect::Unknown);
-        for (size_t i = 0; i < out.effects.size(); ++i)
+        out.observedBorrow.resize(lhs.effects.size());
+        out.borrowEscaped.resize(lhs.effects.size());
+        for (size_t i = 0; i < out.effects.size(); ++i) {
             out.effects[i] = mergeFdParamEffect(
                 lhs.effects[i], rhs.effects[i]);
+            out.observedBorrow[i] = lhs.observedBorrow[i] || rhs.observedBorrow[i];
+            out.borrowEscaped[i] = lhs.borrowEscaped[i] || rhs.borrowEscaped[i];
+        }
 
         std::set<const VarDecl*> vars;
         for (const auto& [var, binding] : lhs.bindings) {
@@ -2787,6 +2864,8 @@ public:
         if (const auto* declaration = dyn_cast<DeclStmt>(stmt)) {
             for (const Decl* decl : declaration->decls()) {
                 const auto* var = dyn_cast<VarDecl>(decl);
+                if (var && var->getType()->isReferenceType() && var->hasInit())
+                    blockBorrow(var->getInit(), out);
                 if (!var || !isFdIntegerType(var->getType()) ||
                     !var->hasInit())
                     continue;
@@ -2818,17 +2897,55 @@ public:
 
         if (const auto* call = dyn_cast<CallExpr>(stmt))
             applyCall(call, out);
+        if (const auto* ret = dyn_cast<ReturnStmt>(stmt))
+            blockBorrow(ret->getRetValue(), out);
+        if (const auto* unary = dyn_cast<UnaryOperator>(stmt)) {
+            if (unary->getOpcode() == UO_AddrOf)
+                blockBorrow(unary->getSubExpr(), out);
+        }
         return out;
     }
 
     void refineOnEdge(const Stmt*, bool, State&, ASTContext&) const {}
 
 private:
+    static void blockBorrow(const Expr* expr, State& state) {
+        if (!expr) return;
+        expr = expr->IgnoreParenCasts();
+        if (const auto* conditional = dyn_cast<ConditionalOperator>(expr)) {
+            blockBorrow(conditional->getTrueExpr(), state);
+            blockBorrow(conditional->getFalseExpr(), state);
+            return;
+        }
+        if (const auto* binary = dyn_cast<BinaryOperator>(expr)) {
+            if (binary->getOpcode() == BO_Comma || binary->getOpcode() == BO_Assign) {
+                blockBorrow(binary->getRHS(), state);
+                return;
+            }
+        }
+        if (const auto* unary = dyn_cast<UnaryOperator>(expr)) {
+            if (unary->getOpcode() == UO_Plus) {
+                blockBorrow(unary->getSubExpr(), state);
+                return;
+            }
+        }
+        for (unsigned source : fdParamBindingFor(expr, state).sources)
+            state.borrowEscaped[source] = true;
+    }
+
+    static void observeBorrow(const Expr* expr, State& state) {
+        const auto binding = fdParamBindingFor(expr, state);
+        if (!binding.opaque && binding.sources.size() == 1)
+            state.observedBorrow[*binding.sources.begin()] = true;
+    }
+
     void applyCall(const CallExpr* call, State& state) const {
         const llvm::StringRef direct =
             globalFdCalleeName(call->getDirectCallee());
         const unsigned offset = callParamOffset(call);
         if (isKnownFdPrimitive(call)) {
+            if (isNativeAcceptCall(call))
+                observeBorrow(call->getArg(0), state);
             if (direct == "close" && call->getNumArgs() > offset)
                 applyFdParamEffect(
                     fdParamBindingFor(call->getArg(offset), state),
@@ -2845,6 +2962,7 @@ private:
                 switch (summary->paramOwnership(paramIndex)) {
                     case ParamOwnership::Borrowed:
                         effect = FdParamEffect::None;
+                        observeBorrow(call->getArg(argIndex), state);
                         break;
                     case ParamOwnership::Consumed:
                         effect = FdParamEffect::Consumed;
@@ -2891,6 +3009,12 @@ std::vector<ParamOwnership> computeFdParamOwnerships(
                 out[i] = ParamOwnership::Transferred;
                 break;
             case FdParamEffect::None:
+                // A no-op integer parameter alone is not an FD contract.
+                // Require positive native/modelled borrow evidence, no
+                // consume/opaque effect, and no unsupported alias escape.
+                if (exit->second.observedBorrow[i] && !exit->second.borrowEscaped[i])
+                    out[i] = ParamOwnership::Borrowed;
+                break;
             case FdParamEffect::Unknown:
                 break;
         }

@@ -832,6 +832,69 @@ TEST(FdResourceRuleTest, AcceptWrapperCrossTUOwnershipAndClose) {
     }
 }
 
+TEST(FdResourceRuleTest, AcceptClosedAliasDoesNotReturnOwnership) {
+    for (const auto* acquire : {"accept(l,0,0)", "accept4(l,0,0,0)"}) {
+        SCOPED_TRACE(acquire);
+        EXPECT_TRUE(runFdRule(std::string("int wrapper(int l){int fd=") + acquire +
+            ";int saved=fd;close(fd);return saved;}"
+            "void caller(int l){int fd=wrapper(l);(void)fd;}").empty());
+        EXPECT_TRUE(runFdRule(std::string("int wrapper(int l){int fd=") + acquire +
+            ";int saved=fd;close(saved);return fd;}"
+            "void caller(int l){int fd=wrapper(l);(void)fd;}").empty());
+    }
+}
+
+TEST(FdResourceRuleTest, AcceptClosingOneResourcePreservesDistinctReturn) {
+    for (const auto* acquire : {"accept(l,0,0)", "accept4(l,0,0,0)"}) {
+        SCOPED_TRACE(acquire);
+        const auto results = runFdRule(std::string("int wrapper(int l){int fd=") + acquire +
+            ";int other=" + acquire + ";close(fd);return other;}"
+            "void caller(int l){int fd=wrapper(l);(void)fd;}");
+        expectSingleResourceLeak(results);
+        if (!results.empty()) EXPECT_EQ(results[0].function, "caller");
+    }
+}
+
+TEST(FdResourceRuleTest, AcceptAliasJoinsAndRebindingsAreConservative) {
+    const auto prefix = std::string("int wrapper(int l,int c){int fd=accept(l,0,0);");
+    for (const auto* body : {
+             "int saved=fd;if(c)saved=7;close(saved);return fd;}",
+             "int saved=c?fd:-1;close(saved);return fd;}",
+             "int other=accept(l,0,0);close(c?fd:other);return fd;}"}) {
+        SCOPED_TRACE(body);
+        const auto results = runFdRule(prefix + body +
+            "void caller(int l,int c){int fd=wrapper(l,c);(void)fd;}");
+        for (const auto& result : results) EXPECT_NE(result.function, "caller");
+    }
+    for (const auto* body : {
+             "int saved=fd;fd=-1;return saved;}",
+             "int saved=fd;++fd;return saved;}",
+             "int saved=fd;fd=accept(l,0,0);close(fd);return saved;}"}) {
+        SCOPED_TRACE(body);
+        const auto results = runFdRule(prefix + body +
+            "void caller(int l,int c){int fd=wrapper(l,c);(void)fd;}");
+        expectSingleResourceLeak(results);
+        if (!results.empty()) EXPECT_EQ(results[0].function, "caller");
+    }
+    EXPECT_TRUE(runFdRule(
+        "void release(int fd){close(fd);}"
+        "int wrapper(int l){int fd=accept(l,0,0);int saved=fd;release(saved);return fd;}"
+        "void caller(int l){int fd=wrapper(l);(void)fd;}").empty());
+}
+
+TEST(FdResourceRuleTest, AcceptNestedWrapperKeepsListenerBorrowed) {
+    for (const auto* acquire : {"accept(l,0,0)", "accept4(l,0,0,0)"}) {
+        SCOPED_TRACE(acquire);
+        const auto prefix = std::string("int nested(int l){return ") + acquire +
+            ";}int wrapper(){int l=socket(2,1,0);int n=nested(l);"
+            "if(n>=0)close(n);return l;}";
+        auto results = runFdRule(prefix + "void caller(){int fd=wrapper();(void)fd;}");
+        expectSingleResourceLeak(results);
+        if (!results.empty()) EXPECT_EQ(results[0].function, "caller");
+        EXPECT_TRUE(runFdRule(prefix + "void caller(){int fd=wrapper();close(fd);}").empty());
+    }
+}
+
 TEST(FdResourceRuleTest, AcceptDoesNotConsumeWrapperOwnedListener) {
     const std::string body =
         "int wrapper(){int listener=socket(2,1,0);int fd=accept(listener,0,0);"
@@ -840,6 +903,52 @@ TEST(FdResourceRuleTest, AcceptDoesNotConsumeWrapperOwnedListener) {
     expectSingleResourceLeak(leaked);
     if (!leaked.empty()) EXPECT_EQ(leaked[0].function, "caller");
     EXPECT_TRUE(runFdRule(body + "void caller(){int listener=wrapper();close(listener);}").empty());
+}
+
+TEST(FdResourceRuleTest, AcceptBorrowEvidenceDoesNotOverrideOpaqueOrConsumedListener) {
+    for (const auto* effect : {
+             "close(l);", "opaque(l);", "if(c)close(l);", "saved=l;",
+             "int* p=&l;close(*p);", "int& ref=l;close(ref);"}) {
+        SCOPED_TRACE(effect);
+        auto results = runFdRule(std::string("extern void opaque(int);int saved;"
+            "int step(int l,int c){int n=accept(l,0,0);") + effect + "return n;}"
+            "int wrapper(int c){int l=socket(2,1,0);int n=step(l,c);close(n);return l;}"
+            "void caller(int c){int l=wrapper(c);(void)l;}");
+        for (const auto& result : results) EXPECT_NE(result.function, "caller");
+    }
+    // An ordinary integer no-op or returning the original listener is not
+    // enough evidence for a non-escaping descriptor-borrow contract.
+    for (const auto* step : {
+             "int step(int l){return 0;}",
+             "int step(int l){int n=accept(l,0,0);close(n);return l;}"}) {
+        auto results = runFdRule(std::string(step) +
+            "int wrapper(){int l=socket(2,1,0);step(l);return l;}"
+            "void caller(){int l=wrapper();(void)l;}");
+        for (const auto& result : results) EXPECT_NE(result.function, "caller");
+    }
+}
+
+TEST(FdResourceRuleTest, AcceptMutatedFailureAndConvertedCloseDoNotProveOwnedReturn) {
+    for (const auto* body : {
+             "int n=-1;mutate(&n);if(c)return n;return accept(l,0,0);}",
+             "int n=accept(l,0,0);int saved=n;close((short)n);return saved;}",
+             "int n=accept(l,0,0);short saved=n;close(saved);return n;}",
+             "int n=accept(l,0,0);int& saved=n;close(saved);return n;}"}) {
+        SCOPED_TRACE(body);
+        auto results = runFdRule(std::string("extern void mutate(int*);int wrapper(int l,int c){") +
+            body + "void caller(int l,int c){int n=wrapper(l,c);(void)n;}");
+        for (const auto& result : results) EXPECT_NE(result.function, "caller");
+    }
+}
+
+TEST(FdResourceRuleTest, AcceptReturnedListenerExpressionIsNotNonEscapingBorrow) {
+    for (const auto* value : {"(0,l)", "+l", "(l=l)"}) {
+        SCOPED_TRACE(value);
+        auto results = runFdRule(std::string("int step(int l){int n=accept(l,0,0);close(n);return ") +
+            value + ";}int wrapper(){int l=socket(2,1,0);close(step(l));return l;}"
+            "void caller(){int l=wrapper();(void)l;}");
+        for (const auto& result : results) EXPECT_NE(result.function, "caller");
+    }
 }
 
 TEST(FdResourceRuleTest, ClosingWrappedAcquisitionIsClean) {
