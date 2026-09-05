@@ -563,10 +563,24 @@ public:
         // This index carries no initializer/range facts across CFG edges.
         struct Escapes : RecursiveASTVisitor<Escapes> {
             std::set<const VarDecl*>& vars;
-            bool& lifetimeEffects;
+            bool& unmodeledEffects;
             ASTContext& ctx;
             Escapes(std::set<const VarDecl*>& out, bool& effects, ASTContext& context)
-                : vars(out), lifetimeEffects(effects), ctx(context) {}
+                : vars(out), unmodeledEffects(effects), ctx(context) {}
+            bool VisitExpr(Expr* expr) {
+                // Purity must not depend on an exhaustive blacklist of AST
+                // nodes. Only writes handled by transfer are admitted. RAV
+                // visits the child of transparent parentheses/implicit casts;
+                // other effectful structural expressions fall back safely.
+                if (!expr->HasSideEffects(ctx) ||
+                    llvm::isa<ParenExpr, ImplicitCastExpr, CallExpr>(expr)) return true;
+                if (const auto* op = llvm::dyn_cast<BinaryOperator>(expr);
+                    op && op->isAssignmentOp()) return true;
+                if (const auto* op = llvm::dyn_cast<UnaryOperator>(expr);
+                    op && op->isIncrementDecrementOp()) return true;
+                unmodeledEffects = true;
+                return true;
+            }
             void referenceTargets(const Stmt* stmt) {
                 if (!stmt) return;
                 if (const auto* ref = llvm::dyn_cast<DeclRefExpr>(stmt))
@@ -586,15 +600,15 @@ public:
                 // Record arrays/aggregates and cleanup attributes can execute
                 // writes at scope exit without any CallExpr in this transfer.
                 if (ctx.getBaseElementType(var->getType())->isRecordType() ||
-                    var->hasAttr<CleanupAttr>()) lifetimeEffects = true;
+                    var->hasAttr<CleanupAttr>()) unmodeledEffects = true;
                 if (var->getType()->isReferenceType() && var->hasInit())
                     referenceTargets(var->getInit());
                 return true;
             }
-            bool VisitCXXConstructExpr(CXXConstructExpr*) { lifetimeEffects = true; return true; }
-            bool VisitCXXBindTemporaryExpr(CXXBindTemporaryExpr*) { lifetimeEffects = true; return true; }
-            bool VisitCXXNewExpr(CXXNewExpr*) { lifetimeEffects = true; return true; }
-            bool VisitCXXDeleteExpr(CXXDeleteExpr*) { lifetimeEffects = true; return true; }
+            bool VisitCXXConstructExpr(CXXConstructExpr*) { unmodeledEffects = true; return true; }
+            bool VisitCXXBindTemporaryExpr(CXXBindTemporaryExpr*) { unmodeledEffects = true; return true; }
+            bool VisitCXXNewExpr(CXXNewExpr*) { unmodeledEffects = true; return true; }
+            bool VisitCXXDeleteExpr(CXXDeleteExpr*) { unmodeledEffects = true; return true; }
             bool VisitCallExpr(CallExpr* call) {
                 codeskeptic::forEachNonConstRefArg(call, [&](const Expr* arg) {
                     referenceTargets(arg);
@@ -602,7 +616,7 @@ public:
                 return true;
             }
             bool VisitLambdaExpr(LambdaExpr* expr) {
-                lifetimeEffects = true;
+                unmodeledEffects = true;
                 for (const auto& capture : expr->captures())
                     if (capture.capturesVariable() &&
                         capture.getCaptureKind() == LCK_ByRef)
@@ -610,7 +624,7 @@ public:
                             vars.insert(var);
                 return true;
             }
-        } visitor(escaped_, hasUnmodeledLifetimeEffects_, ctx);
+        } visitor(escaped_, hasUnmodeledEffects_, ctx);
         visitor.TraverseStmt(fn->getBody());
     }
 
@@ -665,7 +679,7 @@ public:
                 if (var) put(out, var, value);
             }
         } else if (const auto* call = llvm::dyn_cast<CallExpr>(stmt)) {
-            if (hasUnmodeledLifetimeEffects_ || !isEmptyConstObserver(call, ctx))
+            if (hasUnmodeledEffects_ || !isEmptyConstObserver(call, ctx))
                 invalidateEscapes(out);
         } else if (llvm::isa<AsmStmt>(stmt)) {
             invalidateEscapes(out);
@@ -798,8 +812,8 @@ public:
                                    const DefinitionIndex& definitions,
                                    ASTContext& ctx) const {
         // Do not claim a safety proof from a domain which cannot observe all
-        // lifetime effects. Keep the existing numeric detection path instead.
-        if (hasUnmodeledLifetimeEffects_ || !op || op->getOpcode() != BO_Mul) return false;
+        // effects. Keep the existing numeric detection path instead.
+        if (hasUnmodeledEffects_ || !op || op->getOpcode() != BO_Mul) return false;
         const auto snapshot = atStmt_.find(op);
         if (snapshot == atStmt_.end() || snapshot->second.unreachable) return false;
         const auto safe = [&](const Expr* value, const Expr* factor) {
@@ -1049,7 +1063,7 @@ private:
         return false;
     }
     std::set<const VarDecl*> escaped_;
-    bool hasUnmodeledLifetimeEffects_ = false;
+    bool hasUnmodeledEffects_ = false;
     std::map<const Stmt*, State> atStmt_;
 };
 

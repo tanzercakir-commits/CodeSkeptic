@@ -364,6 +364,35 @@ TEST(AllocSizeOverflowRuleTest, Uint64OutParamCleanupCannotSupplyStaleSafetyProo
     EXPECT_EQ(results.size(), 1u);
 }
 
+TEST(AllocSizeOverflowRuleTest, Uint64OutParamAtomicWritesCannotSupplyStaleSafetyProof) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    for (const char* size : {"n*4", "n+((size_t)-1)/2"}) {
+        SCOPED_TRACE(size);
+        EXPECT_EQ(runRule(rule, std::string(R"(
+            typedef __SIZE_TYPE__ size_t;
+            extern void* malloc(size_t);
+            extern void read_size(size_t*);
+            static void observe(const size_t* p){}
+            void* f(){size_t n=0;read_size(&n);if(n>100)return 0;observe(&n);
+                __atomic_fetch_add(&n,((size_t)-1)/2,__ATOMIC_RELAXED);
+                return malloc()") + size + ");}", "observer_atomic.c").size(), 1u);
+    }
+}
+
+TEST(AllocSizeOverflowRuleTest, Uint64OutParamParenthesizedObserverPreservesGuard) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    EXPECT_TRUE(runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern void read_size(size_t*);
+        static void observe(const size_t* value){}
+        void* f(){size_t n=0;(read_size(&n));if((n>100))return 0;
+            (observe((&n)));return malloc(n*4);}
+    )", "observer_parens.c").empty());
+}
+
 // Phase 6.1: a 64-bit allocation-size expression needs operand-corner
 // reasoning because the mathematical product does not fit the int64
 // interval domain. A declared untrusted size_t and a finite factor are
