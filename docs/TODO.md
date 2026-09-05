@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH01-S02-U002
-
-### CS3-CH01-S02-U002 — Sabit pointer-offset kalan kapasitesini izle
-
-**Sonuç:** buf+k ve &buf[k] için bilinen kalan kapasite okuma/yazma denetimine girer.
-
-**Kabul:**
-
-- Son byte, taşma, negatif offset ve one-past ile zero length ayrı fixture'lardır.
-- Bilinmeyen veya değiştirilmiş alias için kapasite uydurulmaz.
-- Kaynak okuma ve hedef yazma bulguları doğru ayrılır; integer hesap taşması güvenli kalır.
-
-**Test bütçesi:** T1
-**Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/rules/BoundsRule.cpp, src/rules/BoundsRule.h, src/engine/ExtentMap.cpp, src/engine/ExtentMap.h, tests/BoundsRuleTest.cpp
-**Bağımlılıklar:** CS3-CH01-S02-U001
+## FRONT — CS3-CH01-S03-U001
 
 ### CS3-CH01-S03-U001 — Yerel scalar uninitialized-read kuralını ekle
 

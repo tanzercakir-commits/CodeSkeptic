@@ -2,6 +2,19 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH01-S02-U002 — Sabit pointer-offset kalan kapasitesini izle
+
+- Commit: `c32825c7873008fc1f38b4ff695590551a20fa7f`
+- Dal: `agent/cs3-ch01-s02-u002-pointer-offsets`
+- Implementer: `root-cs3-ch01-s02-u002-20260905`
+- Bağımsız denetçi: `independent-cwe-ch01-s02-u002-c32825c-20260905`
+- İnceleme SHA-256: `562591c08716a7f726cf4f22d8bb3fb5a74697d5912d876640b51e9cfc2f7d78`
+- Tarih: 2026-09-05T02:36:36.742925+00:00
+- Sonuç: buf+k ve &buf[k] için bilinen kalan kapasite okuma/yazma denetimine girer.
+- focused-tests: PASS; SHA-256 `d6a389cb3125ad0667c9a977ee25e06187e8295ed969c48bfcf7e617af8acd4e`; `bash scripts/local_test.sh focused 'BoundsRuleTest.*:IntervalTest.*:IntervalAnalysisTest.*'`
+- cli-smoke: PASS; SHA-256 `0b04ea31786085942a8758f8423f51beb5103e4d9181a6bf40c1de3a6e5cfbc4`; `PYTHONDONTWRITEBYTECODE=1 python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH01-S02-U002/cli_smoke.py && bash scripts/local_test.sh smoke`
+- queue-check: PASS; SHA-256 `0133b1f864bcd86f617090ab62c1f296aa8d8a7c33e2460edcce450e4d4dce96`; `PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/project_queue.py check && PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/project_queue.py guard --base b9dd8de1c907e023f050d9c5a62fe245edbbdae1`
+
 ## CS3-CH01-S02-U001 — memcpy/memmove kaynak okuma kapasitesini denetle
 
 - Commit: `0816619b14df12e3ee3d7398e91d7a4c2942b181`
