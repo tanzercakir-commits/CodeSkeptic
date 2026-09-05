@@ -700,6 +700,148 @@ TEST(FdResourceRuleTest, AcquisitionWrapperAndChainReport) {
     )"));
 }
 
+TEST(FdResourceRuleTest, AcceptWrappersPreserveNativeOwnershipAndClose) {
+    for (const auto* acquire : {"accept(listener,0,0)", "accept4(listener,0,0,0)"}) {
+        SCOPED_TRACE(acquire);
+        auto results = runFdRule(std::string(
+            "int inner(int listener){return ") + acquire + ";}"
+            "int outer(int listener){return inner(listener);}"
+            "void direct(int listener){int fd=" + acquire + ";(void)fd;}"
+            "void wrapped(int listener){int fd=outer(listener);(void)fd;}"
+            "void good(int listener){int fd=outer(listener);if(fd>=0)close(fd);}");
+        ASSERT_EQ(results.size(), 2u);
+        EXPECT_EQ(results[0].function, "direct");
+        EXPECT_EQ(results[1].function, "wrapped");
+    }
+}
+
+TEST(FdResourceRuleTest, AcceptWrapperFailureSentinelAndListenerRemainSeparate) {
+    for (const auto* acquire : {"accept(listener,0,0)", "accept4(listener,0,0,0)"}) {
+        const std::string prefix = std::string(
+            "int wrapper(int listener,int fail){if(fail)return -1;return ") + acquire + ";}";
+        expectSingleResourceLeak(runFdRule(prefix +
+            "void f(int fail){int listener=socket(2,1,0);int fd=wrapper(listener,fail);close(listener);}"));
+        expectSingleResourceLeak(runFdRule(prefix +
+            "void f(int fail){int listener=socket(2,1,0);int fd=wrapper(listener,fail);if(fd>=0)close(fd);}"));
+        EXPECT_TRUE(runFdRule(prefix +
+            "void f(int fail){int listener=socket(2,1,0);int fd=wrapper(listener,fail);"
+            "if(fd>=0)close(fd);close(listener);}").empty());
+    }
+}
+
+TEST(FdResourceRuleTest, AcceptWrapperNarrowedNumberIsNotCallerOwned) {
+    for (const auto* body : {
+            "short wrapper(int listener){return accept(listener,0,0);}",
+            "int wrapper(int listener){short n=accept(listener,0,0);return n;}",
+            "int wrapper(int listener){return (short)accept(listener,0,0);}"}) {
+        SCOPED_TRACE(body);
+        auto results = runFdRule(std::string(body) +
+            "void caller(int listener){int value=wrapper(listener);(void)value;}");
+        // The native descriptor is lost inside wrapper; its narrowed number
+        // must not create a second, fictitious ownership obligation in caller.
+        ASSERT_EQ(results.size(), 1u);
+        EXPECT_EQ(results[0].function, "wrapper");
+    }
+}
+
+TEST(FdResourceRuleTest, AcceptWrapperRealHeadersInCAndCpp) {
+    const std::string code = R"(
+        #ifndef _GNU_SOURCE
+        #define _GNU_SOURCE
+        #endif
+        #include <sys/socket.h>
+        #include <unistd.h>
+        int first(int listener){return accept(listener,0,0);}
+        int second(int listener){return accept4(listener,0,0,0);}
+        int chain(int listener){return second(listener);}
+        void direct(int listener){int fd=accept(listener,0,0);(void)fd;}
+        void wrapped(int listener){int fd=first(listener);(void)fd;}
+        void nested(int listener){int fd=chain(listener);(void)fd;}
+        void good(int listener){int fd=chain(listener);if(fd>=0)close(fd);}
+    )";
+    for (const auto& language : {std::pair{"-std=gnu11", "accept_wrapper.c"},
+                                std::pair{"-std=gnu++17", "accept_wrapper.cpp"}}) {
+        SCOPED_TRACE(language.first);
+        FdResourceRule rule;
+        auto results = runRuleWithArgs(rule, code, {language.first}, language.second);
+        ASSERT_EQ(results.size(), 3u);
+        EXPECT_EQ(results[0].function, "direct");
+        EXPECT_EQ(results[1].function, "wrapped");
+        EXPECT_EQ(results[2].function, "nested");
+    }
+}
+
+TEST(FdResourceRuleTest, AcceptWrapperLookalikesNeverSeedNativeOwnership) {
+    const char* cases[] = {
+        "int accept(int);int wrapper(int x){return accept(x);}",
+        "int accept(int,...);int wrapper(int x){return accept(x,0,0);}",
+        "long accept(int,sockaddr*,unsigned*);long wrapper(int x){return accept(x,0,0);}",
+        "int accept(int,void*,unsigned*);int wrapper(int x){return accept(x,0,0);}",
+        "int accept(int,sockaddr*,unsigned long long*);int wrapper(int x){return accept(x,0,0);}",
+        "int accept(int,const sockaddr*,unsigned*);int wrapper(int x){return accept(x,0,0);}",
+        "int accept(int,sockaddr*,unsigned*){return 5;}int wrapper(int x){return accept(x,0,0);}",
+        "int accept4(int,sockaddr*,unsigned*,bool);int wrapper(int x){return accept4(x,0,0,false);}",
+        "namespace vendor{int accept(int,sockaddr*,unsigned*);}int wrapper(int x){return vendor::accept(x,0,0);}",
+        "struct S{static int accept(int,sockaddr*,unsigned*);};int wrapper(int x){return S::accept(x,0,0);}",
+        "int wrapper(int){return 7;}",
+        "int wrapper(int){return -1;}",
+    };
+    for (const auto* code : cases) {
+        SCOPED_TRACE(code);
+        FdResourceRule rule;
+        EXPECT_TRUE(runRule(rule, std::string("struct sockaddr;") + code +
+            "void caller(int listener){int fd=wrapper(listener);(void)fd;}").empty());
+    }
+}
+
+TEST(FdResourceRuleTest, AcceptWrapperDescriptorPreservingReturns) {
+    const char* cases[] = {
+        "int wrapper(int l){int n=accept(l,0,0);return static_cast<int>(n);}",
+        "long wrapper(int l){int n=accept(l,0,0);return n;}",
+        "long wrapper(int l){return static_cast<long>(accept(l,0,0));}",
+        "int wrapper(int l){int n=accept(l,0,0);int saved=n;return saved;}",
+    };
+    for (const auto* code : cases) {
+        SCOPED_TRACE(code);
+        auto results = runFdRule(std::string(code) +
+            "void caller(int listener){int fd=wrapper(listener);(void)fd;}");
+        expectSingleResourceLeak(results);
+        if (!results.empty()) EXPECT_EQ(results[0].function, "caller");
+    }
+    // A non-failure borrowed integer alternative prevents a strong Owned
+    // summary; -1 alone is the distinguished acquisition failure sentinel.
+    EXPECT_TRUE(runFdRule(
+        "int wrapper(int l,int c){if(c)return 7;return accept(l,0,0);}"
+        "void caller(int l,int c){int value=wrapper(l,c);(void)value;}").empty());
+}
+
+TEST(FdResourceRuleTest, AcceptWrapperCrossTUOwnershipAndClose) {
+    for (const auto* acquire : {"accept(listener,0,0)", "accept4(listener,0,0,0)"}) {
+        for (bool release : {false, true}) {
+            SCOPED_TRACE(acquire);
+            SCOPED_TRACE(release);
+            FdResourceRule rule;
+            auto results = runRuleCrossTU(rule, std::string(kPosixDecls) +
+                "int inner(int listener){return " + acquire + ";}"
+                "int wrapper(int listener){return inner(listener);}",
+                std::string("extern int wrapper(int);extern int close(int);"
+                    "void caller(int listener){int fd=wrapper(listener);") +
+                    (release ? "if(fd>=0)close(fd);}" : "(void)fd;}"));
+            EXPECT_EQ(results.size(), release ? 0u : 1u);
+        }
+    }
+}
+
+TEST(FdResourceRuleTest, AcceptDoesNotConsumeWrapperOwnedListener) {
+    const std::string body =
+        "int wrapper(){int listener=socket(2,1,0);int fd=accept(listener,0,0);"
+        "if(fd>=0)close(fd);return listener;}";
+    auto leaked = runFdRule(body + "void caller(){int listener=wrapper();(void)listener;}");
+    expectSingleResourceLeak(leaked);
+    if (!leaked.empty()) EXPECT_EQ(leaked[0].function, "caller");
+    EXPECT_TRUE(runFdRule(body + "void caller(){int listener=wrapper();close(listener);}").empty());
+}
+
 TEST(FdResourceRuleTest, ClosingWrappedAcquisitionIsClean) {
     auto results = runFdRule(R"(
         int acquire(const char* p) { return open(p, 0); }

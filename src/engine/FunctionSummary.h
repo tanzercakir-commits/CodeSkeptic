@@ -12,9 +12,19 @@ namespace clang {
 class ASTContext;
 class CallExpr;
 class FunctionDecl;
+class QualType;
 }
 
 namespace codeskeptic {
+
+// Shared native FD contract for summary producers and the resource consumer.
+// accept/accept4 require their validated POSIX declaration/signature; a name
+// alone never grants ownership. This does not consult mutable summary state.
+bool isNativeFdAcquisition(const clang::CallExpr* call);
+
+// A value carrier must preserve every successful (nonnegative int) descriptor.
+// Narrowing/bool/enum conversions cannot transfer that ownership relation.
+bool fdTypePreservesDescriptor(clang::QualType type, const clang::ASTContext& ctx);
 
 // Interprocedural analysis v2: deterministic function summaries.
 //

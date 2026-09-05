@@ -225,11 +225,6 @@ llvm::StringRef calleeName(const CallExpr* call) {
     return id->getName();
 }
 
-bool isAcquireName(llvm::StringRef name) {
-    return name == "open" || name == "openat" || name == "socket" ||
-           name == "dup" || name == "mkstemp";
-}
-
 bool isFdIntegerType(QualType type) {
     return !type.isNull() && type->isIntegerType() &&
            !type->isBooleanType();
@@ -238,44 +233,6 @@ bool isFdIntegerType(QualType type) {
 bool isInt(QualType type) {
     return !type.isNull() &&
            type.getCanonicalType()->isSpecificBuiltinType(BuiltinType::Int);
-}
-
-bool isSockaddrPointer(QualType type) {
-    if (!type->isPointerType()) return false;
-    const QualType pointee = type->getPointeeType();
-    if (pointee.isConstQualified() || pointee.isVolatileQualified()) return false;
-    const auto* record = pointee->getAs<RecordType>();
-    return record && record->getDecl()->getQualifiedNameAsString() == "sockaddr";
-}
-
-bool isAcceptAddress(QualType type) {
-    if (isSockaddrPointer(type)) return true;
-    // GNU C libc exposes __SOCKADDR_ARG as a transparent union; C++ exposes
-    // sockaddr*. Check the formal type so passing 0/nullptr stays recognized.
-    const auto* recordType = type->getAs<RecordType>();
-    const auto* record = recordType ? recordType->getDecl()->getDefinition() : nullptr;
-    if (!record || !record->isUnion() || !record->hasAttr<TransparentUnionAttr>()) return false;
-    for (const auto* field : record->fields())
-        if (isSockaddrPointer(field->getType())) return true;
-    return false;
-}
-
-bool isAcceptCall(const CallExpr* call) {
-    const auto name = calleeName(call);
-    if (name != "accept" && name != "accept4") return false;
-    const auto* callee = call->getDirectCallee();
-    const unsigned count = name == "accept" ? 3 : 4;
-    if (callee->hasBody() || callee->isVariadic() ||
-        callee->getNumParams() != count || call->getNumArgs() != count ||
-        !isInt(callee->getReturnType()) || !isInt(callee->getParamDecl(0)->getType()) ||
-        (count == 4 && !isInt(callee->getParamDecl(3)->getType())) ||
-        !isAcceptAddress(callee->getParamDecl(1)->getType())) return false;
-    const QualType length = callee->getParamDecl(2)->getType();
-    if (!length->isPointerType()) return false;
-    const QualType size = length->getPointeeType();
-    // Linux libc's socklen_t is unsigned int, not any unsigned pointee.
-    return !size.isConstQualified() && !size.isVolatileQualified() &&
-           size.getCanonicalType()->isSpecificBuiltinType(BuiltinType::UInt);
 }
 
 bool isPipeCall(const CallExpr* call) {
@@ -294,7 +251,7 @@ bool isPipeCall(const CallExpr* call) {
 bool isAcquisitionCall(const CallExpr* call) {
     if (!call || !isFdIntegerType(call->getType())) return false;
     if (isPipeCall(call)) return false; // Native pipe returns status, never an owned FD.
-    if (isAcquireName(calleeName(call)) || isAcceptCall(call)) return true;
+    if (codeskeptic::isNativeFdAcquisition(call)) return true;
     const auto* summary =
         codeskeptic::SummaryRegistry::instance().lookup(call);
     return summary &&
@@ -674,7 +631,7 @@ void applyOwnershipToExpr(
 
 void applyModeledCallEffects(const CallExpr* call, State& state) {
     const llvm::StringRef direct = calleeName(call);
-    if (isAcquireName(direct) || isAcceptCall(call) || isPipeCall(call) || direct == "close" ||
+    if (codeskeptic::isNativeFdAcquisition(call) || isPipeCall(call) || direct == "close" ||
         direct == "shutdown")
         return;
     const auto* summary =
@@ -805,12 +762,7 @@ struct ResourceInventory : RecursiveASTVisitor<ResourceInventory> {
     unsigned integerVariables = 0;
 
     bool carriesDescriptor(QualType type) const {
-        if (!isFdIntegerType(type) || type->isEnumeralType()) return false;
-        // Every successful POSIX fd is a nonnegative int. Only an integer
-        // value capable of preserving that entire range can transfer it.
-        const unsigned needed = context.getIntWidth(context.IntTy) - 1;
-        const unsigned available = context.getIntWidth(type) - (type->isSignedIntegerType() ? 1 : 0);
-        return available >= needed;
+        return codeskeptic::fdTypePreservesDescriptor(type, context);
     }
 
     void collectReturnedValue(const Expr* expr, unsigned depth = 0) {

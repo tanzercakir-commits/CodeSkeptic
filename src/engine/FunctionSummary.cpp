@@ -7,6 +7,7 @@
 #include "engine/DataflowEngine.h"
 
 #include <clang/AST/ASTContext.h>
+#include <clang/AST/Attr.h>
 #include <clang/AST/Decl.h>
 #include <clang/AST/Expr.h>
 #include <clang/AST/ExprCXX.h>
@@ -2415,31 +2416,73 @@ bool isFdAcquireName(llvm::StringRef name) {
            name == "dup" || name == "mkstemp";
 }
 
-bool isKnownFdPrimitive(llvm::StringRef name) {
-    return isFdAcquireName(name) || name == "close" || name == "shutdown";
+bool isFdIntType(QualType type) {
+    return !type.isNull() &&
+           type.getCanonicalType()->isSpecificBuiltinType(BuiltinType::Int);
 }
 
-bool isMinusOneFdFailure(const Expr* expr) {
-    if (!expr) return false;
-    expr = expr->IgnoreParenImpCasts();
-    const auto* unary = dyn_cast<UnaryOperator>(expr);
-    if (!unary || unary->getOpcode() != UO_Minus) return false;
-    const auto* literal = dyn_cast<IntegerLiteral>(
-        unary->getSubExpr()->IgnoreParenImpCasts());
-    return literal && literal->getValue() == 1;
+bool isFdSockaddrPointer(QualType type) {
+    if (!type->isPointerType()) return false;
+    const QualType pointee = type->getPointeeType();
+    if (pointee.isConstQualified() || pointee.isVolatileQualified()) return false;
+    const auto* record = pointee->getAs<RecordType>();
+    return record && record->getDecl()->getQualifiedNameAsString() == "sockaddr";
 }
 
-bool isFdAcquisitionExpr(const Expr* expr,
-                         const SummaryTable& previous) {
-    if (!expr) return false;
-    expr = expr->IgnoreParenImpCasts();
-    const auto* call = dyn_cast<CallExpr>(expr);
-    if (!call || !isFdIntegerType(call->getType())) return false;
-    if (isFdAcquireName(globalFdCalleeName(call->getDirectCallee())))
-        return true;
-    const auto summary = lookupPrev(previous, call);
-    return summary &&
-           summary->returnOwnership == ReturnOwnership::Owned;
+bool isFdAcceptAddress(QualType type) {
+    if (isFdSockaddrPointer(type)) return true;
+    // GNU C libc uses a transparent union where C++ uses sockaddr*.
+    const auto* recordType = type->getAs<RecordType>();
+    const auto* record = recordType ? recordType->getDecl()->getDefinition() : nullptr;
+    if (!record || !record->isUnion() || !record->hasAttr<TransparentUnionAttr>()) return false;
+    for (const auto* field : record->fields())
+        if (isFdSockaddrPointer(field->getType())) return true;
+    return false;
+}
+
+bool isNativeAcceptCall(const CallExpr* call) {
+    const auto name = globalFdCalleeName(call->getDirectCallee());
+    if (name != "accept" && name != "accept4") return false;
+    const auto* callee = call->getDirectCallee();
+    const unsigned count = name == "accept" ? 3 : 4;
+    if (callee->hasBody() || callee->isVariadic() ||
+        callee->getNumParams() != count || call->getNumArgs() != count ||
+        !isFdIntType(callee->getReturnType()) || !isFdIntType(callee->getParamDecl(0)->getType()) ||
+        (count == 4 && !isFdIntType(callee->getParamDecl(3)->getType())) ||
+        !isFdAcceptAddress(callee->getParamDecl(1)->getType())) return false;
+    const QualType length = callee->getParamDecl(2)->getType();
+    if (!length->isPointerType()) return false;
+    const QualType size = length->getPointeeType();
+    return !size.isConstQualified() && !size.isVolatileQualified() &&
+           size.getCanonicalType()->isSpecificBuiltinType(BuiltinType::UInt);
+}
+
+bool isKnownFdPrimitive(const CallExpr* call) {
+    const auto name = globalFdCalleeName(call->getDirectCallee());
+    return codeskeptic::isNativeFdAcquisition(call) || name == "close" || name == "shutdown";
+}
+
+bool isMinusOneFdFailure(const Expr* expr, const ASTContext& ctx) {
+    if (!expr || !expr->getType()->isSignedIntegerType() ||
+        expr->isValueDependent() || expr->isTypeDependent()) return false;
+    Expr::EvalResult result;
+    if (!expr->EvaluateAsInt(result, ctx) || !result.Val.isInt() ||
+        result.HasSideEffects || result.HasUndefinedBehavior) return false;
+    const auto& value = result.Val.getInt();
+    return value.isSigned() && value.isSignedIntN(64) && value.getSExtValue() == -1;
+}
+
+const Expr* descriptorValue(const Expr* expr, const ASTContext& ctx) {
+    for (unsigned depth = 0; expr && depth < 128; ++depth) {
+        expr = expr->IgnoreParens();
+        if (!codeskeptic::fdTypePreservesDescriptor(expr->getType(), ctx)) return nullptr;
+        const auto* cast = dyn_cast<CastExpr>(expr);
+        if (!cast) return expr;
+        if (cast->getCastKind() != CK_NoOp && cast->getCastKind() != CK_LValueToRValue &&
+            cast->getCastKind() != CK_IntegralCast) return nullptr;
+        expr = cast->getSubExpr();
+    }
+    return nullptr;
 }
 
 enum class FdReturnState { Unknown, Owned, Borrowed, Failure };
@@ -2457,8 +2500,9 @@ public:
     using State = std::map<const VarDecl*, FdReturnState>;
 
     FdReturnOwnershipAnalysis(std::vector<const VarDecl*> trackedVars,
-                              const SummaryTable& previous)
-        : previous_(previous) {
+                              const SummaryTable& previous,
+                              const ASTContext& ctx)
+        : previous_(previous), context_(ctx) {
         for (const VarDecl* var : trackedVars)
             initial_[var] = isa<ParmVarDecl>(var)
                                 ? FdReturnState::Borrowed
@@ -2532,10 +2576,9 @@ private:
     FdReturnState ownershipOf(const Expr* expr,
                               const State& state) const {
         if (!expr) return FdReturnState::Unknown;
-        if (isFdAcquisitionExpr(expr, previous_))
-            return FdReturnState::Owned;
-        if (isMinusOneFdFailure(expr)) return FdReturnState::Failure;
-        expr = expr->IgnoreParenImpCasts();
+        if (isMinusOneFdFailure(expr, context_)) return FdReturnState::Failure;
+        expr = descriptorValue(expr, context_);
+        if (!expr) return FdReturnState::Unknown;
         if (const auto* var = dyn_cast_or_null<VarDecl>(
                 asVarOrParam(expr))) {
             auto it = state.find(var);
@@ -2549,6 +2592,7 @@ private:
         const auto* call = dyn_cast<CallExpr>(expr);
         if (!call || !isFdIntegerType(call->getType()))
             return FdReturnState::Unknown;
+        if (codeskeptic::isNativeFdAcquisition(call)) return FdReturnState::Owned;
         const auto summary = lookupPrev(previous_, call);
         if (!summary) return FdReturnState::Unknown;
         if (summary->returnOwnership == ReturnOwnership::Owned)
@@ -2566,7 +2610,7 @@ private:
         for (unsigned argIndex = offset;
              argIndex < call->getNumArgs(); ++argIndex) {
             const unsigned paramIndex = argIndex - offset;
-            if (isKnownFdPrimitive(direct)) {
+            if (isKnownFdPrimitive(call)) {
                 if (direct == "close" && paramIndex == 0)
                     kill(asVarOrParam(call->getArg(argIndex)), state);
                 continue;
@@ -2585,19 +2629,20 @@ private:
     }
 
     const SummaryTable& previous_;
+    const ASTContext& context_;
     State initial_;
 };
 
 ReturnOwnership computeFdReturnOwnership(const FunctionDecl* func,
                                          ASTContext& ctx,
                                          const SummaryTable& previous) {
-    if (!isFdIntegerType(func->getReturnType()))
+    if (!codeskeptic::fdTypePreservesDescriptor(func->getReturnType(), ctx))
         return ReturnOwnership::Unknown;
     FdReturnOwnershipAnalysis analysis(
         collectTypedVars(func, [](QualType type) {
             return isFdIntegerType(type);
         }),
-        previous);
+        previous, ctx);
     auto result = codeskeptic::runDataflow(func, ctx, analysis);
     if (!result.converged || analysis.contributions.empty())
         return ReturnOwnership::Unknown;
@@ -2783,7 +2828,7 @@ private:
         const llvm::StringRef direct =
             globalFdCalleeName(call->getDirectCallee());
         const unsigned offset = callParamOffset(call);
-        if (isKnownFdPrimitive(direct)) {
+        if (isKnownFdPrimitive(call)) {
             if (direct == "close" && call->getNumArgs() > offset)
                 applyFdParamEffect(
                     fdParamBindingFor(call->getArg(offset), state),
@@ -3458,6 +3503,18 @@ bool sameComponent(const std::vector<FunctionNode>& component,
 } // anonymous namespace
 
 namespace codeskeptic {
+
+bool isNativeFdAcquisition(const clang::CallExpr* call) {
+    return call && isFdIntegerType(call->getType()) &&
+        (isFdAcquireName(globalFdCalleeName(call->getDirectCallee())) || isNativeAcceptCall(call));
+}
+
+bool fdTypePreservesDescriptor(clang::QualType type, const clang::ASTContext& ctx) {
+    if (!isFdIntegerType(type) || type->isEnumeralType()) return false;
+    const unsigned needed = ctx.getIntWidth(ctx.IntTy) - 1;
+    const unsigned available = ctx.getIntWidth(type) - (type->isSignedIntegerType() ? 1 : 0);
+    return available >= needed;
+}
 
 SummaryRegistry& SummaryRegistry::instance() {
     static SummaryRegistry registry;
