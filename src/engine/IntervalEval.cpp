@@ -559,8 +559,8 @@ void applyIntervalAssign(IntervalMap& state, const Stmt* stmt,
                 setOrigin(v, bin->getRHS());
             }
         // Compound assignment (`x += ...`) not modeled yet → top.
-        // Origin membership stays as-is: with a top() interval the
-        // possible-overflow consumer (finite-bound bar) cannot report.
+        // Origin membership stays as-is; consumers must separately prove
+        // their numeric/type-width overflow corner, not treat top as safe.
         if (bin->isCompoundAssignmentOp())
             if (const VarDecl* v = asIntVar(bin->getLHS()))
                 set(v, Interval::top());
@@ -631,8 +631,8 @@ void applyIntervalAssign(IntervalMap& state, const Stmt* stmt,
             return;
         }
         // A DECLARED untrusted source (--untrusted-int-sources) fills
-        // its integer out-params the way its return is modeled: full
-        // finite type range, untrusted origin (2026-07-29, the
+        // its integer out-params the way its return is modeled: type
+        // range and independently untrusted origin (2026-07-29, the
         // out-param half of docs/PLAN-untrusted-sign.md). The proven
         // false negative behind this: nlohmann's
         // `get_number(format, number)` delivers the attacker's value
@@ -642,33 +642,46 @@ void applyIntervalAssign(IntervalMap& state, const Stmt* stmt,
         // same discipline as the scanf block above, which keeps its
         // own path for format-width refinement. The atoi intrinsics
         // return by value and never reach this branch in practice.
+        // Observe the converted argument type: a const-pointee input
+        // is not an output. This intentionally resolves only &local,
+        // not an arbitrary pointer alias or pointee graph.
+        auto writableIntAddress = [](const Expr* arg) -> const VarDecl* {
+            if (!arg->getType()->isPointerType() ||
+                arg->getType()->getPointeeType().isConstQualified()) return nullptr;
+            return addrOfIntVar(arg);
+        };
         if (ctx && isUntrustedIntSource(call)) {
+            auto seedOutput = [&](const VarDecl* v) {
+                if (!v || !vars.count(v)) return;
+                const auto range = intTypeRange(v->getType(), *ctx);
+                // uint64's upper endpoint cannot fit this signed domain.
+                // That says nothing about the independently known source.
+                // Other unsupported widths do not gain a new source model.
+                const bool uint64 = v->getType()->isUnsignedIntegerType() &&
+                    ctx->getIntWidth(v->getType()) == 64;
+                if (!range && !uint64) return;
+                set(v, range.value_or(Interval::top()));
+                if (untrusted) untrusted->insert(v);
+            };
             forEachNonConstRefArg(call, [&](const Expr* arg) {
-                if (const VarDecl* v = asIntVar(arg))
-                    if (auto tr = intTypeRange(v->getType(), *ctx)) {
-                        set(v, *tr);
-                        if (untrusted && vars.count(v))
-                            untrusted->insert(v);
-                    }
+                seedOutput(asIntVar(arg));
             });
             for (const Expr* arg : call->arguments())
-                if (const VarDecl* v = addrOfIntVar(arg))
-                    if (auto tr = intTypeRange(v->getType(), *ctx)) {
-                        set(v, *tr);
-                        if (untrusted && vars.count(v))
-                            untrusted->insert(v);
-                    }
+                seedOutput(writableIntAddress(arg));
             return;
         }
-        // An int passed by non-const reference may be rewritten.
+        // An int passed by non-const reference or direct mutable address
+        // may be rewritten. Numeric top alone is not origin invalidation:
+        // uint64 allocation consumers can use origin + a type-width corner.
+        auto forgetOutput = [&](const VarDecl* v) {
+            if (!v || !vars.count(v)) return;
+            set(v, Interval::top());
+            if (untrusted) untrusted->erase(v);
+        };
         forEachNonConstRefArg(call, [&](const Expr* arg) {
-            if (const VarDecl* v = asIntVar(arg)) {
-                set(v, Interval::top());
-                // Rewritten by an unknown callee: no longer of proven
-                // untrusted origin (and top() blocks reporting anyway).
-                if (untrusted) untrusted->erase(v);
-            }
+            forgetOutput(asIntVar(arg));
         });
+        for (const Expr* arg : call->arguments()) forgetOutput(writableIntAddress(arg));
     }
 }
 

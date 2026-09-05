@@ -2,6 +2,7 @@
 
 #include "engine/CfgCache.h"
 #include "engine/DataflowEngine.h"
+#include "engine/AllocFunctions.h"
 
 #include <clang/AST/ASTConsumer.h>
 #include <clang/AST/ASTContext.h>
@@ -69,6 +70,7 @@ struct Result {
     bool found = false;
     bool converged = false;
     Interval divisor;
+    bool untrusted = false;
 };
 
 class Consumer : public ASTConsumer {
@@ -97,6 +99,8 @@ public:
         auto dataflow = codeskeptic::runDataflow(v.fn, ctx, analysis);
         out_.converged = dataflow.converged;
         out_.divisor = analysis.intervalAt(site.op, site.divisor);
+        if (const auto* origins = analysis.untrustedAt(site.op))
+            out_.untrusted = origins->count(site.divisor) != 0;
         out_.found = true;
     }
 private:
@@ -257,6 +261,53 @@ TEST(IntervalAnalysisTest, UnknownParamIsTop) {
     Interval n = divisorInterval("int f(int x, int n){ return x / n; }");
     EXPECT_TRUE(n.isTop());
     EXPECT_FALSE(n.isKnownNonZero());
+}
+
+TEST(IntervalAnalysisTest, DeclaredUint64OutParamOriginIsIndependentOfRange) {
+    struct Sources {
+        Sources() { codeskeptic::setUntrustedIntSourceNames({"read_size"}); }
+        ~Sources() { codeskeptic::setUntrustedIntSourceNames({}); }
+    } sources;
+    for (bool reference : {false, true}) {
+        SCOPED_TRACE(reference ? "C++ reference" : "C pointer");
+        const std::string code = std::string("typedef __SIZE_TYPE__ size_t; extern void read_size(size_t") +
+            (reference ? "&" : "*") + "); size_t f(size_t x){size_t n=7;read_size(" +
+            (reference ? "n" : "&n") + ");return x/n;}";
+        Result result;
+        ASSERT_TRUE(clang::tooling::runToolOnCode(std::make_unique<Action>(result), code,
+            reference ? "origin.cpp" : "origin.c"));
+        ASSERT_TRUE(result.found);
+        ASSERT_TRUE(result.converged);
+        EXPECT_TRUE(result.divisor.isTop());
+        EXPECT_TRUE(result.untrusted);
+    }
+}
+
+TEST(IntervalAnalysisTest, DeclaredUint64SourceGuardAndReplacementAreSeparate) {
+    struct Sources {
+        Sources() { codeskeptic::setUntrustedIntSourceNames({"read_size"}); }
+        ~Sources() { codeskeptic::setUntrustedIntSourceNames({}); }
+    } sources;
+    struct Case { const char* statements; Interval range; bool origin; };
+    const Case cases[] = {
+        {"if(n>9)return 0;if(n<3)return 0;", Interval::range(3,9), true},
+        {"size_t saved=n;n=0;n=saved;", Interval::top(), true},
+        {"n=7;", Interval::constant(7), false},
+        {"mutate(n);", Interval::top(), false},
+        {"mutate_ptr(&n);", Interval::top(), false},
+    };
+    for (const auto& item : cases) {
+        SCOPED_TRACE(item.statements);
+        const std::string code = std::string("typedef __SIZE_TYPE__ size_t;extern void read_size(size_t&);") +
+            "extern void mutate(size_t&);extern void mutate_ptr(size_t*);" +
+            "size_t f(size_t x){size_t n=7;read_size(n);" + item.statements + "return x/n;}";
+        Result result;
+        ASSERT_TRUE(clang::tooling::runToolOnCode(std::make_unique<Action>(result), code, "origin.cpp"));
+        ASSERT_TRUE(result.found);
+        ASSERT_TRUE(result.converged);
+        EXPECT_EQ(result.divisor, item.range);
+        EXPECT_EQ(result.untrusted, item.origin);
+    }
 }
 
 TEST(IntervalAnalysisTest, LoopCounterTerminatesViaWidening) {

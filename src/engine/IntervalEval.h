@@ -90,11 +90,14 @@ Interval evalSizeInterval(const clang::Expr* expr, clang::ASTContext& ctx,
 // source (the atoi/strtol/scanf intrinsics or --untrusted-int-sources).
 // Plain assignment and declaration RECOMPUTE membership from the RHS
 // (`n = atoi(s)` inserts, `n = 16` erases — no stale taint); scanf
-// output arguments insert; a non-const-ref pass to an unknown callee
-// erases (the value is no longer of proven origin). Compound assigns
-// and ++/-- leave membership as-is: their interval goes to top(), and
-// the possible-overflow consumer requires a FINITE bound, so staleness
-// there can never surface as a report.
+// output arguments insert. Declared direct uint64 pointer/reference
+// outputs insert independently of their numeric top range; unsupported
+// wider types and pointer aliases do not gain a source model. Const
+// pointer inputs are not outputs. An unknown callee's mutable direct &x
+// or non-const-reference argument erases origin (the new value's source
+// is no longer known). Compound assigns and ++/-- retain derivation but
+// reset the numeric range; top alone is not a promise of silence since
+// a uint64 consumer can reason about type-width corners separately.
 void applyIntervalAssign(IntervalMap& state, const clang::Stmt* stmt,
                          const std::set<const clang::VarDecl*>& vars,
                          const clang::ASTContext* ctx = nullptr,

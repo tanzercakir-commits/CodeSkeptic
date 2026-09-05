@@ -161,6 +161,80 @@ TEST(AllocSizeOverflowRuleTest, CustomAllocatorWrapper_Reports) {
     EXPECT_EQ(results[0].rule_id, "alloc-size-overflow");
 }
 
+// CS3-CH01-S06-U001: source origin must survive a numeric top uint64 range.
+TEST(AllocSizeOverflowRuleTest, Uint64PointerOutParamAdditionAndMultiply) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern void read_size(size_t*);
+        void* bad_add(void){size_t n=0;read_size(&n);return malloc(n+16);}
+        void* bad_mul(void){size_t n=0;read_size(&n);return malloc(n*4);}
+    )", "outparam.c");
+    ASSERT_EQ(results.size(), 2u);
+    for (const auto& result : results) EXPECT_EQ(result.rule_id, "alloc-size-overflow");
+}
+
+TEST(AllocSizeOverflowRuleTest, Uint64ReferenceOutParamAdditionAndMultiply) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern void read_size(size_t&);
+        void* bad_add(){size_t n=0;read_size(n);return malloc(n+16);}
+        void* bad_mul(){size_t n=0;read_size(n);return malloc(n*4);}
+    )");
+    ASSERT_EQ(results.size(), 2u);
+    for (const auto& result : results) EXPECT_EQ(result.rule_id, "alloc-size-overflow");
+}
+
+TEST(AllocSizeOverflowRuleTest, Uint64OutParamTrueSizeMaxGuards) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    for (bool reference : {false, true}) {
+        const std::string prelude = std::string("typedef __SIZE_TYPE__ size_t;extern void* malloc(size_t);") +
+            "extern void read_size(size_t" + (reference ? "&" : "*") + ");void* f(){size_t n=0;read_size(" +
+            (reference ? "n" : "&n") + ");";
+        struct Case { const char* body; size_t count; };
+        const Case cases[] = {
+            {"if(n>((size_t)-1)-16)return 0;return malloc(n+16);}", 0},
+            {"if(n>((size_t)-1)-15)return 0;return malloc(n+16);}", 1},
+            {"if(n>((size_t)-1)/4)return 0;return malloc(n*4);}", 0},
+            {"if(n>((size_t)-1)/4+1)return 0;return malloc(n*4);}", 1},
+            {"if(n>100)return 0;return malloc(n+16);}", 0},
+            {"size_t saved=n;n=0;return malloc(saved+16);}", 1},
+            {"n=8;return malloc(n+16);}", 0},
+        };
+        for (const auto& item : cases) {
+            SCOPED_TRACE(item.body);
+            SCOPED_TRACE(reference ? "reference" : "pointer");
+            const auto results = runRule(rule, prelude + item.body, reference ? "outparam.cpp" : "outparam.c");
+            EXPECT_EQ(results.size(), item.count);
+        }
+    }
+}
+
+TEST(AllocSizeOverflowRuleTest, Uint64OutParamUnknownAndNonOutputBoundaries) {
+    SourceScope scope({"read_size", "inspect_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern void read_size(size_t&);
+        extern void read_size(size_t*);
+        extern void inspect_size(const size_t*);
+        extern void mutate(size_t&);
+        extern void mutate_ptr(size_t*);
+        void* unknown_ref(){size_t n=0;read_size(n);mutate(n);return malloc(n+16);}
+        void* unknown_ptr(){size_t n=0;read_size(&n);mutate_ptr(&n);return malloc(n*4);}
+        void* not_output(){size_t n=8;inspect_size(&n);return malloc(n+16);}
+        void* unknown_alias(){size_t n=0;size_t* p=&n;read_size(p);return malloc(n+16);}
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
 // Phase 6.1: a 64-bit allocation-size expression needs operand-corner
 // reasoning because the mathematical product does not fit the int64
 // interval domain. A declared untrusted size_t and a finite factor are
