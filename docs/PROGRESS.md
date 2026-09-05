@@ -2,6 +2,19 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH01-S02-U001 — memcpy/memmove kaynak okuma kapasitesini denetle
+
+- Commit: `0816619b14df12e3ee3d7398e91d7a4c2942b181`
+- Dal: `agent/cs3-ch01-s02-u001-source-read-capacity`
+- Implementer: `root-cs3-ch01-s02-u001-20260905`
+- Bağımsız denetçi: `independent-cwe-ch01-s02-u001-0816619-20260905`
+- İnceleme SHA-256: `7e95beba10776d5d00ffc94376e90a1b095f8fdbd11f480566e79bac91eb9a88`
+- Tarih: 2026-09-05T01:31:38.388974+00:00
+- Sonuç: Hedef yeterli olsa bile küçük kaynaktan taşan okuma CWE-125 olarak ayrılır.
+- focused-tests: PASS; SHA-256 `125c5962cb20e80b51bf8c780e48cf5c5b0112ead89fc610e639bd5459a5eb9d`; `bash scripts/local_test.sh focused 'BoundsRuleTest.*:IntervalTest.*:IntervalAnalysisTest.*'`
+- cli-smoke: PASS; SHA-256 `75f4711e89d8407e080777f743f2c0206edb70b54d654f8e49eafb5c47b1d578`; `PYTHONDONTWRITEBYTECODE=1 python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH01-S02-U001/cli_smoke.py && bash scripts/local_test.sh smoke`
+- queue-check: PASS; SHA-256 `62688908232d9bb24b9d9e5bae3e1d880b5b338c3005d8fcb3060650ac07e56a`; `PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/project_queue.py check && PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/project_queue.py guard --base 4d0f53ac3224a78e377170c4e1a27ac1e2bcc4dc`
+
 ## CS3-CH01-S01-U003 — Checked-add overflow sonucunun kullanımını izle
 
 - Commit: `da35862435e1991ae673e5a5053022eade6e347c`

@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH01-S02-U001
-
-### CS3-CH01-S02-U001 — memcpy/memmove kaynak okuma kapasitesini denetle
-
-**Sonuç:** Hedef yeterli olsa bile küçük kaynaktan taşan okuma CWE-125 olarak ayrılır.
-
-**Kabul:**
-
-- Büyük hedef/küçük kaynak, exact fit, zero length ve unknown source kapsanır.
-- memset için kaynak okuması üretilmez; strncpy farklı semantiğiyle bu işin dışında kalır.
-- Mevcut destination write sınırı ve güvenli corpus sonuçları korunur.
-
-**Test bütçesi:** T1
-**Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/rules/BoundsRule.cpp, src/rules/BoundsRule.h, tests/BoundsRuleTest.cpp
-**Bağımlılıklar:** Yok
+## FRONT — CS3-CH01-S02-U002
 
 ### CS3-CH01-S02-U002 — Sabit pointer-offset kalan kapasitesini izle
 
