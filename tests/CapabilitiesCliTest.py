@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
+from collections import Counter
 
 
 def fail(message: str) -> None:
@@ -134,3 +136,83 @@ if text_result.returncode != 0 or "experimental rules:" not in text_result.stdou
     fail("human-readable discovery contract failed")
 
 print("CAPABILITIES_CLI_OK schema=2 rules=15 supported=7 out_of_scope=5")
+
+# The advertised diagnostic IDs must select every producer, not just a class
+# with the same name. Exercise actual CLI reports and the MCP wire protocol.
+binary = binary.resolve()
+with tempfile.TemporaryDirectory(prefix="codeskeptic-rule-selection-") as directory:
+    root = Path(directory)
+    source = root / "selection.cpp"
+    source.write_text('''
+struct FILE; struct DIR;
+extern FILE* fopen(const char*,const char*); extern int fclose(FILE*);
+extern DIR* opendir(const char*); extern int closedir(DIR*);
+extern int open(const char*,int,...); extern int close(int);
+extern void* malloc(unsigned long); extern void free(void*);
+int file_leak(const char* p){FILE* f=fopen(p,"r");if(!f)return 1;return 0;}
+int dir_leak(const char* p){DIR* d=opendir(p);if(!d)return 1;return 0;}
+void fd_leak(const char* p){int fd=open(p,0);(void)fd;}
+void heap_leak(){void* p=malloc(8);(void)p;}
+int file_safe(const char* p){FILE* f=fopen(p,"r");if(!f)return 1;fclose(f);return 0;}
+int dir_safe(const char* p){DIR* d=opendir(p);if(!d)return 1;closedir(d);return 0;}
+void fd_safe(const char* p){int fd=open(p,0);close(fd);}
+void heap_safe(){void* p=malloc(8);free(p);}
+''')
+    expected_all = Counter({"resource-leak": 3, "memory-leak": 1})
+    def run(arguments, requests=None):
+        return subprocess.run([str(binary), *map(str, arguments)], cwd=root,
+                              input=requests, text=True, capture_output=True, timeout=45)
+    def check_report(report, expected, finding_key="diagnostics", id_key="rule_id"):
+        assert report["complete"] is True, report
+        assert report["coverage"] == {"attempted_tus": 1, "analyzed_tus": 1,
+                                       "broken_tus": 0, "incomplete_functions": 0}, report
+        findings = report[finding_key]
+        assert Counter(d[id_key] for d in findings) == expected, findings
+        assert all(not d.get("function", "").endswith("_safe") for d in findings), findings
+        if finding_key == "diagnostics":
+            assert report["total"] == sum(expected.values()), report
+        else:
+            assert report["count"] == report["blocking_count"] == sum(expected.values()), report
+            assert report["report_only_count"] == 0, report
+    for name, options, expected in [
+        ("default", [], expected_all),
+        ("no-resource", ["--disable-rule", "resource-leak"], Counter({"memory-leak": 1})),
+        ("no-memory", ["--disable-rule", "memory-leak"], Counter({"resource-leak": 3})),
+    ]:
+        output = root / (name + ".json")
+        result = run([source, "--json", output, *options])
+        assert result.returncode == 1, result.stderr
+        check_report(json.loads(output.read_text()), expected)
+        sarif = root / (name + ".sarif")
+        result = run([source, "--sarif", sarif, *options])
+        assert result.returncode == 1, result.stderr
+        findings = json.loads(sarif.read_text())["runs"][0]["results"]
+        assert Counter(d["ruleId"] for d in findings) == expected, findings
+    def request(identifier, **options):
+        return {"jsonrpc": "2.0", "id": identifier, "method": "tools/call",
+                "params": {"name": "analyze", "arguments": {"path": str(source), **options}}}
+    requests = [request(1, disable_rules="resource-leak"), request(2),
+                request(3, disable_rules="resource-leak"),
+                request(4, disable_rules="memory-leak")]
+    result = run(["--serve"], "".join(json.dumps(r) + "\n" for r in requests))
+    assert result.returncode == 0, result.stderr
+    responses = [json.loads(line) for line in result.stdout.splitlines()]
+    assert len(responses) == len(requests), result.stdout
+    for index, (response, expected) in enumerate(zip(responses,
+            [Counter({"memory-leak": 1}), expected_all,
+             Counter({"memory-leak": 1}), Counter({"resource-leak": 3})]), 1):
+        assert response["id"] == index and "error" not in response, response
+        assert response["result"]["isError"] is False, response
+        data = json.loads(response["result"]["content"][0]["text"])
+        check_report(data, expected, "findings", "rule")
+    # Startup flags must reach the real server, without importing unrelated
+    # launch report destinations or changing defaults between requests.
+    result = run(["--serve", "--disable-rule", "resource-leak"],
+                 json.dumps(request(10)) + "\n" + json.dumps(request(11)) + "\n")
+    assert result.returncode == 0, result.stderr
+    responses = [json.loads(line) for line in result.stdout.splitlines()]
+    assert len(responses) == 2, result.stdout
+    for response in responses:
+        check_report(json.loads(response["result"]["content"][0]["text"]),
+                     Counter({"memory-leak": 1}), "findings", "rule")
+print("DIAGNOSTIC_SELECTION_CLI_MCP_OK mixed producers, JSON/SARIF, request isolation, server defaults")

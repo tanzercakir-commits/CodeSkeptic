@@ -56,6 +56,7 @@ TEST(McpServerTest, ToolsListContainsAnalyze) {
     EXPECT_NE(response.find("\"analyze\""), std::string::npos);
     EXPECT_NE(response.find("\"inputSchema\""), std::string::npos);
     EXPECT_NE(response.find("dataflow traces"), std::string::npos);
+    EXPECT_NE(response.find("disable_rules"), std::string::npos);
 }
 
 TEST(McpServerTest, UnknownMethod_Error) {

@@ -1,6 +1,8 @@
 #include "config/Config.h"
 #include "analyzer/StaticAnalyzer.h"
 #include "rules/DivByZeroRule.h"
+#include "rules/MemoryLeakRule_Ex.h"
+#include "rules/FdResourceRule.h"
 
 #include <gtest/gtest.h>
 #include <llvm/Support/FormatVariadic.h>
@@ -11,6 +13,7 @@
 #include <fstream>
 #include <initializer_list>
 #include <vector>
+#include <algorithm>
 
 using codeskeptic::Config;
 
@@ -393,4 +396,65 @@ TEST(ConfigTest, ChangedCompilationCommandsInvalidateWarmAstCache) {
     EXPECT_EQ(multiple.exitCode(), 1);
     EXPECT_EQ(multiple.findings, 1u);
     EXPECT_EQ(multiple.analyzed_tus, 2u);
+}
+
+TEST(ConfigTest, DiagnosticSelectionPreservesSiblingProducerFamilies) {
+    const auto source = writeConfig("config_diagnostic_selection.cpp", R"(
+        struct FILE; struct DIR;
+        FILE* fopen(const char*, const char*); int fclose(FILE*);
+        DIR* opendir(const char*); int closedir(DIR*);
+        int open(const char*, int, ...); int close(int);
+        void* malloc(unsigned long); void free(void*);
+        int file_leak(const char* p) { FILE* f=fopen(p,"r"); if(!f) return 1; return 0; }
+        int dir_leak(const char* p) { DIR* d=opendir(p); if(!d) return 1; return 0; }
+        void fd_leak(const char* p) { int fd=open(p,0); (void)fd; }
+        void heap_leak() { void* p=malloc(8); (void)p; }
+        int file_safe(const char* p) { FILE* f=fopen(p,"r"); if(!f) return 1; fclose(f); return 0; }
+    )");
+    auto analyze = [&](Config config, unsigned resources, unsigned memory) {
+        config.setSourcePath(source);
+        codeskeptic::StaticAnalyzer analyzer(std::move(config));
+        analyzer.addRule<codeskeptic::MemoryLeakRule_Ex>();
+        analyzer.addRule<codeskeptic::FdResourceRule>();
+        const auto result = analyzer.run();
+        EXPECT_TRUE(result.complete());
+        EXPECT_EQ(result.attempted_tus, 1u);
+        EXPECT_EQ(result.analyzed_tus, 1u);
+        EXPECT_EQ(result.findings, resources + memory);
+        auto count = [&](const char* id) {
+            return std::count_if(analyzer.diagnostics().begin(), analyzer.diagnostics().end(),
+                                [&](const auto& d) { return d.rule_id == id; });
+        };
+        EXPECT_EQ(count("resource-leak"), resources);
+        EXPECT_EQ(count("memory-leak"), memory);
+        for (const auto& d : analyzer.diagnostics()) EXPECT_NE(d.function, "file_safe");
+    };
+    analyze(Config{}, 3, 1);
+    Config noResource;
+    ASSERT_TRUE(parse(noResource, {"codeskeptic", "--disable-rule", "resource-leak"}));
+    analyze(noResource, 0, 1);
+    Config noMemory;
+    ASSERT_TRUE(parse(noMemory, {"codeskeptic", "--disable-rule", "memory-leak"}));
+    analyze(noMemory, 3, 0);
+    Config resourcesOnly;
+    ASSERT_TRUE(resourcesOnly.loadFromFile(writeConfig("config_resource_only.conf",
+                                                       "enable_rule=resource-leak\n")));
+    analyze(resourcesOnly, 3, 0);
+    analyze(Config{}, 3, 1);
+    analyze(noResource, 0, 1);
+}
+
+TEST(ConfigTest, DisablingMemoryLeakDoesNotDisableUseAfterFree) {
+    const auto source = writeConfig("config_sibling_uaf.cpp",
+        "void f(){int* p=new int(1); delete p; int x=*p; (void)x;}\n");
+    Config c;
+    ASSERT_TRUE(parse(c, {"codeskeptic", "--disable-rule", "memory-leak"}));
+    c.setSourcePath(source);
+    codeskeptic::StaticAnalyzer analyzer(std::move(c));
+    analyzer.addRule<codeskeptic::MemoryLeakRule_Ex>();
+    const auto result = analyzer.run();
+    EXPECT_FALSE(result.no_rules);
+    EXPECT_EQ(result.exitCode(), 1);
+    ASSERT_EQ(analyzer.diagnostics().size(), 1u);
+    EXPECT_EQ(analyzer.diagnostics()[0].rule_id, "use-after-free");
 }
