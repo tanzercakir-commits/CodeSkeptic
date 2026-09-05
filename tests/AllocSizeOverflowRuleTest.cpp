@@ -684,6 +684,9 @@ TEST(AllocSizeOverflowRuleTest, BuiltinAddOverflowUseAndStatus) {
         {"one comparison status", "bool overflow=__builtin_add_overflow(n,16,&bytes); if(overflow==1) return 0; return malloc(bytes);", 0},
         {"status pointer alias invalidates", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool* p=&overflow; *p=false; if(overflow) return 0; return malloc(bytes);", 1},
         {"status pointer offset invalidates", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool* p=&overflow; *(p+0)=false; if(overflow) return 0; return malloc(bytes);", 1},
+        {"status reference to pointer invalidates", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool* p=&overflow; bool*& q=p; *q=false; if(overflow) return 0; return malloc(bytes);", 1},
+        {"reference rebinds status pointer", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool other=true; bool* p=&other; bool*& q=p; q=&overflow; *p=false; if(overflow) return 0; return malloc(bytes);", 1},
+        {"reference rebind away preserves status", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool other=true; bool* p=&overflow; bool*& q=p; q=&other; *q=false; if(overflow) return 0; return malloc(bytes);", 0},
         {"status escapes through global pointer", "bool overflow=__builtin_add_overflow(n,16,&bytes); saved_status=&overflow; mutate_saved(); if(overflow) return 0; return malloc(bytes);", 1},
         {"status reference alias invalidates", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool& alias=overflow; alias=false; if(overflow) return 0; return malloc(bytes);", 1},
         {"status pointer passed to callee", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool* p=&overflow; mutate_status_ptr(p); if(overflow) return 0; return malloc(bytes);", 1},
@@ -695,6 +698,11 @@ TEST(AllocSizeOverflowRuleTest, BuiltinAddOverflowUseAndStatus) {
         {"output copy retains success", "if(__builtin_add_overflow(n,16,&bytes)) return 0; size_t copy=bytes; return malloc(copy);", 0},
         {"one path replaces output", "__builtin_add_overflow(n,16,&bytes); if(runtime_header()) bytes=16; return malloc(bytes);", 1},
         {"safe checked path joins constant output", "if(runtime_header()) {if(__builtin_add_overflow(n,16,&bytes)) return 0;} else bytes=16; return malloc(bytes);", 0},
+        {"loop retains old unchecked output", "size_t old=0; for(int i=0;i<2;++i) {if(i==1) old=bytes; __builtin_add_overflow(n,16,&bytes);} return malloc(old);", 1},
+        {"loop current unchecked output", "for(int i=0;i<2;++i) {__builtin_add_overflow(n,16,&bytes);} return malloc(bytes);", 1},
+        {"loop current checked output", "for(int i=0;i<2;++i) {if(__builtin_add_overflow(n,16,&bytes)) return 0;} return malloc(bytes);", 0},
+        {"loop old checked output", "size_t old=0; for(int i=0;i<2;++i) {if(i==1) old=bytes; if(__builtin_add_overflow(n,16,&bytes)) return 0;} return malloc(old);", 0},
+        {"new loop status cannot certify old output", "size_t old=0; bool overflow=false; for(int i=0;i<2;++i) {if(i==1) old=bytes; n=read_size(); overflow=__builtin_add_overflow(n,16,&bytes);} if(overflow) return 0; return malloc(old);", 1},
     };
     for (const auto& item : cases) {
         SCOPED_TRACE(item.name);

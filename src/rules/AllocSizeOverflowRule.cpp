@@ -1225,7 +1225,14 @@ public:
             return call == other.call && trueMeansOverflow == other.trueMeansOverflow;
         }
     };
-    using Origins = std::map<const CallExpr*, bool>; // true = proved safe
+    struct Origin {
+        bool safe;
+        bool currentInvocation;
+        bool operator==(const Origin& other) const {
+            return safe == other.safe && currentInvocation == other.currentInvocation;
+        }
+    };
+    using Origins = std::map<const CallExpr*, Origin>;
     using Targets = std::set<const VarDecl*>;
     struct State {
         std::map<const VarDecl*, Origins> outputs;
@@ -1247,11 +1254,15 @@ public:
         // An output may originate from a checked call on only one path. Keep
         // that possible origin, with safety required on every path carrying it.
         for (const auto& [var, origins] : rhs.outputs)
-            for (const auto& [call, safe] : origins) {
+            for (const auto& [call, origin] : origins) {
                 auto& merged = result.outputs[var];
                 auto found = merged.find(call);
-                if (found == merged.end()) merged[call] = safe;
-                else found->second = found->second && safe;
+                if (found == merged.end()) merged[call] = origin;
+                else {
+                    found->second.safe = found->second.safe && origin.safe;
+                    found->second.currentInvocation =
+                        found->second.currentInvocation && origin.currentInvocation;
+                }
             }
         result.statuses.clear();
         for (const auto& [var, status] : lhs.statuses) {
@@ -1294,15 +1305,18 @@ public:
 
         if (const auto* call = llvm::dyn_cast<CallExpr>(stmt)) {
             if (isCheckedOverflowBuiltin(call)) {
-                // A loop can execute the same AST call again. Old status or
-                // copied-output facts must not certify the new invocation.
+                // A loop can execute the same AST call again. Keep live copied
+                // outputs, but a new status cannot certify a prior invocation.
                 for (auto it = out.statuses.begin(); it != out.statuses.end();)
                     if (it->second.call == call) it = out.statuses.erase(it);
                     else ++it;
-                for (auto& [var, origins] : out.outputs) origins.erase(call);
+                for (auto& [var, origins] : out.outputs) {
+                    auto old = origins.find(call);
+                    if (old != origins.end()) old->second.currentInvocation = false;
+                }
                 if (const VarDecl* output = checkedOverflowOutput(call)) {
                     forget(output);
-                    out.outputs[output] = {{call, false}};
+                    out.outputs[output] = {{call, {false, true}}};
                     if (output->hasGlobalStorage()) out.escaped.insert(output);
                 } else if (call->getNumArgs() >= 3) {
                     for (const auto* var : pointedTargets(call->getArg(2), input)) forget(var);
@@ -1339,9 +1353,18 @@ public:
                    assign && assign->isAssignmentOp()) {
             Targets targets = write(assign->getLHS());
             if (assign->getOpcode() == BO_Assign) {
-                if (const auto* var = plainStorage(assign->getLHS());
-                    var && var->getType()->isPointerType())
-                    bindAlias(var, pointedTargets(assign->getRHS(), input));
+                if (assign->getLHS()->getType()->isPointerType()) {
+                    for (const auto* var : targets) {
+                        if (!var->getType()->isPointerType()) continue;
+                        auto pointees = pointedTargets(assign->getRHS(), input);
+                        if (targets.size() > 1) {
+                            const auto previous = input.aliases.find(var);
+                            if (previous != input.aliases.end())
+                                pointees.insert(previous->second.begin(), previous->second.end());
+                        }
+                        bindAlias(var, std::move(pointees));
+                    }
+                }
                 if (targets.size() == 1)
                     bindValue(*targets.begin(), assign->getRHS());
             }
@@ -1372,7 +1395,8 @@ public:
         const bool safe = isTrue != status->trueMeansOverflow;
         for (auto& [var, origins] : state.outputs) {
             auto found = origins.find(status->call);
-            if (found != origins.end()) found->second = safe;
+            if (found != origins.end() && found->second.currentInvocation)
+                found->second.safe = safe;
         }
     }
 
@@ -1403,7 +1427,8 @@ private:
         if (const auto* ref = llvm::dyn_cast<DeclRefExpr>(expr)) {
             const auto* var = llvm::dyn_cast<VarDecl>(ref->getDecl());
             if (!var) return {};
-            if (var->getType()->isIntegerType()) return {var};
+            if (var->getType()->isIntegerType() || var->getType()->isPointerType())
+                return {var};
             auto alias = state.aliases.find(var);
             return var->getType()->isReferenceType() && alias != state.aliases.end()
                        ? alias->second : Targets{};
@@ -1428,7 +1453,19 @@ private:
         if (const auto* ref = llvm::dyn_cast<DeclRefExpr>(expr)) {
             const auto* var = llvm::dyn_cast<VarDecl>(ref->getDecl());
             auto alias = state.aliases.find(var);
-            return alias == state.aliases.end() ? Targets{} : alias->second;
+            if (alias == state.aliases.end()) return {};
+            if (var->getType()->isReferenceType()) {
+                // A reference-to-pointer aliases the pointer storage, not the
+                // ultimate integer. Follow its current binding after reassignments.
+                Targets targets;
+                for (const auto* pointer : alias->second) {
+                    auto pointees = state.aliases.find(pointer);
+                    if (pointees != state.aliases.end())
+                        targets.insert(pointees->second.begin(), pointees->second.end());
+                }
+                return targets;
+            }
+            return alias->second;
         }
         if (const auto* select = llvm::dyn_cast<ConditionalOperator>(expr)) {
             auto result = pointedTargets(select->getTrueExpr(), state);
@@ -1848,8 +1885,8 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         if (!relationState) continue;
         auto relation = relationState->outputs.find(site.sizeVar);
         if (relation == relationState->outputs.end()) continue;
-        for (const auto& [checked, safe] : relation->second) {
-            if (!checked || checked->getNumArgs() < 3 || safe)
+        for (const auto& [checked, origin] : relation->second) {
+            if (!checked || checked->getNumArgs() < 3 || origin.safe)
                 continue;
 
             const Stmt* keys[3] = {
