@@ -284,45 +284,87 @@ const VarDecl* addrOfIntVar(const Expr* e) {
     return nullptr;
 }
 
+std::optional<int64_t> boundedInteger(const llvm::APInt& value, bool isUnsigned) {
+    if (isUnsigned) {
+        if (value.getActiveBits() > 63) return std::nullopt;
+        return static_cast<int64_t>(value.getZExtValue());
+    }
+    if (!value.isSignedIntN(64)) return std::nullopt;
+    return value.getSExtValue();
+}
+
 std::optional<int64_t> constInt(const Expr* e) {
     if (!e) return std::nullopt;
-    e = e->IgnoreParenImpCasts();
+    e = e->IgnoreParens();
     if (const auto* lit = dyn_cast<IntegerLiteral>(e)) {
-        // isSignedIntN(64), not significantBits>63: INT64_MAX needs 64
-        // significant bits as a signed quantity yet fits int64 exactly.
-        // Interval arithmetic overflow-guards itself (-> top()), so
-        // boundary constants are safe to model (Juliet int64_t_max_*).
-        if (!lit->getValue().isSignedIntN(64)) return std::nullopt;
-        return lit->getValue().getSExtValue();
+        // APInt is only a bit pattern: UINT32_MAX is positive, not -1.
+        return boundedInteger(lit->getValue(), lit->getType()->isUnsignedIntegerType());
     }
     if (const auto* u = dyn_cast<UnaryOperator>(e))
-        if (u->getOpcode() == UO_Minus)
-            if (auto v = constInt(u->getSubExpr())) return -*v;
+        if (u->getOpcode() == UO_Minus && u->getType()->isSignedIntegerType())
+            if (auto v = constInt(u->getSubExpr()))
+                if (*v != INT64_MIN) return -*v;
     return std::nullopt;
 }
 
-// Fold `e` to a signed 64-bit constant. The literal path (constInt) is
-// tried first — it needs no context and covers the common case. With a
-// context, Clang's own constant evaluator folds full constant
+// Fold the ORIGINAL typed expression, including usual arithmetic conversions.
+// Without context only the narrow, context-free literal path is available.
+// With a context, Clang's own constant evaluator folds full constant
 // expressions: `INT_MAX/2`, `SIZE_MAX-1`, `1 << 30`, a sizeof, an enum
 // constant. Only genuinely constant expressions fold — anything with a
 // runtime operand (`abs(x)`, `sqrt(MAX)`) fails and yields nullopt, so
 // no unsound refinement can slip in. Values outside int64 are dropped.
 std::optional<int64_t> foldConstInt(const Expr* e, const ASTContext* ctx) {
-    if (auto v = constInt(e)) return v;
-    if (!ctx || !e) return std::nullopt;
+    if (!e) return std::nullopt;
+    if (!ctx) return constInt(e);
     if (e->isValueDependent() || e->isTypeDependent()) return std::nullopt;
     if (!e->getType()->isIntegralOrEnumerationType()) return std::nullopt;
     clang::Expr::EvalResult res;
-    if (!e->EvaluateAsInt(res, *ctx) || !res.Val.isInt())
+    if (!e->EvaluateAsInt(res, *ctx) || !res.Val.isInt() ||
+        res.HasSideEffects || res.HasUndefinedBehavior)
         return std::nullopt;
     const llvm::APSInt& ap = res.Val.getInt();
-    if (ap.isSigned()) {
-        if (!ap.isSignedIntN(64)) return std::nullopt;  // see constInt
-        return ap.getSExtValue();
+    return boundedInteger(ap, ap.isUnsigned());
+}
+
+// Whether every represented value survives an integral conversion unchanged.
+// Wide destinations can contain the whole int64 domain; their own full range
+// need not fit that domain. Unknown endpoints never certify a narrowing cast.
+bool intervalFitsType(const Interval& v, QualType to, const ASTContext& ctx) {
+    if (!to->isIntegralOrEnumerationType() || v.isEmpty() ||
+        v.loIsInf() || v.hiIsInf()) return false;
+    const unsigned width = ctx.getIntWidth(to);
+    if (!width) return false;
+    if (to->isSignedIntegerOrEnumerationType()) {
+        if (width >= 64) return true;
+        return v.lo() >= -(int64_t(1) << (width - 1)) &&
+               v.hi() <= (int64_t(1) << (width - 1)) - 1;
     }
-    if (ap.getActiveBits() > 63) return std::nullopt;
-    return static_cast<int64_t>(ap.getZExtValue());
+    return v.lo() >= 0 &&
+           (width >= 63 || v.hi() <= (int64_t(1) << width) - 1);
+}
+
+bool comparisonOperandPreservesValue(const Expr* operand, const Interval& v,
+                                     const ASTContext* ctx) {
+    operand = operand->IgnoreParens();
+    while (const auto* cast = dyn_cast<ImplicitCastExpr>(operand)) {
+        if (cast->getCastKind() != CK_LValueToRValue &&
+            cast->getCastKind() != CK_NoOp) {
+            if (cast->getCastKind() != CK_IntegralCast || !ctx) return false;
+            const QualType from = cast->getSubExpr()->getType();
+            const QualType to = cast->getType();
+            if (!from->isIntegralOrEnumerationType() ||
+                !to->isIntegralOrEnumerationType()) return false;
+            const unsigned fw = ctx->getIntWidth(from), tw = ctx->getIntWidth(to);
+            const bool fs = from->isSignedIntegerOrEnumerationType();
+            const bool ts = to->isSignedIntegerOrEnumerationType();
+            const bool typePreserving = (fs == ts && tw >= fw) ||
+                                        (!fs && ts && tw > fw);
+            if (!typePreserving && !intervalFitsType(v, to, *ctx)) return false;
+        }
+        operand = cast->getSubExpr()->IgnoreParens();
+    }
+    return true;
 }
 
 // Negation of a comparison operator (for the false edge).
@@ -418,42 +460,25 @@ Interval evalInterval(const Expr* expr, const IntervalMap& state,
     // wrap and the cast preserves the interval exactly (the picojpeg
     // `tableIndex = ((index>>3)&2)+(index&1)` shape — an int expression
     // in [0,3] assigned to uint8). No context → old conservative top.
-    if (const auto* cast = dyn_cast<ImplicitCastExpr>(expr)) {
+    if (const auto* cast = dyn_cast<CastExpr>(expr)) {
         const CastKind k = cast->getCastKind();
         if (k == CK_LValueToRValue || k == CK_NoOp)
             return evalInterval(cast->getSubExpr(), state, ctx);
         if (k == CK_IntegralCast && ctx) {
+            // Actual constant casts may wrap deliberately, including casts
+            // from 128-bit intermediates. Fold before interpreting the source
+            // in our narrower model; never truncate an unknown interval.
+            if (auto c = foldConstInt(expr, ctx)) return Interval::constant(*c);
             Interval v = evalInterval(cast->getSubExpr(), state, ctx);
-            if (v.isEmpty() || v.loIsInf() || v.hiIsInf())
-                return Interval::top();
-            QualType to = cast->getType();
-            const unsigned width = ctx->getIntWidth(to);
-            if (width == 0 || width > 64) return Interval::top();
-            int64_t tmin, tmax;
-            if (to->isSignedIntegerOrEnumerationType()) {
-                if (width == 64) {
-                    tmin = INT64_MIN;
-                    tmax = INT64_MAX;
-                } else {
-                    tmin = -(int64_t(1) << (width - 1));
-                    tmax = (int64_t(1) << (width - 1)) - 1;
-                }
-            } else {
-                tmin = 0;
-                // uint64's full range does not fit int64; only the
-                // int64-representable part can be certified.
-                tmax = (width >= 64) ? INT64_MAX
-                                     : (int64_t(1) << width) - 1;
-            }
-            if (v.lo() >= tmin && v.hi() <= tmax) return v;
+            if (intervalFitsType(v, cast->getType(), *ctx)) return v;
             return Interval::top();
         }
         return Interval::top();
     }
 
     if (const auto* lit = dyn_cast<IntegerLiteral>(expr)) {
-        if (!lit->getValue().isSignedIntN(64)) return Interval::top();
-        return Interval::constant(lit->getValue().getSExtValue());
+        if (auto c = constInt(lit)) return Interval::constant(*c);
+        return Interval::top();
     }
     if (const auto* ref = dyn_cast<DeclRefExpr>(expr)) {
         if (const auto* vd = dyn_cast<VarDecl>(ref->getDecl())) {
@@ -463,9 +488,15 @@ Interval evalInterval(const Expr* expr, const IntervalMap& state,
         return Interval::top();
     }
     if (const auto* u = dyn_cast<UnaryOperator>(expr)) {
-        if (u->getOpcode() == UO_Minus)
+        if (u->getOpcode() == UO_Minus) {
+            if (u->getType()->isUnsignedIntegerType()) {
+                // Unsigned negation wraps in its AST type, not in int64.
+                if (auto c = foldConstInt(u, ctx)) return Interval::constant(*c);
+                return Interval::top();
+            }
             return Interval::negate(
                 evalInterval(u->getSubExpr(), state, ctx));
+        }
         if (u->getOpcode() == UO_Plus)
             return evalInterval(u->getSubExpr(), state, ctx);
         return Interval::top();
@@ -688,7 +719,7 @@ void applyIntervalAssign(IntervalMap& state, const Stmt* stmt,
 void refineIntervalOnEdge(IntervalMap& state, const Expr* cond, bool isTrue,
                           const std::set<const VarDecl*>& vars,
                           const ASTContext* ctx) {
-    walkCondition(
+    walkCondition<true>(
         cond, isTrue,
         // `if (x)`: true → x != 0; false → x == 0.
         [&](const VarDecl* var, bool truthy) {
@@ -702,13 +733,26 @@ void refineIntervalOnEdge(IntervalMap& state, const Expr* cond, bool isTrue,
         // arrives variable-on-the-left; on the false edge the negation
         // holds.
         [&](const VarDecl* var, BinaryOperatorKind opc, const Expr* other,
-            bool edgeTrue) {
+            bool edgeTrue, const Expr* operand) {
             if (!vars.count(var)) return;
             auto c = foldConstInt(other, ctx);
             if (!c) return;
             auto it = state.find(var);
             if (it == state.end()) return;
+            // Refining the original signed variable using its converted
+            // unsigned value would invent contradictions (e.g. -1 == UINT_MAX).
+            if (!comparisonOperandPreservesValue(operand, it->second, ctx)) return;
             BinaryOperatorKind eff = edgeTrue ? opc : negateCmp(opc);
+            // The lattice's MIN/MAX are representation limits, not limits of
+            // uint64/int128. An out-of-domain edge remains unknown, not empty.
+            if (ctx && var->getType()->isIntegerType()) {
+                const unsigned width = ctx->getIntWidth(var->getType());
+                const bool isSigned = var->getType()->isSignedIntegerType();
+                if (eff == BO_GT && *c == INT64_MAX && it->second.hiIsInf() &&
+                    (width > 64 || (!isSigned && width == 64))) return;
+                if (eff == BO_LT && *c == INT64_MIN && it->second.loIsInf() &&
+                    isSigned && width > 64) return;
+            }
             it->second = constrainBy(it->second, eff, *c);
         });
 }
@@ -720,16 +764,15 @@ Interval evalSizeInterval(const Expr* e, ASTContext& ctx,
 
     // Value-preserving casts are transparent; a narrowing cast stops here
     // so the size can never be over-estimated into a false overflow.
-    if (const auto* cast = dyn_cast<ImplicitCastExpr>(e)) {
+    if (const auto* cast = dyn_cast<CastExpr>(e)) {
         const CastKind k = cast->getCastKind();
         if (k == CK_LValueToRValue || k == CK_NoOp)
             return evalSizeInterval(cast->getSubExpr(), ctx, state);
-        if (k == CK_IntegralCast &&
-            cast->getType()->isIntegerType() &&
-            cast->getSubExpr()->getType()->isIntegerType() &&
-            ctx.getIntWidth(cast->getType()) >=
-                ctx.getIntWidth(cast->getSubExpr()->getType()))
-            return evalSizeInterval(cast->getSubExpr(), ctx, state);
+        if (k == CK_IntegralCast) {
+            if (auto c = foldConstInt(e, &ctx)) return Interval::constant(*c);
+            Interval v = evalSizeInterval(cast->getSubExpr(), ctx, state);
+            if (intervalFitsType(v, cast->getType(), ctx)) return v;
+        }
         return Interval::top();
     }
 
@@ -756,7 +799,7 @@ Interval evalSizeInterval(const Expr* e, ASTContext& ctx,
     }
 
     // Literals and tracked variables — the plain evaluator, same state.
-    return evalInterval(e, state);
+    return evalInterval(e, state, &ctx);
 }
 
 IntervalMap soleDefIntervals(const clang::FunctionDecl* fn,

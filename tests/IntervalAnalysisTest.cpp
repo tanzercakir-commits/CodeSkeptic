@@ -9,6 +9,7 @@
 #include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/FrontendAction.h>
+#include <clang/Frontend/ASTUnit.h>
 #include <clang/Tooling/Tooling.h>
 #include <gtest/gtest.h>
 
@@ -128,6 +129,26 @@ Interval divisorInterval(const std::string& code) {
     return out.divisor;
 }
 
+Interval initializerInterval(const std::string& declaration, bool context, bool size = false) {
+    auto ast = clang::tooling::buildASTFromCodeWithArgs(
+        "void f(){" + declaration + "}", {"-std=c11"}, "initializer.c");
+    EXPECT_NE(ast, nullptr);
+    if (!ast) return Interval::top();
+    struct Visitor : RecursiveASTVisitor<Visitor> {
+        const Expr* init = nullptr;
+        bool VisitVarDecl(VarDecl* vd) {
+            if (vd->getName() == "n") init = vd->getInit();
+            return true;
+        }
+    } visitor;
+    auto& ctx = ast->getASTContext();
+    visitor.TraverseDecl(ctx.getTranslationUnitDecl());
+    EXPECT_NE(visitor.init, nullptr);
+    const codeskeptic::IntervalMap empty;
+    return size ? codeskeptic::evalSizeInterval(visitor.init, ctx, empty) :
+                  codeskeptic::evalInterval(visitor.init, empty, context ? &ctx : nullptr);
+}
+
 struct DestructorElementAnalysis {
     using State = bool;
     static constexpr bool kFollowExceptionalControlFlow = true;
@@ -220,6 +241,101 @@ TEST(IntervalAnalysisTest, ConstantAssignment) {
     Interval n = divisorInterval("int f(int x){ int n = 5; return x / n; }");
     EXPECT_EQ(n, Interval::constant(5));
     EXPECT_TRUE(n.isKnownNonZero());
+}
+
+TEST(IntervalAnalysisTest, UnsignedLiteralAndInitializerChainKeepActualValue) {
+    const char* bodies[] = {
+        "unsigned n=4294967295U;",
+        "unsigned a=4294967295U; unsigned n=a;",
+        "unsigned a=4294967295U; long long n=a;",
+    };
+    for (const char* body : bodies) {
+        SCOPED_TRACE(body);
+        EXPECT_EQ(divisorInterval(std::string("long long f(){") + body +
+                                  "return 10/n;}"),
+                  Interval::constant(4294967295LL));
+    }
+}
+
+TEST(IntervalAnalysisTest, TypedConstantAndCastBoundaries) {
+    struct Case { const char* declaration; Interval expected; };
+    const Case cases[] = {
+        {"int n=2147483647;", Interval::constant(2147483647)},
+        {"int n=(-2147483647-1);", Interval::constant(-2147483647LL-1)},
+        {"unsigned n=2147483648U;", Interval::constant(2147483648LL)},
+        {"long long n=9223372036854775807LL;", Interval::constant(INT64_MAX)},
+        {"long long n=(-9223372036854775807LL-1);", Interval::constant(INT64_MIN)},
+        {"unsigned long long n=9223372036854775807ULL;", Interval::constant(INT64_MAX)},
+        {"unsigned long long n=9223372036854775808ULL;", Interval::top()},
+        {"unsigned long long n=18446744073709551615ULL;", Interval::top()},
+        {"unsigned n=(unsigned)-1;", Interval::constant(4294967295LL)},
+        {"int n=(int)4294967295U;", Interval::constant(-1)},
+        {"unsigned long long n=(unsigned long long)-1;", Interval::top()},
+        {"__int128 n=(__int128)9223372036854775807LL;", Interval::constant(INT64_MAX)},
+        {"__int128 n=(__int128)(-9223372036854775807LL-1);", Interval::constant(INT64_MIN)},
+        {"unsigned __int128 n=(unsigned __int128)4294967295U;", Interval::constant(4294967295LL)},
+        {"unsigned __int128 n=(unsigned __int128)-1;", Interval::top()},
+        {"__int128 n=((__int128)1<<100);", Interval::top()},
+        {"unsigned n=(unsigned)(((unsigned __int128)1<<100)+5);", Interval::constant(5)},
+        {"unsigned n=-1U;", Interval::constant(4294967295LL)},
+        {"unsigned n=-4294967295U;", Interval::constant(1)},
+        {"unsigned n=-0U;", Interval::constant(0)},
+        {"unsigned long long n=-9223372036854775808ULL;", Interval::top()},
+    };
+    for (const auto& item : cases) {
+        SCOPED_TRACE(item.declaration);
+        EXPECT_EQ(divisorInterval(std::string("long long f(){") +
+            item.declaration + "return 10/n;}"), item.expected);
+    }
+}
+
+TEST(IntervalAnalysisTest, TypedUnsignedGuardsPreserveReachableValues) {
+    const char* guards[] = {
+        "if(n>=4294967295U)return 0;",
+        "if(n>=-1)return 0;",
+        "if(-1<=n)return 0;",
+        "if(!(n < -1))return 0;",
+        "if(n>=-1 || n<1)return 0;",
+    };
+    for (const char* guard : guards) {
+        SCOPED_TRACE(guard);
+        EXPECT_EQ(divisorInterval(std::string("int f(){unsigned n=8;") +
+            guard + "return 10/n;}"), Interval::constant(8));
+    }
+    // The variable side also undergoes the usual arithmetic conversions.
+    // A non-value-preserving comparison must not constrain the signed
+    // original to UINT_MAX and invent an unreachable state.
+    EXPECT_EQ(divisorInterval("int f(){int n=-1; if(n!=4294967295U)return 0; return 10/n;}"),
+              Interval::constant(-1));
+    EXPECT_EQ(divisorInterval("int f(){int n=-2; if(n<1U)return 0; return 10/n;}"),
+              Interval::constant(-2));
+}
+
+TEST(IntervalAnalysisTest, LiteralFallbackAndSizeCastsNeverSignExtendUnsigned) {
+    for (bool context : {false, true}) {
+        EXPECT_EQ(initializerInterval("unsigned n=4294967295U;", context),
+                  Interval::constant(4294967295LL));
+        EXPECT_TRUE(initializerInterval("unsigned long long n=18446744073709551615ULL;", context).isTop());
+        EXPECT_TRUE(initializerInterval("unsigned long long n=-9223372036854775808ULL;", context).isTop());
+    }
+    EXPECT_EQ(initializerInterval("__SIZE_TYPE__ n=4294967295U;", true, true),
+              Interval::constant(4294967295LL));
+    EXPECT_EQ(initializerInterval("__SIZE_TYPE__ n=(unsigned)-1;", true, true),
+              Interval::constant(4294967295LL));
+    EXPECT_TRUE(initializerInterval("__SIZE_TYPE__ n=-1;", true, true).isTop());
+    EXPECT_TRUE(initializerInterval("__SIZE_TYPE__ n=(unsigned long long)-1;", true, true).isTop());
+}
+
+TEST(IntervalAnalysisTest, WideGuardBeyondInt64IsUnknownNotUnreachable) {
+    EXPECT_TRUE(divisorInterval(
+        "long long f(){unsigned long long n=9223372036854775808ULL;"
+        "if(n<=9223372036854775807LL)return 0;return 10/n;}").isTop());
+    EXPECT_TRUE(divisorInterval(
+        "long long f(){__int128 n=((__int128)1<<100);"
+        "if(n<=9223372036854775807LL)return 0;return 10/n;}").isTop());
+    EXPECT_TRUE(divisorInterval(
+        "long long f(){__int128 n=-((__int128)1<<100);"
+        "if(n>=(-9223372036854775807LL-1))return 0;return 10/n;}").isTop());
 }
 
 TEST(IntervalAnalysisTest, ArithmeticRange) {

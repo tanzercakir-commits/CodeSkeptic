@@ -29,6 +29,16 @@ TEST(IntOverflowRuleTest, ConstantProductOverflows) {
     EXPECT_EQ(results[0].severity, Severity::Warning);
 }
 
+TEST(IntOverflowRuleTest, UnsignedLiteralGuardDoesNotHideSignedOverflow) {
+    for (bool reachable : {true, false}) {
+        IntOverflowRule rule;
+        auto results = runRule(rule, std::string(
+            "int f(){int n=2000000000; if(n") + (reachable ? "<" : ">") +
+            "4294967295U) return n*2; return 0;}");
+        EXPECT_EQ(results.size(), reachable ? 1u : 0u);
+    }
+}
+
 TEST(IntOverflowRuleTest, WidenedAssignmentStillOverflows) {
     // The classic bite: int*int overflows in `int` BEFORE the widening to
     // long. The multiplication's own type (int) is the overflow point.

@@ -456,6 +456,27 @@ TEST(BoundsRuleTest, SourceReadSkipsInfeasibleStates) {
     }
 }
 
+TEST(BoundsRuleTest, TypedUnsignedGuardSourceAndOffsetDestination) {
+    struct Case { const char* guard; unsigned reports; };
+    const Case cases[] = {
+        {"if(n<4294967295U)", 1}, {"if(n>4294967295U)", 0},
+        {"if(n < -1)", 1}, {"if(-1 > n)", 1}, {"if(n > -1)", 0},
+        {"if(n>=-1)return;", 1}, {"if(n < -1LL)", 0},
+    };
+    for (bool source : {true, false}) {
+        for (const auto& item : cases) {
+            SCOPED_TRACE(item.guard);
+            SCOPED_TRACE(source ? "source" : "destination");
+            BoundsRule rule;
+            auto results = runRule(rule, copy(std::string(
+                "void f(){unsigned n=8;char small[4]={},large[64]={};") +
+                item.guard + (source ? "memcpy(large,small+1,8);}" :
+                                      "memcpy(small+1,large,8);}")));
+            EXPECT_EQ(results.size(), item.reports);
+        }
+    }
+}
+
 // CS3-CH01-S02-U002: constant offsets consume capacity in pointee-sized
 // units, while the copy count and remaining capacity are always bytes.
 TEST(BoundsRuleTest, CopySourcePointerOffsetCapacity) {

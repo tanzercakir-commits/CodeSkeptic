@@ -149,7 +149,10 @@ inline clang::BinaryOperatorKind mirror(clang::BinaryOperatorKind opc) {
 // The general skeleton. onTruth(var, isTrue): the `if (x)` form.
 // onCompare(var, opc, other, isTrue): the `x OPC other` form; opc is
 // always normalized variable-on-left, other is the opposite side.
-template <typename TruthFn, typename CompareFn>
+// Numeric clients may opt in to preserve comparison casts: their callback
+// receives (var, opc, typedOther, isTrue, typedVariableOperand). Existing
+// clients retain the original stripped operands and four-argument callback.
+template <bool PreserveComparisonCasts = false, typename TruthFn, typename CompareFn>
 void walkCondition(const clang::Expr* cond, bool isTrue,
                    TruthFn&& onTruth, CompareFn&& onCompare) {
     namespace d = condwalk_detail;
@@ -170,7 +173,7 @@ void walkCondition(const clang::Expr* cond, bool isTrue,
                 if ((name == "__builtin_expect" ||
                      name == "__builtin_expect_with_probability") &&
                     call->getNumArgs() >= 1) {
-                    walkCondition(call->getArg(0), isTrue,
+                    walkCondition<PreserveComparisonCasts>(call->getArg(0), isTrue,
                                   std::forward<TruthFn>(onTruth),
                                   std::forward<CompareFn>(onCompare));
                     return;
@@ -181,7 +184,7 @@ void walkCondition(const clang::Expr* cond, bool isTrue,
         // instead of by name: an exact-identity wrapper (Carbon's
         // CheckCondition — see identityCallArg).
         if (const clang::Expr* inner = d::identityCallArg(call)) {
-            walkCondition(inner, isTrue, std::forward<TruthFn>(onTruth),
+            walkCondition<PreserveComparisonCasts>(inner, isTrue, std::forward<TruthFn>(onTruth),
                           std::forward<CompareFn>(onCompare));
             return;
         }
@@ -193,7 +196,7 @@ void walkCondition(const clang::Expr* cond, bool isTrue,
     }
     if (const auto* unary = llvm::dyn_cast<clang::UnaryOperator>(cond)) {
         if (unary->getOpcode() == clang::UO_LNot)
-            walkCondition(unary->getSubExpr(), !isTrue, onTruth, onCompare);
+            walkCondition<PreserveComparisonCasts>(unary->getSubExpr(), !isTrue, onTruth, onCompare);
         return;
     }
     const auto* binOp = llvm::dyn_cast<clang::BinaryOperator>(cond);
@@ -202,15 +205,15 @@ void walkCondition(const clang::Expr* cond, bool isTrue,
 
     if (opc == clang::BO_LAnd) {
         if (isTrue) {
-            walkCondition(binOp->getLHS(), true, onTruth, onCompare);
-            walkCondition(binOp->getRHS(), true, onTruth, onCompare);
+            walkCondition<PreserveComparisonCasts>(binOp->getLHS(), true, onTruth, onCompare);
+            walkCondition<PreserveComparisonCasts>(binOp->getRHS(), true, onTruth, onCompare);
         }
         return;
     }
     if (opc == clang::BO_LOr) {
         if (!isTrue) {
-            walkCondition(binOp->getLHS(), false, onTruth, onCompare);
-            walkCondition(binOp->getRHS(), false, onTruth, onCompare);
+            walkCondition<PreserveComparisonCasts>(binOp->getLHS(), false, onTruth, onCompare);
+            walkCondition<PreserveComparisonCasts>(binOp->getRHS(), false, onTruth, onCompare);
         }
         return;
     }
@@ -222,8 +225,14 @@ void walkCondition(const clang::Expr* cond, bool isTrue,
     // informs about i AND end); clients filter what they can't use.
     const clang::VarDecl* lhsVar = d::asVar(lhs);
     const clang::VarDecl* rhsVar = d::asVar(rhs);
-    if (lhsVar) onCompare(lhsVar, opc, rhs, isTrue);
-    if (rhsVar && rhsVar != lhsVar) onCompare(rhsVar, d::mirror(opc), lhs, isTrue);
+    if constexpr (PreserveComparisonCasts) {
+        if (lhsVar) onCompare(lhsVar, opc, binOp->getRHS(), isTrue, binOp->getLHS());
+        if (rhsVar && rhsVar != lhsVar)
+            onCompare(rhsVar, d::mirror(opc), binOp->getLHS(), isTrue, binOp->getRHS());
+    } else {
+        if (lhsVar) onCompare(lhsVar, opc, rhs, isTrue);
+        if (rhsVar && rhsVar != lhsVar) onCompare(rhsVar, d::mirror(opc), lhs, isTrue);
+    }
 }
 
 // Pointer-nullness domain: setNull(var, isNullOnEdge) — the fact that

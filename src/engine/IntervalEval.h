@@ -38,6 +38,9 @@ Interval evalInterval(const clang::Expr* expr, const IntervalMap& state);
 // Context-aware variant (#69b): narrowing integral casts are checked by
 // VALUE — an operand interval that fits the destination type's range
 // passes through unchanged (it cannot wrap); otherwise top() as before.
+// Constant integral casts are folded in their actual AST type, including
+// explicit casts and 128-bit intermediates. Values outside int64 remain top;
+// ordinary binary arithmetic retains its mathematical overflow evidence.
 // `ctx` may be null (identical to the 2-arg form).
 Interval evalInterval(const clang::Expr* expr, const IntervalMap& state,
                       const clang::ASTContext* ctx);
@@ -72,8 +75,9 @@ std::optional<int64_t> boundedTypeSizeInChars(clang::ASTContext& ctx,
 // evalInterval with `sizeof(T)` (a compile-time constant) and constant
 // arithmetic over it, so `n * sizeof(int)`, `sizeof(struct X)`, and plain
 // byte counts evaluate; a variable factor uses `state`. Value-preserving
-// casts (lvalue-load / no-op / WIDENING integral) are transparent; a
-// NARROWING cast stops (→ top), so a size is never over-estimated into a
+// casts (lvalue-load / no-op / integral with a fitting source range) are
+// transparent; constant casts use the actual typed value, and unproved
+// conversions stop (→ top), so a size is never over-estimated into a
 // false overflow. Needs ASTContext for type sizes. The one place size
 // semantics live — shared by the extent map and the copy-size check.
 Interval evalSizeInterval(const clang::Expr* expr, clang::ASTContext& ctx,
@@ -119,7 +123,10 @@ bool exprDerivesFromUntrusted(const clang::Expr* e,
 // With `ctx` (optional), the compared-against side is folded as a full
 // constant expression, so idiomatic overflow guards written with
 // constant arithmetic — `n < INT_MAX/2`, `n <= SIZE_MAX-1` — refine too;
-// without it only plain integer literals fold (the old behavior).
+// Comparison casts are retained: a non-value-preserving conversion of the
+// variable side cannot refine the original variable. Out-of-int64 constants
+// and unsupported conversions stay unknown; without context only the narrow
+// literal fallback is available.
 void refineIntervalOnEdge(IntervalMap& state, const clang::Expr* cond,
                           bool isTrue,
                           const std::set<const clang::VarDecl*>& vars,

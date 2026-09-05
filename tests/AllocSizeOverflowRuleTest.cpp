@@ -26,6 +26,18 @@ struct SourceScope {
 };
 }  // namespace
 
+TEST(AllocSizeOverflowRuleTest, UnsignedLiteralGuardPreservesWrapBoundary) {
+    SourceScope scope({"read_u32"});
+    for (bool safe : {false, true}) {
+        AllocSizeOverflowRule rule;
+        auto results = runRule(rule, std::string(
+            "extern unsigned read_u32(); extern void* malloc(__SIZE_TYPE__);"
+            "void* f(){unsigned n=read_u32(); if(n") + (safe ? ">=" : ">") +
+            "4294967295U)return 0; return malloc(n+1U);}");
+        EXPECT_EQ(results.size(), safe ? 0u : 1u);
+    }
+}
+
 // The trophy: the LVGL loca_count shape. An untrusted uint32 length
 // read through an out-param, `+ 1` in uint32, times a size — the add
 // wraps to 0. malloc is the intrinsic sink.
