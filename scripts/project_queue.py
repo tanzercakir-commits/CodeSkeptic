@@ -45,6 +45,30 @@ SCOPE_POLICY_FILES = ("AGENTS.md", "INVARIANTS.md", "docs/QUEUE_GUIDE.md",
 SCOPE_PROTECTED = {*FILES, *SCOPE_POLICY_FILES, "MASTER_PROMPT.md",
                    ".github/workflows/project-queue.yml", "scripts/check_docs_sync.sh",
                    "scripts/progress_status.py", "tests/StatusAutomationTest.py"}
+# Owner explicitly approved this one active-contract decision after the actual
+# Abseil false-positive diagnosis. This is not a general FRONT amendment API.
+CHECKPOINT_POLICY_PARENT = "695839b6f99d8c47113482d163eb5d6aca697617"
+CHECKPOINT_POLICY_BRANCH = "agent/cs3-ch01-s07-u003-hosted-qualification"
+CHECKPOINT_POLICY_TASK = "CS3-CH01-S07-U003"
+CHECKPOINT_POLICY_OLD_BOOK = "dbd43aa50258838a3ba47501edbbec70657b48246607db9f163b85bcbb9008b4"
+CHECKPOINT_POLICY_OLD_CONTRACT = "499ec85bc8aa72f15735776a09d87b4f086d883ca2bb270b97d55b90be6bf371"
+CHECKPOINT_POLICY_NEW_BOOK = "7178840617c58b555a528e3f464faaa8317af46a9cf8b60981188cf752838170"
+CHECKPOINT_POLICY_FILES = (*FILES[:3], *SCOPE_POLICY_FILES, "docs/CI_GATES.md")
+CHECKPOINT_POLICY_ACCEPTANCE = (
+    "Sahibin 2026-09-05 açık onayıyla, sabit base beklentileri değiştirilmeden yalnız head için "
+    "kaynak ve regresyon kanıtına bağlı bağımsız incelenmiş kesin semantik fark kaydı kullanılabilir. "
+    "Yanlış pozitif olduğu kanıtlanan eski bulgunun kaldırılması veya doğrulanmış yeni bulgunun eklenmesi "
+    "proje/revision, eski beklenti ve tam fingerprint çoklu kümesiyle tek tek gerekçelendirilir; "
+    "tolerans aralığı, genel bastırma ve açıklanmamış fark kabul edilmez. Base özgün manifestle, head "
+    "ayrıca adlandırılmış ve hash'lenmiş kesin etkin beklentiyle doğrulanır; kaynaklar, tarifler, "
+    "kapsam/kalite eşikleri, üç tekrar ve 48 shard şartı değişmez. Eski başarısız kayıtlar korunur; "
+    "kabul ancak yeni exact-head başarılı hosted koşu ve bağımsız raw base/head fark denetimiyle sağlanır."
+)
+CHECKPOINT_POLICY_REASON = (
+    "Owner 2026-09-05 explicitly approved the diagnosed Abseil one-past false-positive policy decision: "
+    "preserve original base pins and failed evidence; admit only independently reviewed exact head "
+    "semantic deltas with source/regression proof, unchanged coverage and fresh hosted qualification."
+)
 
 
 class QueueError(ValueError):
@@ -259,6 +283,25 @@ def validate_plan_transition(old, book, parent, branch):
     return "plan-amendment"
 
 
+def checkpoint_policy_book(book):
+    """Pure, exact one-off proposal; publish via the existing transaction writer.
+
+    Ordinary amend/extend-scope stay unchanged. Git admission is separately
+    restricted by checkpoint_policy_edge; this function grants no write power.
+    """
+    validate_book(book)
+    require(digest(book) == CHECKPOINT_POLICY_OLD_BOOK and bool(pending(book)) and
+            pending(book)[0]["id"] == CHECKPOINT_POLICY_TASK and
+            digest(pending(book)[0]) == CHECKPOINT_POLICY_OLD_CONTRACT,
+            "not the owner-authorized checkpoint book")
+    updated = copy.deepcopy(book)
+    pending(updated)[0]["acceptance"].append(CHECKPOINT_POLICY_ACCEPTANCE)
+    updated["revision"] += 1
+    updated["decisions"].append({"revision": updated["revision"], "reason": CHECKPOINT_POLICY_REASON,
+                                 "previous_plan_sha256": digest(book["chapters"])})
+    return validate_book(updated)
+
+
 def task_block(task, level=3):
     return (f"{'#' * level} {task['id']} — {task['title']}\n\n**Sonuç:** {task['outcome']}\n\n**Kabul:**\n\n" + "".join(f"- {x}\n" for x in task["acceptance"]) + f"\n**Test bütçesi:** {task['budget']}\n**Kontroller:** {', '.join(task['checks'])}\n**Kapsam:** {', '.join(task['scope'])}\n**Bağımlılıklar:** {', '.join(task['depends']) or 'Yok'}\n\n")
 
@@ -399,6 +442,17 @@ def scope_policy_edge(root, parent, head, book, changed):
                 "agent/" + SCOPE_POLICY_TASK.lower() + "-"))
 
 
+def checkpoint_policy_edge(root, parent, head, old, book, changed):
+    """The exact owner-authorized nine-file edge, never a reusable exception."""
+    return (parent == CHECKPOINT_POLICY_PARENT and
+            git(root, "symbolic-ref", "--short", "HEAD") == CHECKPOINT_POLICY_BRANCH and
+            set(changed) == set(CHECKPOINT_POLICY_FILES) and
+            git(root, "rev-parse", head + "^") == parent and
+            digest(old) == CHECKPOINT_POLICY_OLD_BOOK and
+            digest(book) == CHECKPOINT_POLICY_NEW_BOOK and
+            book == checkpoint_policy_book(old))
+
+
 def implementation_span(root, head, book):
     """Check every implementation edge, not just the last commit or final diff.
 
@@ -421,7 +475,12 @@ def implementation_span(root, head, book):
         parent = parents[0]
         old = validate_book(json.loads(git(root, "show", f"{parent}:{FILES[0]}"), object_pairs_hook=unique))
         changed = git(root, "diff", "--name-only", parent, cursor).splitlines()
-        if old == book:
+        if checkpoint_policy_edge(root, parent, cursor, old, book, changed):
+            # Do not stop replay here: earlier implementation still has to
+            # obey its original contract all the way back to the previous POP.
+            book = old
+            task = pending(book)[0]
+        elif old == book:
             require(scope_policy_edge(root, parent, cursor, book, changed) or
                     all(any(fnmatch.fnmatchcase(p, pattern) for pattern in task["scope"]) for p in changed), "out-of-scope unit history")
             require(not set(changed) & set(FILES), "manual ledger history")
@@ -460,6 +519,9 @@ def guard(root, base):
         return "bootstrap"
     old_text = git(root, "show", f"{base}:{FILES[0]}")
     old = validate_book(json.loads(old_text, object_pairs_hook=unique))
+    if checkpoint_policy_edge(root, base, head, old, book, changed):
+        implementation_span(root, head, book)
+        return "checkpoint-adjudication-policy"
     if book == old:
         require(bool(pending(old)), "work after terminal queue")
         task = pending(old)[0]

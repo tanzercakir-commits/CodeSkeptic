@@ -40,6 +40,18 @@ amendment, not worked on immediately. A blocked front stays blocked: never
 skip it or weaken its acceptance to obtain PASS. No old wholesale merges or
 copies: donor behavior must be re-understood, narrowly reimplemented and tested.
 
+The owner separately approved the diagnosed Abseil false-positive acceptance
+decision on 2026-09-05. One exact historical checkpoint directly after
+695839b6f99d8c47113482d163eb5d6aca697617 may add the frozen U003 head-only
+semantic-adjudication acceptance clause, with independent exact-head review.
+Its nine-file boundary and old/new book digests are enforced by project_queue;
+all completed records, FIFO order, scope, check names and T3 budget stay intact.
+This is not reusable permission to rewrite FRONT or bypass a regression.
+Subsequent implementation still requires ordinary reviewed scope extensions.
+Base pins stay original; any head delta needs exact source/regression evidence,
+independent classification and fresh successful hosted qualification. Never
+relabel the old failed campaign or accept unrelated drift under that decision.
+
 ## Delegation boundary
 
 Before each assignment name the one allowed repository/worktree, branch and

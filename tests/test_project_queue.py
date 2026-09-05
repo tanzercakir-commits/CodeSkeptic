@@ -86,7 +86,60 @@ def scope_review_for(book, head=HEAD, branch=None, additions=None):
     }
 
 
+@contextlib.contextmanager
+def checkpoint_policy_fixture(book, head=HEAD, branch=None):
+    """Bind the production one-off algorithm to one disposable fixture edge."""
+    values = {
+        "CHECKPOINT_POLICY_PARENT": head,
+        "CHECKPOINT_POLICY_BRANCH": branch or branch_for(queue.pending(book)[0]),
+        "CHECKPOINT_POLICY_TASK": queue.pending(book)[0]["id"],
+        "CHECKPOINT_POLICY_OLD_BOOK": queue.digest(book),
+        "CHECKPOINT_POLICY_OLD_CONTRACT": queue.digest(queue.pending(book)[0]),
+    }
+    with contextlib.ExitStack() as stack:
+        for name, value in values.items():
+            stack.enter_context(mock.patch.object(queue, name, value))
+        updated = queue.checkpoint_policy_book(book)
+        stack.enter_context(mock.patch.object(queue, "CHECKPOINT_POLICY_NEW_BOOK", queue.digest(updated)))
+        yield updated
+
+
 class QueueContractTests(unittest.TestCase):
+    def test_48_checkpoint_policy_only_appends_exact_front_acceptance_and_decision(self):
+        old = advance(make_book())
+        before = copy.deepcopy(old)
+        with checkpoint_policy_fixture(old) as updated:
+            expected = copy.deepcopy(queue.pending(old)[0])
+            expected["acceptance"].append(queue.CHECKPOINT_POLICY_ACCEPTANCE)
+            self.assertEqual(queue.pending(updated)[0], expected)
+            self.assertEqual(queue.pending(updated)[1:], queue.pending(old)[1:])
+            self.assertEqual(updated["progress"], old["progress"])
+            self.assertEqual(updated["revision"], old["revision"] + 1)
+            self.assertEqual(updated["decisions"][:-1], old["decisions"])
+            self.assertEqual(updated["decisions"][-1], {
+                "revision": updated["revision"], "reason": queue.CHECKPOINT_POLICY_REASON,
+                "previous_plan_sha256": queue.digest(old["chapters"]),
+            })
+            self.assertEqual(queue.render(updated)["docs/PROGRESS.md"], queue.render(old)["docs/PROGRESS.md"])
+            with self.assertRaises(queue.QueueError):
+                queue.checkpoint_policy_book(updated)  # No replay.
+            with self.assertRaises(queue.QueueError):
+                queue.amend(old, updated["chapters"], queue.CHECKPOINT_POLICY_REASON)
+            self.assertEqual(old, before)
+
+    def test_49_checkpoint_policy_rejects_wrong_book_task_and_contract(self):
+        book = advance(make_book())
+        with checkpoint_policy_fixture(book):
+            for name, value in (("CHECKPOINT_POLICY_OLD_BOOK", "0" * 64),
+                                ("CHECKPOINT_POLICY_TASK", "CS3-CH09-S01-U001"),
+                                ("CHECKPOINT_POLICY_OLD_CONTRACT", "0" * 64)):
+                with self.subTest(name=name), mock.patch.object(queue, name, value), self.assertRaises(queue.QueueError):
+                    queue.checkpoint_policy_book(book)
+            changed = copy.deepcopy(book)
+            queue.pending(changed)[1]["outcome"] = "Unrelated future change"
+            with self.assertRaises(queue.QueueError):
+                queue.checkpoint_policy_book(changed)
+
     def test_38_reviewed_scope_extension_preserves_every_other_contract_field(self):
         old = advance(make_book())
         before = copy.deepcopy(old)
@@ -766,6 +819,96 @@ q.publish(Path(sys.argv[2]), q.read_json(Path(sys.argv[3])))
             self.commit("Second policy edit is not covered by fixed parent")
             with self.assertRaises(queue.QueueError):
                 queue.guard(self.root, policy_head)
+
+    def commit_checkpoint_policy(self, updated):
+        for name in queue.CHECKPOINT_POLICY_FILES:
+            if name in queue.FILES:
+                continue
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("Owner-authorized semantic policy fixture\n", encoding="utf-8")
+        queue.publish(self.root, updated)
+        self.commit("Exact owner-approved semantic policy checkpoint")
+        return self.git("rev-parse", "HEAD")
+
+    def test_50_checkpoint_policy_guard_scope_product_and_real_pop_replay(self):
+        with checkpoint_policy_fixture(self.book, self.head, self.branch) as updated:
+            policy_head = self.commit_checkpoint_policy(updated)
+            self.assertEqual(queue.guard(self.root, self.head), "checkpoint-adjudication-policy")
+            self.assertEqual(queue.check(self.root), updated)
+            self.assertEqual(self.cli("finalize", "--review", str(self.receipt)), 2)  # Old PASS invalid.
+            receipt = scope_review_for(updated, policy_head, self.branch)
+            self.receipt.write_text(queue.canonical(receipt), encoding="utf-8")
+            self.assertEqual(self.cli("extend-scope", "--review", str(self.receipt)), 0)
+            self.commit("Only reviewed scope ledger after policy")
+            scope_head = self.git("rev-parse", "HEAD")
+            self.assertEqual(queue.guard(self.root, policy_head), "scope-extension")
+            source = self.root / "include/cwe.h"
+            source.parent.mkdir()
+            source.write_text("int qualified_product;\n", encoding="utf-8")
+            self.commit("Admitted product after policy and scope")
+            product_head = self.git("rev-parse", "HEAD")
+            self.assertEqual(queue.guard(self.root, scope_head), "implementation")
+            self.review = review_for(queue.pending(queue.check(self.root))[0], product_head, self.branch, self.evidence)
+            self.save_review()
+            self.assertEqual(self.cli("finalize", "--review", str(self.receipt)), 0)
+            self.commit("Verified ordinary POP after semantic policy")
+            self.assertEqual(queue.guard(self.root, product_head), "finalized")
+
+    def test_51_checkpoint_policy_rejects_wrong_parent_branch_and_new_digest(self):
+        with checkpoint_policy_fixture(self.book, self.head, self.branch) as updated:
+            self.commit_checkpoint_policy(updated)
+            for name, value in (("CHECKPOINT_POLICY_PARENT", "0" * 40),
+                                ("CHECKPOINT_POLICY_BRANCH", self.branch + "-other"),
+                                ("CHECKPOINT_POLICY_NEW_BOOK", "0" * 64)):
+                with self.subTest(name=name), mock.patch.object(queue, name, value), self.assertRaises(queue.QueueError):
+                    queue.guard(self.root, self.head)
+
+    def test_52_checkpoint_policy_rejects_mixed_product(self):
+        with checkpoint_policy_fixture(self.book, self.head, self.branch) as updated:
+            source = self.root / "src/mixed.cc"
+            source.parent.mkdir()
+            source.write_text("int mixed_product;\n", encoding="utf-8")
+            self.commit_checkpoint_policy(updated)
+            with self.assertRaises(queue.QueueError):
+                queue.guard(self.root, self.head)
+
+    def test_53_checkpoint_policy_cannot_launder_earlier_out_of_scope_history(self):
+        source = self.root / "outside/escape.cc"
+        source.parent.mkdir()
+        source.write_text("int earlier_out_of_scope;\n", encoding="utf-8")
+        self.commit("Earlier out-of-scope edge before policy")
+        parent = self.git("rev-parse", "HEAD")
+        with checkpoint_policy_fixture(self.book, parent, self.branch) as updated:
+            self.commit_checkpoint_policy(updated)
+            with self.assertRaises(queue.QueueError):
+                queue.guard(self.root, parent)
+
+    def test_54_checkpoint_policy_cannot_change_more_than_the_frozen_proposal(self):
+        with checkpoint_policy_fixture(self.book, self.head, self.branch) as updated:
+            queue.pending(updated)[0]["outcome"] = "Weakened unrelated outcome"
+            # Even an altered output digest cannot bypass exact pure replay.
+            with mock.patch.object(queue, "CHECKPOINT_POLICY_NEW_BOOK", queue.digest(updated)):
+                self.commit_checkpoint_policy(updated)
+                with self.assertRaises(queue.QueueError):
+                    queue.guard(self.root, self.head)
+
+    def test_55_valid_checkpoint_policy_does_not_admit_a_later_policy_edit(self):
+        with checkpoint_policy_fixture(self.book, self.head, self.branch) as updated:
+            first_head = self.commit_checkpoint_policy(updated)
+            self.assertEqual(queue.guard(self.root, self.head), "checkpoint-adjudication-policy")
+            (self.root / "AGENTS.md").write_text("Repeated unauthorized policy edit\n", encoding="utf-8")
+            self.commit("No repeated policy permission after a valid checkpoint")
+            with self.assertRaises(queue.QueueError):
+                queue.guard(self.root, first_head)
+
+    def test_56_checkpoint_policy_preserves_completed_evidence_records(self):
+        with checkpoint_policy_fixture(self.book, self.head, self.branch) as updated:
+            updated["progress"][0]["completed_at"] = "Changed historical completion record"
+            with mock.patch.object(queue, "CHECKPOINT_POLICY_NEW_BOOK", queue.digest(updated)):
+                self.commit_checkpoint_policy(updated)
+                with self.assertRaises(queue.QueueError):
+                    queue.guard(self.root, self.head)
 
 
 if __name__ == "__main__":

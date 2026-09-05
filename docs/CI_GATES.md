@@ -145,6 +145,38 @@ receipt checksum is revalidated. Missing projects/repetitions, substituted
 binaries, resumed receipts and failed/skipped/cancelled jobs cannot qualify.
 No pin, baseline, quality floor or hosted protection is lowered here.
 
+### Owner-approved exact semantic adjudication (policy checkpoint)
+
+The first actual candidate `695839b6f99d8c47113482d163eb5d6aca697617`
+passed Linux, Windows, Juliet and measurement, but its real-world run failed.
+Abseil lost exactly one old false positive: `csf1-46954827fe18f69a` at pinned
+`demangle.cc:524`, the legal formation of `&buf[20]` for a20-element array.
+The subsequent write decrements the pointer first. The existing one-past test
+retains detection of actual out-of-bounds reads. All158 TUs and the other11
+findings are preserved across the three head repetitions. LVGL separately
+added four uninit-scalar reports at `LV_UNUSED` casts; these require their own
+diagnosis/correction and are not accepted by the Abseil decision.
+
+After that evidence, the owner explicitly approved a narrow acceptance-policy
+revision. It permits independently classified, source/regression-backed exact
+head semantic deltas while preserving the original base manifest and pins.
+This section records authorization, **not an implemented exception or PASS**.
+The existing producer/verifier still enforce the original pins until separately
+scoped implementation and its independent review are complete.
+
+The required implementation must identify any head-effective manifest separately
+from the unchanged baseline, preserve every input/recipe/coverage/timeout pin,
+and validate exact added/removed fingerprint multiplicities against actual base
+reports in all three repetitions. No count tolerance, general suppression or
+unexplained difference is permitted. A reviewed delta must identify the project,
+pinned revision, original expectations, specific classification and source/test
+evidence. A false positive must not be restored merely to make CI green.
+
+The original failed run and receipts remain failed and preserved. Only a fresh
+successful exact-head campaign with the same48-shard profile and independent
+raw-evidence audit may complete U003. This authorization does not change main,
+hosted protections, experimental tiers, existing quality floors or FIFO order.
+
 ### Evidence collection and independent validation
 
 Each artifact envelope binds the configuration digest, full input identity,

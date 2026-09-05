@@ -32,3 +32,9 @@
    A failure is recorded as failure; a blocked task is not DONE.
 10. No subordinate has GitHub/PR/merge authority. Primary-only integration,
     read-only independent audit and explicit protected-main approval remain.
+11. The owner's separately approved U003 semantic-adjudication policy is one
+    direct edge after 695839b6f99d8c47113482d163eb5d6aca697617, bound to exact
+    old/new BOOK digests and nine declared files. It only appends the frozen
+    acceptance clause and its decision; PROGRESS and all other contracts stay
+    unchanged. Historical replay continues through the old contract to the
+    prior POP. Ordinary amend/scope commands gain no FRONT-rewrite authority.

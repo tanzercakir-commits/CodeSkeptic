@@ -57,6 +57,31 @@ en fazla 10 MiB ve digest'i doğru dosyadır. Receipt en fazla 64 KiB'dır.
 Denetçi gerçek dosyaları, komut çıktısını, RED/GREEN ve risk sınırlarını inceler.
 Bu ortak kullanıcı hesabında prosedürel bağımsızlıktır, imza/uzak attestation değil.
 
+### Onaylı tek semantik kabul checkpoint'i
+
+Sahip, gerçek Abseil taramasında saptanan eski one-past yanlış alarmı için
+2026-09-05 tarihinde açık kabul politikası onayı verdi. Yalnız doğrudan parent
+`695839b6f99d8c47113482d163eb5d6aca697617`, exact U003 dalı, eski/yeni BOOK
+digest'leri ve dokuz kesin dosyaya bağlı tarihsel geçiş kullanılabilir:
+BOOK/PLAN/TODO, AGENTS, INVARIANTS, QUEUE_GUIDE, project_queue.py,
+test_project_queue.py ve CI_GATES. PROGRESS byte-byte aynı kalır; hiçbir POP,
+ürün kodu, scope, check, bütçe, outcome veya başka görev değişmez.
+
+`checkpoint_policy_book` yalnız sabit eski kitaptan önceden belirlenmiş yeni
+kitabı hesaplayan saf fonksiyondur; genel bir FRONT düzenleme komutu değildir.
+Görünümler mevcut `publish` işlem/journal mekanizmasıyla birlikte hazırlanır.
+Primary exact aday commit'ini bağımsız denetletir ve parent guard'ını çalıştırır.
+Guard ve geçmiş denetimi aynı dar geçişi doğrular; önceki kapsamı geri yükleyip
+önceki POP'a kadar denetime devam eder. Bu noktada geçmiş denetimi kesilmez.
+Eski ve bitmiş sözleşmeler yeniden yazılmaz, ordinary amend/scope kilitleri açılmaz.
+
+Bu geçiş yalnız U003'e kesin, bağımsız incelenmiş head semantik farkı kabulünü
+ekler. Base manifest/pinleri korunur; head etkin beklentisi ayrı ad/digest taşır.
+Kaynak ve regresyon kanıtı, fingerprint çoklu-küme farkı, tam kapsam, üç tekrar,
+yeni başarılı exact-head hosted sonuç ve bağımsız ham kanıt denetimi şarttır.
+Başarısız eski receipt'ler başarısız kalır. Uygulama dosyaları için daha sonra
+normal bağımsız scope-extension gerekir; bu checkpoint ürün PASS'i değildir.
+
 ## Değişiklik ve hata kurtarma
 
 Yeni fikirleri hemen uygulama. Gelecek chapter/section/task listesini repo dışında
