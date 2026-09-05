@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH01-S04-U002
-
-### CS3-CH01-S04-U002 — pipe/pipe2 çift descriptor çıkışını modelle
-
-**Sonuç:** Başarılı iki out-param descriptor bağımsız kaynak olarak izlenir.
-
-**Kabul:**
-
-- Başarıda iki kapatma, tek kapatma ve hiç kapatmama sonuçları ayrılır.
-- Hatalı dönüş ve yeniden atanmış out-param sahte ownership yaratmaz.
-- İki kaynak tek bulguda kaybolmaz; mevcut descriptor dönüş modeli bozulmaz.
-
-**Test bütçesi:** T1
-**Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/rules/FdResourceRule.cpp, src/rules/FdResourceRule.h, tests/FdResourceRuleTest.cpp
-**Bağımlılıklar:** CS3-CH01-S04-U001
+## FRONT — CS3-CH01-S05-U001
 
 ### CS3-CH01-S05-U001 — Uzunluk ve index sink'lerinde kanıtlı narrowing kaybını raporla
 
