@@ -87,9 +87,9 @@ do not claim their checks passed. Also run `python3 -B scripts/project_queue.py 
 
 ## Explicit same-input base/head checkpoint (S07-U002)
 
-`ci/regression-checkpoint.json` is initially **disabled**: this unit delivers
-wiring and local evidence, not a successful hosted campaign. S07-U003 owns its
-first activation and qualification. The request pins the full base SHA, the same
+S07-U002 delivered `ci/regression-checkpoint.json` **disabled**, with wiring
+and local evidence rather than a successful hosted campaign. S07-U003 owns its
+activation and qualification (current candidate status below). The request pins the full base SHA, the same
 input SHA, the canonical real-world manifest digest and the only supported
 profile, `nightly-weekend-three-repeats`. The head and workflow SHA must both
 equal the actual push event SHA; run ID, attempt, repository and agent ref come
@@ -221,3 +221,38 @@ measurement and all 48 real-world shards. Until those receipts exist, local
 tests and a green Project FIFO job establish neither hosted product correctness
 nor release readiness. Main integration remains a separate owner-authorized
 action; neither checkpoint activation nor a PASS grants merge authority.
+
+## Current qualification candidate (S07-U003)
+
+The first request, `hosted-qualification-001-20260905`, is now enabled in the
+candidate. Its base and common inputs remain the unchanged main commit
+`7dfd37596414c9512316093ff4fb6b039673f55f`; the eight-project manifest and quality
+pins are unchanged. Enabling this request locally is **not** a hosted result.
+Only the primary may push its exact clean head after independent publication
+precheck; that precheck is not the task's final PASS or permission to POP.
+
+Earlier feature head `4a1626f4f809bb4261993b277bead6395719974b` actually passed
+Juliet (run `33974498005`) and FIFO (`33974498013`), but failed Linux self-scan
+(`33974497998`) and two native Windows tests (`33974497981`). These failures
+were retained and diagnosed before activating this first full profile:
+
+- The two accept tests used GNU/Linux headers unconditionally on Windows.
+  Their real Linux header assertions remain explicitly Linux-qualified, while
+  shared portable POSIX declaration bodies now exercise the same direct/wrapped
+  leak, close and transfer behavior in both C and C++ on every host. This is not
+  WinSock support or a blanket test disable. Actual Windows success is still
+  required; a Linux fixture probe cannot establish it.
+- The complete local baseline self-scan analyzed all 49 TUs and reported one
+  possible null dereference in `FdAnalysis::transfer`. `isTrackableLocal` already
+  rejects null, so the caller was safe; an early null `continue` makes that
+  existing condition explicit without a suppression or analyzer-rule change.
+  A narrow scan of the changed file with the same analyzer is now complete and
+  clean. Declaration-kind tests preserve resource behavior around non-variable
+  typedef, enum and record declarations.
+
+Both necessary file additions passed independent scope and applied-transition
+reviews before editing. Acceptance, FIFO, completed records, existing quality
+gates and source pins remain unchanged. Full current-head hosted Linux,
+Windows, Juliet, measurement and 48-shard evidence remains **pending** until
+the actual run/job/artifact records pass independent validation. Earlier SHA
+results and local preparation cannot fill any missing current-head result.

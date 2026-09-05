@@ -886,6 +886,7 @@ public:
         if (const auto* declaration = dyn_cast<DeclStmt>(stmt)) {
             for (const Decl* decl : declaration->decls()) {
                 const auto* var = dyn_cast<VarDecl>(decl);
+                if (!var) continue;
                 if (var && var->hasInit() && var->getType()->isReferenceType() &&
                     var->getType()->getPointeeType()->isIntegerType()) {
                     Slot value = valueSlot(var->getInit(), out);

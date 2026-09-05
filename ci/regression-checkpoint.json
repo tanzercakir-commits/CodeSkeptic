@@ -1,7 +1,7 @@
 {
   "schema": "codeskeptic-regression-checkpoint/v1",
-  "enabled": false,
-  "request_id": "wiring-preparation-001",
+  "enabled": true,
+  "request_id": "hosted-qualification-001-20260905",
   "base_sha": "7dfd37596414c9512316093ff4fb6b039673f55f",
   "inputs_sha": "7dfd37596414c9512316093ff4fb6b039673f55f",
   "profile": "nightly-weekend-three-repeats",

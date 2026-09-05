@@ -524,6 +524,27 @@ TEST(FdResourceRuleTest, AcceptPortableDeclarationsInCAndCpp) {
     expectAcceptFormsInCAndCpp(kPosixDecls);
 }
 
+TEST(FdResourceRuleTest, AcceptNonVariableDeclarationsPreserveDescriptorState) {
+    for (const auto* acquire : {"accept(listener,0,0)", "accept4(listener,0,0,0)"}) {
+        for (const bool release : {false, true}) {
+            const auto code = std::string(kPosixDecls) +
+                "void f(int listener){typedef int Descriptor;enum Marker{Zero};"
+                "struct Metadata{int field;};Descriptor fd=" + acquire + ";" +
+                (release ? "close(fd);" : "(void)fd;") + "}";
+            for (const auto& language : {std::pair{"-std=gnu11", "decls.c"},
+                                        std::pair{"-std=gnu++17", "decls.cpp"}}) {
+                SCOPED_TRACE(acquire);
+                SCOPED_TRACE(release);
+                SCOPED_TRACE(language.first);
+                FdResourceRule rule;
+                const auto results = runRuleWithArgs(rule, code, {language.first}, language.second);
+                if (release) EXPECT_TRUE(results.empty());
+                else expectSingleResourceLeak(results);
+            }
+        }
+    }
+}
+
 #if defined(__linux__)
 TEST(FdResourceRuleTest, AcceptActualSystemHeaderForms) {
     expectAcceptFormsInCAndCpp(kLinuxSocketHeaders);
