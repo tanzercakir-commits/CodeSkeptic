@@ -29,6 +29,10 @@ namespace codeskeptic {
 // followed through CFG assignments. Explicit casts, enum/bool/dependent/unknown/volatile
 // values, mixed-origin CFG joins, address/reference-exposed source/destination
 // locals and arithmetic-origin propagation are outside that subset.
+// Captured ranges and equal-source witnesses belong to each stored value, not a
+// globally mutable cast record. Guards refine that value's surviving input range;
+// source writes break equality, not the old captured value. Infeasible paths stay
+// infeasible across later assignments; widened loop-carried identities are unknown.
 // Existing signed arithmetic and negative-to-unsigned
 // reports are not duplicated. Both subcases retain the registry's experimental,
 // report-only sign-conversion ID; this is not a generic cast warning.

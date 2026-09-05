@@ -20,6 +20,7 @@
 #include "rules/IntOverflowRule.h"
 
 #include <gtest/gtest.h>
+#include <map>
 
 using namespace codeskeptic;
 using namespace codeskeptic::testing;
@@ -500,4 +501,32 @@ TEST(SignConversionRuleTest, NarrowingVolatileStorageIsNotAStableValueProof) {
         void source(char* dst){volatile unsigned wide=70000;unsigned short index=wide;dst[index]=0;}
         void destination(char* dst){unsigned wide=70000;volatile unsigned short index=wide;dst[index]=0;}
     )").empty());
+}
+
+TEST(SignConversionRuleTest, NarrowingPreservesDeadPathsAndPostCastSourceGuards) {
+    SignConversionRule rule;
+    const auto findings = runRule(rule, R"(
+        void safe_unreachable_reset(char* dst){unsigned wide=70000;unsigned short index=wide;if(wide<10){wide=70000;dst[index]=0;}}
+        void bad_reachable_reset(char* dst){unsigned wide=70000;unsigned short index=wide;if(wide>10){wide=70000;dst[index]=0;}}
+        void safe_postcast_guard(char* dst,unsigned n){if(n<200||n>300)return;unsigned char index=n;if(n<=255)dst[index]=0;}
+        void bad_postcast_guard(char* dst,unsigned n){if(n<200||n>300)return;unsigned char index=n;if(n>255)dst[index]=0;}
+        void bad_reassigned_source(char* dst){unsigned n=70000;unsigned short index=n;n=0;if(n<=255)dst[index]=0;}
+        void safe_killed_value(char* dst){unsigned wide=70000;unsigned short index=wide;index=0;dst[index]=0;}
+    )");
+    std::map<std::string,unsigned> actual;
+    for (const auto& finding : findings) ++actual[finding.function];
+    const std::map<std::string,unsigned> expected = {
+        {"bad_reachable_reset",1}, {"bad_postcast_guard",1}, {"bad_reassigned_source",1}};
+    EXPECT_EQ(actual, expected);
+}
+
+TEST(SignConversionRuleTest, NarrowingSourceSnapshotCopiesAreNotReassignedValues) {
+    SignConversionRule rule;
+    EXPECT_TRUE(runRule(rule, R"(
+        void copied_before(char* dst,unsigned n){if(n<200||n>300)return;unsigned saved=n;unsigned char index=n;n=0;if(saved<=255)dst[index]=0;}
+        void copied_after(char* dst,unsigned n){if(n<200||n>300)return;unsigned char index=n;unsigned saved=n;n=0;if(saved<=255)dst[index]=0;}
+    )").empty());
+    EXPECT_EQ(runRule(rule, R"(
+        void replaced_before_copy(char* dst){unsigned n=70000;unsigned short index=n;n=0;unsigned saved=n;if(saved<=255)dst[index]=0;}
+    )").size(), 1u);
 }

@@ -24,6 +24,7 @@
 #include <set>
 #include <limits>
 #include <map>
+#include <optional>
 #include <vector>
 
 using namespace clang;
@@ -364,13 +365,35 @@ NarrowingProofs collectNarrowingProofs(const FunctionDecl* fn, ASTContext& ctx,
 // subset. No pointer-alias or interprocedural length propagation is claimed.
 class NarrowingFlow {
 public:
-    using Origins = std::set<const Expr*>;
-    using State = std::map<const VarDecl*, Origins>;
+    struct Fact {
+        const Expr* cast = nullptr;
+        codeskeptic::Interval range;
+        std::set<const VarDecl*> witnesses;
+        bool operator==(const Fact& other) const {
+            return cast == other.cast && range == other.range && witnesses == other.witnesses;
+        }
+    };
+    struct State {
+        codeskeptic::IntervalState numeric;
+        bool feasible = true;
+        std::map<const VarDecl*, Fact> values;
+        std::map<const VarDecl*, std::set<const VarDecl*>> copies;
+        bool operator==(const State& other) const {
+            return feasible == other.feasible && numeric == other.numeric &&
+                values == other.values && copies == other.copies;
+        }
+        bool operator!=(const State& other) const { return !(*this == other); }
+    };
     NarrowingFlow(const NarrowingProofs& proofs, const FunctionDecl* fn,
                   const codeskeptic::IntervalAnalysis& analysis) : proofs_(proofs), analysis_(analysis) {
         struct Escapes : RecursiveASTVisitor<Escapes> {
             std::set<const VarDecl*> vars;
-            bool TraverseLambdaExpr(LambdaExpr*) { return true; }
+            bool TraverseLambdaExpr(LambdaExpr* lambda) {
+                for (const auto& capture : lambda->captures())
+                    if (capture.capturesVariable() && capture.getCaptureKind() == LCK_ByRef)
+                        if (const auto* var = dyn_cast<VarDecl>(capture.getCapturedVar())) vars.insert(var);
+                return true;
+            }
             bool VisitUnaryOperator(UnaryOperator* op) {
                 if (op->getOpcode() == UO_AddrOf)
                     if (const auto* var = directVar(op->getSubExpr())) vars.insert(var);
@@ -394,43 +417,75 @@ public:
         excluded_ = std::move(escapes.vars);
         variables_ = collectIntVars(fn).size();
     }
-    State initialState() const { return {}; }
+    State initialState() const { State state; state.numeric = analysis_.initialState(); return state; }
     unsigned latticeHeight() const { return static_cast<unsigned>((proofs_.size() + 1) * (variables_ + 1) + 4); }
     State merge(const State& a, const State& b) const {
-        // A mixed/unknown join is not a proof that this exact stored value
-        // reaches the sink. Retain only the origins common to both paths.
+        if (!a.feasible) return b;
+        if (!b.feasible) return a;
         State out;
-        for (const auto& [var, origins] : a) {
-            const auto other = b.find(var);
-            if (other == b.end()) continue;
-            for (const Expr* origin : origins)
-                if (other->second.count(origin)) out[var].insert(origin);
+        out.numeric = analysis_.merge(a.numeric, b.numeric);
+        for (const auto& [var, fact] : a.values) {
+            const auto other = b.values.find(var);
+            if (other == b.values.end() || fact.cast != other->second.cast) continue;
+            Fact joined{fact.cast, codeskeptic::Interval::join(fact.range, other->second.range), {}};
+            for (const auto* witness : fact.witnesses)
+                if (other->second.witnesses.count(witness)) joined.witnesses.insert(witness);
+            out.values.emplace(var, std::move(joined));
         }
+        for (const auto& [var, peers] : a.copies) {
+            const auto other = b.copies.find(var);
+            if (other == b.copies.end()) continue;
+            for (const auto* peer : peers)
+                if (other->second.count(peer)) out.copies[var].insert(peer);
+        }
+        retainFeasibility(out);
         return out;
     }
-    Origins origins(const Expr* expr, const State& state, unsigned depth = 0) const {
-        if (!expr || depth >= 32) return {};
-        expr = expr->IgnoreParens();
-        if (const auto proof = proofs_.find(expr); proof != proofs_.end())
-            return excluded_.count(directVar(proof->second.operand)) ? Origins{} : Origins{expr};
-        if (const auto* cast = dyn_cast<ImplicitCastExpr>(expr)) {
-            if (cast->getCastKind() == CK_LValueToRValue || cast->getCastKind() == CK_NoOp ||
-                (cast->getCastKind() == CK_IntegralCast &&
-                 cast->getType()->isIntegerType() && cast->getSubExpr()->getType()->isIntegerType()))
-                return origins(cast->getSubExpr(), state, depth + 1);
-            return {};
-        }
-        const auto found = state.find(directVar(expr));
-        return found == state.end() ? Origins{} : found->second;
+    void widen(State& state) const {
+        if (!state.feasible) return;
+        analysis_.widen(state.numeric);
+        // Never manufacture a finite unsafe endpoint while widening old
+        // captured values. Unstable loop-carried identity becomes unknown.
+        state.values.clear();
+        state.copies.clear();
     }
-    State transfer(const Stmt* stmt, const State& before, ASTContext&) const {
+    void refineOnEdge(const Stmt* condition, bool isTrue, State& state, ASTContext& ctx) const {
+        if (!state.feasible) return;
+        analysis_.refineOnEdge(condition, isTrue, state.numeric, ctx);
+        retainFeasibility(state);
+        if (state.feasible) refineFacts(state);
+    }
+    State transfer(const Stmt* stmt, const State& before, ASTContext& ctx) const {
+        if (!before.feasible) return before;
         State after = before;
+        refineFacts(after);
         auto assign = [&](const VarDecl* var, const Expr* value) {
-            if (!var || !var->hasLocalStorage() || !var->getType()->isIntegerType() ||
-                var->getType().isVolatileQualified() || excluded_.count(var)) return;
-            auto sources = origins(value, after);
-            if (sources.empty()) after.erase(var);
-            else after[var] = std::move(sources);
+            if (!trackable(var)) return;
+            auto captured = factFor(value, after, ctx);
+            const auto* source = copiedScalar(value, after, ctx);
+            const auto peers = equivalents(source, after);
+            auto updateWitness = [&](Fact& fact) {
+                const bool sameSnapshot = source && fact.witnesses.count(source);
+                fact.witnesses.erase(var);
+                if (sameSnapshot) fact.witnesses.insert(var);
+            };
+            for (auto& [stored, fact] : after.values) {
+                (void)stored;
+                updateWitness(fact);
+            }
+            if (captured) updateWitness(*captured);
+            after.copies.erase(var);
+            for (auto& [other, links] : after.copies) {
+                (void)other;
+                links.erase(var);
+            }
+            for (const auto* peer : peers) {
+                if (peer == var) continue;
+                after.copies[var].insert(peer);
+                after.copies[peer].insert(var);
+            }
+            if (captured) after.values[var] = std::move(*captured);
+            else after.values.erase(var);
         };
         if (const auto* decl = dyn_cast<DeclStmt>(stmt)) {
             for (const auto* item : decl->decls())
@@ -440,15 +495,12 @@ public:
         } else if (const auto* unary = dyn_cast<UnaryOperator>(stmt); unary && unary->isIncrementDecrementOp()) {
             assign(directVar(unary->getSubExpr()), nullptr);
         }
+        after.numeric = analysis_.transfer(stmt, before.numeric, ctx);
+        retainFeasibility(after);
         return after;
     }
     void onStatement(const Stmt* stmt, const State& before, const State&, ASTContext& ctx) {
-        const auto* numeric = analysis_.stateAt(stmt);
-        if (!numeric) return;
-        for (const auto& [var, range] : *numeric) {
-            (void)var;
-            if (range.isEmpty()) return; // no reachable valuation at this sink
-        }
+        if (!before.feasible) return;
         const Expr* value = nullptr;
         if (const auto* subscript = dyn_cast<ArraySubscriptExpr>(stmt)) value = subscript->getIdx();
         if (const auto* call = dyn_cast<CallExpr>(stmt)) {
@@ -466,11 +518,92 @@ public:
                     value = call->getArg(2);
             }
         }
-        auto found = origins(value, before);
-        consumed.insert(found.begin(), found.end());
+        auto fact = factFor(value, before, ctx);
+        if (!fact || fact->range.isEmpty() || fact->range.loIsInf() || fact->range.hiIsInf() ||
+            fits(fact->range, fact->cast->getType(), ctx)) return;
+        auto [it, inserted] = consumed.emplace(fact->cast, fact->range);
+        if (!inserted) it->second = codeskeptic::Interval::join(it->second, fact->range);
     }
-    Origins consumed;
+    std::map<const Expr*, codeskeptic::Interval> consumed;
 private:
+    static bool fits(const codeskeptic::Interval& range, QualType type, ASTContext& ctx) {
+        if (range.isEmpty() || range.loIsInf() || range.hiIsInf()) return false;
+        const unsigned bits = ctx.getIntWidth(type);
+        if (type->isSignedIntegerType()) return range.fitsSignedBits(bits);
+        return range.lo() >= 0 && (bits >= 64 || static_cast<uint64_t>(range.hi()) < (uint64_t{1} << bits));
+    }
+    static void retainFeasibility(State& state) {
+        if (!state.feasible) return;
+        for (const auto& [var, range] : state.numeric.iv) {
+            (void)var;
+            if (!range.isEmpty()) continue;
+            state.feasible = false;
+            state.numeric = {};
+            state.values.clear();
+            state.copies.clear();
+            return;
+        }
+    }
+    static void refineFacts(State& state) {
+        for (auto& [var, fact] : state.values) {
+            (void)var;
+            for (const auto* witness : fact.witnesses) {
+                const auto range = state.numeric.iv.find(witness);
+                if (range != state.numeric.iv.end())
+                    fact.range = codeskeptic::Interval::meet(fact.range, range->second);
+            }
+        }
+    }
+    bool trackable(const VarDecl* var) const {
+        return var && (var->hasLocalStorage() || isa<ParmVarDecl>(var)) &&
+            var->getType()->isIntegerType() && !var->getType().isVolatileQualified() && !excluded_.count(var);
+    }
+    std::set<const VarDecl*> equivalents(const VarDecl* var, const State& state) const {
+        if (!trackable(var)) return {};
+        std::set<const VarDecl*> out{var};
+        const auto peers = state.copies.find(var);
+        if (peers != state.copies.end()) out.insert(peers->second.begin(), peers->second.end());
+        return out;
+    }
+    const VarDecl* copiedScalar(const Expr* expr, const State& state, ASTContext& ctx, unsigned depth = 0) const {
+        if (!expr || depth >= 32) return nullptr;
+        expr = expr->IgnoreParens();
+        if (const auto* cast = dyn_cast<ImplicitCastExpr>(expr)) {
+            const auto src = cast->getSubExpr()->getType(), dst = cast->getType();
+            bool preserves = cast->getCastKind() == CK_LValueToRValue || cast->getCastKind() == CK_NoOp;
+            if (cast->getCastKind() == CK_IntegralCast && src->isIntegerType() && dst->isIntegerType() &&
+                !src->isBooleanType() && !dst->isBooleanType()) {
+                const unsigned from = ctx.getIntWidth(src), to = ctx.getIntWidth(dst);
+                preserves = (src->isSignedIntegerType() == dst->isSignedIntegerType() && to >= from) ||
+                    (src->isUnsignedIntegerType() && dst->isSignedIntegerType() && to > from);
+                if (!preserves) preserves = fits(codeskeptic::evalInterval(cast->getSubExpr(), state.numeric.iv, &ctx), dst, ctx);
+            }
+            return preserves ? copiedScalar(cast->getSubExpr(), state, ctx, depth + 1) : nullptr;
+        }
+        const auto* var = directVar(expr);
+        return trackable(var) ? var : nullptr;
+    }
+    std::optional<Fact> factFor(const Expr* expr, const State& state, ASTContext& ctx, unsigned depth = 0) const {
+        if (!expr || !state.feasible || depth >= 32) return std::nullopt;
+        expr = expr->IgnoreParens();
+        if (const auto proof = proofs_.find(expr); proof != proofs_.end()) {
+            const auto* source = directVar(proof->second.operand);
+            if (source && !trackable(source)) return std::nullopt;
+            auto range = proof->second.range;
+            if (source)
+                range = codeskeptic::Interval::meet(range, codeskeptic::evalInterval(proof->second.operand, state.numeric.iv, &ctx));
+            return Fact{expr, range, equivalents(source, state)};
+        }
+        if (const auto* cast = dyn_cast<ImplicitCastExpr>(expr)) {
+            if (cast->getCastKind() == CK_LValueToRValue || cast->getCastKind() == CK_NoOp ||
+                (cast->getCastKind() == CK_IntegralCast && cast->getType()->isIntegerType() &&
+                 cast->getSubExpr()->getType()->isIntegerType()))
+                return factFor(cast->getSubExpr(), state, ctx, depth + 1);
+            return std::nullopt;
+        }
+        const auto found = state.values.find(directVar(expr));
+        return found == state.values.end() ? std::nullopt : std::optional<Fact>{found->second};
+    }
     const NarrowingProofs& proofs_;
     const codeskeptic::IntervalAnalysis& analysis_;
     std::set<const VarDecl*> excluded_;
@@ -499,7 +632,7 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
             const auto propagation = codeskeptic::runDataflow(fn, ctx, flow);
             if (!propagation.converged)
                 codeskeptic::CoverageReport::instance().recordDataflowFailure(fn->getQualifiedNameAsString(), propagation.failure);
-            else for (const Expr* cast : flow.consumed) {
+            else for (const auto& [cast, survivingRange] : flow.consumed) {
                 const auto& proof = proofs.at(cast);
                 const auto& sm = ctx.getSourceManager();
                 const auto loc = sm.getExpansionLoc(cast->getBeginLoc());
@@ -511,7 +644,7 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
                 diag.function = fn->getQualifiedNameAsString();
                 diag.severity = codeskeptic::Severity::Warning;
                 diag.message = "Lossy implicit narrowing from '" + proof.operand->getType().getAsString() +
-                    "' to '" + cast->getType().getAsString() + "': proven source range " + proof.range.toString() +
+                    "' to '" + cast->getType().getAsString() + "': proven source range " + survivingRange.toString() +
                     " exceeds the destination range and reaches a length/index sink (CWE-681)";
                 results.push_back(std::move(diag));
             }
