@@ -1233,6 +1233,8 @@ public:
         }
     };
     using Origins = std::map<const CallExpr*, Origin>;
+    // nullptr is an unresolved possible target, never a definite storage cell.
+    // Retaining it prevents a partially known alias from becoming a strong write.
     using Targets = std::set<const VarDecl*>;
     struct State {
         std::map<const VarDecl*, Origins> outputs;
@@ -1254,24 +1256,19 @@ public:
         // An output may originate from a checked call on only one path. Keep
         // that possible origin, with safety required on every path carrying it.
         for (const auto& [var, origins] : rhs.outputs)
-            for (const auto& [call, origin] : origins) {
-                auto& merged = result.outputs[var];
-                auto found = merged.find(call);
-                if (found == merged.end()) merged[call] = origin;
-                else {
-                    found->second.safe = found->second.safe && origin.safe;
-                    found->second.currentInvocation =
-                        found->second.currentInvocation && origin.currentInvocation;
-                }
-            }
+            mergeOrigins(result.outputs[var], origins);
         result.statuses.clear();
         for (const auto& [var, status] : lhs.statuses) {
             auto found = rhs.statuses.find(var);
             if (found != rhs.statuses.end() && found->second == status)
                 result.statuses.emplace(var, status);
         }
-        for (const auto& [var, targets] : rhs.aliases)
+        for (auto& [var, targets] : result.aliases)
+            if (!rhs.aliases.count(var)) targets.insert(nullptr);
+        for (const auto& [var, targets] : rhs.aliases) {
+            if (!lhs.aliases.count(var)) result.aliases[var].insert(nullptr);
             result.aliases[var].insert(targets.begin(), targets.end());
+        }
         result.escaped.insert(rhs.escaped.begin(), rhs.escaped.end());
         return result;
     }
@@ -1284,9 +1281,14 @@ public:
         };
         const auto write = [&](const Expr* lhs) {
             Targets targets = writtenTargets(lhs, input);
-            if (targets.empty() && !plainStorage(lhs))
+            if (targets.empty() && !plainStorage(lhs)) {
                 targets = input.escaped;
-            for (const auto* var : targets) forget(var);
+                targets.insert(nullptr);
+            }
+            for (const auto* var : targets) {
+                out.statuses.erase(var); // A possible write invalidates must-proof.
+                if (targets.size() == 1 && var) out.outputs.erase(var);
+            }
             return targets;
         };
         const auto bindValue = [&](const VarDecl* var, const Expr* value) {
@@ -1338,7 +1340,7 @@ public:
                 targets = reachableTargets(targets, input);
                 for (const auto* var : targets) {
                     forget(var);
-                    if (var->getType()->isPointerType()) out.aliases.erase(var);
+                    if (var && var->getType()->isPointerType()) out.aliases.erase(var);
                 }
                 out.escaped.insert(targets.begin(), targets.end());
             }
@@ -1360,7 +1362,7 @@ public:
             if (assign->getOpcode() == BO_Assign) {
                 if (assign->getLHS()->getType()->isPointerType()) {
                     for (const auto* var : targets) {
-                        if (!var->getType()->isPointerType()) continue;
+                        if (!var || !var->getType()->isPointerType()) continue;
                         auto pointees = pointedTargets(assign->getRHS(), input);
                         if (targets.size() > 1) {
                             const auto previous = input.aliases.find(var);
@@ -1372,6 +1374,13 @@ public:
                 }
                 if (targets.size() == 1)
                     bindValue(*targets.begin(), assign->getRHS());
+                else
+                    for (const auto* var : targets) {
+                        if (!var || !var->getType()->isUnsignedIntegerType()) continue;
+                        if (const auto* origins = copiedOutput(
+                                assign->getRHS(), input, ctx, var->getType()))
+                            mergeOrigins(out.outputs[var], *origins);
+                    }
             }
         } else if (const auto* unary = llvm::dyn_cast<UnaryOperator>(stmt);
                    unary && unary->isIncrementDecrementOp()) {
@@ -1420,12 +1429,25 @@ public:
     }
 
 private:
+    static void mergeOrigins(Origins& target, const Origins& source) {
+        for (const auto& [call, origin] : source) {
+            auto found = target.find(call);
+            if (found == target.end()) target[call] = origin;
+            else {
+                found->second.safe = found->second.safe && origin.safe;
+                found->second.currentInvocation =
+                    found->second.currentInvocation && origin.currentInvocation;
+            }
+        }
+    }
     static Targets loadedTargets(const Targets& pointers, const State& state) {
         Targets result;
         for (const auto* pointer : pointers) {
             auto pointees = state.aliases.find(pointer);
             if (pointees != state.aliases.end())
                 result.insert(pointees->second.begin(), pointees->second.end());
+            else
+                result.insert(nullptr);
         }
         return result;
     }
@@ -1474,7 +1496,8 @@ private:
         return {};
     }
     static Targets pointedTargets(const Expr* expr, const State& state) {
-        if (!expr || !expr->getType()->isPointerType()) return {};
+        if (!expr) return {nullptr};
+        if (!expr->getType()->isPointerType()) return {};
         expr = expr->IgnoreParenCasts();
         if (const auto* op = llvm::dyn_cast<UnaryOperator>(expr)) {
             if (op->getOpcode() == UO_AddrOf)
@@ -1487,7 +1510,7 @@ private:
         if (const auto* ref = llvm::dyn_cast<DeclRefExpr>(expr)) {
             const auto* var = llvm::dyn_cast<VarDecl>(ref->getDecl());
             auto alias = state.aliases.find(var);
-            if (alias == state.aliases.end()) return {};
+            if (alias == state.aliases.end()) return {nullptr};
             if (var->getType()->isReferenceType()) {
                 // A reference-to-pointer aliases the pointer storage, not the
                 // ultimate integer. Follow its current binding after reassignments.
@@ -1512,7 +1535,7 @@ private:
             result.insert(other.begin(), other.end());
             return result;
         }
-        return {};
+        return {nullptr};
     }
     static const Origins* copiedOutput(const Expr* expr, const State& state,
                                        ASTContext& ctx, QualType destination) {
