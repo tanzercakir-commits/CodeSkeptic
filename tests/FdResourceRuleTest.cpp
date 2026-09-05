@@ -16,6 +16,9 @@ const char* kPosixDecls = R"(
     extern int open(const char*, int, ...);
     extern int openat(int, const char*, int, ...);
     extern int socket(int, int, int);
+    struct sockaddr;
+    extern int accept(int, struct sockaddr*, unsigned int*);
+    extern int accept4(int, struct sockaddr*, unsigned int*, int);
     extern int dup(int);
     extern int mkstemp(char*);
     extern int close(int);
@@ -71,6 +74,138 @@ TEST(FdResourceRuleTest, CloseReleasesDescriptor) {
         void f(const char* p) { int fd = open(p, 0); close(fd); }
     )");
     EXPECT_TRUE(results.empty());
+}
+
+TEST(FdResourceRuleTest, AcceptFamilyAcquiresReturnedDescriptors) {
+    for (const auto* acquisition : {"accept(listener,0,0)", "accept4(listener,0,0,0)"}) {
+        SCOPED_TRACE(acquisition);
+        for (const auto* finish : {
+            "(void)fd;", "if(fd==-1)return;", "if(fd<0)return;",
+            "if(release)close(fd);", "shutdown(fd,2);"}) {
+            SCOPED_TRACE(finish);
+            expectSingleResourceLeak(runFdRule(
+                std::string("void f(int listener,int release){int fd=") + acquisition +
+                ";" + finish + "}"));
+        }
+        const auto discarded = runFdRule(
+            std::string("void f(int listener){") + acquisition + ";}");
+        expectSingleResourceLeak(discarded);
+        if (!discarded.empty()) EXPECT_NE(discarded[0].message.find("discarded"), std::string::npos);
+    }
+}
+
+TEST(FdResourceRuleTest, AcceptFamilyCloseTransferAndFailurePathsAreClean) {
+    for (const auto* acquisition : {"accept(listener,0,0)", "accept4(listener,0,0,0)"}) {
+        SCOPED_TRACE(acquisition);
+        for (const auto* finish : {
+            "close(fd);return 0;", "return fd;", "if(fd==-1)return -1;close(fd);return 0;",
+            "if(fd<0)return -1;close(fd);return 0;", "if(fd>=0)close(fd);return 0;",
+            "if(-1!=fd)close(fd);return 0;", "int alias=fd;close(alias);return 0;",
+            "if(fd==-1)return 7;return fd;"}) {
+            SCOPED_TRACE(finish);
+            EXPECT_TRUE(runFdRule(
+                std::string("int f(int listener){int fd=") + acquisition +
+                ";" + finish + "}").empty());
+        }
+    }
+}
+
+TEST(FdResourceRuleTest, AcceptNamedUserMethodsAndNamespacesAreNotPosix) {
+    for (const auto* code : {
+        "struct S{int accept(int,sockaddr*,unsigned*);};void f(S& s){int x=s.accept(1,0,0);(void)x;}",
+        "struct S{static int accept4(int,sockaddr*,unsigned*,int);};void f(){int x=S::accept4(1,0,0,0);(void)x;}",
+        "namespace vendor{int accept(int,sockaddr*,unsigned*);}void f(){int x=vendor::accept(1,0,0);(void)x;}",
+        "namespace vendor{int accept4(int,sockaddr*,unsigned*,int);}void f(){int x=vendor::accept4(1,0,0,0);(void)x;}"}) {
+        SCOPED_TRACE(code);
+        EXPECT_TRUE(runFdRule(code).empty());
+    }
+}
+
+TEST(FdResourceRuleTest, AcceptAssignmentFailureGuardDoesNotCreateResource) {
+    for (const auto* acquisition : {"accept(listener,0,0)", "accept4(listener,0,0,0)"}) {
+        SCOPED_TRACE(acquisition);
+        for (const auto* comparison : {"<0", "==-1", "<=-1"}) {
+            SCOPED_TRACE(comparison);
+            EXPECT_TRUE(runFdRule(std::string("int f(int listener){int fd;if((fd=") +
+                acquisition + ")" + comparison + ")return -1;close(fd);return 0;}").empty());
+        }
+        EXPECT_TRUE(runFdRule(std::string("int f(int listener){int fd;if(-1==(fd=") +
+            acquisition + "))return -1;close(fd);return 0;}").empty());
+        expectSingleResourceLeak(runFdRule(std::string("int f(int listener){int fd;if((fd=") +
+            acquisition + ")<0)return -1;return 0;}"));
+    }
+}
+
+TEST(FdResourceRuleTest, AcceptBorrowsListenerAndDescriptorZeroIsValid) {
+    for (const auto* acquisition : {"accept(listener,0,0)", "accept4(listener,0,0,0)"}) {
+        SCOPED_TRACE(acquisition);
+        const auto prefix = std::string("void f(){int listener=socket(2,1,0);int fd=") + acquisition + ";";
+        const auto listener = runFdRule(prefix + "close(fd);}");
+        expectSingleResourceLeak(listener);
+        if (!listener.empty()) EXPECT_NE(listener[0].message.find("listener"), std::string::npos);
+        const auto accepted = runFdRule(prefix + "close(listener);}");
+        expectSingleResourceLeak(accepted);
+        if (!accepted.empty()) EXPECT_NE(accepted[0].message.find("'fd'"), std::string::npos);
+        EXPECT_TRUE(runFdRule(prefix + "close(fd);close(listener);}").empty());
+        expectSingleResourceLeak(runFdRule(std::string("void f(int listener){int fd=") +
+            acquisition + ";if(fd>0)close(fd);}"));
+        expectSingleResourceLeak(runFdRule(std::string("void f(int listener){int fd=") +
+            acquisition + ";if(!fd)return;close(fd);}"));
+    }
+}
+
+TEST(FdResourceRuleTest, AcceptConditionalReturnDoesNotHideOtherPathLeak) {
+    for (const auto* acquisition : {"accept(listener,0,0)", "accept4(listener,0,0,0)"}) {
+        SCOPED_TRACE(acquisition);
+        expectSingleResourceLeak(runFdRule(std::string("int f(int listener,int transfer){int fd=") +
+            acquisition + ";if(fd<0)return -1;if(transfer)return fd;return 0;}"));
+        EXPECT_TRUE(runFdRule(std::string("int f(int listener,int transfer){int fd=") +
+            acquisition + ";if(fd<0)return -1;if(transfer)return fd;close(fd);return 0;}").empty());
+        EXPECT_TRUE(runFdRule(std::string("int f(int listener){int fd;return (fd=") +
+            acquisition + ");}").empty());
+        EXPECT_TRUE(runFdRule(std::string("void f(int listener){close(") +
+            acquisition + ");}").empty());
+    }
+}
+
+TEST(FdResourceRuleTest, AcceptSignatureLookalikesAreNotProducers) {
+    for (const auto* code : {
+        "int accept(int);void f(){int x=accept(1);(void)x;}",
+        "int accept(int,...);void f(){int x=accept(1,0,0);(void)x;}",
+        "struct sockaddr;long accept(int,sockaddr*,unsigned*);void f(){long x=accept(1,0,0);(void)x;}",
+        "int accept(int,void*,unsigned*);void f(){int x=accept(1,0,0);(void)x;}",
+        "struct sockaddr;int accept(int,sockaddr*,bool*);void f(){int x=accept(1,0,0);(void)x;}",
+        "struct sockaddr;int accept(int,sockaddr*,unsigned long long*);void f(){int x=accept(1,0,0);(void)x;}",
+        "struct sockaddr;int accept(int,const sockaddr*,unsigned*);void f(){int x=accept(1,0,0);(void)x;}",
+        "struct sockaddr;int accept(int,sockaddr*,unsigned*){return 5;}void f(){int x=accept(1,0,0);(void)x;}",
+        "struct sockaddr;int accept4(int,sockaddr*,unsigned*,bool);void f(){int x=accept4(1,0,0,false);(void)x;}"}) {
+        SCOPED_TRACE(code);
+        FdResourceRule rule;
+        EXPECT_TRUE(runRule(rule, code).empty());
+    }
+}
+
+TEST(FdResourceRuleTest, AcceptActualSystemHeaderForms) {
+    const std::string code = R"(
+        #define _GNU_SOURCE 1
+        #include <sys/socket.h>
+        #include <unistd.h>
+        void bad_accept(int listener){int fd=accept(listener,0,0);(void)fd;}
+        void bad_accept4(int listener){int fd=accept4(listener,0,0,0);(void)fd;}
+        void good_accept(int listener){int fd=accept(listener,0,0);if(fd>=0)close(fd);}
+        void good_accept4(int listener){int fd=accept4(listener,0,0,0);if(fd>=0)close(fd);}
+        int transfer(int listener){return accept(listener,0,0);}
+        int transfer4(int listener){return accept4(listener,0,0,0);}
+    )";
+    for (const auto& language : {std::pair{"-std=gnu11", "accept.c"},
+                                std::pair{"-std=gnu++17", "accept.cpp"}}) {
+        SCOPED_TRACE(language.first);
+        FdResourceRule rule;
+        const auto results = runRuleWithArgs(rule, code, {language.first}, language.second);
+        ASSERT_EQ(results.size(), 2u);
+        EXPECT_EQ(results[0].function, "bad_accept");
+        EXPECT_EQ(results[1].function, "bad_accept4");
+    }
 }
 
 TEST(FdResourceRuleTest, ShutdownAloneDoesNotCloseDescriptor) {

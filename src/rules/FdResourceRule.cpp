@@ -7,6 +7,7 @@
 #include "engine/FunctionSummary.h"
 
 #include <clang/AST/ASTContext.h>
+#include <clang/AST/Attr.h>
 #include <clang/AST/Decl.h>
 #include <clang/AST/Expr.h>
 #include <clang/AST/ParentMapContext.h>
@@ -29,7 +30,10 @@ namespace {
 
 using Origin = const CallExpr*;
 
-enum class ResourceLife { None, Open, Closed, Escaped };
+// A precise return transfers ownership only on that exit path. An opaque
+// escape is different: it prevents a definite local-ownership claim. Keep
+// them distinct so returning on one path cannot hide a leak on another.
+enum class ResourceLife { None, Open, Closed, Returned, Escaped };
 
 ResourceLife mergeLife(ResourceLife a, ResourceLife b) {
     if (a == b) return a;
@@ -175,9 +179,52 @@ bool isFdIntegerType(QualType type) {
            !type->isBooleanType();
 }
 
+bool isInt(QualType type) {
+    return !type.isNull() &&
+           type.getCanonicalType()->isSpecificBuiltinType(BuiltinType::Int);
+}
+
+bool isSockaddrPointer(QualType type) {
+    if (!type->isPointerType()) return false;
+    const QualType pointee = type->getPointeeType();
+    if (pointee.isConstQualified() || pointee.isVolatileQualified()) return false;
+    const auto* record = pointee->getAs<RecordType>();
+    return record && record->getDecl()->getQualifiedNameAsString() == "sockaddr";
+}
+
+bool isAcceptAddress(QualType type) {
+    if (isSockaddrPointer(type)) return true;
+    // GNU C libc exposes __SOCKADDR_ARG as a transparent union; C++ exposes
+    // sockaddr*. Check the formal type so passing 0/nullptr stays recognized.
+    const auto* recordType = type->getAs<RecordType>();
+    const auto* record = recordType ? recordType->getDecl()->getDefinition() : nullptr;
+    if (!record || !record->isUnion() || !record->hasAttr<TransparentUnionAttr>()) return false;
+    for (const auto* field : record->fields())
+        if (isSockaddrPointer(field->getType())) return true;
+    return false;
+}
+
+bool isAcceptCall(const CallExpr* call) {
+    const auto name = calleeName(call);
+    if (name != "accept" && name != "accept4") return false;
+    const auto* callee = call->getDirectCallee();
+    const unsigned count = name == "accept" ? 3 : 4;
+    if (callee->hasBody() || callee->isVariadic() ||
+        callee->getNumParams() != count || call->getNumArgs() != count ||
+        !isInt(callee->getReturnType()) || !isInt(callee->getParamDecl(0)->getType()) ||
+        (count == 4 && !isInt(callee->getParamDecl(3)->getType())) ||
+        !isAcceptAddress(callee->getParamDecl(1)->getType())) return false;
+    const QualType length = callee->getParamDecl(2)->getType();
+    if (!length->isPointerType()) return false;
+    const QualType size = length->getPointeeType();
+    // Linux libc's socklen_t is unsigned int, not any unsigned pointee.
+    return !size.isConstQualified() && !size.isVolatileQualified() &&
+           size.getCanonicalType()->isSpecificBuiltinType(BuiltinType::UInt);
+}
+
 bool isAcquisitionCall(const CallExpr* call) {
     if (!call || !isFdIntegerType(call->getType())) return false;
-    if (isAcquireName(calleeName(call))) return true;
+    if (isAcquireName(calleeName(call)) || isAcceptCall(call)) return true;
     const auto* summary =
         codeskeptic::SummaryRegistry::instance().lookup(call);
     return summary &&
@@ -197,6 +244,17 @@ const VarDecl* asVar(const Expr* expr) {
     expr = expr->IgnoreParenImpCasts();
     const auto* ref = dyn_cast<DeclRefExpr>(expr);
     return ref ? dyn_cast<VarDecl>(ref->getDecl()) : nullptr;
+}
+
+const VarDecl* valueVariable(const Expr* expr) {
+    if (const auto* var = asVar(expr)) return var;
+    if (!expr) return nullptr;
+    const auto* assignment = dyn_cast<BinaryOperator>(expr->IgnoreParenImpCasts());
+    // A simple int assignment yields its stored value. Do not treat a
+    // compound assignment, arithmetic result or narrowing storage as the FD.
+    if (!assignment || assignment->getOpcode() != BO_Assign ||
+        !isInt(assignment->getType())) return nullptr;
+    return asVar(assignment->getLHS());
 }
 
 bool isTrackableLocal(const VarDecl* var) {
@@ -261,7 +319,7 @@ void rememberNegativeWitnesses(Origin origin, const VarDecl* target,
 }
 
 Binding bindingFor(const Expr* expr, const State& state) {
-    const VarDecl* var = asVar(expr);
+    const VarDecl* var = valueVariable(expr);
     if (!var) return Binding{{}, true};
     auto it = state.bindings.find(var);
     return it == state.bindings.end() ? Binding{{}, true} : it->second;
@@ -270,6 +328,17 @@ Binding bindingFor(const Expr* expr, const State& state) {
 void escape(const Binding& binding, State& state) {
     for (Origin origin : binding.origins)
         state.resources[origin] = ResourceLife::Escaped;
+}
+
+void returnOwnership(const Binding& binding, State& state) {
+    if (binding.opaque || binding.origins.size() != 1) {
+        escape(binding, state);
+        return;
+    }
+    const Origin origin = *binding.origins.begin();
+    // Returning the -1 failure sentinel does not transfer a resource.
+    if (resourceLife(state, origin) != ResourceLife::None)
+        state.resources[origin] = ResourceLife::Returned;
 }
 
 void release(const Binding& binding, State& state) {
@@ -314,7 +383,7 @@ void applyOwnershipToExpr(
 
 void applyModeledCallEffects(const CallExpr* call, State& state) {
     const llvm::StringRef direct = calleeName(call);
-    if (isAcquireName(direct) || direct == "close" ||
+    if (isAcquireName(direct) || isAcceptCall(call) || direct == "close" ||
         direct == "shutdown")
         return;
     const auto* summary =
@@ -371,11 +440,11 @@ std::optional<FailureEdge> failureEdge(const Expr* condition) {
     const auto* comparison = dyn_cast<BinaryOperator>(condition);
     if (!comparison || !comparison->isComparisonOp()) return std::nullopt;
 
-    const VarDecl* var = asVar(comparison->getLHS());
+    const VarDecl* var = valueVariable(comparison->getLHS());
     auto constant = integerConstant(comparison->getRHS());
     BinaryOperatorKind op = comparison->getOpcode();
     if (!var || !constant) {
-        var = asVar(comparison->getRHS());
+        var = valueVariable(comparison->getRHS());
         constant = integerConstant(comparison->getLHS());
         op = swappedComparison(op);
     }
@@ -537,9 +606,9 @@ public:
 
         if (const auto* ret = dyn_cast<ReturnStmt>(stmt)) {
             if (Origin origin = acquisition(ret->getRetValue())) {
-                out.resources[origin] = ResourceLife::Escaped;
+                out.resources[origin] = ResourceLife::Returned;
             } else {
-                escape(bindingFor(ret->getRetValue(), out), out);
+                returnOwnership(bindingFor(ret->getRetValue(), out), out);
             }
             return out;
         }
