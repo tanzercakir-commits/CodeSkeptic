@@ -31,6 +31,41 @@ using namespace clang::ast_matchers;
 
 namespace {
 
+// Warning evidence is separate from the full converted size. A signed
+// external count converted to size_t may include values beyond int64 (top),
+// but its finite nonnegative source subset still proves the existing possible
+// destination-overflow warning. Never use this subset for a definite error,
+// a source read, or an allocation/buffer capacity.
+codeskeptic::Interval copyWarningRange(const Expr* expr, ASTContext& ctx,
+                                      const codeskeptic::IntervalMap& state,
+                                      const codeskeptic::Interval& full) {
+    using codeskeptic::Interval;
+    if (!full.isEmpty() && !full.hiIsInf()) return full;
+    const auto* cast = dyn_cast<ImplicitCastExpr>(expr->IgnoreParens());
+    if (!cast || cast->getCastKind() != CK_IntegralCast) return Interval::bottom();
+    const QualType from = cast->getSubExpr()->getType(), to = cast->getType();
+    if (!from->isSignedIntegerType() || !to->isUnsignedIntegerType())
+        return Interval::bottom();
+    const unsigned width = ctx.getIntWidth(from);
+    if (!width || width > 64 || ctx.getIntWidth(to) < width)
+        return Interval::bottom();
+    const auto source = codeskeptic::evalSizeInterval(cast->getSubExpr(), ctx, state);
+    if (source.isEmpty() || source.loIsInf() || source.hiIsInf())
+        return Interval::bottom();
+    // Mathematical arithmetic can exceed its signed result type; that part
+    // is not a defined source value and cannot be a conversion witness.
+    const int64_t high = width == 64 ? INT64_MAX : (int64_t(1) << (width - 1)) - 1;
+    return Interval::meet(source, Interval::range(0, high));
+}
+
+std::string copyWarningRangeText(const codeskeptic::Interval& full,
+                                 const codeskeptic::Interval& warning) {
+    if (full == warning) return full.toString();
+    return full.toString() + (codeskeptic::currentLang() == codeskeptic::Lang::TR
+        ? " (negatif olmayan kaynak alt kumesi " : " (nonnegative source subset ") +
+        warning.toString() + ")";
+}
+
 // Every integer local and parameter — the domain IntervalAnalysis
 // tracks, so the subscript index resolves to a proven range.
 std::set<const VarDecl*> collectIntVars(const FunctionDecl* fn) {
@@ -897,7 +932,8 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
     //    contract, so reachability is by construction — this is the
     //    docs/untrusted-length.md increment. A guard (`if (n <= cap)`)
     //    narrows the range on its own edge and silences it; an unknown
-    //    (top) length stays silent — provenance alone never reports.
+    //    (top) length without a finite, conversion-preserved nonnegative
+    //    source subset stays silent — provenance alone never reports.
     // Byte capacity = element count (ExtentMap) * element size.
     const codeskeptic::IntervalMap emptyState;
     for (const auto* call : copies) {
@@ -914,8 +950,11 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
 
         const bool definite =
             !sz.loIsInf() && sz.lo() > capacity.hi();
+        const auto warningRange = copyWarningRange(call->getArg(2), ctx,
+                                                   st ? *st : emptyState, sz);
         bool possibleUntrusted = false;
-        if (!definite && !sz.hiIsInf() && sz.hi() > capacity.hi()) {
+        if (!definite && !warningRange.isEmpty() && !warningRange.hiIsInf() &&
+            warningRange.hi() > capacity.hi()) {
             const auto* un = analysis.untrustedAt(call);
             possibleUntrusted =
                 un && codeskeptic::exprDerivesFromUntrusted(call->getArg(2),
@@ -941,7 +980,7 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
                                         std::to_string(capacity.hi()))
                      : codeskeptic::msg(
                            codeskeptic::MsgId::BoundsCopyUntrustedLen,
-                           sz.toString(), std::to_string(capacity.hi()));
+                           copyWarningRangeText(sz, warningRange), std::to_string(capacity.hi()));
         results.push_back(std::move(diag));
     }
 
@@ -965,6 +1004,7 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
             if (!state || !initialized) continue;
             const auto size = codeskeptic::evalSizeInterval(call->getArg(2), ctx, *state);
             if (size.isEmpty()) continue;
+            const auto warningRange = copyWarningRange(call->getArg(2), ctx, *state, size);
             const auto report = [&](unsigned argument, bool source) {
                 const auto slice = copySlice(call->getArg(argument), bindings, *initialized, ctx);
                 if ((!source && !slice.hasOffset) || slice.bytes.isEmpty() || slice.bytes.hiIsInf())
@@ -974,8 +1014,8 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
                     ? 0 : slice.bytes.hi() - slice.offset;
                 const bool definite = !size.loIsInf() && size.lo() > remaining;
                 const auto* origins = sourceAnalysis.untrustedAt(call);
-                const bool possible = !source && !definite && !size.hiIsInf() &&
-                    size.hi() > remaining && origins &&
+                const bool possible = !source && !definite && !warningRange.isEmpty() &&
+                    !warningRange.hiIsInf() && warningRange.hi() > remaining && origins &&
                     codeskeptic::exprDerivesFromUntrusted(call->getArg(2), *origins);
                 if (!definite && !possible) return;
                 const SourceLocation loc = sm.getExpansionLoc(call->getBeginLoc());
@@ -995,7 +1035,8 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
                 } else if (!source) {
                     diag.message = codeskeptic::msg(definite ? codeskeptic::MsgId::BoundsCopyOverflow
                                                             : codeskeptic::MsgId::BoundsCopyUntrustedLen,
-                                                    size.toString(), std::to_string(remaining));
+                                                    definite ? size.toString() : copyWarningRangeText(size, warningRange),
+                                                    std::to_string(remaining));
                 } else {
                     diag.message = codeskeptic::currentLang() == codeskeptic::Lang::TR
                         ? "kaynak tampon siniri disinda okuma (CWE-125): " + size.toString() +

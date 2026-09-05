@@ -367,6 +367,39 @@ bool comparisonOperandPreservesValue(const Expr* operand, const Interval& v,
     return true;
 }
 
+// A known singleton can be converted exactly without inventing an inverse
+// interval across a wrapping conversion. Only the actual variable read and
+// its implicit integral conversions qualify; assignments/other expressions
+// stay conservative. APSInt retains unsigned values outside int64 here solely
+// to decide this comparison, never to seed the interval state.
+std::optional<llvm::APSInt> convertedSingleton(const Expr* operand,
+                                              const VarDecl* var, int64_t value,
+                                              const ASTContext& ctx,
+                                              unsigned depth = 0) {
+    if (!operand || depth >= 64) return std::nullopt;
+    operand = operand->IgnoreParens();
+    if (const auto* cast = dyn_cast<ImplicitCastExpr>(operand)) {
+        const CastKind kind = cast->getCastKind();
+        if (kind != CK_LValueToRValue && kind != CK_NoOp && kind != CK_IntegralCast)
+            return std::nullopt;
+        auto source = convertedSingleton(cast->getSubExpr(), var, value, ctx, depth + 1);
+        if (!source || kind != CK_IntegralCast) return source;
+        if (!cast->getType()->isIntegralOrEnumerationType()) return std::nullopt;
+        const unsigned width = ctx.getIntWidth(cast->getType());
+        if (!width || width > 128) return std::nullopt;
+        const llvm::APInt bits = source->isSigned() ? source->sextOrTrunc(width)
+                                                  : source->zextOrTrunc(width);
+        return llvm::APSInt(bits, !cast->getType()->isSignedIntegerOrEnumerationType());
+    }
+    const auto* ref = dyn_cast<DeclRefExpr>(operand);
+    if (!ref || ref->getDecl() != var || var->getType().isVolatileQualified() ||
+        !intervalFitsType(Interval::constant(value), var->getType(), ctx)) return std::nullopt;
+    const unsigned width = ctx.getIntWidth(var->getType());
+    if (width > 128) return std::nullopt;
+    return llvm::APSInt(llvm::APInt(64, static_cast<uint64_t>(value)).sextOrTrunc(width),
+                       !var->getType()->isSignedIntegerOrEnumerationType());
+}
+
 // Negation of a comparison operator (for the false edge).
 BinaryOperatorKind negateCmp(BinaryOperatorKind op) {
     switch (op) {
@@ -739,15 +772,38 @@ void refineIntervalOnEdge(IntervalMap& state, const Expr* cond, bool isTrue,
             if (!c) return;
             auto it = state.find(var);
             if (it == state.end()) return;
+            BinaryOperatorKind eff = edgeTrue ? opc : negateCmp(opc);
             // Refining the original signed variable using its converted
             // unsigned value would invent contradictions (e.g. -1 == UINT_MAX).
-            if (!comparisonOperandPreservesValue(operand, it->second, ctx)) return;
-            BinaryOperatorKind eff = edgeTrue ? opc : negateCmp(opc);
+            if (!comparisonOperandPreservesValue(operand, it->second, ctx)) {
+                int64_t value;
+                if (ctx && it->second.isSingleton(&value)) {
+                    if (auto converted = convertedSingleton(operand, var, value, *ctx)) {
+                        const llvm::APSInt rhs(llvm::APInt(64, static_cast<uint64_t>(*c)), false);
+                        const int cmp = llvm::APSInt::compareValues(*converted, rhs);
+                        bool holds = true;
+                        switch (eff) {
+                            case BO_LT: holds = cmp < 0; break;
+                            case BO_LE: holds = cmp <= 0; break;
+                            case BO_GT: holds = cmp > 0; break;
+                            case BO_GE: holds = cmp >= 0; break;
+                            case BO_EQ: holds = cmp == 0; break;
+                            case BO_NE: holds = cmp != 0; break;
+                            default: break;
+                        }
+                        if (!holds) it->second = Interval::bottom();
+                    }
+                }
+                return;
+            }
             // The lattice's MIN/MAX are representation limits, not limits of
             // uint64/int128. An out-of-domain edge remains unknown, not empty.
-            if (ctx && var->getType()->isIntegerType()) {
+            if (!ctx &&
+                ((eff == BO_GT && *c == INT64_MAX && it->second.hiIsInf()) ||
+                 (eff == BO_LT && *c == INT64_MIN && it->second.loIsInf()))) return;
+            if (ctx && var->getType()->isIntegralOrEnumerationType()) {
                 const unsigned width = ctx->getIntWidth(var->getType());
-                const bool isSigned = var->getType()->isSignedIntegerType();
+                const bool isSigned = var->getType()->isSignedIntegerOrEnumerationType();
                 if (eff == BO_GT && *c == INT64_MAX && it->second.hiIsInf() &&
                     (width > 64 || (!isSigned && width == 64))) return;
                 if (eff == BO_LT && *c == INT64_MIN && it->second.loIsInf() &&

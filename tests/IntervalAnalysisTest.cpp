@@ -338,6 +338,31 @@ TEST(IntervalAnalysisTest, WideGuardBeyondInt64IsUnknownNotUnreachable) {
         "if(n>=(-9223372036854775807LL-1))return 0;return 10/n;}").isTop());
 }
 
+TEST(IntervalAnalysisTest, ContextFreeWideBoundaryGuardStaysUnknown) {
+    auto ast = clang::tooling::buildASTFromCodeWithArgs(
+        "void f(unsigned long long n){if(n>9223372036854775807ULL){}}",
+        {"-std=c11"}, "guard.c");
+    ASSERT_NE(ast, nullptr);
+    struct Visitor : RecursiveASTVisitor<Visitor> {
+        const VarDecl* variable = nullptr;
+        const Expr* condition = nullptr;
+        bool VisitVarDecl(VarDecl* vd) {
+            if (vd->getName() == "n") variable = vd;
+            return true;
+        }
+        bool VisitIfStmt(IfStmt* statement) {
+            condition = statement->getCond();
+            return true;
+        }
+    } visitor;
+    visitor.TraverseDecl(ast->getASTContext().getTranslationUnitDecl());
+    ASSERT_NE(visitor.variable, nullptr);
+    ASSERT_NE(visitor.condition, nullptr);
+    codeskeptic::IntervalMap state{{visitor.variable, Interval::top()}};
+    codeskeptic::refineIntervalOnEdge(state, visitor.condition, true, {visitor.variable});
+    EXPECT_TRUE(state.at(visitor.variable).isTop());
+}
+
 TEST(IntervalAnalysisTest, ArithmeticRange) {
     // n = a + b = 3 + 4 = 7 — a range ZeroState cannot compute.
     Interval n = divisorInterval(

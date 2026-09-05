@@ -477,6 +477,25 @@ TEST(BoundsRuleTest, TypedUnsignedGuardSourceAndOffsetDestination) {
     }
 }
 
+TEST(BoundsRuleTest, ConvertedSignedSingletonGuardKeepsBothEdges) {
+    struct Case { const char* declaration; const char* condition; unsigned reports; };
+    const Case cases[] = {
+        {"int n=-1;", "n==4294967295U", 1},
+        {"int n=-1;", "n!=4294967295U", 0},
+        {"int n=-2;", "n<1U", 0},
+        {"int n=-2;", "n>1U", 1},
+        {"unsigned short n=8;", "n < -1", 0},
+    };
+    for (const auto& item : cases) {
+        SCOPED_TRACE(item.declaration);
+        SCOPED_TRACE(item.condition);
+        BoundsRule rule;
+        auto results = runRule(rule, copy(std::string("void f(){char dst[64]={},src[4]={};") +
+            item.declaration + "if(" + item.condition + ") memcpy(dst,src,8);}"));
+        EXPECT_EQ(results.size(), item.reports);
+    }
+}
+
 // CS3-CH01-S02-U002: constant offsets consume capacity in pointee-sized
 // units, while the copy count and remaining capacity are always bytes.
 TEST(BoundsRuleTest, CopySourcePointerOffsetCapacity) {
@@ -1114,6 +1133,49 @@ TEST(BoundsRuleTest, UntrustedLenGuarded_Clean) {
         }
     )");
     EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(BoundsRuleTest, UnknownConvertedSizeKeepsOnlyDestinationWarningSubset) {
+    struct Case {
+        const char* statements;
+        const char* size;
+        unsigned reports;
+        bool sourceError = false;
+    };
+    const Case cases[] = {
+        {"", "n", 1},
+        {"if(n<0 || n>32)return;", "n", 0},
+        {"if(n>=0)return;", "n", 0}, // no representable nonnegative witness
+        {"n=2;", "n", 0},
+        {"n=16;", "n", 1, true}, // real definite read of the four-byte source
+        {"", "n*unknown", 0},
+        {"", "(unsigned char)n", 0}, // no range before narrowing is reused
+    };
+    for (bool offset : {false, true}) {
+        for (const auto& item : cases) {
+            SCOPED_TRACE(item.statements);
+            SCOPED_TRACE(item.size);
+            SCOPED_TRACE(offset);
+            BoundsRule rule;
+            auto results = runRule(rule, copy(std::string(
+                "extern int atoi(const char*); void f(const char* text,int unknown){"
+                "int n=atoi(text);char dst[64]={},src[4]={};") +
+                item.statements + "memcpy(" + (offset ? "dst+1" : "dst") +
+                ",src," + item.size + ");}"));
+            ASSERT_EQ(results.size(), item.reports);
+            for (const auto& result : results) {
+                if (item.sourceError) {
+                    EXPECT_EQ(result.severity, Severity::Error);
+                    EXPECT_NE(result.message.find("source buffer over-read"), std::string::npos);
+                    EXPECT_EQ(result.message.find("nonnegative source subset"), std::string::npos);
+                    continue;
+                }
+                EXPECT_EQ(result.severity, Severity::Warning);
+                EXPECT_EQ(result.message.find("source buffer over-read"), std::string::npos);
+                EXPECT_NE(result.message.find("nonnegative source subset"), std::string::npos);
+            }
+        }
+    }
 }
 
 TEST(BoundsRuleTest, UntrustedLenScanfStrncpy_Warn) {

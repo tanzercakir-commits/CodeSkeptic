@@ -124,7 +124,8 @@ bool exprDerivesFromUntrusted(const clang::Expr* e,
 // constant expression, so idiomatic overflow guards written with
 // constant arithmetic — `n < INT_MAX/2`, `n <= SIZE_MAX-1` — refine too;
 // Comparison casts are retained: a non-value-preserving conversion of the
-// variable side cannot refine the original variable. Out-of-int64 constants
+// variable side cannot refine the original range; a known singleton can still
+// decide feasibility in its exact converted type. Out-of-int64 constants
 // and unsupported conversions stay unknown; without context only the narrow
 // literal fallback is available.
 void refineIntervalOnEdge(IntervalMap& state, const clang::Expr* cond,
