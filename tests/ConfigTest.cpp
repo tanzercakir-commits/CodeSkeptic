@@ -1,8 +1,11 @@
 #include "config/Config.h"
+#include "core/Capabilities.h"
 #include "analyzer/StaticAnalyzer.h"
 #include "rules/DivByZeroRule.h"
 #include "rules/MemoryLeakRule_Ex.h"
 #include "rules/FdResourceRule.h"
+#include "rules/NullDerefRule.h"
+#include "rules/PolicyRule.h"
 
 #include <gtest/gtest.h>
 #include <llvm/Support/FormatVariadic.h>
@@ -43,6 +46,9 @@ std::string snapshot(const Config& c) {
     for (auto range : c.lines()) lines.push_back(llvm::json::Array{range.first, range.second});
     llvm::json::Object pairs;
     for (const auto& entry : c.allocatorPairs()) pairs[entry.first] = strings(entry.second);
+    llvm::json::Object selection;
+    for (const auto& capability : codeskeptic::ruleCapabilities())
+        selection[std::string(capability.id)] = c.isRuleEnabled(std::string(capability.id));
     llvm::json::Object state{
         {"source", c.sourcePath()}, {"files", strings(c.sourceFiles())},
         {"build", c.buildPath()}, {"explicit_build", c.buildPathSpecified()},
@@ -64,8 +70,8 @@ std::string snapshot(const Config& c) {
         {"whole", c.wholeProgram()}, {"broken", c.analyzeBrokenTUs()},
         {"partial", c.acceptPartialCoverage()}, {"assumptions", c.assumptions()},
         {"recovery", c.assertRecovery()}, {"cache", c.warmCache()},
-        {"help", c.helpRequested()}, {"off_rule", c.isRuleEnabled("off-rule")},
-        {"on_rule", c.isRuleEnabled("on-rule")}};
+        {"help", c.helpRequested()}, {"off_rule", c.isRuleEnabled("memory-leak")},
+        {"on_rule", c.isRuleEnabled("resource-leak")}, {"selection", std::move(selection)}};
     return llvm::formatv("{0}", llvm::json::Value(std::move(state))).str();
 }
 
@@ -215,7 +221,7 @@ TEST(ConfigTest, FailedCliUpdatePreservesCompleteObservableState) {
     Config c;
     ASSERT_TRUE(parse(c, {"codeskeptic", "--source", "kept.cpp", "--build-path", "kept-build",
                          "--function", "kept", "--lines", "5-9", "--lang", "tr",
-                         "--disable-rule", "off-rule", "--json", "kept.json"}));
+                         "--disable-rule", "memory-leak", "--json", "kept.json"}));
     c.setWarmCache(true);
     const auto before = snapshot(c);
     EXPECT_FALSE(parse(c, {"codeskeptic", "--source", "new.cpp", "--build-path", "new-build",
@@ -457,4 +463,108 @@ TEST(ConfigTest, DisablingMemoryLeakDoesNotDisableUseAfterFree) {
     EXPECT_EQ(result.exitCode(), 1);
     ASSERT_EQ(analyzer.diagnostics().size(), 1u);
     EXPECT_EQ(analyzer.diagnostics()[0].rule_id, "use-after-free");
+}
+
+TEST(ConfigTest, RuleSelectionIsAtomicCanonicalAndDisableWins) {
+    Config config;
+    ASSERT_TRUE(config.addEnabledRules("memory-leak,resource-leak,contract"));
+    ASSERT_TRUE(config.addDisabledRules("resource-leak"));
+    EXPECT_TRUE(config.isRuleEnabled("memory-leak"));
+    EXPECT_FALSE(config.isRuleEnabled("resource-leak"));
+    EXPECT_FALSE(config.isRuleEnabled("bounds"));
+    // Unknown future diagnostics remain visible and fail closed.
+    EXPECT_TRUE(config.isRuleEnabled("unknown-future-diagnostic"));
+    const auto before = snapshot(config);
+    codeskeptic::InputError error;
+    for (const char* bad : {"memory-leak,,contract", "memory-leak,zz-unknown", "\t"}) {
+        EXPECT_FALSE(config.addDisabledRules(bad, &error));
+        EXPECT_EQ(error.field, "disable_rules");
+        EXPECT_EQ(snapshot(config), before);
+        EXPECT_FALSE(config.addEnabledRules(bad, &error));
+        EXPECT_EQ(error.field, "enable_rules");
+        EXPECT_EQ(snapshot(config), before);
+    }
+    ASSERT_TRUE(config.addDisabledRules("contract-syntax", &error));
+    EXPECT_FALSE(config.isRuleEnabled("contract"));
+    EXPECT_FALSE(config.isRuleEnabled("contract-syntax"));
+    EXPECT_FALSE(config.isRuleEnabled("contract-unsupported"));
+    EXPECT_TRUE(error.reason.empty());
+}
+
+TEST(ConfigTest, ServerInheritsOnlyRuleSelectionDefaults) {
+    Config defaults;
+    ASSERT_TRUE(parse(defaults, {"codeskeptic", "--source", "ignored.cpp",
+        "--json", "ignored.json", "--function", "ignored", "--assumptions",
+        "--disable-rule", "resource-leak"}));
+    Config request;
+    request.inheritRuleSelection(defaults);
+    EXPECT_FALSE(request.isRuleEnabled("resource-leak"));
+    EXPECT_TRUE(request.assumptions());
+    EXPECT_TRUE(request.sourcePath().empty());
+    EXPECT_TRUE(request.jsonOutputPath().empty());
+    EXPECT_TRUE(request.functions().empty());
+    ASSERT_TRUE(request.addDisabledRules("memory-leak"));
+    EXPECT_TRUE(defaults.isRuleEnabled("memory-leak"));
+    Config next;
+    next.inheritRuleSelection(defaults);
+    EXPECT_TRUE(next.isRuleEnabled("memory-leak"));
+}
+
+namespace {
+template <typename Producer>
+void checkContractSiblingSelection(const char* filename, const char* contents,
+                                   const char* producer, const char* contractId) {
+    const auto source = writeConfig(filename, contents);
+    for (const std::string disabled : {std::string{}, std::string(producer),
+                                      std::string("contract"), std::string("contract-syntax")}) {
+        SCOPED_TRACE(disabled);
+        Config config;
+        config.setSourcePath(source);
+        if (!disabled.empty()) ASSERT_TRUE(config.addDisabledRules(disabled));
+        codeskeptic::StaticAnalyzer analyzer(std::move(config));
+        analyzer.addRule<Producer>(); // No separate ContractRule to mask inventory errors.
+        const auto result = analyzer.run();
+        EXPECT_FALSE(result.no_rules);
+        EXPECT_TRUE(result.complete());
+        EXPECT_EQ(result.analyzed_tus, 1u);
+        EXPECT_EQ(result.findings, disabled.empty() ? 2u : 1u);
+        unsigned contracts = 0, siblings = 0;
+        for (const auto& diagnostic : analyzer.diagnostics()) {
+            contracts += diagnostic.rule_id == contractId;
+            siblings += diagnostic.rule_id == producer;
+        }
+        EXPECT_EQ(contracts, disabled.empty() || disabled == producer ? 1u : 0u);
+        EXPECT_EQ(siblings, disabled == producer ? 0u : 1u);
+    }
+}
+}
+
+TEST(ConfigTest, DivisionProducerPreservesContractSibling) {
+    checkContractSiblingSelection<codeskeptic::DivByZeroRule>("selection_div_contract.cpp", R"(
+        // cs: requires n != 0
+        int divide(int a, int n);
+        int bad_contract() { return divide(10, 0); }
+        int bad_division() { int z=0; return 1/z; }
+        int safe(int n) { if(n != 0) return divide(10,n); return 0; }
+    )", "div-by-zero", "contract");
+}
+
+TEST(ConfigTest, NullProducerPreservesContractSibling) {
+    checkContractSiblingSelection<codeskeptic::NullDerefRule>("selection_null_contract.cpp", R"(
+        // cs: requires p != null
+        int consume(int* p);
+        int bad_contract() { return consume(nullptr); }
+        int bad_dereference() { int* p=nullptr; return *p; }
+        int safe(int* p) { if(p) return consume(p); return 0; }
+    )", "null-deref", "contract");
+}
+
+TEST(ConfigTest, PolicyProducerPreservesContractAliasSibling) {
+    checkContractSiblingSelection<codeskeptic::PolicyRule>("selection_policy_contract.cpp", R"(
+        // cs:policy no-such-policy
+        int bad_contract() { return 0; }
+        // cs:policy no-absolute-paths
+        const char* bad_policy() { return "/etc/app/config.ini"; }
+        const char* safe() { return "config/app.ini"; }
+    )", "policy", "contract-syntax");
 }

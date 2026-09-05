@@ -2,6 +2,7 @@
 #define CODESKEPTIC_CAPABILITIES_H
 
 #include <iosfwd>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -27,6 +28,9 @@ struct RuleCapability {
 
 const std::vector<RuleCapability>& ruleCapabilities();
 const RuleCapability* findRuleCapability(std::string_view finding_id);
+// Producer IDs are implementation identities. Selection is by every public
+// family they can emit; internal contract aliases belong to "contract".
+std::vector<std::string> producerFindingFamilies(const std::string& producer_id);
 const char* capabilityTierName(CapabilityTier tier);
 
 // Unknown diagnostics fail closed. `contract-syntax` and

@@ -41,6 +41,17 @@ public:
     }
     Severity minSeverity() const { return min_severity_; }
     bool isRuleEnabled(const std::string& rule_id) const;
+    bool addDisabledRules(const std::string& list, InputError* error = nullptr);
+    bool addEnabledRules(const std::string& list, InputError* error = nullptr);
+    // Only selection defaults are inherited by an MCP request. Source/scope,
+    // report paths, model files and other launch settings remain request-local.
+    void inheritRuleSelection(const Config& defaults) {
+        auto enabled = defaults.enabled_rules_;
+        auto disabled = defaults.disabled_rules_;
+        enabled_rules_ = std::move(enabled);
+        disabled_rules_ = std::move(disabled);
+        assumptions_ = defaults.assumptions_; // Explicit family activation only.
+    }
 
     void setSourcePath(const std::string& path) { source_path_ = path; }
     void setBuildPath(const std::string& path) {
@@ -175,6 +186,8 @@ private:
     bool loadFromFileInPlace(const std::string& path, InputError* error);
     bool parseArgsInPlace(int argc, char* argv[], InputError* error);
     bool addNamesTo(std::set<std::string>& target, const std::string& list,
+                    const char* field, InputError* error);
+    bool addRuleIds(std::set<std::string>& target, const std::string& list,
                     const char* field, InputError* error);
 
     std::string source_path_;

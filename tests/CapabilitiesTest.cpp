@@ -87,3 +87,17 @@ TEST(CapabilitiesTest, TextSurfaceIsHumanReadable) {
     EXPECT_NE(out.str().find("experimental rules:"), std::string::npos);
     EXPECT_NE(out.str().find("out-of-scope:"), std::string::npos);
 }
+
+TEST(CapabilitiesTest, ProducerInventoryContainsEverySiblingFamily) {
+    using codeskeptic::producerFindingFamilies;
+    EXPECT_EQ(producerFindingFamilies("memory-leak"),
+              (std::vector<std::string>{"memory-leak", "double-free", "use-after-free", "resource-leak"}));
+    for (const char* producer : {"div-by-zero", "null-deref", "policy"})
+        EXPECT_EQ(producerFindingFamilies(producer),
+                  (std::vector<std::string>{producer, "contract"}));
+    for (const char* producer : {"uninit-ptr", "uninit-scalar", "resource-leak",
+         "int-overflow", "sign-conversion", "alloc-size-overflow", "bounds", "assumption", "contract"})
+        EXPECT_EQ(producerFindingFamilies(producer), std::vector<std::string>{producer});
+    EXPECT_EQ(producerFindingFamilies("contract-syntax"), std::vector<std::string>{"contract"});
+    EXPECT_EQ(producerFindingFamilies("future-extension"), std::vector<std::string>{"future-extension"});
+}

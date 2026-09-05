@@ -151,11 +151,12 @@ AnalysisResult StaticAnalyzer::run() {
         return result;
     }
 
-    for (const auto& rule_id : engine_.ruleIds()) {
-        if (!config_.isRuleEnabled(rule_id)) {
-            engine_.enableRule(rule_id, false);
-        }
-    }
+    engine_.setDiagnosticSelector([this](const std::string& id) {
+        // The assumption producer is always registered, but has no effective
+        // work without its explicit opt-in. Keep that existing behavior.
+        return (id != "assumption" || config_.assumptions()) &&
+               config_.isRuleEnabled(id);
+    });
 
     // Registered-but-disabled is still "no analysis". Without this
     // post-configuration check, disabling every rule produced a false

@@ -1,4 +1,6 @@
 #include "engine/RuleEngine.h"
+#include "core/Capabilities.h"
+#include <algorithm>
 
 #include "engine/ImmutableFlags.h"
 
@@ -26,7 +28,7 @@ DiagnosticList RuleEngine::runAll(clang::ASTContext& ctx) {
 
     DiagnosticList results;
     for (auto& rule : rules_) {
-        if (rule->isEnabled()) {
+        if (rule->isEnabled() && hasSelectedFamily(*rule)) {
             rule->check(ctx, results);
         }
     }
@@ -47,7 +49,24 @@ DiagnosticList RuleEngine::runAll(clang::ASTContext& ctx) {
     // recycled FunctionDecl address in the next TU would not just be
     // stale, it would silently apply ANOTHER file's asserts as facts.
     AssertGuardCache::instance().clear();
+    // Producer checks can attach traces by diagnostic-vector index. Filter
+    // only after all checks/cleanup, before consumers fingerprint/count/report.
+    if (diagnostic_selector_) {
+        results.erase(std::remove_if(results.begin(), results.end(),
+            [&](const Diagnostic& diagnostic) {
+                return findRuleCapability(diagnostic.rule_id) &&
+                       !diagnostic_selector_(diagnostic.rule_id);
+            }), results.end());
+    }
     return results;
+}
+
+bool RuleEngine::hasSelectedFamily(const Rule& rule) const {
+    if (!diagnostic_selector_) return true;
+    const auto families = producerFindingFamilies(rule.id());
+    return std::any_of(families.begin(), families.end(), [&](const std::string& id) {
+        return !findRuleCapability(id) || diagnostic_selector_(id);
+    });
 }
 
 size_t RuleEngine::ruleCount() const {
@@ -57,7 +76,7 @@ size_t RuleEngine::ruleCount() const {
 size_t RuleEngine::enabledRuleCount() const {
     size_t count = 0;
     for (const auto& rule : rules_) {
-        if (rule->isEnabled()) ++count;
+        if (rule->isEnabled() && hasSelectedFamily(*rule)) ++count;
     }
     return count;
 }

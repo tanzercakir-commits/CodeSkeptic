@@ -1,6 +1,7 @@
 #include "config/Config.h"
 
 #include "core/Messages.h"
+#include "core/Capabilities.h"
 
 #include <filesystem>
 #include <fstream>
@@ -239,8 +240,8 @@ bool Config::loadFromFileInPlace(const std::string& path, InputError* error) {
                 ok = false;
             }
         }
-        else if (key == "enable_rule")   enabled_rules_.insert(value);
-        else if (key == "disable_rule")  disabled_rules_.insert(value);
+        else if (key == "enable_rule") { if (!addEnabledRules(value, error)) return false; }
+        else if (key == "disable_rule") { if (!addDisabledRules(value, error)) return false; }
         else {
             configError(path, lineNumber, "unknown key '" + key + "'");
             ok = false;
@@ -323,7 +324,7 @@ bool Config::parseArgsInPlace(int argc, char* argv[], InputError* error) {
                 return false;
             }
         } else if (arg == "--disable-rule" && i + 1 < argc) {
-            disabled_rules_.insert(argv[++i]);
+            if (!addDisabledRules(argv[++i], error)) return false;
         } else if (arg == "--lang" && i + 1 < argc) {
             lang_ = argv[++i];
             if (lang_ != "en" && lang_ != "tr") {
@@ -437,7 +438,7 @@ bool Config::parseArgsInPlace(int argc, char* argv[], InputError* error) {
                       << "  --html <file>          Self-contained HTML report (filters,\n"
                       << "                         dataflow traces with source context)\n"
                       << "  --severity <level>     Minimum severity (info/warning/error)\n"
-                      << "  --disable-rule <id>    Disable a rule\n"
+                      << "  --disable-rule <ids>   Disable diagnostic families (comma list; repeatable)\n"
                       << "  --baseline <file>      Suppress findings recorded in baseline\n"
                       << "  --write-baseline <file> Record current findings as baseline\n"
                       << "  --function <names>     Analyze only these functions (comma list,\n"
@@ -550,9 +551,39 @@ bool Config::parseArgsInPlace(int argc, char* argv[], InputError* error) {
 }
 
 bool Config::isRuleEnabled(const std::string& rule_id) const {
-    if (disabled_rules_.count(rule_id)) return false;
+    const auto* capability = findRuleCapability(rule_id);
+    // A new/unclassified diagnostic cannot disappear and manufacture clean.
+    if (!capability) return true;
+    const std::string family(capability->id);
+    if (disabled_rules_.count(family)) return false;
     if (enabled_rules_.empty()) return true;
-    return enabled_rules_.count(rule_id) > 0;
+    return enabled_rules_.count(family) > 0;
+}
+
+bool Config::addRuleIds(std::set<std::string>& target, const std::string& list,
+                        const char* field, InputError* error) {
+    std::set<std::string> names;
+    if (!addNamesTo(names, list, field, error)) return false;
+    auto staged = target;
+    for (const auto& name : names) {
+        const auto* capability = findRuleCapability(name);
+        if (!capability)
+            return rejectInput(error, "unknown_rule", field, "Unknown diagnostic family");
+        // The two internal contract aliases select their public family; they
+        // are not independently advertised or independently enabled rules.
+        staged.insert(std::string(capability->id));
+    }
+    target = std::move(staged);
+    if (error) *error = {};
+    return true;
+}
+
+bool Config::addDisabledRules(const std::string& list, InputError* error) {
+    return addRuleIds(disabled_rules_, list, "disable_rules", error);
+}
+
+bool Config::addEnabledRules(const std::string& list, InputError* error) {
+    return addRuleIds(enabled_rules_, list, "enable_rules", error);
 }
 
 bool Config::addFunctions(const std::string& list, InputError* error) {

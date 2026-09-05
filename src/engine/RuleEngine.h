@@ -5,6 +5,7 @@
 #include "core/Rule.h"
 
 #include <memory>
+#include <functional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -23,6 +24,11 @@ public:
     }
 
     void enableRule(const std::string& rule_id, bool enabled);
+    // Independent of implementation-producer enablement; owned by this engine,
+    // never process-global. Unknown diagnostics must remain fail-closed.
+    void setDiagnosticSelector(std::function<bool(const std::string&)> selector) {
+        diagnostic_selector_ = std::move(selector);
+    }
     DiagnosticList runAll(clang::ASTContext& ctx);
 
     // For --summary-out: runAll must harvest into the cross-TU store
@@ -35,7 +41,9 @@ public:
     std::vector<std::string> ruleIds() const;
 
 private:
+    bool hasSelectedFamily(const Rule& rule) const;
     std::vector<std::unique_ptr<Rule>> rules_;
+    std::function<bool(const std::string&)> diagnostic_selector_;
     bool harvest_global_ = false;
 };
 

@@ -1,4 +1,5 @@
 #include "server/McpServer.h"
+#include "config/Config.h"
 
 #include "core/FunctionFilter.h"
 #include "engine/FatalCalls.h"
@@ -212,6 +213,60 @@ TEST(McpServerTest, LateInputFailurePreservesAllPublishedRegistries) {
     EXPECT_EQ(allocatorPairs(), pairs);
     EXPECT_EQ(SourceManager::warmCacheHits(), hits);
     EXPECT_EQ(SourceManager::warmCacheMisses(), misses);
+}
+
+TEST(McpServerTest, InvalidRuleSelectionPreservesDefaultsRegistriesAndCache) {
+    Config defaults;
+    ASSERT_TRUE(defaults.addDisabledRules("resource-leak"));
+    for (const char* value : {R"("")", R"("memory-leak,,bounds")",
+                              R"("memory-leak,zz-unknown")", "[]", "null", "false"}) {
+        SCOPED_TRACE(value);
+        auto selection = llvm::json::parse(value);
+        ASSERT_TRUE(static_cast<bool>(selection));
+        const bool wrongType = !selection->getAsString();
+        llvm::json::Object request{
+            {"jsonrpc", "2.0"}, {"id", 79}, {"method", "tools/call"},
+            {"params", llvm::json::Object{{"name", "analyze"},
+                {"arguments", llvm::json::Object{{"path", "unused.cpp"},
+                    {"functions", "new_function"}, {"fatal_asserts", "new_fatal"},
+                    {"alloc_functions", "new_alloc"},
+                    {"disable_rules", std::move(*selection)}}}}}};
+        const auto functions = functionFilter();
+        const auto ranges = lineRanges();
+        const auto fatal = fatalCallNames();
+        const auto alloc = allocFunctionNames();
+        const auto free = freeFunctionNames();
+        const auto pairs = allocatorPairs();
+        const auto hits = SourceManager::warmCacheHits();
+        const auto misses = SourceManager::warmCacheMisses();
+        const auto response = handleMcpMessage(
+            llvm::formatv("{0}", llvm::json::Value(std::move(request))).str(), defaults);
+        auto parsed = llvm::json::parse(response);
+        ASSERT_TRUE(static_cast<bool>(parsed));
+        const auto* object = parsed->getAsObject();
+        ASSERT_NE(object, nullptr);
+        EXPECT_EQ(object->get("result"), nullptr);
+        const auto* error = object->getObject("error");
+        ASSERT_NE(error, nullptr) << response;
+        EXPECT_EQ(error->getInteger("code"), -32602);
+        const auto* data = error->getObject("data");
+        ASSERT_NE(data, nullptr);
+        EXPECT_EQ(data->getString("schema"), "codeskeptic-input-error/v1");
+        EXPECT_EQ(data->getString("field"), "disable_rules");
+        EXPECT_EQ(data->getString("reason"), wrongType ? "invalid_type" :
+            (std::string(value).find("zz-unknown") != std::string::npos
+                ? "unknown_rule" : "invalid_list"));
+        EXPECT_FALSE(defaults.isRuleEnabled("resource-leak"));
+        EXPECT_TRUE(defaults.isRuleEnabled("memory-leak"));
+        EXPECT_EQ(functionFilter(), functions);
+        EXPECT_EQ(lineRanges(), ranges);
+        EXPECT_EQ(fatalCallNames(), fatal);
+        EXPECT_EQ(allocFunctionNames(), alloc);
+        EXPECT_EQ(freeFunctionNames(), free);
+        EXPECT_EQ(allocatorPairs(), pairs);
+        EXPECT_EQ(SourceManager::warmCacheHits(), hits);
+        EXPECT_EQ(SourceManager::warmCacheMisses(), misses);
+    }
 }
 
 namespace {

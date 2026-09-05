@@ -155,6 +155,18 @@ const char* capabilityTierName(CapabilityTier tier) {
     return "out-of-scope";
 }
 
+std::vector<std::string> producerFindingFamilies(const std::string& producer_id) {
+    if (producer_id == "memory-leak")
+        return {"memory-leak", "double-free", "use-after-free", "resource-leak"};
+    if (producer_id == "div-by-zero" || producer_id == "null-deref" ||
+        producer_id == "policy")
+        return {producer_id, "contract"};
+    if (const auto* family = findRuleCapability(producer_id))
+        return {std::string(family->id)};
+    // Extension producers are not silently discarded by a public allowlist.
+    return {producer_id};
+}
+
 bool findingBlocksVerdict(std::string_view finding_id) {
     const RuleCapability* capability = findRuleCapability(finding_id);
     return capability ? capability->blocks_verdict : true;

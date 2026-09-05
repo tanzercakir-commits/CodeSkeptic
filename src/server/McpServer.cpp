@@ -148,6 +148,10 @@ json::Value handleToolsList(const json::Value& id) {
                  "(e.g. \"pool_alloc=pool_free\"); malformed values "
                  "are rejected without partial registration"},
             }},
+            {"disable_rules", json::Object{
+                {"type", "string"},
+                {"description", "Comma-separated diagnostic family IDs to exclude for this request; adds to server defaults. Omit to add no exclusions. Empty or unknown IDs are rejected."},
+            }},
         }},
         {"required", json::Array{"path"}},
     };
@@ -165,13 +169,14 @@ json::Value handleToolsList(const json::Value& id) {
     });
 }
 
-json::Value runAnalyze(const json::Value& id, const json::Object* args) {
+json::Value runAnalyze(const json::Value& id, const json::Object* args,
+                      const codeskeptic::Config& defaults) {
     if (!args) return makeError(id, -32602, "missing arguments");
 
     static const std::set<std::string> allowedFields = {
         "path", "build_path", "functions", "lines", "summaries",
         "fatal_asserts", "alloc_functions", "free_functions",
-        "allocator_pairs"
+        "allocator_pairs", "disable_rules"
     };
     for (const auto& field : *args) {
         const std::string name = field.first.str();
@@ -180,6 +185,8 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
     }
 
     for (const auto& name : allowedFields) {
+        if (name == "disable_rules" && args->get(name) && !args->getString(name))
+            return makeInputError(id, {"invalid_type", name, "Expected a comma-separated diagnostic ID string"});
         if (args->get(name) && !args->getString(name))
             return makeError(id, -32602,
                              "field must be a string: " + name);
@@ -195,7 +202,12 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
         return makeError(id, -32602, "field must not be empty: path");
 
     codeskeptic::Config config;
+    config.inheritRuleSelection(defaults);
     codeskeptic::InputError inputError;
+    if (auto disabled = args->getString("disable_rules")) {
+        if (!config.addDisabledRules(disabled->str(), &inputError))
+            return makeInputError(id, inputError);
+    }
     config.setSourcePath(path->str());
     if (auto buildPath = args->getString("build_path"))
         config.setBuildPath(buildPath->str());
@@ -315,13 +327,14 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
 }
 
 json::Value handleToolsCall(const json::Value& id,
-                            const json::Object* params) {
+                            const json::Object* params,
+                            const codeskeptic::Config& defaults) {
     if (!params) return makeError(id, -32602, "missing params");
     auto name = params->getString("name");
     if (!name) return makeError(id, -32602, "missing tool name");
     if (*name != "analyze")
         return makeError(id, -32602, "unknown tool: " + name->str());
-    return runAnalyze(id, params->getObject("arguments"));
+    return runAnalyze(id, params->getObject("arguments"), defaults);
 }
 
 } // anonymous namespace
@@ -329,6 +342,10 @@ json::Value handleToolsCall(const json::Value& id,
 namespace codeskeptic {
 
 std::string handleMcpMessage(const std::string& line) {
+    return handleMcpMessage(line, Config{});
+}
+
+std::string handleMcpMessage(const std::string& line, const Config& defaults) {
     auto parsed = json::parse(line);
     if (!parsed) {
         llvm::consumeError(parsed.takeError());
@@ -364,7 +381,7 @@ std::string handleMcpMessage(const std::string& line) {
     } else if (*method == "tools/list") {
         response = handleToolsList(id);
     } else if (*method == "tools/call") {
-        response = handleToolsCall(id, msg->getObject("params"));
+        response = handleToolsCall(id, msg->getObject("params"), defaults);
     } else {
         response = makeError(id, -32601,
                              "method not found: " + method->str());
@@ -373,6 +390,10 @@ std::string handleMcpMessage(const std::string& line) {
 }
 
 int runMcpServer() {
+    return runMcpServer(Config{});
+}
+
+int runMcpServer(const Config& defaults) {
 #ifdef _WIN32
     // Newline-delimited JSON-RPC framing: Windows text-mode stdio
     // would expand "\n" to "\r\n" on write and leave stray '\r's in
@@ -387,7 +408,7 @@ int runMcpServer() {
         // splits at '\n', so a client's "\r\n" leaves a trailing '\r'.
         if (!line.empty() && line.back() == '\r') line.pop_back();
         if (line.empty()) continue;
-        std::string response = handleMcpMessage(line);
+        std::string response = handleMcpMessage(line, defaults);
         if (!response.empty()) {
             std::cout << response << "\n" << std::flush;
         }

@@ -92,7 +92,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (config.serve()) {
-        return codeskeptic::runMcpServer();
+        return codeskeptic::runMcpServer(config);
     }
 
     // Summary-diff mode: not analysis, but a contract-diff report

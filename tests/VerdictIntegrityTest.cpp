@@ -103,11 +103,33 @@ TEST(VerdictIntegrityTest, RequestedMissingBaselineIsExitTwo) {
 TEST(VerdictIntegrityTest, AllRegisteredRulesDisabledIsExitTwo) {
     const auto source = writeCleanSource("verdict_no_enabled_rules.cpp");
     auto result = runWithOneRule(configFor(
-        {"codeskeptic", source, "--disable-rule", "div-by-zero"}));
+        {"codeskeptic", source, "--disable-rule", "div-by-zero",
+         "--disable-rule", "contract"}));
 
     EXPECT_TRUE(result.no_rules);
     EXPECT_EQ(result.status(), AnalysisStatus::Failed);
     EXPECT_EQ(result.exitCode(), 2);
+}
+
+TEST(VerdictIntegrityTest, SiblingContractFamilyKeepsRegisteredProducerEffective) {
+    const auto source = writeCleanSource("verdict_sibling_family.cpp");
+    auto result = runWithOneRule(configFor(
+        {"codeskeptic", source, "--disable-rule", "div-by-zero"}));
+    EXPECT_FALSE(result.no_rules);
+    EXPECT_TRUE(result.complete());
+    EXPECT_EQ(result.analyzed_tus, 1u);
+    EXPECT_EQ(result.exitCode(), 0);
+}
+
+TEST(VerdictIntegrityTest, UnknownDiagnosticIsNotHiddenByPublicAllowlist) {
+    const auto source = writeCleanSource("verdict_unknown_selection.cpp");
+    Config config = configFor({"codeskeptic", source});
+    ASSERT_TRUE(config.addEnabledRules("memory-leak"));
+    StaticAnalyzer analyzer(std::move(config));
+    analyzer.addRule<FixedFindingRule>("future-extension");
+    const auto result = analyzer.run();
+    EXPECT_EQ(result.exitCode(), 1);
+    EXPECT_EQ(result.blockingFindings(), 1u);
 }
 
 TEST(VerdictIntegrityTest, ExperimentalFindingIsVisibleButDoesNotBlock) {

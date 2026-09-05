@@ -215,4 +215,66 @@ void heap_safe(){void* p=malloc(8);free(p);}
     for response in responses:
         check_report(json.loads(response["result"]["content"][0]["text"]),
                      Counter({"memory-leak": 1}), "findings", "rule")
+    # Rejection must be shared with CLI and leave the next request untouched.
+    invalid_values = ["", "memory-leak,,bounds", "memory-leak,zz-unknown", [], None, False]
+    requests = [request(20, disable_rules="resource-leak")]
+    requests += [request(21 + i, disable_rules=value) for i, value in enumerate(invalid_values)]
+    requests += [request(30), request(31, disable_rules="resource-leak")]
+    result = run(["--serve"], "".join(json.dumps(r) + "\n" for r in requests))
+    assert result.returncode == 0, result.stderr
+    responses = [json.loads(line) for line in result.stdout.splitlines()]
+    assert [r["id"] for r in responses] == [r["id"] for r in requests], responses
+    for response, value in zip(responses[1:-2], invalid_values):
+        assert "result" not in response and response["error"]["code"] == -32602, response
+        error = response["error"]["data"]
+        assert error["schema"] == "codeskeptic-input-error/v1", error
+        assert error["field"] == "disable_rules", error
+        if isinstance(value, str):
+            cli = run([source, "--disable-rule", value])
+            assert cli.returncode == 2, cli.stderr
+            prefix = "[CodeSkeptic] input-error "
+            errors = [json.loads(line[len(prefix):]) for line in cli.stderr.splitlines()
+                      if line.startswith(prefix)]
+            assert errors == [error], (cli.stderr, response)
+        else:
+            assert error["reason"] == "invalid_type", error
+    first = json.loads(responses[0]["result"]["content"][0]["text"])
+    restored = json.loads(responses[-1]["result"]["content"][0]["text"])
+    assert restored == first, (first, restored)
+    check_report(json.loads(responses[-2]["result"]["content"][0]["text"]),
+                 expected_all, "findings", "rule")
+
+    def check_no_rules(response):
+        assert response["result"]["isError"] is True, response
+        data = json.loads(response["result"]["content"][0]["text"])
+        assert data["exit_code"] == 2 and data["status"] == "failed", data
+        assert data["complete"] is False and data["count"] == 0, data
+        assert data["coverage"]["analyzed_tus"] == 0, data
+
+    all_ids = ",".join(rule["id"] for rule in rules)
+    for options in ([], ["--assumptions"]):
+        result = run([source, "--disable-rule", all_ids, *options])
+        assert result.returncode == 2, result.stderr
+        result = run(["--serve", *options],
+                     json.dumps(request(40, disable_rules=all_ids)) + "\n")
+        assert result.returncode == 0, result.stderr
+        check_no_rules(json.loads(result.stdout))
+
+    # Actual config-file allowlists reach both entry points. A per-request
+    # exclusion adds to immutable defaults; it does not replace the allowlist.
+    (root / ".codeskeptic.conf").write_text(
+        "enable_rule=memory-leak\nenable_rule=resource-leak\ndisable_rule=resource-leak\n")
+    output = root / "config-selection.json"
+    result = run([source, "--json", output])
+    assert result.returncode == 1, result.stderr
+    check_report(json.loads(output.read_text()), Counter({"memory-leak": 1}))
+    result = run(["--serve"], "".join(json.dumps(r) + "\n" for r in [
+        request(50), request(51, disable_rules="memory-leak"), request(52)]))
+    assert result.returncode == 0, result.stderr
+    responses = [json.loads(line) for line in result.stdout.splitlines()]
+    assert [r["id"] for r in responses] == [50, 51, 52], responses
+    check_no_rules(responses[1])
+    for response in (responses[0], responses[2]):
+        check_report(json.loads(response["result"]["content"][0]["text"]),
+                     Counter({"memory-leak": 1}), "findings", "rule")
 print("DIAGNOSTIC_SELECTION_CLI_MCP_OK mixed producers, JSON/SARIF, request isolation, server defaults")
