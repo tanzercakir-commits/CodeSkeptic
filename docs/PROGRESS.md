@@ -2,6 +2,20 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH01-S07-U003 — İlk hosted regresyon checkpoint'ini gerçek exact-head kanıtıyla kapat
+
+- Commit: `caa389100f6bc60f1736581c571dd2e3677790ed`
+- Dal: `agent/cs3-ch01-s07-u003-hosted-qualification`
+- Implementer: `root-cs3-ch01-s07-u003-20260905`
+- Bağımsız denetçi: `independent-cwe-ch01-s07-u003-caa3891-20260906`
+- İnceleme SHA-256: `518b8d2144b84efe3af101cb897034384f77a1d4a4059e87137083281e148b91`
+- Tarih: 2026-09-05T21:29:01.898058+00:00
+- Sonuç: Yeni kuyruk hattının eski ürün ve gerçek dünya kontrollerindeki durumu gerçek GitHub sonuçlarıyla doğrulanır; main entegrasyonu yapılmaz.
+- hosted-regressions: PASS; SHA-256 `77290be2eef9491a18461f44bf9a62d3e3a064ca610106d6be76585660aa062c`; `Independent audit of direct GitHub run/attempt job evidence: Linux 33991053139, Windows 33991053177, Juliet 33991053103, and raw-validated measurement 33991053122; attempt 1, exact caa389100f6bc60f1736581c571dd2e3677790ed; verify workflow identities and every required non-skipped step.`
+- hosted-realworld-base-head: PASS; SHA-256 `abfa40567a9185f6758b6a50e7dfd7ecf9b4a8e849ee547c511a226e7fd234a3`; `python3 -B scripts/verify_regression_checkpoint.py with the retained realworld-run-33991053110-attempt-1-jedi_obk config/adjudications/context/run/jobs/catalog JSON and archives, --inputs-root /tmp/codeskeptic-checkpoint-inputs-pA9shQ/inputs; independently revalidate all 51 archive digests and all 48 raw shard reports against original base pins and exact reviewed head Counter deltas.`
+- checkpoint-receipt-validation: PASS; SHA-256 `7e28479169f5c03c3f2d51fe32935c6980b3397aceef9f055de797764fa33a38`; `python3 -B scripts/verify_regression_checkpoint.py separately for measurement 33991053122/1 and realworld 33991053110/1, with exact retained --config --adjudications --context --run-json --jobs-json --catalog-json --archives and pinned --inputs-root; commands and byte-identical independently reproduced receipts are recorded in the evidence log.`
+- queue-check: PASS; SHA-256 `30c553fff507b5bb253c542db4c6b1f6325df9c4e3d57ed7a9046e4ca5b2186a`; `python3 -B scripts/project_queue.py check; python3 -B scripts/project_queue.py guard --base HEAD^; git diff --check; verify clean exact HEAD caa389100f6bc60f1736581c571dd2e3677790ed.`
+
 ## CS3-CH01-S07-U002 — Exact base-head checkpoint ve kanıt doğrulayıcısını kur
 
 - Commit: `b18ed2546f838f9d5ef6882a8fc1597420f6848d`
