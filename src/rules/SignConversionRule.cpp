@@ -22,6 +22,8 @@
 #include <clang/Basic/SourceManager.h>
 
 #include <set>
+#include <limits>
+#include <map>
 #include <vector>
 
 using namespace clang;
@@ -269,13 +271,219 @@ bool allPostCastUsesRangeGuarded(const FunctionDecl* fn,
     return consumedInTrueBranch;
 }
 
+struct NarrowingProof {
+    const Expr* operand;
+    codeskeptic::Interval range;
+};
+using NarrowingProofs = std::map<const Expr*, NarrowingProof>;
+
+bool hasNarrowingCandidate(const FunctionDecl* fn, ASTContext& ctx) {
+    struct V : RecursiveASTVisitor<V> {
+        ASTContext& ctx;
+        bool found = false;
+        explicit V(ASTContext& c) : ctx(c) {}
+        bool TraverseLambdaExpr(LambdaExpr*) { return true; }
+        bool VisitImplicitCastExpr(ImplicitCastExpr* cast) {
+            const auto src = cast->getSubExpr()->getType(), dst = cast->getType();
+            found = cast->getCastKind() == CK_IntegralCast && !cast->isPartOfExplicitCast() &&
+                !cast->isTypeDependent() && src->isIntegerType() && dst->isIntegerType() &&
+                ctx.getIntWidth(dst) < ctx.getIntWidth(src);
+            return !found;
+        }
+    } visitor(ctx);
+    visitor.TraverseStmt(const_cast<Stmt*>(fn->getBody()));
+    return visitor.found;
+}
+
+// This extension owns only implicit scalar/literal narrowing reaching a
+// recognized length/index sink. Signed arithmetic remains IntOverflowRule's
+// responsibility; explicit casts, enums, bool and unrepresentable facts are
+// deliberately not interpreted as a new loss proof.
+NarrowingProofs collectNarrowingProofs(const FunctionDecl* fn, ASTContext& ctx,
+                                     const codeskeptic::IntervalAnalysis& analysis) {
+    struct V : RecursiveASTVisitor<V> {
+        ASTContext& ctx;
+        const codeskeptic::IntervalAnalysis& analysis;
+        NarrowingProofs proofs;
+        V(ASTContext& c, const codeskeptic::IntervalAnalysis& a) : ctx(c), analysis(a) {}
+        bool TraverseLambdaExpr(LambdaExpr*) { return true; }
+        bool VisitImplicitCastExpr(ImplicitCastExpr* cast) {
+            if (cast->getCastKind() != CK_IntegralCast || cast->isPartOfExplicitCast() ||
+                cast->isTypeDependent() || cast->isValueDependent()) return true;
+            const Expr* operand = cast->getSubExpr();
+            const QualType src = operand->getType(), dst = cast->getType();
+            if (!src->isIntegerType() || !dst->isIntegerType() || src->isEnumeralType() ||
+                dst->isEnumeralType() || src->isBooleanType() || dst->isBooleanType() ||
+                isNonSizeUnsignedSink(dst)) return true;
+            const unsigned srcBits = ctx.getIntWidth(src), dstBits = ctx.getIntWidth(dst);
+            if (srcBits > 64 || dstBits >= srcBits || dstBits == 0) return true;
+            const Expr* value = operand->IgnoreParenImpCasts();
+            if (!isa<DeclRefExpr>(value) && !isa<IntegerLiteral>(value)) return true;
+            if (const auto* var = directVar(value); var && var->getType().isVolatileQualified()) return true;
+            const codeskeptic::IntervalMap* state = analysis.stateAt(cast);
+            if (!state) state = analysis.stateAt(operand);
+            if (!state) state = analysis.stateAt(value);
+            if (!state) return true;
+            auto range = codeskeptic::evalInterval(operand, *state, &ctx);
+            // Interpret literal bits using the actual AST signedness. The
+            // shared signed interval domain cannot represent large uint64s.
+            if (const auto* literal = dyn_cast<IntegerLiteral>(value)) {
+                const auto& bits = literal->getValue();
+                if (src->isUnsignedIntegerType()) {
+                    if (bits.getActiveBits() > 63) return true;
+                    range = codeskeptic::Interval::constant(static_cast<int64_t>(bits.getZExtValue()));
+                } else range = codeskeptic::Interval::constant(bits.getSExtValue());
+            }
+            if (range.isEmpty() || range.loIsInf() || range.hiIsInf()) return true;
+            if (src->isUnsignedIntegerType() && range.lo() < 0) return true;
+            if (src->isSignedIntegerType() && !range.fitsSignedBits(srcBits)) return true;
+            if (src->isUnsignedIntegerType() && srcBits < 64 &&
+                static_cast<uint64_t>(range.hi()) >= (uint64_t{1} << srcBits)) return true;
+            const int64_t minimum = dst->isUnsignedIntegerType() ? 0 : -(int64_t{1} << (dstBits - 1));
+            const int64_t maximum = dst->isUnsignedIntegerType() ?
+                static_cast<int64_t>((uint64_t{1} << dstBits) - 1) : (int64_t{1} << (dstBits - 1)) - 1;
+            if (range.lo() >= minimum && range.hi() <= maximum) return true;
+            // Existing negative-to-unsigned reports keep their own proof and
+            // post-cast guard policy, without a second report for the same cast.
+            const auto* untrusted = analysis.untrustedAt(cast);
+            if (!untrusted) untrusted = analysis.untrustedAt(operand);
+            if (!untrusted) untrusted = analysis.untrustedAt(value);
+            if (src->isSignedIntegerType() && dst->isUnsignedIntegerType() && range.lo() < 0 &&
+                untrusted && codeskeptic::exprDerivesFromUntrusted(operand, *untrusted)) return true;
+            proofs.emplace(cast, NarrowingProof{operand, range});
+            return true;
+        }
+    } visitor(ctx, analysis);
+    visitor.TraverseStmt(const_cast<Stmt*>(fn->getBody()));
+    return visitor.proofs;
+}
+
+// A small finite origin lattice, separate from numeric ranges: replacing the
+// original source cannot rewrite the value already stored in a narrow local.
+// Address/reference-exposed locals are conservatively outside this direct-value
+// subset. No pointer-alias or interprocedural length propagation is claimed.
+class NarrowingFlow {
+public:
+    using Origins = std::set<const Expr*>;
+    using State = std::map<const VarDecl*, Origins>;
+    NarrowingFlow(const NarrowingProofs& proofs, const FunctionDecl* fn,
+                  const codeskeptic::IntervalAnalysis& analysis) : proofs_(proofs), analysis_(analysis) {
+        struct Escapes : RecursiveASTVisitor<Escapes> {
+            std::set<const VarDecl*> vars;
+            bool TraverseLambdaExpr(LambdaExpr*) { return true; }
+            bool VisitUnaryOperator(UnaryOperator* op) {
+                if (op->getOpcode() == UO_AddrOf)
+                    if (const auto* var = directVar(op->getSubExpr())) vars.insert(var);
+                return true;
+            }
+            bool VisitVarDecl(VarDecl* var) {
+                if (var->getType()->isReferenceType() && var->hasInit())
+                    if (const auto* target = directVar(var->getInit())) vars.insert(target);
+                return true;
+            }
+            bool VisitCallExpr(CallExpr* call) {
+                const auto* fn = call->getDirectCallee();
+                if (!fn) return true;
+                for (unsigned i = 0; i < call->getNumArgs() && i < fn->getNumParams(); ++i)
+                    if (fn->getParamDecl(i)->getType()->isReferenceType())
+                        if (const auto* var = directVar(call->getArg(i))) vars.insert(var);
+                return true;
+            }
+        } escapes;
+        escapes.TraverseStmt(const_cast<Stmt*>(fn->getBody()));
+        excluded_ = std::move(escapes.vars);
+        variables_ = collectIntVars(fn).size();
+    }
+    State initialState() const { return {}; }
+    unsigned latticeHeight() const { return static_cast<unsigned>((proofs_.size() + 1) * (variables_ + 1) + 4); }
+    State merge(const State& a, const State& b) const {
+        // A mixed/unknown join is not a proof that this exact stored value
+        // reaches the sink. Retain only the origins common to both paths.
+        State out;
+        for (const auto& [var, origins] : a) {
+            const auto other = b.find(var);
+            if (other == b.end()) continue;
+            for (const Expr* origin : origins)
+                if (other->second.count(origin)) out[var].insert(origin);
+        }
+        return out;
+    }
+    Origins origins(const Expr* expr, const State& state, unsigned depth = 0) const {
+        if (!expr || depth >= 32) return {};
+        expr = expr->IgnoreParens();
+        if (const auto proof = proofs_.find(expr); proof != proofs_.end())
+            return excluded_.count(directVar(proof->second.operand)) ? Origins{} : Origins{expr};
+        if (const auto* cast = dyn_cast<ImplicitCastExpr>(expr)) {
+            if (cast->getCastKind() == CK_LValueToRValue || cast->getCastKind() == CK_NoOp ||
+                (cast->getCastKind() == CK_IntegralCast &&
+                 cast->getType()->isIntegerType() && cast->getSubExpr()->getType()->isIntegerType()))
+                return origins(cast->getSubExpr(), state, depth + 1);
+            return {};
+        }
+        const auto found = state.find(directVar(expr));
+        return found == state.end() ? Origins{} : found->second;
+    }
+    State transfer(const Stmt* stmt, const State& before, ASTContext&) const {
+        State after = before;
+        auto assign = [&](const VarDecl* var, const Expr* value) {
+            if (!var || !var->hasLocalStorage() || !var->getType()->isIntegerType() ||
+                var->getType().isVolatileQualified() || excluded_.count(var)) return;
+            auto sources = origins(value, after);
+            if (sources.empty()) after.erase(var);
+            else after[var] = std::move(sources);
+        };
+        if (const auto* decl = dyn_cast<DeclStmt>(stmt)) {
+            for (const auto* item : decl->decls())
+                if (const auto* var = dyn_cast<VarDecl>(item)) assign(var, var->getInit());
+        } else if (const auto* assignment = dyn_cast<BinaryOperator>(stmt); assignment && assignment->isAssignmentOp()) {
+            assign(directVar(assignment->getLHS()), assignment->getOpcode() == BO_Assign ? assignment->getRHS() : nullptr);
+        } else if (const auto* unary = dyn_cast<UnaryOperator>(stmt); unary && unary->isIncrementDecrementOp()) {
+            assign(directVar(unary->getSubExpr()), nullptr);
+        }
+        return after;
+    }
+    void onStatement(const Stmt* stmt, const State& before, const State&, ASTContext& ctx) {
+        const auto* numeric = analysis_.stateAt(stmt);
+        if (!numeric) return;
+        for (const auto& [var, range] : *numeric) {
+            (void)var;
+            if (range.isEmpty()) return; // no reachable valuation at this sink
+        }
+        const Expr* value = nullptr;
+        if (const auto* subscript = dyn_cast<ArraySubscriptExpr>(stmt)) value = subscript->getIdx();
+        if (const auto* call = dyn_cast<CallExpr>(stmt)) {
+            const auto* callee = call->getDirectCallee();
+            if (callee && !isa<CXXMethodDecl>(callee) && callee->getDeclContext()->getRedeclContext()->isTranslationUnit() &&
+                !callee->hasBody() && !callee->isVariadic() && callee->getNumParams() == 3 && call->getNumArgs() == 3) {
+                const auto name = callee->getNameAsString();
+                const auto first = callee->getParamDecl(0)->getType();
+                const auto second = callee->getParamDecl(1)->getType();
+                const auto size = callee->getParamDecl(2)->getType();
+                const bool memory = name == "memcpy" || name == "memmove";
+                if ((memory || name == "memset") && first->isVoidPointerType() &&
+                    (memory ? second->isVoidPointerType() : second->isSpecificBuiltinType(BuiltinType::Int)) &&
+                    callee->getReturnType()->isVoidPointerType() && ctx.hasSameType(size, ctx.getSizeType()))
+                    value = call->getArg(2);
+            }
+        }
+        auto found = origins(value, before);
+        consumed.insert(found.begin(), found.end());
+    }
+    Origins consumed;
+private:
+    const NarrowingProofs& proofs_;
+    const codeskeptic::IntervalAnalysis& analysis_;
+    std::set<const VarDecl*> excluded_;
+    size_t variables_ = 0;
+};
+
 void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
                      const codeskeptic::ParamIntervalMap& paramMap,
                      codeskeptic::DiagnosticList& results) {
     if (!fn->hasBody()) return;
 
     auto sites = collectConvSites(fn);
-    if (sites.empty()) return;
+    if (sites.empty() && !hasNarrowingCandidate(fn, ctx)) return;
 
     codeskeptic::IntervalAnalysis analysis(
         collectIntVars(fn), codeskeptic::paramSeeds(paramMap, fn));
@@ -283,6 +491,32 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
     if (!df.converged)
         codeskeptic::CoverageReport::instance().recordDataflowFailure(
             fn->getQualifiedNameAsString(), df.failure);
+
+    if (df.converged) {
+        const auto proofs = collectNarrowingProofs(fn, ctx, analysis);
+        if (!proofs.empty()) {
+            NarrowingFlow flow(proofs, fn, analysis);
+            const auto propagation = codeskeptic::runDataflow(fn, ctx, flow);
+            if (!propagation.converged)
+                codeskeptic::CoverageReport::instance().recordDataflowFailure(fn->getQualifiedNameAsString(), propagation.failure);
+            else for (const Expr* cast : flow.consumed) {
+                const auto& proof = proofs.at(cast);
+                const auto& sm = ctx.getSourceManager();
+                const auto loc = sm.getExpansionLoc(cast->getBeginLoc());
+                codeskeptic::Diagnostic diag;
+                diag.file = sm.getFilename(loc).str();
+                diag.line = sm.getSpellingLineNumber(loc);
+                diag.column = sm.getSpellingColumnNumber(loc);
+                diag.rule_id = "sign-conversion";
+                diag.function = fn->getQualifiedNameAsString();
+                diag.severity = codeskeptic::Severity::Warning;
+                diag.message = "Lossy implicit narrowing from '" + proof.operand->getType().getAsString() +
+                    "' to '" + cast->getType().getAsString() + "': proven source range " + proof.range.toString() +
+                    " exceeds the destination range and reaches a length/index sink (CWE-681)";
+                results.push_back(std::move(diag));
+            }
+        }
+    }
 
     const SourceManager& sm = ctx.getSourceManager();
     std::set<unsigned> reportedLines;

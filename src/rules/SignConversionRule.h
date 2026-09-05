@@ -23,7 +23,17 @@ namespace codeskeptic {
 // There the explicit cast is not intent, it is the defect's vehicle —
 // nlohmann's bug WAS the cast, written deliberately.
 //
-// Precision-first gates, all required:
+// The second, sink-specific subcase reports proven implicit scalar/literal
+// narrowing at native memcpy/memmove/memset lengths or array indices. A finite
+// source range must exceed the destination type; direct local value copies are
+// followed through CFG assignments. Explicit casts, enum/bool/dependent/unknown/volatile
+// values, mixed-origin CFG joins, address/reference-exposed source/destination
+// locals and arithmetic-origin propagation are outside that subset.
+// Existing signed arithmetic and negative-to-unsigned
+// reports are not duplicated. Both subcases retain the registry's experimental,
+// report-only sign-conversion ID; this is not a generic cast warning.
+//
+// Precision-first gates for the original negative-to-unsigned subcase:
 //   - the operand derives from a declared untrusted source (the
 //     atoi/strtol intrinsics, scanf outputs, or --untrusted-int-sources
 //     returns AND out-params) — provenance is opt-in, never guessed;
@@ -37,8 +47,8 @@ class SignConversionRule : public Rule {
 public:
     std::string id() const override { return "sign-conversion"; }
     std::string description() const override {
-        return "Untrusted signed value converted to unsigned while "
-               "provably able to be negative";
+        return "Untrusted negative-to-unsigned conversion or proven lossy "
+               "narrowing reaching a length/index sink";
     }
     Severity defaultSeverity() const override { return Severity::Warning; }
 
