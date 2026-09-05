@@ -187,3 +187,72 @@ TEST(UninitScalarRuleTest, UnevaluatedBuiltinsAreNotValueReads) {
         EXPECT_EQ(runRule(rule, code).size(), 1u);
     }
 }
+
+TEST(UninitScalarRuleTest, ImplicitNoReturnOperationsRespectLifetimeOrder) {
+    UninitScalarRule rule;
+    const auto result = runRule(rule, R"(
+        struct NoReturnCtor { [[noreturn]] NoReturnCtor(); };
+        struct NoReturnDtor { NoReturnDtor(); [[noreturn]] ~NoReturnDtor(); };
+        struct Normal { Normal(); ~Normal(); };
+        int safe_ctor() { NoReturnCtor stop; int x; return x; }
+        int safe_dtor_scope() { { NoReturnDtor stop; } int x; return x; }
+        int safe_dtor_temporary() { NoReturnDtor{}; int x; return x; }
+        int bad_normal_ctor() { Normal normal; int x; return x; }
+        int bad_return_before_dtor() { NoReturnDtor stop; int x; return x; }
+    )");
+    ASSERT_EQ(result.size(), 2u);
+    EXPECT_EQ(result[0].function, "bad_normal_ctor");
+    EXPECT_EQ(result[1].function, "bad_return_before_dtor");
+}
+
+TEST(UninitScalarRuleTest, TemporaryCleanupHappensAfterValueEvaluation) {
+    const std::string declarations =
+        "struct D { D(); [[noreturn]] ~D(); }; D makeD(); ";
+    for (const auto* body : {
+        "int f(){int x;return (D{},x);}",
+        "int f(){int x;int y=(D{},x);return y;}",
+        "int f(){const D& guard=D{};int x;return x;}",
+        "int f(){const D& guard=(0,D{});int x;return x;}",
+        "int f(){const D& guard=makeD();int x;return x;}"}) {
+        SCOPED_TRACE(body);
+        UninitScalarRule rule;
+        EXPECT_EQ(runRule(rule, declarations + body).size(), 1u);
+    }
+    for (const auto* body : {
+        "int f(){{const D& guard=D{};}int x;return x;}",
+        "int f(){{const D& guard=(0,D{});}int x;return x;}",
+        "int f(){{const D& guard=makeD();}int x;return x;}"}) {
+        SCOPED_TRACE(body);
+        UninitScalarRule rule;
+        EXPECT_TRUE(runRule(rule, declarations + body).empty());
+    }
+}
+
+TEST(UninitScalarRuleTest, OnlyTheResultTemporaryHasExtendedLifetime) {
+    UninitScalarRule rule;
+    const auto result = runRule(rule, R"(
+        struct D { D(); [[noreturn]] ~D(); };
+        struct Normal { Normal(); ~Normal(); };
+        int safe() { const D& ref=(D{},D{}); int x; return x; }
+        int bad() { const D& ref=(Normal{},D{}); int x; return x; }
+    )");
+    ASSERT_EQ(result.size(), 1u);
+    EXPECT_EQ(result[0].function, "bad");
+}
+
+TEST(UninitScalarRuleTest, ZeroArraysAndNonOwningBindingsHaveNoDestructorCall) {
+    UninitScalarRule rule;
+    const auto result = runRule(rule, R"(
+        struct D { D(); [[noreturn]] ~D(); };
+        struct C { [[noreturn]] C(); };
+        D& object();
+        int bad_zero_dtor() { {D objects[0];} int x; return x; }
+        int bad_zero_ctor() { C objects[0]; int x; return x; }
+        int bad_reference() { {D& ref=object();} int x; return x; }
+        int safe_nonempty() { {D objects[1];} int x; return x; }
+    )");
+    ASSERT_EQ(result.size(), 3u);
+    EXPECT_EQ(result[0].function, "bad_zero_dtor");
+    EXPECT_EQ(result[1].function, "bad_zero_ctor");
+    EXPECT_EQ(result[2].function, "bad_reference");
+}

@@ -61,6 +61,53 @@ private:
         return true;
     }
 
+    bool emptyArray(QualType type) const {
+        for (unsigned depth = 0; depth < 32; ++depth) {
+            const auto* array = ctx_.getAsConstantArrayType(type);
+            if (!array) return false;
+            if (array->getSize().isZero()) return true;
+            type = array->getElementType();
+        }
+        return false;
+    }
+
+    bool destructorDoesNotReturn(QualType type) const {
+        for (unsigned depth = 0; depth < 32; ++depth) {
+            if (const auto* array = ctx_.getAsArrayType(type)) {
+                const auto* size = dyn_cast<ConstantArrayType>(array);
+                if (!size || size->getSize().isZero()) return false;
+                type = array->getElementType();
+                continue;
+            }
+            const auto* record = type->getAsCXXRecordDecl();
+            return record && record->isAnyDestructorNoReturn();
+        }
+        return false;
+    }
+
+    const CXXBindTemporaryExpr* resultTemporary(const Expr* expr) const {
+        // Lifetime extension follows only the resulting object, not every
+        // temporary below an MTE: in (D{}, D{}) the LHS still dies now.
+        for (unsigned depth = 0; expr && depth < 32; ++depth) {
+            expr = expr->IgnoreParenImpCasts();
+            if (const auto* bind = dyn_cast<CXXBindTemporaryExpr>(expr)) return bind;
+            if (const auto* cast = dyn_cast<CastExpr>(expr)) {
+                expr = cast->getSubExpr();
+            } else if (const auto* comma = dyn_cast<BinaryOperator>(expr);
+                       comma && comma->getOpcode() == BO_Comma) {
+                expr = comma->getRHS();
+            } else {
+                return nullptr;
+            }
+        }
+        return nullptr;
+    }
+
+    void finishFullExpression() {
+        terminated_ = terminated_ || fullExpressionTerminates_;
+        fullExpressionTerminates_ = false;
+    }
+
     void escape(const Expr* expr) {
         const auto* var = directVariable(expr);
         if (!escapeFrames_.empty()) {
@@ -200,8 +247,12 @@ private:
                           codeskeptic::isFatalCall(call);
             return true;
         }
-        if (const auto* construct = dyn_cast<CXXConstructExpr>(expr))
-            return arguments(construct, construct->getConstructor(), depth);
+        if (const auto* construct = dyn_cast<CXXConstructExpr>(expr)) {
+            if (emptyArray(construct->getType())) return true;
+            if (!arguments(construct, construct->getConstructor(), depth)) return false;
+            terminated_ = terminated_ || construct->getConstructor()->isNoReturn();
+            return true;
+        }
         if (const auto* member = dyn_cast<MemberExpr>(expr))
             return expression(member->getBase(), depth + 1);
         if (const auto* subscript = dyn_cast<ArraySubscriptExpr>(expr)) {
@@ -219,10 +270,27 @@ private:
             return expression(cleanups->getSubExpr(), depth + 1);
         if (const auto* constant = dyn_cast<ConstantExpr>(expr))
             return expression(constant->getSubExpr(), depth + 1);
-        if (const auto* temporary = dyn_cast<MaterializeTemporaryExpr>(expr))
+        if (const auto* temporary = dyn_cast<MaterializeTemporaryExpr>(expr)) {
+            if (temporary->getStorageDuration() != SD_FullExpression) {
+                const auto* bind = resultTemporary(temporary->getSubExpr());
+                if (!bind && destructorDoesNotReturn(temporary->getType())) return false;
+                if (bind) temporaryLifetimes_[bind] = temporary->getStorageDuration();
+            }
             return expression(temporary->getSubExpr(), depth + 1);
-        if (const auto* temporary = dyn_cast<CXXBindTemporaryExpr>(expr))
-            return expression(temporary->getSubExpr(), depth + 1);
+        }
+        if (const auto* temporary = dyn_cast<CXXBindTemporaryExpr>(expr)) {
+            if (!expression(temporary->getSubExpr(), depth + 1)) return false;
+            const auto* destructor = temporary->getTemporary()->getDestructor();
+            if (destructor && destructor->getParent()->isAnyDestructorNoReturn()) {
+                auto found = temporaryLifetimes_.find(temporary);
+                if (found == temporaryLifetimes_.end() || found->second == SD_FullExpression)
+                    fullExpressionTerminates_ = true;
+                else if (found->second == SD_Automatic && !scopeTerminates_.empty())
+                    scopeTerminates_.back() = true;
+                // Static/thread lifetime extension does not destroy it here.
+            }
+            return true;
+        }
         if (const auto* argument = dyn_cast<CXXDefaultArgExpr>(expr))
             return expression(argument->getExpr(), depth + 1);
         return isa<DeclRefExpr>(expr) || isa<IntegerLiteral>(expr) ||
@@ -237,11 +305,19 @@ private:
         if (!stmt) return Flow::Continue;
         if (!enter(depth)) return Flow::Unsupported;
         if (const auto* block = dyn_cast<CompoundStmt>(stmt)) {
+            scopeTerminates_.push_back(false);
+            Flow flow = Flow::Continue;
             for (const Stmt* child : block->body()) {
-                const auto flow = statement(child, depth + 1);
-                if (flow != Flow::Continue) return flow;
+                flow = statement(child, depth + 1);
+                if (flow != Flow::Continue) break;
             }
-            return Flow::Continue;
+            const bool cleanupStops = scopeTerminates_.back();
+            scopeTerminates_.pop_back();
+            if (flow == Flow::Continue && cleanupStops) {
+                terminated_ = true;
+                return Flow::Stop;
+            }
+            return flow;
         }
         if (const auto* declaration = dyn_cast<DeclStmt>(stmt)) {
             for (const Decl* decl : declaration->decls()) {
@@ -262,6 +338,10 @@ private:
                 if (var->getType()->isReferenceType()) escape(var->getInit());
                 if (tracked && var->hasInit())
                     states_[var] = Initialization::Initialized;
+                if (!var->hasGlobalStorage() && !scopeTerminates_.empty() &&
+                    destructorDoesNotReturn(var->getType()))
+                    scopeTerminates_.back() = true;
+                finishFullExpression();
                 if (terminated_) return Flow::Stop;
             }
             return Flow::Continue;
@@ -271,6 +351,7 @@ private:
                 ? Flow::Stop : Flow::Unsupported;
         if (const auto* expr = dyn_cast<Expr>(stmt)) {
             if (!expression(expr, depth + 1)) return Flow::Unsupported;
+            finishFullExpression();
             return terminated_ ? Flow::Stop : Flow::Continue;
         }
         if (isa<NullStmt>(stmt)) return Flow::Continue;
@@ -282,9 +363,12 @@ private:
     const FunctionDecl* function_;
     std::map<const VarDecl*, Initialization> states_;
     std::vector<std::vector<const VarDecl*>> escapeFrames_;
+    std::map<const CXXBindTemporaryExpr*, StorageDuration> temporaryLifetimes_;
+    std::vector<bool> scopeTerminates_;
     codeskeptic::DiagnosticList pending_;
     unsigned budget_ = 16384;
     bool terminated_ = false;
+    bool fullExpressionTerminates_ = false;
 };
 
 class ScalarCallback : public MatchFinder::MatchCallback {
