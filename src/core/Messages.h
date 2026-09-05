@@ -5,6 +5,19 @@
 
 namespace codeskeptic {
 
+// Machine-readable input failure shared by CLI and MCP. Kept outside Config:
+// a rejected update must not even replace an error field in the accepted state.
+struct InputError {
+    std::string reason;
+    std::string field;
+    std::string message;
+};
+
+bool rejectInput(InputError* error, const std::string& reason,
+                 const std::string& field, const std::string& message);
+std::string inputErrorJson(const InputError& error);
+void reportInputError(const InputError& error);
+
 enum class Lang { EN, TR };
 
 void setLang(Lang lang);

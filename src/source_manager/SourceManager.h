@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "core/Messages.h"
 
 namespace clang {
 class ASTContext;
@@ -33,8 +34,8 @@ public:
                   bool synthetic_single_file);
     ~SourceManager();
 
-    void addSourceFile(const std::string& path);
-    void scanDirectory(const std::string& dir_path);
+    bool addSourceFile(const std::string& path, InputError* error = nullptr);
+    bool scanDirectory(const std::string& dir_path, InputError* error = nullptr);
     int processAll(ASTCallback callback);
 
     // Warm AST cache (MCP server / long-lived process): parsed TUs are

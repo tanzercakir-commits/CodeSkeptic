@@ -1,6 +1,8 @@
 #include "server/McpServer.h"
 
 #include "core/FunctionFilter.h"
+#include "engine/FatalCalls.h"
+#include "engine/AllocFunctions.h"
 #include "source_manager/SourceManager.h"
 #include <llvm/Support/JSON.h>
 #include <llvm/Support/FormatVariadic.h>
@@ -163,12 +165,52 @@ TEST(McpServerTest, InvalidTextScopeFailsBeforePublishingGlobalsOrCache) {
         EXPECT_EQ(object->get("result"), nullptr);
         const auto* error = object->getObject("error");
         EXPECT_NE(error, nullptr) << response;
-        if (error) EXPECT_EQ(error->getInteger("code"), -32602);
+        if (error) {
+            EXPECT_EQ(error->getInteger("code"), -32602);
+            const auto* data = error->getObject("data");
+            ASSERT_NE(data, nullptr);
+            EXPECT_EQ(data->getString("schema"), "codeskeptic-input-error/v1");
+            EXPECT_EQ(data->getString("reason"), "invalid_list");
+            EXPECT_EQ(data->getString("field"), "functions");
+        }
         EXPECT_EQ(functionFilter(), functions);
         EXPECT_EQ(lineRanges(), ranges);
         EXPECT_EQ(SourceManager::warmCacheHits(), hits);
         EXPECT_EQ(SourceManager::warmCacheMisses(), misses);
     }
+}
+
+TEST(McpServerTest, LateInputFailurePreservesAllPublishedRegistries) {
+    const auto functions = functionFilter();
+    const auto ranges = lineRanges();
+    const auto fatal = fatalCallNames();
+    const auto alloc = allocFunctionNames();
+    const auto free = freeFunctionNames();
+    const auto pairs = allocatorPairs();
+    const auto hits = SourceManager::warmCacheHits();
+    const auto misses = SourceManager::warmCacheMisses();
+    auto response = handleMcpMessage(
+        R"({"jsonrpc":"2.0","id":78,"method":"tools/call","params":{"name":"analyze","arguments":{"path":"unused.cpp","functions":"new_function","lines":"2-5","fatal_asserts":"new_fatal","alloc_functions":"new_alloc","free_functions":"new_free","allocator_pairs":"valid=pair,bad"}}})");
+    auto parsed = llvm::json::parse(response);
+    ASSERT_TRUE(static_cast<bool>(parsed));
+    const auto* object = parsed->getAsObject();
+    ASSERT_NE(object, nullptr);
+    EXPECT_EQ(object->get("result"), nullptr);
+    const auto* error = object->getObject("error");
+    ASSERT_NE(error, nullptr);
+    EXPECT_EQ(error->getInteger("code"), -32602);
+    const auto* data = error->getObject("data");
+    ASSERT_NE(data, nullptr);
+    EXPECT_EQ(data->getString("field"), "allocator_pairs");
+    EXPECT_EQ(data->getString("reason"), "invalid_list");
+    EXPECT_EQ(functionFilter(), functions);
+    EXPECT_EQ(lineRanges(), ranges);
+    EXPECT_EQ(fatalCallNames(), fatal);
+    EXPECT_EQ(allocFunctionNames(), alloc);
+    EXPECT_EQ(freeFunctionNames(), free);
+    EXPECT_EQ(allocatorPairs(), pairs);
+    EXPECT_EQ(SourceManager::warmCacheHits(), hits);
+    EXPECT_EQ(SourceManager::warmCacheMisses(), misses);
 }
 
 namespace {

@@ -8,6 +8,8 @@
 #include <limits>
 #include <set>
 #include <stdexcept>
+#include <algorithm>
+#include <charconv>
 
 namespace {
 
@@ -70,15 +72,33 @@ Config::Config()
     , lang_("en")
     , min_severity_(Severity::Info) {}
 
-bool Config::loadFromFile(const std::string& path) {
+bool Config::loadFromFile(const std::string& path, InputError* error) {
+    Config staged = *this;
+    InputError failure{"invalid_value", "config", "Invalid configuration input"};
+    if (!staged.loadFromFileInPlace(path, &failure)) {
+        if (failure.reason.empty())
+            failure = {"invalid_value", "config", "Invalid configuration input"};
+        if (error) *error = failure;
+        reportInputError(failure);
+        return false;
+    }
+    *this = std::move(staged);
+    if (error) *error = {};
+    return true;
+}
+
+bool Config::loadFromFileInPlace(const std::string& path, InputError* error) {
+    if (path.find('\0') != std::string::npos)
+        return rejectInput(error, "invalid_path", "config", "Path contains NUL");
     std::ifstream file(path);
     // The default project config is optional. Once the file exists, every
     // non-comment line is a contract and is validated strictly.
     if (!file.is_open()) {
         std::error_code ec;
-        if (std::filesystem::exists(path, ec) && !ec) {
+        const bool exists = std::filesystem::exists(path, ec);
+        if (exists || ec) {
             std::cerr << "[CodeSkeptic] cannot read config: " << path << "\n";
-            return false;
+            return rejectInput(error, "read_error", "config", "Cannot read configuration file");
         }
         return true;
     }
@@ -86,8 +106,11 @@ bool Config::loadFromFile(const std::string& path) {
     std::string line;
     std::size_t lineNumber = 0;
     bool ok = true;
+    std::string selectedOutput;
     while (std::getline(file, line)) {
         ++lineNumber;
+        if (line.find('\0') != std::string::npos)
+            return rejectInput(error, "invalid_value", "config", "Configuration contains NUL");
         line = trim(line);
         if (line.empty() || line[0] == '#') continue;
 
@@ -104,6 +127,17 @@ bool Config::loadFromFile(const std::string& path) {
             configError(path, lineNumber, "empty key");
             ok = false;
             continue;
+        }
+
+        std::string output;
+        if (key == "output_format") output = value;
+        else if (key == "json_output") output = "json";
+        else if (key == "sarif_output") output = "sarif";
+        else if (key == "html_output") output = "html";
+        if (!output.empty()) {
+            if (!selectedOutput.empty() && selectedOutput != output)
+                return rejectInput(error, "conflict", "output", "Conflicting output selectors");
+            selectedOutput = output;
         }
 
         if (key == "source_path")        source_path_ = value;
@@ -148,10 +182,10 @@ bool Config::loadFromFile(const std::string& path) {
             }
         }
         else if (key == "baseline")      baseline_path_ = value;
-        else if (key == "function")      addFunctions(value);
-        else if (key == "fatal_asserts") addFatalAsserts(value);
-        else if (key == "assert_macros") addAssertMacros(value);
-        else if (key == "negative_assert_macros") addNegativeAssertMacros(value);
+        else if (key == "function") { if (!addFunctions(value, error)) return false; }
+        else if (key == "fatal_asserts") { if (!addFatalAsserts(value, error)) return false; }
+        else if (key == "assert_macros") { if (!addAssertMacros(value, error)) return false; }
+        else if (key == "negative_assert_macros") { if (!addNegativeAssertMacros(value, error)) return false; }
         else if (key == "assert_recovery") {
             if (!parseBool(value, assert_recovery_)) {
                 configError(path, lineNumber,
@@ -159,20 +193,20 @@ bool Config::loadFromFile(const std::string& path) {
                 ok = false;
             }
         }
-        else if (key == "alloc_functions") addNamesTo(alloc_functions_, value);
-        else if (key == "free_functions")  addNamesTo(free_functions_, value);
+        else if (key == "alloc_functions") { if (!addAllocFunctions(value, error)) return false; }
+        else if (key == "free_functions") { if (!addFreeFunctions(value, error)) return false; }
         else if (key == "allocator_pairs") {
-            if (!addAllocatorPairs(value)) {
+            if (!addAllocatorPairs(value, error)) {
                 configError(path, lineNumber,
                             "allocator_pairs expects allocator=deallocator"
                             " entries separated by commas");
-                ok = false;
+                return false;
             }
         }
-        else if (key == "owning_pointers") addNamesTo(owning_pointers_, value);
-        else if (key == "untrusted_int_sources") addNamesTo(untrusted_int_sources_, value);
-        else if (key == "report_paths")    addReportPaths(value);
-        else if (key == "policy")          addNamesTo(policies_, value);
+        else if (key == "owning_pointers") { if (!addOwningPointers(value, error)) return false; }
+        else if (key == "untrusted_int_sources") { if (!addNamesTo(untrusted_int_sources_, value, "untrusted_int_sources", error)) return false; }
+        else if (key == "report_paths") { if (!addReportPaths(value, error)) return false; }
+        else if (key == "policy") { if (!addNamesTo(policies_, value, "policy", error)) return false; }
         else if (key == "model_file") {
             if (value.empty()) {
                 configError(path, lineNumber,
@@ -221,9 +255,32 @@ bool Config::loadFromFile(const std::string& path) {
     return ok;
 }
 
-bool Config::parseArgs(int argc, char* argv[]) {
+bool Config::parseArgs(int argc, char* argv[], InputError* error) {
+    Config staged = *this;
+    InputError failure{"invalid_value", "arguments", "Invalid command line input"};
+    if (!staged.parseArgsInPlace(argc, argv, &failure)) {
+        if (failure.reason.empty())
+            failure = {"invalid_value", "arguments", "Invalid command line input"};
+        if (error) *error = failure;
+        reportInputError(failure);
+        return false;
+    }
+    *this = std::move(staged);
+    if (error) *error = {};
+    return true;
+}
+
+bool Config::parseArgsInPlace(int argc, char* argv[], InputError* error) {
+    if (argc < 1 || !argv)
+        return rejectInput(error, "invalid_value", "arguments", "Missing argument vector");
+    for (int i = 0; i < argc; ++i)
+        if (!argv[i])
+            return rejectInput(error, "invalid_value", "arguments", "Null argument");
+    std::string selectedOutput;
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
+        if (arg.empty())
+            return rejectInput(error, "invalid_value", "arguments", "Empty argument");
 
         if (singleValueOptions().count(arg) &&
             (i + 1 >= argc || looksLikeOption(argv[i + 1]))) {
@@ -235,6 +292,12 @@ bool Config::parseArgs(int argc, char* argv[]) {
              looksLikeOption(argv[i + 2]))) {
             std::cerr << "[CodeSkeptic] --summary-diff expects two files\n";
             return false;
+        }
+
+        if (arg == "--json" || arg == "--sarif" || arg == "--html") {
+            if (!selectedOutput.empty() && selectedOutput != arg)
+                return rejectInput(error, "conflict", "output", "Conflicting output selectors");
+            selectedOutput = arg;
         }
 
         if (arg == "--source" && i + 1 < argc) {
@@ -271,34 +334,34 @@ bool Config::parseArgs(int argc, char* argv[]) {
         } else if (arg == "--baseline" && i + 1 < argc) {
             baseline_path_ = argv[++i];
         } else if (arg == "--function" && i + 1 < argc) {
-            addFunctions(argv[++i]);
+            if (!addFunctions(argv[++i], error)) return false;
         } else if (arg == "--fatal-asserts" && i + 1 < argc) {
-            addFatalAsserts(argv[++i]);
+            if (!addFatalAsserts(argv[++i], error)) return false;
         } else if (arg == "--assert-macros" && i + 1 < argc) {
-            addAssertMacros(argv[++i]);
+            if (!addAssertMacros(argv[++i], error)) return false;
         } else if (arg == "--negative-assert-macros" && i + 1 < argc) {
-            addNegativeAssertMacros(argv[++i]);
+            if (!addNegativeAssertMacros(argv[++i], error)) return false;
         } else if (arg == "--no-assert-recovery") {
             assert_recovery_ = false;
         } else if (arg == "--alloc-functions" && i + 1 < argc) {
-            addNamesTo(alloc_functions_, argv[++i]);
+            if (!addAllocFunctions(argv[++i], error)) return false;
         } else if (arg == "--free-functions" && i + 1 < argc) {
-            addNamesTo(free_functions_, argv[++i]);
+            if (!addFreeFunctions(argv[++i], error)) return false;
         } else if (arg == "--allocator-pairs" && i + 1 < argc) {
-            if (!addAllocatorPairs(argv[++i])) {
+            if (!addAllocatorPairs(argv[++i], error)) {
                 std::cerr << "[CodeSkeptic] --allocator-pairs expects "
                              "allocator=deallocator entries separated by "
                              "commas\n";
                 return false;
             }
         } else if (arg == "--untrusted-int-sources" && i + 1 < argc) {
-            addNamesTo(untrusted_int_sources_, argv[++i]);
+            if (!addNamesTo(untrusted_int_sources_, argv[++i], "untrusted_int_sources", error)) return false;
         } else if (arg == "--owning-pointers" && i + 1 < argc) {
-            addNamesTo(owning_pointers_, argv[++i]);
+            if (!addOwningPointers(argv[++i], error)) return false;
         } else if (arg == "--report-paths" && i + 1 < argc) {
-            addReportPaths(argv[++i]);
+            if (!addReportPaths(argv[++i], error)) return false;
         } else if (arg == "--policy" && i + 1 < argc) {
-            addNamesTo(policies_, argv[++i]);
+            if (!addNamesTo(policies_, argv[++i], "policy", error)) return false;
         } else if (arg == "--gate" && i + 1 < argc) {
             summary_diff_gate_ = argv[++i];
             if (summary_diff_gate_ != "error" &&
@@ -310,7 +373,7 @@ bool Config::parseArgs(int argc, char* argv[]) {
             }
         } else if (arg == "--lines" && i + 1 < argc) {
             const std::string value = argv[++i];
-            if (!addLines(value)) {
+            if (!addLines(value, error)) {
                 std::cerr << "[CodeSkeptic] --lines expects positive line "
                              "numbers/ranges (e.g. 10-40,55), got: "
                           << value << "\n";
@@ -352,8 +415,13 @@ bool Config::parseArgs(int argc, char* argv[]) {
             }
             std::string fileLine;
             while (std::getline(listFile, fileLine)) {
+                if (!fileLine.empty() && fileLine.back() == '\r') fileLine.pop_back();
+                if (fileLine.find('\0') != std::string::npos)
+                    return rejectInput(error, "invalid_path", "files", "File list contains NUL");
                 if (!fileLine.empty()) source_files_.push_back(fileLine);
             }
+            if (listFile.bad())
+                return rejectInput(error, "read_error", "files", "Cannot read source file list");
         } else if (arg == "--write-baseline" && i + 1 < argc) {
             write_baseline_path_ = argv[++i];
         } else if (arg == "--help") {
@@ -487,40 +555,31 @@ bool Config::isRuleEnabled(const std::string& rule_id) const {
     return enabled_rules_.count(rule_id) > 0;
 }
 
-void Config::addFunctions(const std::string& list) {
-    std::string token;
-    for (size_t i = 0; i <= list.size(); ++i) {
-        char c = (i < list.size()) ? list[i] : ',';
-        if (c == ',') {
-            if (!token.empty()) functions_.insert(token);
-            token.clear();
-        } else if (c != ' ') {
-            token += c;
-        }
-    }
+bool Config::addFunctions(const std::string& list, InputError* error) {
+    return addNamesTo(functions_, list, "functions", error);
 }
 
-void Config::addFatalAsserts(const std::string& list) {
-    addNamesTo(fatal_asserts_, list);
+bool Config::addFatalAsserts(const std::string& list, InputError* error) {
+    return addNamesTo(fatal_asserts_, list, "fatal_asserts", error);
 }
 
-void Config::addNegativeAssertMacros(const std::string& list) {
-    addNamesTo(negative_assert_macros_, list);
+bool Config::addNegativeAssertMacros(const std::string& list, InputError* error) {
+    return addNamesTo(negative_assert_macros_, list, "negative_assert_macros", error);
 }
 
-void Config::addAssertMacros(const std::string& list) {
-    addNamesTo(assert_macros_, list);
+bool Config::addAssertMacros(const std::string& list, InputError* error) {
+    return addNamesTo(assert_macros_, list, "assert_macros", error);
 }
 
-void Config::addAllocFunctions(const std::string& list) {
-    addNamesTo(alloc_functions_, list);
+bool Config::addAllocFunctions(const std::string& list, InputError* error) {
+    return addNamesTo(alloc_functions_, list, "alloc_functions", error);
 }
 
-void Config::addFreeFunctions(const std::string& list) {
-    addNamesTo(free_functions_, list);
+bool Config::addFreeFunctions(const std::string& list, InputError* error) {
+    return addNamesTo(free_functions_, list, "free_functions", error);
 }
 
-bool Config::addAllocatorPairs(const std::string& list) {
+bool Config::addAllocatorPairs(const std::string& list, InputError* error) {
     auto parsed = allocator_pairs_;
     std::size_t begin = 0;
     while (begin <= list.size()) {
@@ -531,32 +590,37 @@ bool Config::addAllocatorPairs(const std::string& list) {
         const std::size_t separator = entry.find('=');
         if (entry.empty() || separator == std::string::npos ||
             entry.find('=', separator + 1) != std::string::npos) {
-            return false;
+            return rejectInput(error, "invalid_list", "allocator_pairs", "Expected allocator=deallocator entries");
         }
         const std::string allocator = trim(entry.substr(0, separator));
         const std::string deallocator = trim(entry.substr(separator + 1));
-        if (allocator.empty() || deallocator.empty()) return false;
+        if (allocator.empty() || deallocator.empty() ||
+            std::any_of(entry.begin(), entry.end(),
+                [](unsigned char ch) { return ch < 32 || ch == 127; }))
+            return rejectInput(error, "invalid_list", "allocator_pairs", "Expected allocator=deallocator entries");
         parsed[allocator].insert(deallocator);
         if (comma == std::string::npos) break;
         begin = comma + 1;
     }
     allocator_pairs_ = std::move(parsed);
+    if (error) *error = {};
     return true;
 }
 
-void Config::addOwningPointers(const std::string& list) {
-    addNamesTo(owning_pointers_, list);
+bool Config::addOwningPointers(const std::string& list, InputError* error) {
+    return addNamesTo(owning_pointers_, list, "owning_pointers", error);
 }
 
-void Config::addReportPaths(const std::string& list) {
+bool Config::addReportPaths(const std::string& list, InputError* error) {
     // Comma-split with edge-trim only: unlike identifier lists, paths
     // may legally contain interior spaces.
     std::string token;
+    auto parsed = report_paths_;
+    if (list.find('\0') != std::string::npos)
+        return rejectInput(error, "invalid_path", "report_paths", "Path contains NUL");
     auto flush = [&] {
-        size_t b = token.find_first_not_of(" \t");
-        size_t e = token.find_last_not_of(" \t");
-        if (b != std::string::npos)
-            report_paths_.push_back(token.substr(b, e - b + 1));
+        token = trim(token);
+        if (!token.empty()) parsed.push_back(token);
         token.clear();
     };
     for (char c : list) {
@@ -564,60 +628,62 @@ void Config::addReportPaths(const std::string& list) {
         else token += c;
     }
     flush();
+    if (parsed.size() == report_paths_.size())
+        return rejectInput(error, "invalid_list", "report_paths", "Expected at least one report path");
+    report_paths_ = std::move(parsed);
+    if (error) *error = {};
+    return true;
 }
 
-void Config::addNamesTo(std::set<std::string>& target,
-                        const std::string& list) {
+bool Config::addNamesTo(std::set<std::string>& target,
+                        const std::string& list, const char* field, InputError* error) {
+    auto parsed = target;
     std::string token;
     for (size_t i = 0; i <= list.size(); ++i) {
         char c = (i < list.size()) ? list[i] : ',';
         if (c == ',') {
-            if (!token.empty()) target.insert(token);
+            token = trim(token);
+            if (token.empty() || std::any_of(token.begin(), token.end(),
+                    [](unsigned char ch) { return ch < 32 || ch == 127; }))
+                return rejectInput(error, "invalid_list", field, "Expected a non-empty comma-separated name list");
+            parsed.insert(token);
             token.clear();
-        } else if (c != ' ') {
+        } else {
             token += c;
         }
     }
+    target = std::move(parsed);
+    if (error) *error = {};
+    return true;
 }
 
-bool Config::addLines(const std::string& list) {
+bool Config::addLines(const std::string& list, InputError* error) {
     // "12-40,55" -> {12,40}, {55,55}. Invalid scope is a caller error:
     // silently dropping it would expand a targeted analysis to all functions.
     std::string token;
+    auto parsedLines = lines_;
     bool ok = true;
-    auto flush = [this, &ok](const std::string& t) {
+    bool overflow = false;
+    auto number = [&overflow](const std::string& text, unsigned& value) {
+        if (text.empty() || !std::all_of(text.begin(), text.end(),
+                [](char ch) { return ch >= '0' && ch <= '9'; })) return false;
+        const auto parsed = std::from_chars(text.data(), text.data() + text.size(), value);
+        if (parsed.ec == std::errc::result_out_of_range) overflow = true;
+        return parsed.ec == std::errc{} && parsed.ptr == text.data() + text.size();
+    };
+    auto flush = [&parsedLines, &ok, &number](const std::string& raw) {
+        const std::string t = trim(raw);
         if (t.empty()) {
             ok = false;
             return;
         }
         auto dash = t.find('-');
         unsigned from = 0, to = 0;
-        try {
-            std::size_t used = 0;
-            if (dash == std::string::npos) {
-                const auto parsed = std::stoul(t, &used);
-                if (used != t.size()) throw std::invalid_argument("line");
-                if (parsed > std::numeric_limits<unsigned>::max())
-                    throw std::out_of_range("line");
-                from = to = static_cast<unsigned>(parsed);
-            } else {
-                if (dash == 0 || dash + 1 >= t.size() ||
-                    t.find('-', dash + 1) != std::string::npos)
-                    throw std::invalid_argument("range");
-                const std::string first = t.substr(0, dash);
-                const std::string last = t.substr(dash + 1);
-                const auto parsedFrom = std::stoul(first, &used);
-                if (used != first.size()) throw std::invalid_argument("line");
-                if (parsedFrom > std::numeric_limits<unsigned>::max())
-                    throw std::out_of_range("line");
-                from = static_cast<unsigned>(parsedFrom);
-                const auto parsedTo = std::stoul(last, &used);
-                if (used != last.size()) throw std::invalid_argument("line");
-                if (parsedTo > std::numeric_limits<unsigned>::max())
-                    throw std::out_of_range("line");
-                to = static_cast<unsigned>(parsedTo);
-            }
-        } catch (...) {
+        if (dash == std::string::npos) {
+            if (!number(t, from)) { ok = false; return; }
+            to = from;
+        } else if (!number(trim(t.substr(0, dash)), from) ||
+                   !number(trim(t.substr(dash + 1)), to)) {
             ok = false;
             return;
         }
@@ -625,18 +691,23 @@ bool Config::addLines(const std::string& list) {
             ok = false;
             return;
         }
-        lines_.emplace_back(from, to);
+        parsedLines.emplace_back(from, to);
     };
     for (size_t i = 0; i <= list.size(); ++i) {
         char c = (i < list.size()) ? list[i] : ',';
         if (c == ',') {
             flush(token);
             token.clear();
-        } else if (c != ' ') {
+        } else {
             token += c;
         }
     }
-    return ok;
+    if (!ok)
+        return rejectInput(error, overflow ? "overflow" : "invalid_range", "lines",
+                           "invalid lines scope; expected positive unsigned line numbers or ascending ranges");
+    lines_ = std::move(parsedLines);
+    if (error) *error = {};
+    return true;
 }
 
 bool Config::parseSeverity(const std::string& str, Severity& severity) const {

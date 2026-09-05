@@ -1,6 +1,28 @@
 #include "core/Messages.h"
+#include <iostream>
+#include <llvm/Support/JSON.h>
+#include <llvm/Support/raw_ostream.h>
 
 namespace codeskeptic {
+
+bool rejectInput(InputError* error, const std::string& reason,
+                 const std::string& field, const std::string& message) {
+    if (error) *error = {reason, field, message};
+    return false;
+}
+
+std::string inputErrorJson(const InputError& error) {
+    std::string result;
+    llvm::raw_string_ostream stream(result);
+    stream << llvm::json::Value(llvm::json::Object{
+        {"schema", "codeskeptic-input-error/v1"}, {"reason", error.reason},
+        {"field", error.field}, {"message", error.message}});
+    return result;
+}
+
+void reportInputError(const InputError& error) {
+    std::cerr << "[CodeSkeptic] input-error " << inputErrorJson(error) << '\n';
+}
 
 namespace {
 

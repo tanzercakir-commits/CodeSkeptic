@@ -275,6 +275,71 @@ TEST(ConfigTest, ConflictingOutputSelectorsDoNotSilentlyDiscardRequestedOutput) 
     EXPECT_EQ(snapshot(c), before);
 }
 
+TEST(ConfigTest, ProgrammaticListsAreAtomicAndReturnStructuredReasons) {
+    using Setter = bool (Config::*)(const std::string&, codeskeptic::InputError*);
+    const std::vector<Setter> setters{
+        &Config::addFunctions, &Config::addFatalAsserts, &Config::addAssertMacros,
+        &Config::addNegativeAssertMacros, &Config::addAllocFunctions,
+        &Config::addFreeFunctions, &Config::addOwningPointers};
+    for (auto setter : setters) {
+        Config c;
+        codeskeptic::InputError error;
+        ASSERT_TRUE((c.*setter)("kept", &error));
+        const auto before = snapshot(c);
+        for (const auto& bad : {std::string("valid,,bad"), std::string("\t"),
+                               std::string("good,bad\0suffix", 15)}) {
+            EXPECT_FALSE((c.*setter)(bad, &error));
+            EXPECT_EQ(error.reason, "invalid_list");
+            EXPECT_FALSE(error.field.empty());
+            EXPECT_EQ(snapshot(c), before);
+        }
+        EXPECT_TRUE((c.*setter)("ns::valid", &error));
+        EXPECT_TRUE(error.reason.empty());
+    }
+    Config c;
+    codeskeptic::InputError error;
+    ASSERT_TRUE(c.addReportPaths(" kept path , other ", &error));
+    const auto before = snapshot(c);
+    for (const char* bad : {",,,", " \t\r\n"}) {
+        EXPECT_FALSE(c.addReportPaths(bad, &error));
+        EXPECT_EQ(error.field, "report_paths");
+        EXPECT_EQ(snapshot(c), before);
+    }
+}
+
+TEST(ConfigTest, ConfigConflictAndNulNeverPublishEarlierLines) {
+    Config c;
+    ASSERT_TRUE(c.addFunctions("kept"));
+    const auto before = snapshot(c);
+    codeskeptic::InputError error;
+    auto path = writeConfig("config_output_conflict.conf",
+        "function=new\njson_output=one.json\nsarif_output=two.sarif\n");
+    EXPECT_FALSE(c.loadFromFile(path, &error));
+    EXPECT_EQ(error.reason, "conflict");
+    EXPECT_EQ(snapshot(c), before);
+    path = writeConfig("config_nul.conf", "function=new\n");
+    { std::ofstream file(path, std::ios::app | std::ios::binary);
+      file << "source_path=prefix" << '\0' << "suffix\n"; }
+    EXPECT_FALSE(c.loadFromFile(path, &error));
+    EXPECT_EQ(error.reason, "invalid_value");
+    EXPECT_EQ(snapshot(c), before);
+}
+
+TEST(ConfigTest, FileListReadFailureIsAtomicAndCrLfPathsStayExact) {
+    Config c;
+    ASSERT_TRUE(parse(c, {"codeskeptic", "--function", "kept"}));
+    const auto before = snapshot(c);
+    const auto path = writeConfig("config_files_nul.txt", "valid.cpp\n");
+    { std::ofstream file(path, std::ios::app | std::ios::binary);
+      file << "bad" << '\0' << ".cpp\n"; }
+    EXPECT_FALSE(parse(c, {"codeskeptic", "--files", path.c_str()}));
+    EXPECT_EQ(snapshot(c), before);
+    { std::ofstream file(path, std::ios::binary);
+      file << "first.cpp\r\nMy Project/second.cpp\r\n"; }
+    ASSERT_TRUE(parse(c, {"codeskeptic", "--files", path.c_str()}));
+    EXPECT_EQ(c.sourceFiles(), std::vector<std::string>({"first.cpp", "My Project/second.cpp"}));
+}
+
 TEST(ConfigTest, ChangedCompilationCommandsInvalidateWarmAstCache) {
     namespace fs = std::filesystem;
     const auto root = fs::path(::testing::TempDir()) /

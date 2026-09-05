@@ -66,6 +66,17 @@ json::Object makeError(const json::Value& id, int code,
     };
 }
 
+json::Object makeInputError(const json::Value& id, const codeskeptic::InputError& error) {
+    auto data = json::parse(codeskeptic::inputErrorJson(error));
+    if (!data) {
+        llvm::consumeError(data.takeError());
+        return makeError(id, -32603, "cannot serialize input failure");
+    }
+    auto response = makeError(id, -32602, error.message);
+    (*response.getObject("error"))["data"] = std::move(*data);
+    return response;
+}
+
 json::Value handleInitialize(const json::Value& id) {
     return makeResponse(id, json::Object{
         {"protocolVersion", kProtocolVersion},
@@ -172,6 +183,10 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
         if (args->get(name) && !args->getString(name))
             return makeError(id, -32602,
                              "field must be a string: " + name);
+        if (auto value = args->getString(name)) {
+            if (value->contains('\0'))
+                return makeInputError(id, {"invalid_value", name, "Input contains NUL"});
+        }
     }
 
     auto path = args->getString("path");
@@ -180,30 +195,35 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
         return makeError(id, -32602, "field must not be empty: path");
 
     codeskeptic::Config config;
+    codeskeptic::InputError inputError;
     config.setSourcePath(path->str());
     if (auto buildPath = args->getString("build_path"))
         config.setBuildPath(buildPath->str());
-    if (auto functions = args->getString("functions"))
-        config.addFunctions(functions->str());
+    if (auto functions = args->getString("functions")) {
+        if (!config.addFunctions(functions->str(), &inputError))
+            return makeInputError(id, inputError);
+    }
     if (auto lines = args->getString("lines")) {
-        if (!config.addLines(lines->str()))
-            return makeError(id, -32602,
-                             "invalid lines scope; expected e.g. 10-40,55");
+        if (!config.addLines(lines->str(), &inputError))
+            return makeInputError(id, inputError);
     }
     if (auto summaries = args->getString("summaries"))
         config.setSummaryIn(summaries->str());
-    if (auto fatalAsserts = args->getString("fatal_asserts"))
-        config.addFatalAsserts(fatalAsserts->str());
-    if (auto allocFns = args->getString("alloc_functions"))
-        config.addAllocFunctions(allocFns->str());
-    if (auto freeFns = args->getString("free_functions"))
-        config.addFreeFunctions(freeFns->str());
+    if (auto fatalAsserts = args->getString("fatal_asserts")) {
+        if (!config.addFatalAsserts(fatalAsserts->str(), &inputError))
+            return makeInputError(id, inputError);
+    }
+    if (auto allocFns = args->getString("alloc_functions")) {
+        if (!config.addAllocFunctions(allocFns->str(), &inputError))
+            return makeInputError(id, inputError);
+    }
+    if (auto freeFns = args->getString("free_functions")) {
+        if (!config.addFreeFunctions(freeFns->str(), &inputError))
+            return makeInputError(id, inputError);
+    }
     if (auto pairs = args->getString("allocator_pairs")) {
-        if (!config.addAllocatorPairs(pairs->str()))
-            return makeError(
-                id, -32602,
-                "invalid allocator_pairs; expected allocator=deallocator "
-                "entries separated by commas");
+        if (!config.addAllocatorPairs(pairs->str(), &inputError))
+            return makeInputError(id, inputError);
     }
     // Long-lived process: parsed ASTs are kept warm between calls (the
     // fingerprint catches staleness — a stale AST is NEVER served)

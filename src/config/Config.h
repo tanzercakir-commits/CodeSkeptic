@@ -2,6 +2,7 @@
 #define CODESKEPTIC_CONFIG_H
 
 #include "core/Diagnostic.h"
+#include "core/Messages.h"
 
 #include <map>
 #include <set>
@@ -15,8 +16,8 @@ class Config {
 public:
     Config();
 
-    bool loadFromFile(const std::string& path);
-    bool parseArgs(int argc, char* argv[]);
+    bool loadFromFile(const std::string& path, InputError* error = nullptr);
+    bool parseArgs(int argc, char* argv[], InputError* error = nullptr);
     bool helpRequested() const { return help_requested_; }
 
     const std::string& sourcePath() const { return source_path_; }
@@ -90,12 +91,12 @@ public:
     bool warmCache() const { return warm_cache_; }
 
     // Programmatic scope settings (the MCP server uses these directly)
-    void addFunctions(const std::string& list);
-    bool addLines(const std::string& list);
+    bool addFunctions(const std::string& list, InputError* error = nullptr);
+    bool addLines(const std::string& list, InputError* error = nullptr);
 
     // Fatal-assert handlers (--fatal-asserts): user-declared noreturn
     // functions; the engine kills dataflow paths at calls to them.
-    void addFatalAsserts(const std::string& list);
+    bool addFatalAsserts(const std::string& list, InputError* error = nullptr);
     const std::set<std::string>& fatalAsserts() const {
         return fatal_asserts_;
     }
@@ -107,13 +108,13 @@ public:
     // not spelled "assert" (see engine/AssertGuards.h).
     void setAssertRecovery(bool on) { assert_recovery_ = on; }
     bool assertRecovery() const { return assert_recovery_; }
-    void addAssertMacros(const std::string& list);
+    bool addAssertMacros(const std::string& list, InputError* error = nullptr);
     const std::set<std::string>& assertMacros() const {
         return assert_macros_;
     }
     // --negative-assert-macros: names that assert a pointer IS null and
     // must be vetoed even when the spelling heuristic misses them.
-    void addNegativeAssertMacros(const std::string& list);
+    bool addNegativeAssertMacros(const std::string& list, InputError* error = nullptr);
     const std::set<std::string>& negativeAssertMacros() const {
         return negative_assert_macros_;
     }
@@ -121,15 +122,15 @@ public:
     // Custom allocator wrappers (--alloc-functions / --free-functions):
     // extend the leak/double-free/UAF domain to project-specific heap
     // wrappers (git__malloc, zmalloc, ...).
-    void addAllocFunctions(const std::string& list);
-    void addFreeFunctions(const std::string& list);
+    bool addAllocFunctions(const std::string& list, InputError* error = nullptr);
+    bool addFreeFunctions(const std::string& list, InputError* error = nullptr);
     const std::set<std::string>& allocFunctions() const {
         return alloc_functions_;
     }
     const std::set<std::string>& freeFunctions() const {
         return free_functions_;
     }
-    bool addAllocatorPairs(const std::string& list);
+    bool addAllocatorPairs(const std::string& list, InputError* error = nullptr);
     const std::map<std::string, std::set<std::string>>& allocatorPairs() const {
         return allocator_pairs_;
     }
@@ -145,7 +146,7 @@ public:
     // Project owning-smart-pointer wrappers (--owning-pointers): raw
     // pointers adopted by construction into these types escape the leak
     // domain (Ref<T>, RefPtr<T>, scoped_refptr<T>, ...).
-    void addOwningPointers(const std::string& list);
+    bool addOwningPointers(const std::string& list, InputError* error = nullptr);
     const std::set<std::string>& owningPointers() const {
         return owning_pointers_;
     }
@@ -155,7 +156,7 @@ public:
     // 15 of 16 findings were in LLVM DEPENDENCY headers pulled into the
     // TUs — noise for the project being scanned. Unset = report all
     // (analysis itself is unaffected; this filters reporting only).
-    void addReportPaths(const std::string& list);
+    bool addReportPaths(const std::string& list, InputError* error = nullptr);
     const std::vector<std::string>& reportPaths() const {
         return report_paths_;
     }
@@ -171,7 +172,10 @@ public:
 
 private:
     bool parseSeverity(const std::string& str, Severity& severity) const;
-    void addNamesTo(std::set<std::string>& target, const std::string& list);
+    bool loadFromFileInPlace(const std::string& path, InputError* error);
+    bool parseArgsInPlace(int argc, char* argv[], InputError* error);
+    bool addNamesTo(std::set<std::string>& target, const std::string& list,
+                    const char* field, InputError* error);
 
     std::string source_path_;
     std::vector<std::string> source_files_;

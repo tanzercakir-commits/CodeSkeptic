@@ -27,14 +27,17 @@ protected:
 
 TEST_F(SourceManagerTargetTest, InvalidFileTargetsPreserveAcceptedState) {
     SourceManager manager(root.string(), nullptr, true);
-    manager.addSourceFile((root / "kept.cpp").string());
+    ASSERT_TRUE(manager.addSourceFile((root / "kept.cpp").string()));
     const auto before = manager.files();
-    manager.addSourceFile(root.string());
+    codeskeptic::InputError error;
+    EXPECT_FALSE(manager.addSourceFile(root.string(), &error));
+    EXPECT_EQ(error.reason, "invalid_target");
+    EXPECT_EQ(error.field, "path");
     EXPECT_EQ(manager.files(), before);
     std::ofstream(root / "not-source.txt") << "not a source";
-    manager.addSourceFile((root / "not-source.txt").string());
+    EXPECT_FALSE(manager.addSourceFile((root / "not-source.txt").string(), &error));
     EXPECT_EQ(manager.files(), before);
-    manager.addSourceFile((root / "missing.cpp").string());
+    EXPECT_FALSE(manager.addSourceFile((root / "missing.cpp").string(), &error));
     EXPECT_EQ(manager.files(), before);
 }
 
@@ -63,6 +66,18 @@ TEST_F(SourceManagerTargetTest, FailedDirectoryScanNeverPublishesTraversedPrefix
     SourceManager manager(root.string(), nullptr, true);
     manager.addSourceFile((root / "kept.cpp").string());
     const auto before = manager.files();
-    manager.scanDirectory(tree.string());
+    codeskeptic::InputError inputError;
+    EXPECT_FALSE(manager.scanDirectory(tree.string(), &inputError));
+    EXPECT_EQ(inputError.reason, "read_error");
     EXPECT_EQ(manager.files(), before);
+}
+
+TEST_F(SourceManagerTargetTest, ValidScanAfterRejectedScanCommitsTogether) {
+    SourceManager manager(root.string(), nullptr, true);
+    codeskeptic::InputError error;
+    EXPECT_FALSE(manager.scanDirectory((root / "missing").string(), &error));
+    EXPECT_TRUE(manager.files().empty());
+    ASSERT_TRUE(manager.scanDirectory(root.string(), &error));
+    EXPECT_TRUE(error.reason.empty());
+    EXPECT_EQ(manager.files(), std::vector<std::string>{(root / "kept.cpp").string()});
 }

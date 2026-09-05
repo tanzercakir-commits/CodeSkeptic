@@ -187,33 +187,57 @@ SourceManager::SourceManager(
         comp_db_ = std::make_unique<ExtensionAwareCompilationDatabase>();
 }
 
-void SourceManager::addSourceFile(const std::string& path) {
-    auto abs = fs::absolute(path);
-    if (!fs::exists(abs)) {
-        std::cerr << msg(MsgId::FileNotFound, abs.string()) << "\n";
-        return;
+bool SourceManager::addSourceFile(const std::string& path, InputError* error) {
+    auto fail = [&](const char* reason, const char* message) {
+        InputError failure{reason, "path", message};
+        if (error) *error = failure;
+        reportInputError(failure);
+        return false;
+    };
+    if (path.empty() || path.find('\0') != std::string::npos)
+        return fail("invalid_path", "Expected a non-empty source path without NUL");
+    try {
+        const auto abs = fs::absolute(path);
+        if (!fs::is_regular_file(abs))
+            return fail("invalid_target", "Source target is not a regular file");
+        const auto ext = abs.extension().string();
+        if (ext != ".c" && ext != ".cpp" && ext != ".cc" && ext != ".cxx")
+            return fail("invalid_target", "Unsupported source extension");
+        source_files_.push_back(abs.string());
+    } catch (const fs::filesystem_error&) {
+        return fail("read_error", "Cannot inspect source target");
     }
-    source_files_.push_back(abs.string());
+    if (error) *error = {};
+    return true;
 }
 
-void SourceManager::scanDirectory(const std::string& dir_path) {
-    if (!fs::is_directory(dir_path)) {
-        std::cerr << msg(MsgId::DirNotFound, dir_path) << "\n";
-        return;
-    }
-
+bool SourceManager::scanDirectory(const std::string& dir_path, InputError* error) {
+    auto fail = [&](const char* reason, const char* message) {
+        InputError failure{reason, "path", message};
+        if (error) *error = failure;
+        reportInputError(failure);
+        return false;
+    };
+    if (dir_path.empty() || dir_path.find('\0') != std::string::npos)
+        return fail("invalid_path", "Expected a non-empty directory path without NUL");
+    auto staged = source_files_;
     try {
+        if (!fs::is_directory(dir_path))
+            return fail("invalid_target", "Target is not a directory");
         for (const auto& entry : fs::recursive_directory_iterator(dir_path)) {
             if (!entry.is_regular_file()) continue;
 
             auto ext = entry.path().extension().string();
             if (ext == ".c" || ext == ".cpp" || ext == ".cc" || ext == ".cxx") {
-                source_files_.push_back(entry.path().string());
+                staged.push_back(fs::absolute(entry.path()).string());
             }
         }
-    } catch (const fs::filesystem_error& e) {
-        std::cerr << msg(MsgId::DirScanError, e.what()) << "\n";
+    } catch (const fs::filesystem_error&) {
+        return fail("read_error", "Directory traversal failed");
     }
+    source_files_ = std::move(staged);
+    if (error) *error = {};
+    return true;
 }
 
 namespace {
