@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH01-S03-U001
-
-### CS3-CH01-S03-U001 — Yerel scalar uninitialized-read kuralını ekle
-
-**Sonuç:** Yerel integer/bool değerinin atama öncesi gerçek okuması yeni experimental kimlikle raporlanır.
-
-**Kabul:**
-
-- int x; return x; ve arithmetic read pozitif; initializer, assignment-first, sizeof ve yalnız adres alma negatiftir.
-- Static/thread-local sıfır başlangıcı yanlış bulgu üretmez.
-- Pointer-only mevcut kuralın tüm CWE-457'yi kapsadığı iddia edilmez; kuralın kimliği ve registration'ı tutarlıdır.
-
-**Test bütçesi:** T1
-**Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/rules/UninitScalarRule*, src/analyzer/StaticAnalyzer.cpp, src/main.cpp, src/server/McpServer.cpp, src/core/RuleCapabilities.def, src/core/Capabilities.cpp, src/CMakeLists.txt, tests/UninitScalarRuleTest.cpp, tests/CMakeLists.txt, docs/capabilities.md, README.md, scripts/check_capabilities_sync.py, tests/CapabilitiesTest.cpp, tests/CapabilitiesCliTest.py
-**Bağımlılıklar:** Yok
+## FRONT — CS3-CH01-S03-U002
 
 ### CS3-CH01-S03-U002 — Scalar initialization durumunu CFG birleşimlerinde koru
 

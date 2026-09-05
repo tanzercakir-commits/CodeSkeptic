@@ -2,6 +2,19 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH01-S03-U001 — Yerel scalar uninitialized-read kuralını ekle
+
+- Commit: `e637439dc55d42a4565e32afcad5023e57eb1806`
+- Dal: `agent/cs3-ch01-s03-u001-uninitialized-scalars`
+- Implementer: `root-cs3-ch01-s03-u001-20260905`
+- Bağımsız denetçi: `independent-cwe-ch01-s03-u001-e637439-20260905`
+- İnceleme SHA-256: `dcb498109ca40aca7292b95100e3b0c874e08fa3049c9f2e933e25d6fe326600`
+- Tarih: 2026-09-05T03:25:10.959412+00:00
+- Sonuç: Yerel integer/bool değerinin atama öncesi gerçek okuması yeni experimental kimlikle raporlanır.
+- focused-tests: PASS; SHA-256 `ef4ace77bff63f6443df9b0215166466cb2f09a31a8c589e4281a3e3dcbe42ca`; `bash scripts/local_test.sh focused 'UninitScalarRuleTest.*:UninitPointerRuleExTest.*:CapabilitiesTest.*:FunctionFilterTest.*:McpServerTest.*'`
+- cli-smoke: PASS; SHA-256 `5c6bfa51e3d82ec6777a139e6e10e1914ad4420cb67825507e041f39470319cf`; `PYTHONDONTWRITEBYTECODE=1 python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH01-S03-U001/cli_smoke.py && bash scripts/local_test.sh smoke`
+- queue-check: PASS; SHA-256 `996fbc28a011084502d8dab89b28f4c18bc135e9332fe3c3bcf9c1e8f46a00a5`; `PYTHONDONTWRITEBYTECODE=1 bash scripts/check_docs_sync.sh && PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/project_queue.py check && PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/project_queue.py guard --base 70710aa64f276f33d387c9dca98554506c652a08`
+
 ## CS3-CH01-S02-U002 — Sabit pointer-offset kalan kapasitesini izle
 
 - Commit: `c32825c7873008fc1f38b4ff695590551a20fa7f`
