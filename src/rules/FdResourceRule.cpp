@@ -349,6 +349,19 @@ const ConstantArrayType* localFdArray(const VarDecl* var) {
         !array->getElementType().isVolatileQualified() ? array : nullptr;
 }
 
+// Pointer addresses use nonnegative offsets, including &scalar at offset 0.
+// Binding/status keys instead use -1 for the scalar value. Keep that conversion
+// at the dereference boundary so *p, p[0] and *(p+0) name the same storage.
+Slot pointedValueSlot(Slot address) {
+    if (!address || address.index < 0) return {};
+    if (const auto* array = localFdArray(address.variable))
+        return array->getSize().getLimitedValue() > static_cast<unsigned long long>(address.index) ? address : Slot{};
+    return address.index == 0 && address.variable->hasLocalStorage() &&
+        address.variable->getType()->isIntegerType() ? Slot{address.variable} : Slot{};
+}
+
+Slot valueSlot(const Expr* expr, const State& state, unsigned depth = 0);
+
 Slot pointerSlot(const Expr* expr, const State& state, unsigned depth = 0) {
     if (!expr || depth >= 32) return {};
     expr = expr->IgnoreParenImpCasts();
@@ -359,41 +372,57 @@ Slot pointerSlot(const Expr* expr, const State& state, unsigned depth = 0) {
     }
     const Expr* base = nullptr;
     const Expr* offset = nullptr;
+    bool subtract = false;
     if (const auto* address = dyn_cast<UnaryOperator>(expr);
         address && address->getOpcode() == UO_AddrOf) {
-        if (const auto* var = asVar(address->getSubExpr());
-            var && var->hasLocalStorage() && isInt(var->getType())) return {var};
-        const auto* subscript = dyn_cast<ArraySubscriptExpr>(address->getSubExpr()->IgnoreParenImpCasts());
-        if (subscript) { base = subscript->getBase(); offset = subscript->getIdx(); }
-    } else if (const auto* add = dyn_cast<BinaryOperator>(expr); add && add->getOpcode() == BO_Add) {
+        const Expr* operand = address->getSubExpr()->IgnoreParenImpCasts();
+        if (const auto* dereference = dyn_cast<UnaryOperator>(operand);
+            dereference && dereference->getOpcode() == UO_Deref)
+            return pointerSlot(dereference->getSubExpr(), state, depth + 1);
+        if (const auto* subscript = dyn_cast<ArraySubscriptExpr>(operand)) {
+            // Forming a one-past address is valid; reading that slot is not.
+            base = subscript->getBase(); offset = subscript->getIdx();
+        } else {
+            Slot value = valueSlot(operand, state, depth + 1);
+            if (!value) return {};
+            if (value.index == -1) value.index = 0;
+            return pointedValueSlot(value) ? value : Slot{};
+        }
+    } else if (const auto* add = dyn_cast<BinaryOperator>(expr);
+               add && (add->getOpcode() == BO_Add || add->getOpcode() == BO_Sub)) {
         base = add->getLHS(); offset = add->getRHS();
-        if (offset->getType()->isPointerType()) std::swap(base, offset);
+        subtract = add->getOpcode() == BO_Sub;
+        if (!subtract && offset->getType()->isPointerType()) std::swap(base, offset);
     }
     auto amount = slotOffset(offset);
+    if (amount && subtract) *amount = -*amount;
     Slot slot = pointerSlot(base, state, depth + 1);
     if (!slot || !amount || (*amount > 0 && slot.index > std::numeric_limits<long long>::max() - *amount)) return {};
     slot.index += *amount;
     return slot.index >= 0 ? slot : Slot{};
 }
 
-Slot valueSlot(const Expr* expr, const State& state) {
-    if (const auto* var = valueVariable(expr)) return {var};
-    if (!expr) return {};
+Slot valueSlot(const Expr* expr, const State& state, unsigned depth) {
+    if (!expr || depth >= 32) return {};
+    if (const auto* var = asVar(expr)) {
+        if (!var->getType()->isReferenceType()) return {var};
+        const auto found = state.arrayPointers.find(var);
+        return found == state.arrayPointers.end() ? Slot{} : pointedValueSlot(found->second);
+    }
     expr = expr->IgnoreParenImpCasts();
     if (const auto* assignment = dyn_cast<BinaryOperator>(expr);
         assignment && assignment->getOpcode() == BO_Assign && isInt(assignment->getType()))
-        expr = assignment->getLHS()->IgnoreParenImpCasts();
+        return valueSlot(assignment->getLHS(), state, depth + 1);
     if (const auto* dereference = dyn_cast<UnaryOperator>(expr);
-        dereference && dereference->getOpcode() == UO_Deref) return pointerSlot(dereference->getSubExpr(), state);
+        dereference && dereference->getOpcode() == UO_Deref)
+        return pointedValueSlot(pointerSlot(dereference->getSubExpr(), state, depth + 1));
     const auto* subscript = dyn_cast<ArraySubscriptExpr>(expr);
     if (!subscript) return {};
-    Slot slot = pointerSlot(subscript->getBase(), state);
+    Slot slot = pointerSlot(subscript->getBase(), state, depth + 1);
     const auto offset = slotOffset(subscript->getIdx());
     if (!slot || !offset || (*offset > 0 && slot.index > std::numeric_limits<long long>::max() - *offset)) return {};
     slot.index += *offset;
-    const auto* array = localFdArray(slot.variable);
-    if (slot.index < 0 || !array || array->getSize().getLimitedValue() <= static_cast<unsigned long long>(slot.index)) return {};
-    return slot;
+    return pointedValueSlot(slot);
 }
 
 std::optional<long long> integerConstant(const Expr* expr);
@@ -469,7 +498,8 @@ PipeStatus pipeStatus(const Expr* expr, const State& state, unsigned depth = 0) 
         status.success = compareStatus(status.success, *constant, op, unsignedCompare);
         return status;
     }
-    const auto found = state.pipeStatuses.find(valueVariable(expr));
+    const Slot value = valueSlot(expr, state);
+    const auto found = state.pipeStatuses.find(value.index == -1 ? value.variable : nullptr);
     return found == state.pipeStatuses.end() ? PipeStatus{} : found->second;
 }
 
@@ -904,6 +934,14 @@ public:
         if (const auto* declaration = dyn_cast<DeclStmt>(stmt)) {
             for (const Decl* decl : declaration->decls()) {
                 const auto* var = dyn_cast<VarDecl>(decl);
+                if (var && var->hasInit() && var->getType()->isReferenceType() &&
+                    var->getType()->getPointeeType()->isIntegerType()) {
+                    Slot value = valueSlot(var->getInit(), out);
+                    if (value.index == -1) value.index = 0;
+                    if (pointedValueSlot(value)) out.arrayPointers[var] = value;
+                    else out.arrayPointers.erase(var);
+                    continue;
+                }
                 if (var && var->hasInit() && var->getType()->isPointerType()) {
                     Slot pointer = pointerSlot(var->getInit(), out);
                     if (pointer) out.arrayPointers[var] = pointer;
@@ -1003,14 +1041,26 @@ public:
                 // A mutable address argument can overwrite a saved pipe status.
                 // A later comparison of that variable must not erase ownership
                 // acquired before the unrelated call.
-                for (const Expr* arg : call->arguments()) {
+                const auto* callee = call->getDirectCallee();
+                for (unsigned i = 0; i < call->getNumArgs(); ++i) {
+                    const Expr* arg = call->getArg(i);
+                    if (callee && i < callee->getNumParams()) {
+                        const QualType formal = callee->getParamDecl(i)->getType();
+                        if (formal->isReferenceType() && !formal->getPointeeType().isConstQualified()) {
+                            const Slot value = valueSlot(arg, out);
+                            if (value && value.index == -1) out.pipeStatuses.erase(value.variable);
+                        }
+                    }
                     if (!arg->getType()->isPointerType() || arg->getType()->getPointeeType().isConstQualified()) continue;
+                    const Slot pointed = pointedValueSlot(pointerSlot(arg, out));
                     const auto* address = dyn_cast<UnaryOperator>(arg->IgnoreParenImpCasts());
                     if (address && address->getOpcode() == UO_AddrOf) {
-                        out.pipeStatuses.erase(asVar(address->getSubExpr()));
-                        out.arrayPointers.erase(asVar(address->getSubExpr()));
+                        const auto* var = asVar(address->getSubExpr());
+                        out.pipeStatuses.erase(var);
+                        // &reference exposes the referent, not a reseatable
+                        // pointer variable. Preserve its storage identity.
+                        if (var && var->getType()->isPointerType()) out.arrayPointers.erase(var);
                     }
-                    const Slot pointed = pointerSlot(arg, out);
                     if (pointed && pointed.index == -1) out.pipeStatuses.erase(pointed.variable);
                 }
                 applyModeledCallEffects(call, out);

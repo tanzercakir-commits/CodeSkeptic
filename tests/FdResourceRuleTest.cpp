@@ -268,6 +268,54 @@ TEST(FdResourceRuleTest, PipeIndirectStatusAssignmentInvalidatesOnlyTheWrittenVa
     }
 }
 
+TEST(FdResourceRuleTest, PipeScalarAliasSpellingsShareOneStorageIdentity) {
+    for (const auto* call : {"pipe(fds)", "pipe2(fds,0)"}) {
+        SCOPED_TRACE(call);
+        const auto prefix = std::string("void f(){int fds[2];int rc=") + call + ";";
+        for (const auto* write : {
+            "int* p=&rc;*p=-1;", "int* p=&rc;p[0]=-1;", "int* p=&rc;0[p]=-1;",
+            "int* p=&rc;*(p+0)=-1;", "int* p=&rc;*(0+p)=-1;", "int* p=&rc;*(&p[0])=-1;",
+            "int* p=&rc;*(&*p)=-1;", "int* p=&rc;*((p+1)-1)=-1;",
+            "int* p=&rc;++p;--p;*p=-1;", "int* p=&rc;int* q=p;q[0]=-1;",
+            "int* p=&rc;p[0]-=1;", "int* p=&rc;--p[0];", "int& alias=rc;alias=-1;",
+            "int& alias=rc;--alias;", "int& alias=rc;alias-=1;",
+            "int& alias=rc;int* p=&alias;p[0]=-1;"}) {
+            SCOPED_TRACE(write);
+            EXPECT_EQ(runFdRule(prefix + write +
+                "if(rc<0)return;close(fds[0]);close(fds[1]);}").size(), 2u);
+            EXPECT_TRUE(runFdRule(prefix + "int saved=rc;" + write +
+                "if(saved<0)return;close(fds[0]);close(fds[1]);}").empty());
+        }
+    }
+}
+
+TEST(FdResourceRuleTest, PipeScalarAliasReadsAndMutableCallsUseTheSameValue) {
+    for (const auto* call : {"pipe(fds)", "pipe2(fds,0)"}) {
+        SCOPED_TRACE(call);
+        const auto prefix = std::string("void f(){int fds[2];int rc=") + call + ";int* p=&rc;int& r=rc;";
+        for (const auto* value : {"*p", "p[0]", "0[p]", "*(p+0)", "r"}) {
+            SCOPED_TRACE(value);
+            EXPECT_TRUE(runFdRule(prefix + "if(" + value + "<0)return;close(fds[0]);close(fds[1]);}").empty());
+            EXPECT_TRUE(runFdRule(prefix + "int saved=" + value +
+                ";rc=-1;if(saved<0)return;close(fds[0]);close(fds[1]);}").empty());
+        }
+        const std::string declarations = "void mutate(int*);void mutate_ref(int&);void inspect(const int*);void inspect_ref(const int&);";
+        for (const auto* write : {"mutate(p+0);", "mutate(&r);", "mutate_ref(r);", "mutate_ref(p[0]);"}) {
+            SCOPED_TRACE(write);
+            EXPECT_EQ(runFdRule(declarations + prefix + write +
+                "if(rc<0)return;close(fds[0]);close(fds[1]);}").size(), 2u);
+            EXPECT_TRUE(runFdRule(declarations + prefix + "int saved=rc;" + write +
+                "if(saved<0)return;close(fds[0]);close(fds[1]);}").empty());
+        }
+        EXPECT_TRUE(runFdRule(declarations + prefix +
+            "inspect(p+0);inspect_ref(r);if(rc<0)return;close(fds[0]);close(fds[1]);}").empty());
+        EXPECT_TRUE(runFdRule(prefix +
+            "if(rc<0)return;int& read=fds[0];int& write=fds[1];close(read);close(write);}").empty());
+    }
+    EXPECT_TRUE(runFdRule("void f(){int fds[2];int* p=&fds[2];p-=2;pipe(p);close(fds[0]);close(fds[1]);}").empty());
+    EXPECT_EQ(runFdRule("void f(){int fds[2];int* p=&fds[2];p-=2;pipe(p);}").size(), 2u);
+}
+
 TEST(FdResourceRuleTest, PipeFailureRestoresAlreadyAppliedOutputOwnershipEffects) {
     for (const auto* call : {"pipe(fds)", "pipe2(fds,0)"}) {
         SCOPED_TRACE(call);
