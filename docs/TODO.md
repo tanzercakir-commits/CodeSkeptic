@@ -2,23 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH01-S06-U003
-
-### CS3-CH01-S06-U003 — accept ailesinin wrapper sahipliğini ortak özette koru
-
-**Sonuç:** accept/accept4 çağrısından dönen sahiplik ortak function summary üzerinden caller'a taşınır; wrapper arkasındaki sızıntı kaybolmaz.
-
-**Kabul:**
-
-- S04-U001 sırasında gerçek CLI ile görülen accept-returning wrapper eksikliği önce değişikliksiz RED ile doğrulanır; doğrudan native çağrı pozitif kontrolü aynı fixture'da bulunur.
-- Gerçek C/C++ accept/accept4 imzaları, tek ve çok katlı return wrapper'ları ve caller close/leak ayrımı modellenir; dinlenen descriptor borrowed kalır, -1 yalnız başarısızlıktır.
-- Yalnız isim eşleşen method/namespace/yanlış prototip ve owned olmayan constant-return fonksiyonlar otomatik owned sayılmaz; ortak producer tanımı ile FdResourceRule sözleşmesi ayrışmaz.
-- Mevcut open/socket/dup, FILE/DIR, summary model/conflict ve cross-TU davranışları tam Linux suite ve ilgili ownership corpus/gerçek CLI diliminde korunur; çalışma dışı kod donor olarak kopyalanmaz.
-
-**Test bütçesi:** T2
-**Kontroller:** linux-suite, relevant-corpus, queue-check
-**Kapsam:** src/engine/FunctionSummary*, src/rules/FdResourceRule*, tests/InterproceduralTest.cpp, tests/FdResourceRuleTest.cpp, tests/MemoryLeakRuleExTest.cpp
-**Bağımlılıklar:** CS3-CH01-S04-U001
+## FRONT — CS3-CH01-S07-U001
 
 ### CS3-CH01-S07-U001 — Mevcut CI kapılarını agent dalı push olayına bağla
 

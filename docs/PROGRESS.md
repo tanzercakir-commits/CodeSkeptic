@@ -2,6 +2,19 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH01-S06-U003 — accept ailesinin wrapper sahipliğini ortak özette koru
+
+- Commit: `aedcf460a0d81cd0b4ef9f44a728aa698c155573`
+- Dal: `agent/cs3-ch01-s06-u003-accept-wrapper-summary`
+- Implementer: `root-cs3-ch01-s06-u003-20260905`
+- Bağımsız denetçi: `independent-cwe-ch01-s06-u003-aedcf46-20260905`
+- İnceleme SHA-256: `3fbae45ffe4cef65fc69eb5db53b010b2b8ae1acbd4157ec4ff6123768f2bdb5`
+- Tarih: 2026-09-05T14:09:42.710261+00:00
+- Sonuç: accept/accept4 çağrısından dönen sahiplik ortak function summary üzerinden caller'a taşınır; wrapper arkasındaki sızıntı kaybolmaz.
+- linux-suite: PASS; SHA-256 `6aa7887bf179da8611c263706048123751c79cfa35bb00f3a115e27eea4b4209`; `bash scripts/local_test.sh full`
+- relevant-corpus: PASS; SHA-256 `f43c1f27216a10041bed5f46e8fb76d6cbb08fd826565d8b7754a6abddd7f07e`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH01-S06-U003/corpus.py && python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH01-S06-U003/observer.py`
+- queue-check: PASS; SHA-256 `39ebbc132774353b0208758696f1d2564e99953c016e06b36891520b8df8928c`; `python3 -B scripts/project_queue.py check && python3 -B scripts/project_queue.py guard --base c61ae739`
+
 ## CS3-CH01-S06-U002 — Ortak integer literal ve guard çözümünde unsigned değeri koru
 
 - Commit: `d1ddc8d64fb9f669af1ca82b0d76583307a097bc`
