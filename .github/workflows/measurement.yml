@@ -1,6 +1,9 @@
 name: Measurement delta
 
 on:
+  push:
+    branches: ["agent/cs3-*"]
+    paths: ["ci/regression-checkpoint.json"]
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
 
@@ -8,11 +11,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: measurement-${{ github.event.pull_request.number }}
+  group: measurement-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   base-head:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -92,5 +96,54 @@ jobs:
             measurement-head.json
             measurement-delta.json
             measurement-delta.md
+          if-no-files-found: error
+          retention-days: 14
+
+  checkpoint-plan:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      CHECKPOINT_WORKFLOW_SHA: ${{ github.workflow_sha }}
+    outputs:
+      selected: ${{ steps.request.outputs.selected }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Select only a fresh explicit checkpoint at event head
+        id: request
+        run: python3 -B scripts/run_regression_checkpoint.py plan --lane measurement --github-output "$GITHUB_OUTPUT"
+
+  checkpoint-measurement:
+    needs: checkpoint-plan
+    if: needs.checkpoint-plan.outputs.selected == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CHECKPOINT_WORKFLOW_SHA: ${{ github.workflow_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install LLVM 20 and checkpoint tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-20-dev libclang-20-dev libzstd-dev zlib1g-dev clang-20 ninja-build time python3-yaml
+      - name: Test checkpoint and workflow policy
+        run: |
+          /usr/bin/python3 -B tests/RegressionCheckpointTest.py
+          /usr/bin/python3 -B tests/WorkflowPolicyTest.py
+      - name: Build exact versions and measure identical immutable inputs
+        run: |
+          python3 -B scripts/run_regression_checkpoint.py measure --lane measurement \
+            --workspace "$RUNNER_TEMP/checkpoint-measure-work" \
+            --output "$RUNNER_TEMP/checkpoint-measure-output"
+      - name: Upload exact measurement artifact (failure is not PASS)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkpoint-measurement-${{ github.run_id }}-${{ github.run_attempt }}-measurement
+          path: ${{ runner.temp }}/checkpoint-measure-output
           if-no-files-found: error
           retention-days: 14

@@ -5,6 +5,9 @@ name: Deterministic real-world campaign
 # project repetition, so a failed project cannot erase another project's
 # evidence and no hosted job pretends to span an aggregate campaign window.
 on:
+  push:
+    branches: ["agent/cs3-*"]
+    paths: ["ci/regression-checkpoint.json"]
   workflow_dispatch:
     inputs:
       tier:
@@ -28,6 +31,7 @@ concurrency:
 
 jobs:
   plan:
+    if: github.event_name != 'push'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -61,6 +65,7 @@ jobs:
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   build-analyzer:
+    if: github.event_name != 'push'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -144,7 +149,7 @@ jobs:
           retention-days: 30
 
   aggregate:
-    if: always()
+    if: always() && github.event_name != 'push'
     needs: [plan, build-analyzer, scan]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -172,5 +177,139 @@ jobs:
         with:
           name: realworld-aggregate-${{ github.sha }}
           path: aggregate
+          if-no-files-found: error
+          retention-days: 30
+
+  checkpoint-plan:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      CHECKPOINT_WORKFLOW_SHA: ${{ github.workflow_sha }}
+    outputs:
+      selected: ${{ steps.request.outputs.selected }}
+      matrix: ${{ steps.request.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Select fresh explicit request and all 48 independent shards
+        id: request
+        run: python3 -B scripts/run_regression_checkpoint.py plan --lane realworld --github-output "$GITHUB_OUTPUT"
+
+  checkpoint-build:
+    name: checkpoint-build-${{ matrix.side }}
+    needs: checkpoint-plan
+    if: needs.checkpoint-plan.outputs.selected == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        side: [base, head]
+    env:
+      CHECKPOINT_WORKFLOW_SHA: ${{ github.workflow_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install LLVM 20 and build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-20-dev libclang-20-dev libzstd-dev zlib1g-dev clang-20 ninja-build
+      - name: Build and bind exact shared analyzer
+        run: |
+          python3 -B scripts/run_regression_checkpoint.py build --lane realworld \
+            --side "${{ matrix.side }}" --workspace "$RUNNER_TEMP/checkpoint-build-work" \
+            --output "$RUNNER_TEMP/checkpoint-build-output"
+      - name: Upload bound analyzer
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkpoint-realworld-${{ github.run_id }}-${{ github.run_attempt }}-binary-${{ matrix.side }}
+          path: ${{ runner.temp }}/checkpoint-build-output
+          if-no-files-found: error
+          retention-days: 30
+
+  checkpoint-scan:
+    name: checkpoint-scan-${{ matrix.side }}-${{ matrix.project }}-${{ matrix.repetition }}
+    needs: [checkpoint-plan, checkpoint-build]
+    if: needs.checkpoint-plan.outputs.selected == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix: ${{ fromJSON(needs.checkpoint-plan.outputs.matrix) }}
+    env:
+      CHECKPOINT_WORKFLOW_SHA: ${{ github.workflow_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install pinned-project build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-20 cmake ninja-build libssl-dev libxml2-dev \
+            libbz2-dev liblzma-dev libzstd-dev zlib1g-dev meson bear gperf libcap-dev libmount-dev
+      - name: Download only this exact run-attempt side analyzer
+        uses: actions/download-artifact@v4
+        with:
+          name: checkpoint-realworld-${{ github.run_id }}-${{ github.run_attempt }}-binary-${{ matrix.side }}
+          path: ${{ runner.temp }}/checkpoint-binary
+      - name: Run one fresh independent side-project-repetition
+        run: |
+          python3 -B scripts/run_regression_checkpoint.py shard --lane realworld \
+            --side "${{ matrix.side }}" --project "${{ matrix.project }}" --repetition "${{ matrix.repetition }}" \
+            --binary-artifact "$RUNNER_TEMP/checkpoint-binary" \
+            --workspace "$RUNNER_TEMP/checkpoint-shard-work" --output "$RUNNER_TEMP/checkpoint-shard-output"
+      - name: Preserve shard evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkpoint-realworld-${{ github.run_id }}-${{ github.run_attempt }}-shard-${{ matrix.side }}-${{ matrix.project }}-${{ matrix.repetition }}
+          path: ${{ runner.temp }}/checkpoint-shard-output
+          if-no-files-found: error
+          retention-days: 30
+
+  checkpoint-aggregate:
+    if: always() && needs.checkpoint-plan.outputs.selected == 'true'
+    needs: [checkpoint-plan, checkpoint-build, checkpoint-scan]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CHECKPOINT_WORKFLOW_SHA: ${{ github.workflow_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Download distinct exact-attempt artifacts without merging identities
+        uses: actions/download-artifact@v4
+        with:
+          pattern: checkpoint-realworld-${{ github.run_id }}-${{ github.run_attempt }}-*
+          path: ${{ runner.temp }}/checkpoint-artifacts
+          merge-multiple: false
+      - name: Record actual predecessor job conclusions
+        env:
+          CHECKPOINT_NEEDS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          jobs = json.loads(os.environ["CHECKPOINT_NEEDS"])
+          result = {name: jobs[name]["result"] for name in ("checkpoint-plan", "checkpoint-build", "checkpoint-scan")}
+          (Path(os.environ["RUNNER_TEMP"]) / "checkpoint-needs.json").write_text(json.dumps(result), encoding="utf-8")
+          PY
+      - name: Verify all raw receipts and unchanged base-head quality pins
+        run: |
+          python3 -B scripts/run_regression_checkpoint.py aggregate --lane realworld \
+            --artifacts "$RUNNER_TEMP/checkpoint-artifacts" --needs "$RUNNER_TEMP/checkpoint-needs.json" \
+            --workspace "$RUNNER_TEMP/checkpoint-aggregate-work" --output "$RUNNER_TEMP/checkpoint-aggregate-output"
+      - name: Upload aggregate artifact (hosted completion checked separately)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkpoint-realworld-${{ github.run_id }}-${{ github.run_attempt }}-aggregate
+          path: ${{ runner.temp }}/checkpoint-aggregate-output
           if-no-files-found: error
           retention-days: 30

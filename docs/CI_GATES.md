@@ -85,9 +85,139 @@ The command is `actionlint -shellcheck= -pyflakes= .github/workflows/ci.yml
 ShellCheck/Pyflakes companions are not installed and are explicitly disabled;
 do not claim their checks passed. Also run `python3 -B scripts/project_queue.py check`.
 
-The next unit, S07-U002, adds exact base/head checkpoint execution and evidence
-validation. S07-U003 then requires actual same-head Linux, Windows, Juliet,
-measurement and eight-project repeated base/head real-world qualification.
-Until those receipts exist, local tests and a green Project FIFO job establish
-neither hosted product correctness nor release readiness. Main integration
-remains a separate owner-authorized action.
+## Explicit same-input base/head checkpoint (S07-U002)
+
+`ci/regression-checkpoint.json` is initially **disabled**: this unit delivers
+wiring and local evidence, not a successful hosted campaign. S07-U003 owns its
+first activation and qualification. The request pins the full base SHA, the same
+input SHA, the canonical real-world manifest digest and the only supported
+profile, `nightly-weekend-three-repeats`. The head and workflow SHA must both
+equal the actual push event SHA; run ID, attempt, repository and agent ref come
+from Actions, not from a freely chosen receipt field.
+
+Both measurement and real-world workflows now have an additive push lane for
+`agent/cs3-*`, filtered to that request file. The cheap `checkpoint-plan` job
+requires an enabled request with a **new request_id in the final candidate
+commit**, compared with its first parent. Inherited requests on new branches
+and ordinary ledger commits do not launch a heavy campaign, even if a broad
+new-branch push path comparison includes the old request. A disabled request
+also selects no heavy jobs. A malformed request fails closed. Do not push a
+request buried below a later ledger commit and expect that later SHA to qualify.
+Existing PR measurement and scheduled/manual real-world jobs remain intact.
+
+`scripts/run_regression_checkpoint.py` has `plan`, `build`, `measure`, `shard`
+and `aggregate` modes. It creates fresh workspaces under `RUNNER_TEMP`, builds
+the exact versions and calls the existing measurement and real-world runners.
+It does not install tools, implicitly fetch a missing base commit, or reuse
+cached campaign receipts. Hosted jobs explicitly install their dependencies;
+the existing real-world runner fetches the manifest-pinned upstream projects.
+There is no corresponding installation on the owner's computer.
+
+Both analyzers use one common exact-base checkout. All its regular tracked
+files are hashed and matched against the pinned Git objects, including the
+thesis fixtures, source tree, manifest and copied project profiles. Dirty or
+ignored extra inputs are rejected, and the identity is checked again after
+execution. Measurement uses the same compilation database and source paths
+for both binaries and binds the database bytes. The complete input checkout
+must stay outside generated build/output directories.
+
+The real-world profile contains eight pinned projects and three repetitions
+for **each** analyzer: 48 independent side/project/repetition shards, with at
+most six running concurrently. The two analyzers are built once per side and
+shared as digest-bound artifacts. Each shard keeps the existing project timeout;
+base and head are not squeezed sequentially into one shard's time limit. Four
+existing aggregates validate base/nightly, base/weekend, head/nightly and
+head/weekend with unchanged pins and three-repeat determinism.
+
+### What actually blocks acceptance
+
+Measurement retains the existing comparator and frozen CLEAN/BUG floors. The
+wrapper additionally requires exact cases and source identities, complete base
+and head coverage, consistent counts and no unavailable/incomplete results.
+Measurement timing, RSS and fingerprint differences are informational; they
+cannot excuse a failed quality floor. Some frozen BUG cases intentionally have
+a zero minimum: the checkpoint does not silently change those expectations.
+
+Real-world findings, fingerprint digest, exit classification, TU-list digest
+and all coverage fields remain **exact blocking pins**, not informational
+measurement deltas. Every raw analyzer report, TU list, accepted receipt and
+receipt checksum is revalidated. Missing projects/repetitions, substituted
+binaries, resumed receipts and failed/skipped/cancelled jobs cannot qualify.
+No pin, baseline, quality floor or hosted protection is lowered here.
+
+### Evidence collection and independent validation
+
+Each artifact envelope binds the configuration digest, full input identity,
+source/binary identity and workflow/run/attempt context to exact file hashes.
+The measurement artifact includes both measurements, recomputed JSON/Markdown
+comparison, binary build bindings and the shared compilation database. The
+real-world run produces two binary, 48 raw shard and one aggregate artifacts.
+Artifact names contain lane, run ID and attempt; aggregate downloads keep
+identities separate rather than merging files with duplicate names.
+
+After a run finishes, the primary obtains the following **directly from GitHub**:
+
+- Run metadata from `repos/{owner}/{repo}/actions/runs/{run_id}`.
+- That exact attempt's jobs from
+  `repos/{owner}/{repo}/actions/runs/{run_id}/attempts/{attempt}/jobs`.
+- The complete artifact catalog from
+  `repos/{owner}/{repo}/actions/runs/{run_id}/artifacts`.
+- Each selected artifact's ZIP from
+  `repos/{owner}/{repo}/actions/artifacts/{artifact_id}/zip`, saved as
+  `{artifact_id}.zip` in a dedicated archive directory.
+
+Fetch all pages and combine their arrays while preserving `total_count`; a
+partial page is rejected. Independently construct `context.json` with exact
+`head_sha`, `workflow_sha`, decimal-string `run_id`/`run_attempt`, `repository`,
+`ref` and `lane`. Use the candidate's request JSON and a fresh detached checkout
+of its pinned base as `--inputs-root`. Then, once per lane:
+
+```bash
+python3 -B scripts/verify_regression_checkpoint.py \
+  --config ci/regression-checkpoint.json --context /evidence/context.json \
+  --inputs-root /checkouts/exact-base --run-json /evidence/run.json \
+  --jobs-json /evidence/jobs.json --catalog-json /evidence/artifacts.json \
+  --archives /evidence/archives --output /evidence/validated.json
+```
+
+The output must not already exist. The verifier makes no network requests and
+executes no downloaded binary. It requires actual completed/successful run and
+checkpoint job records from the same attempt, exact expected artifact IDs,
+unexpired catalog records and GitHub's archive SHA-256/byte size before safe
+extraction. It rejects duplicate/traversing/symlink ZIP entries, corrupt or
+oversized archives and any envelope/raw-evidence mismatch. It recomputes the
+result instead of trusting an aggregate's own PASS. Downloads are capped at
+2 GiB per archive and 8 GiB total; extracted data has the same size limits.
+
+Use a complete workflow rerun, not a partial failed-jobs rerun: successful jobs
+or artifacts inherited from an older attempt cannot satisfy a new attempt's
+complete identity set. Cancelled or incomplete runs are not usable evidence.
+
+These checks are integrity and consistency checks, **not a cryptographic
+attestation of an honest producer**. A fabricated but internally consistent API
+JSON fixture is not GitHub evidence. The caller and independent verifier must
+check the actual remote repository/run/attempt and preserve the fetched records
+and archive digests. The result's provenance explicitly states this boundary.
+
+### Local checks versus hosted qualification
+
+Run `python3 -B tests/RegressionCheckpointTest.py` (PyYAML required for its real
+workflow checks), existing measurement/real-world/workflow policy tests and
+actionlint on both changed workflows. The checkpoint test guards the entire
+parsed legacy workflow against verified POP `4a1626f4f809bb4261993b277bead6395719974b`
+after removing only the declared additive lane changes. Synthetic manifests and
+receipts are test fixtures only, never substitutes for the real pinned corpus.
+
+The actual CLI slice is explicit:
+`CODESKEPTIC_CHECKPOINT_BINARY=/absolute/codeskeptic python3 -B tests/RegressionCheckpointTest.py RealCliSliceTest`.
+It runs the real binary twice against one small fixed input set and validates
+the generated measurement artifact; using the same binary twice tests the
+pipeline, not a new-version quality claim. Without the environment variable,
+this test is explicitly skipped, not claimed as a successful CLI check. S07-U002
+also requires its stated T2 Linux suite, queue and independent exact-head review.
+
+S07-U003 separately requires actual same-head Linux, Windows, Juliet,
+measurement and all 48 real-world shards. Until those receipts exist, local
+tests and a green Project FIFO job establish neither hosted product correctness
+nor release readiness. Main integration remains a separate owner-authorized
+action; neither checkpoint activation nor a PASS grants merge authority.
