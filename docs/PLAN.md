@@ -1,6 +1,6 @@
 # CodeSkeptic — CWE Ürün Planı
 
-Sürüm: 14. Eski planın devamı değil; main tabanlı yeni program.
+Sürüm: 15. Eski planın devamı değil; main tabanlı yeni program.
 
 PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.
 
@@ -323,7 +323,7 @@ PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. G
 
 **Test bütçesi:** T1
 **Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/config/Config*, src/source_manager/SourceManager*, src/core/Messages*, src/server/McpServer*, tests/ConfigTest.cpp, tests/SourceManagerTest.cpp, tests/McpServerTest.cpp
+**Kapsam:** src/config/Config*, src/source_manager/SourceManager*, src/core/Messages*, src/server/McpServer*, tests/ConfigTest.cpp, tests/SourceManagerTest.cpp, tests/McpServerTest.cpp, tests/CMakeLists.txt
 **Bağımlılıklar:** Yok
 
 #### CS3-CH02-S01-U003 — Çoklu producer kural seçimini diagnostic ID ile tutarlı uygula
