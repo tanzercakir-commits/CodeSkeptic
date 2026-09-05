@@ -19,6 +19,7 @@ add_executable(codeskeptic_tests
     VerdictIntegrityTest.cpp
     JsonReporterTest.cpp
     UninitPointerRuleExTest.cpp
+    UninitScalarRuleTest.cpp
     MemoryLeakRuleExTest.cpp
     FdResourceRuleTest.cpp
     DivByZeroRuleTest.cpp

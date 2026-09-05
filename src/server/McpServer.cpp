@@ -16,6 +16,7 @@
 #include "rules/ContractRule.h"
 #include "rules/PolicyRule.h"
 #include "rules/UninitPointerRule_Ex.h"
+#include "rules/UninitScalarRule.h"
 
 #include <llvm/Support/JSON.h>
 #include <llvm/Support/raw_ostream.h>
@@ -210,6 +211,7 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
 
     codeskeptic::StaticAnalyzer analyzer(std::move(config));
     analyzer.addRule<codeskeptic::UninitPointerRule_Ex>();
+    analyzer.addRule<codeskeptic::UninitScalarRule>();
     analyzer.addRule<codeskeptic::MemoryLeakRule_Ex>();
     analyzer.addRule<codeskeptic::FdResourceRule>();
     analyzer.addRule<codeskeptic::DivByZeroRule>();

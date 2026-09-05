@@ -41,14 +41,14 @@ legacy = {
 for field, expected in legacy.items():
     if payload.get(field) != expected:
         fail(f"legacy {field} expected={expected!r} got={payload.get(field)!r}")
-if len(payload.get("rules", [])) != 14:
+if len(payload.get("rules", [])) != 15:
     fail("legacy rules list is missing or incomplete")
 if payload.get("success_metrics", {}).get("cwe_count") is not False:
     fail("CWE count must be published as a non-metric")
 
 rules = payload.get("rule_capabilities")
-if not isinstance(rules, list) or len(rules) != 14:
-    fail(f"expected 14 rules, got {len(rules) if isinstance(rules, list) else type(rules)}")
+if not isinstance(rules, list) or len(rules) != 15:
+    fail(f"expected 15 rules, got {len(rules) if isinstance(rules, list) else type(rules)}")
 if len({rule.get("id") for rule in rules}) != len(rules):
     fail("duplicate rule id")
 
@@ -99,6 +99,13 @@ for field, expected in expected_alloc_size.items():
             f"got={alloc_size.get(field)!r}"
         )
 
+scalar = next((rule for rule in rules if rule.get("id") == "uninit-scalar"), None)
+if scalar is None:
+    fail("uninit-scalar capability is missing")
+for field, expected in expected_alloc_size.items():
+    if scalar.get(field) != expected:
+        fail(f"uninit-scalar {field} expected={expected!r} got={scalar.get(field)!r}")
+
 out_of_scope = {
     item.get("id")
     for item in payload.get("capabilities", {}).get("out_of_scope", [])
@@ -126,4 +133,4 @@ text_result = subprocess.run(
 if text_result.returncode != 0 or "experimental rules:" not in text_result.stdout:
     fail("human-readable discovery contract failed")
 
-print("CAPABILITIES_CLI_OK schema=2 rules=14 supported=7 out_of_scope=5")
+print("CAPABILITIES_CLI_OK schema=2 rules=15 supported=7 out_of_scope=5")

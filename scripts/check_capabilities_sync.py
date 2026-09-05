@@ -49,8 +49,8 @@ for line_no, raw in enumerate(REGISTRY.read_text(encoding="utf-8").splitlines(),
         fail(f"duplicate registry id: {rule_id}")
     entries[rule_id] = values
 
-if len(entries) != 14:
-    fail(f"expected 14 public rule capabilities, got {len(entries)}")
+if len(entries) != 15:
+    fail(f"expected 15 public rule capabilities, got {len(entries)}")
 
 for rule_id, (tier, default, quality, blocking) in entries.items():
     if tier == "supported" and not (default and quality and blocking):

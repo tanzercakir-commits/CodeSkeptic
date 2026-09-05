@@ -210,6 +210,7 @@ others are weakest: gating *new* changes (human or AI-generated).
 | Rule | ID | Tier | Verdict | Detects |
 |------|----|------|---------|---------|
 | Uninitialized pointer | `uninit-ptr` | experimental | report-only | Dereference of a pointer that may be unassigned on some path (CFG dataflow) |
+| Uninitialized scalar | `uninit-scalar` | experimental | report-only | Actual reads of automatic integer/bool locals before initialization in straight-line code; escaped bindings remain unknown (CWE-457 subset, not all uninitialized storage) |
 | Memory leak | `memory-leak` | supported | blocking | Leaks at function exit and reassignment leaks, `malloc`/`calloc`/`strdup`/`free` and `new`/`delete` (CFG dataflow with escape analysis) |
 | Double free | `double-free` | supported | blocking | Freeing a pointer already in freed state (shares the memory-leak dataflow) |
 | Use after free | `use-after-free` | supported | blocking | Dereference (`*p`, `p->`, `p[i]`) of a pointer in freed state (shares the memory-leak dataflow) |

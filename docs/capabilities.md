@@ -51,6 +51,7 @@ stay silent until their source/contract/policy signal exists.
 | Rule | ID | Tier | Default | Quality gate | Verdict |
 |---|---|---|:---:|:---:|---|
 | Uninitialized pointer | `uninit-ptr` | experimental | on | no | report-only |
+| Uninitialized scalar | `uninit-scalar` | experimental | on | no | report-only |
 | Memory leak | `memory-leak` | supported | on | yes | blocking |
 | Double free | `double-free` | supported | on | yes | blocking |
 | Use after free | `use-after-free` | supported | on | yes | blocking |
@@ -64,6 +65,16 @@ stay silent until their source/contract/policy signal exists.
 | Inferred assumption | `assumption` | experimental | off | no | report-only |
 | Contract verification | `contract` | experimental | on | no | report-only |
 | Policy enforcement | `policy` | experimental | on | no | report-only |
+
+`uninit-scalar` currently handles straight-line automatic integer/bool value
+reads, including compound updates. Initializers, assignment-first, ordinary
+`sizeof`/`alignof`/`noexcept`, address-taking and zero-initialized static/thread-local
+storage do not invent uninitialized reads. Address/reference escapes become
+unknown, not proven initialized. Volatile locals, enums, aggregates, heap storage,
+branch/loop merges, exception flow and unsupported/unspecified expression sequencing
+are outside this first unit; such functions do not acquire a straight-line proof.
+`uninit-ptr` remains the separate pointer-dereference rule. Neither rule claims
+complete CWE-457 coverage or a measured precision tier for the new scalar subset.
 
 The supported evidence is the pinned Juliet precision gate: double-free
 1.000 (101 TP / 0 FP), use-after-free 1.000 (212 / 0), div-by-zero 1.000

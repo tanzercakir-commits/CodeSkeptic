@@ -8,7 +8,7 @@
 
 TEST(CapabilitiesTest, RegistryEnforcesTierBehavior) {
     const auto& rules = codeskeptic::ruleCapabilities();
-    EXPECT_EQ(rules.size(), 14u);
+    EXPECT_EQ(rules.size(), 15u);
 
     for (const auto& rule : rules) {
         if (rule.tier == codeskeptic::CapabilityTier::Supported) {
@@ -36,6 +36,17 @@ TEST(CapabilitiesTest, RegistryEnforcesTierBehavior) {
     // Extensions and unknown future diagnostics fail closed until they are
     // classified deliberately.
     EXPECT_TRUE(codeskeptic::findingBlocksVerdict("unknown-rule"));
+}
+
+TEST(CapabilitiesTest, ScalarInitializationIsSeparateAndReportOnly) {
+    const auto* scalar = codeskeptic::findRuleCapability("uninit-scalar");
+    ASSERT_NE(scalar, nullptr);
+    EXPECT_EQ(scalar->tier, codeskeptic::CapabilityTier::Experimental);
+    EXPECT_TRUE(scalar->default_enabled);
+    EXPECT_FALSE(scalar->quality_gated);
+    EXPECT_FALSE(scalar->blocks_verdict);
+    EXPECT_FALSE(codeskeptic::findingBlocksVerdict("uninit-scalar"));
+    EXPECT_NE(codeskeptic::findRuleCapability("uninit-ptr"), nullptr);
 }
 
 TEST(CapabilitiesTest, JsonSurfacePublishesTieredScopeContract) {

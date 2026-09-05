@@ -4,6 +4,7 @@
 // entry on one line: scripts/check_capabilities_sync.py also reads it to
 // prove README.md and docs/capabilities.md publish the same contract.
 CODESKEPTIC_RULE_CAPABILITY("uninit-ptr", Experimental, true, false, false, "per-rule precision sample pending")
+CODESKEPTIC_RULE_CAPABILITY("uninit-scalar", Experimental, true, false, false, "straight-line automatic integer/bool subset; independent precision sample pending")
 CODESKEPTIC_RULE_CAPABILITY("memory-leak", Supported, true, true, true, "Juliet 0.860 precision (80 TP / 13 FP); Phase 3 gate >= 0.85")
 CODESKEPTIC_RULE_CAPABILITY("double-free", Supported, true, true, true, "Juliet 1.000 precision (101 TP / 0 FP)")
 CODESKEPTIC_RULE_CAPABILITY("use-after-free", Supported, true, true, true, "Juliet 1.000 precision (212 TP / 0 FP)")

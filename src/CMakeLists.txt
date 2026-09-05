@@ -30,6 +30,7 @@ add_library(codeskeptic_core STATIC
     analyzer/Baseline.cpp
     server/McpServer.cpp
     rules/UninitPointerRule_Ex.cpp
+    rules/UninitScalarRule.cpp
     rules/MemoryLeakRule_Ex.cpp
     rules/FdResourceRule.cpp
     rules/DivByZeroRule.cpp
