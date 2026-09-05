@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH01-S01-U003
-
-### CS3-CH01-S01-U003 — Checked-add overflow sonucunun kullanımını izle
-
-**Sonuç:** Checked-add çağrısının başarısızlık sonucu yok sayıldığında güvensiz boyut kullanımı yakalanır.
-
-**Kabul:**
-
-- Builtin add overflow kontrolsüz kullanım pozitif, doğrulanmış success branch negatiftir.
-- Status/output reassignment ve escape önceki kanıtı geçersiz kılar.
-- Checked-mul regresyonları ve ilgisiz arithmetic bulguları değişmez.
-
-**Test bütçesi:** T1
-**Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/rules/AllocSizeOverflowRule.cpp, tests/AllocSizeOverflowRuleTest.cpp
-**Bağımlılıklar:** CS3-CH01-S01-U002
+## FRONT — CS3-CH01-S02-U001
 
 ### CS3-CH01-S02-U001 — memcpy/memmove kaynak okuma kapasitesini denetle
 

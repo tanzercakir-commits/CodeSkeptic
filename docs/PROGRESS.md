@@ -2,6 +2,19 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH01-S01-U003 — Checked-add overflow sonucunun kullanımını izle
+
+- Commit: `da35862435e1991ae673e5a5053022eade6e347c`
+- Dal: `agent/cs3-ch01-s01-u003-checked-add`
+- Implementer: `root-cs3-ch01-s01-u003-20260905`
+- Bağımsız denetçi: `independent-cwe-ch01-s01-u003-da35862-20260905`
+- İnceleme SHA-256: `12af8cc2f84d537e9a419c3b7d5806009897a23a4cd980c888e1ab9094cd10c6`
+- Tarih: 2026-09-05T00:44:00.157780+00:00
+- Sonuç: Checked-add çağrısının başarısızlık sonucu yok sayıldığında güvensiz boyut kullanımı yakalanır.
+- focused-tests: PASS; SHA-256 `eb08b1edace2bac91c96e096d1855b0519c20290d131e63c7b656fd7bc37133e`; `bash scripts/local_test.sh focused 'AllocSizeOverflowRuleTest.*:IntOverflowRuleTest.*:IntervalTest.*:IntervalAnalysisTest.*'`
+- cli-smoke: PASS; SHA-256 `2d6cd22b2aaee34282b6b4907360acc65da71f1d03b6230ac7426123893401b0`; `PYTHONDONTWRITEBYTECODE=1 python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH01-S01-U003/cli_smoke.py && bash scripts/local_test.sh smoke`
+- queue-check: PASS; SHA-256 `a39c62d003baca5278332e49c1cd77acc47c752353a69259a41fc68f01aa034b`; `PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/project_queue.py check && PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/project_queue.py guard --base 8a45e888765c9aa94982ee7f90e4d2cb069b61f9`
+
 ## CS3-CH01-S01-U002 — 64-bit allocation-size toplamayı denetle
 
 - Commit: `a3fb412a19dfdc34e853fce7f6fc0e7c2c18c1d1`
