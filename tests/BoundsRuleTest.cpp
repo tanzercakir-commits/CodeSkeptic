@@ -456,6 +456,238 @@ TEST(BoundsRuleTest, SourceReadSkipsInfeasibleStates) {
     }
 }
 
+// CS3-CH01-S02-U002: constant offsets consume capacity in pointee-sized
+// units, while the copy count and remaining capacity are always bytes.
+TEST(BoundsRuleTest, CopySourcePointerOffsetCapacity) {
+    struct Case { const char* setup; const char* source; const char* count; unsigned reports; };
+    const Case cases[] = {
+        {"char src[4]={};", "src+3", "1", 0},
+        {"char src[4]={};", "src+3", "2", 1},
+        {"char src[4]={};", "&src[3]", "1", 0},
+        {"char src[4]={};", "&src[3]", "2", 1},
+        {"char src[4]={};", "3+src", "2", 1},
+        {"char src[4]={};", "src+4", "0", 0},
+        {"char src[4]={};", "&src[4]", "0", 0},
+        {"char src[4]={};", "src+4", "1", 1},
+        {"char src[4]={};", "&src[4]", "1", 1},
+        {"char src[4]={};", "src-1", "1", 1},
+        {"int src[4]={};", "src+3", "sizeof(int)", 0},
+        {"int src[4]={};", "src+3", "sizeof(int)+1", 1},
+        {"char src[4]={};", "src+unknown_offset", "1", 0},
+        {"", "unknown_source+1", "8", 0},
+        {"char small[4]={},large[64]={}; char* src=small; src=large;", "src+3", "8", 0},
+        {"int* src=(int*)malloc(10);", "src+2", "2", 0},
+        {"int* src=(int*)malloc(10);", "src+2", "3", 1},
+    };
+    for (const char* function : {"memcpy", "memmove"}) {
+        for (const auto& item : cases) {
+            SCOPED_TRACE(function);
+            SCOPED_TRACE(item.setup);
+            SCOPED_TRACE(item.source);
+            SCOPED_TRACE(item.count);
+            BoundsRule rule;
+            auto results = runRule(rule, copy(
+                std::string("void f(const char* unknown_source,unsigned unknown_offset){char dst[64]={};") +
+                item.setup + function + "(dst," + item.source + "," + item.count + ");}"));
+            EXPECT_EQ(results.size(), item.reports);
+            for (const auto& result : results) {
+                EXPECT_EQ(result.severity, Severity::Error);
+                EXPECT_NE(result.message.find("source"), std::string::npos);
+            }
+        }
+    }
+}
+
+TEST(BoundsRuleTest, CopyDestinationPointerOffsetCapacity) {
+    struct Case { const char* setup; const char* destination; const char* count; unsigned reports; };
+    const Case cases[] = {
+        {"char dst[4]={};", "dst+3", "1", 0},
+        {"char dst[4]={};", "dst+3", "2", 1},
+        {"char dst[4]={};", "&dst[3]", "1", 0},
+        {"char dst[4]={};", "&dst[3]", "2", 1},
+        {"char dst[4]={};", "3+dst", "2", 1},
+        {"char dst[4]={};", "dst+4", "0", 0},
+        {"char dst[4]={};", "&dst[4]", "0", 0},
+        {"char dst[4]={};", "dst+4", "1", 1},
+        {"char dst[4]={};", "&dst[4]", "1", 1},
+        {"char dst[4]={};", "dst-1", "1", 1},
+        {"int dst[4]={};", "dst+3", "sizeof(int)", 0},
+        {"int dst[4]={};", "dst+3", "sizeof(int)+1", 1},
+        {"char dst[4]={};", "dst+unknown_offset", "1", 0},
+        {"", "unknown_destination+1", "8", 0},
+        {"char small[4]={},large[64]={}; char* dst=small; dst=large;", "dst+3", "8", 0},
+        {"int* dst=(int*)malloc(10);", "dst+2", "2", 0},
+        {"int* dst=(int*)malloc(10);", "dst+2", "3", 1},
+    };
+    for (const char* function : {"memcpy", "memmove"}) {
+        for (const auto& item : cases) {
+            SCOPED_TRACE(function);
+            SCOPED_TRACE(item.setup);
+            SCOPED_TRACE(item.destination);
+            SCOPED_TRACE(item.count);
+            BoundsRule rule;
+            auto results = runRule(rule, copy(
+                std::string("void f(char* unknown_destination,unsigned unknown_offset){char src[64]={};") +
+                item.setup + function + "(" + item.destination + ",src," + item.count + ");}"));
+            EXPECT_EQ(results.size(), item.reports);
+            for (const auto& result : results) {
+                EXPECT_EQ(result.severity, Severity::Error);
+                EXPECT_NE(result.message.find("destination"), std::string::npos);
+            }
+        }
+    }
+}
+
+TEST(BoundsRuleTest, MemsetPointerOffsetCapacity) {
+    BoundsRule rule;
+    auto results = runRule(rule, copy(R"(
+        void bad() {char dst[4]={}; memset(dst+3,0,2);}
+        void last() {char dst[4]={}; memset(dst+3,0,1);}
+        void one_past_zero() {char dst[4]={}; memset(&dst[4],0,0);}
+    )"));
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].function, "bad");
+    EXPECT_NE(results[0].message.find("destination"), std::string::npos);
+}
+
+TEST(BoundsRuleTest, CopyOffsetCastsAndCheckedArithmetic) {
+    struct Case { const char* setup; const char* pointer; const char* count; unsigned reports; };
+    const Case cases[] = {
+        {"int buf[4]={};", "(char*)buf+1", "sizeof(buf)-1", 0},
+        {"int buf[4]={};", "(char*)buf+1", "sizeof(buf)", 1},
+        {"int buf[4]={};", "(char*)(buf+1)", "sizeof(buf)-sizeof(int)", 0},
+        {"int buf[4]={};", "(char*)(buf+1)", "sizeof(buf)-sizeof(int)+1", 1},
+        {"char buf[8]={};", "buf+(unsigned char)257", "7", 0},
+        {"char buf[8]={};", "buf+(unsigned char)257", "8", 1},
+        {"char buf[8]={}; int k=1;", "buf+k", "8", 1},
+        {"char buf[8]={};", "buf+(1<<1)", "7", 1},
+        {"char buf[8]={}; unsigned u=4294967295U, k=u+1;", "buf+k", "8", 0},
+        {"char buf[8]={}; unsigned u=4294967295U, k=u+2;", "buf+k", "8", 1},
+        {"char buf[8]={};", "buf+(-1ULL)", "1", 0},
+        {"char buf[8]={};", "buf+(((unsigned __int128)1<<64)+1)", "1", 0},
+        {"char buf[8]={};", "buf-(-9223372036854775807LL-1)", "1", 0},
+        {"int buf[4]={};", "buf+9223372036854775807LL", "1", 0},
+        {"char buf[8]={};", "(buf+9223372036854775807LL)+1", "1", 0},
+    };
+    for (bool source : {true, false}) {
+        for (const auto& item : cases) {
+            SCOPED_TRACE(source ? "source" : "destination");
+            SCOPED_TRACE(item.pointer);
+            SCOPED_TRACE(item.count);
+            BoundsRule rule;
+            std::string args = source ? std::string("other,") + item.pointer
+                                      : std::string(item.pointer) + ",other";
+            auto results = runRule(rule, copy(std::string("void f(){char other[64]={};") +
+                item.setup + "memcpy(" + args + "," + item.count + ");}"));
+            EXPECT_EQ(results.size(), item.reports);
+            for (const auto& result : results)
+                EXPECT_NE(result.message.find(source ? "source" : "destination"), std::string::npos);
+        }
+    }
+}
+
+TEST(BoundsRuleTest, CopyOffsetAliasesAndInfeasibility) {
+    struct Case { const char* body; unsigned reports; };
+    const Case cases[] = {
+        {"char buf[4]={}; char* p=buf+1; memcpy(other,p,4);", 1},
+        {"char buf[4]={}; char* p=buf+1; memcpy(p,other,4);", 1},
+        {"char buf[4]={}; char* p=buf+1; char* q=p+1; memcpy(other,q,3);", 1},
+        {"char* p=(char*)malloc(4); p=large; memcpy(other,p+3,8);", 0},
+        {"char* p=(char*)malloc(4); p=large; memcpy(p+3,other,8);", 0},
+        {"char* p=(char*)malloc(4); char*& alias=p; alias=large; memcpy(other,p+3,8);", 0},
+        {"char* p=(char*)malloc(4); char*& alias=p; alias=large; memcpy(p+3,other,8);", 0},
+        {"char* p=(char*)malloc(4); char** alias=&p; *alias=large; memcpy(p+3,other,8);", 0},
+        {"char buf[4]={}; if(n>4)return; if(n<8)return; n=0; memcpy(other,buf+3,2);", 0},
+        {"char buf[4]={}; if(n>4)return; if(n<8)return; n=0; memcpy(buf+3,other,2);", 0},
+        {"char buf[4]={}; if(n>8)return; if(n<4)return; memcpy(buf+3,other,2);", 1},
+        {"char buf[8]={}; int k=1; int& alias=k; alias=0; memcpy(other,buf+k,8);", 0},
+        {"char buf[8]={}; int k=1; int* alias=&k; *alias=0; memcpy(buf+k,other,8);", 0},
+    };
+    for (const auto& item : cases) {
+        SCOPED_TRACE(item.body);
+        BoundsRule rule;
+        auto results = runRule(rule, copy(
+            std::string("void f(unsigned n){char other[64]={},large[64]={};") + item.body + "}"));
+        EXPECT_EQ(results.size(), item.reports);
+    }
+}
+
+TEST(BoundsRuleTest, CopyOffsetUnsignedConstantChainPreservesValue) {
+    BoundsRule rule;
+    auto results = runRule(rule, copy(R"(
+        void safe_source() {
+            char dst[64]={}, src[8]={};
+            unsigned n=4294967295U;
+            long long k=n;
+            memcpy(dst,src+(k-4294967295LL),8);
+        }
+        void safe_destination() {
+            char src[64]={}, dst[8]={};
+            unsigned n=4294967295U;
+            long long k=n;
+            memcpy(dst+(k-4294967295LL),src,8);
+        }
+    )"));
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(BoundsRuleTest, CopyOffsetRequiresExecutedInitializerInC) {
+    struct Case { const char* body; unsigned reports; };
+    const Case cases[] = {
+        {"goto after; int k=7; after: memcpy(dst,src+k,2);", 0},
+        {"int k=7; goto after; after: memcpy(dst,src+k,2);", 1},
+        {"if(skip)goto after; int k=7; after: memcpy(dst,src+k,2);", 0},
+        {"goto after; char* p=(char*)malloc(4); after: memcpy(dst,p+3,2);", 0},
+    };
+    for (const auto& item : cases) {
+        SCOPED_TRACE(item.body);
+        BoundsRule rule;
+        auto results = runRuleWithArgs(rule, copy(
+            std::string("void f(int skip){char dst[64]={0},src[8]={0};") + item.body + "}"),
+            {"-std=gnu11"}, "offset.c");
+        EXPECT_EQ(results.size(), item.reports);
+    }
+}
+
+TEST(BoundsRuleTest, OnePastAddressDoesNotHideAnActualRead) {
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        int* address() {static int buf[4]={}; return &(buf[4]);}
+        int read() {int buf[4]={}; return buf[4];}
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].function, "read");
+}
+
+TEST(BoundsRuleTest, CopyOffsetDestinationsPreserveUntrustedAndPaddingSemantics) {
+    BoundsRule rule;
+    auto results = runRule(rule, copy(R"(
+        int atoi(const char*);
+        int length();
+        char* strncpy(char*,const char*,__SIZE_TYPE__);
+        void possible(const char* src) {
+            char dst[8]={}; int n=atoi(src);
+            if(n<0 || n>8) return; memcpy(dst+4,src,n);
+        }
+        void guarded(const char* src) {
+            char dst[8]={}; int n=atoi(src);
+            if(n<0 || n>4) return; memcpy(dst+4,src,n);
+        }
+        void ordinary(const char* src) {
+            char dst[8]={}; int n=length();
+            if(n<0 || n>8) return; memcpy(dst+4,src,n);
+        }
+        void padded() {char dst[64]={},src[1]={}; strncpy(dst+1,src,8);}
+        void bad_padding() {char dst[4]={},src[64]={}; strncpy(dst+3,src,2);}
+    )"));
+    ASSERT_EQ(results.size(), 2u);
+    for (const auto& result : results) {
+        EXPECT_TRUE(result.function == "possible" || result.function == "bad_padding");
+        EXPECT_EQ(result.severity, result.function == "possible" ? Severity::Warning : Severity::Error);
+        EXPECT_NE(result.message.find("destination"), std::string::npos);
+    }
+}
+
 TEST(BoundsRuleTest, MemcpyPastFixedArray) {
     // 50 bytes into a 16-byte buffer.
     BoundsRule rule;

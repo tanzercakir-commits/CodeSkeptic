@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -409,13 +410,15 @@ BufExtent bufferExtent(const Expr* e, const codeskeptic::ExtentMap& extents,
 // New source-read semantics must not be inferred from a user's same-named
 // method, namespace function, definition or incompatible declaration.
 bool isGlobalMemoryFunction(const CallExpr* call, llvm::StringRef name,
-                            unsigned arity, ASTContext& ctx) {
+                            unsigned arity, ASTContext& ctx,
+                            QualType returnType = QualType()) {
     const FunctionDecl* callee = call ? call->getDirectCallee() : nullptr;
     if (!callee || !callee->getIdentifier() || callee->getName() != name ||
         call->getNumArgs() != arity || callee->getNumParams() != arity ||
         callee->isVariadic() || callee->hasBody() ||
         !callee->getDeclContext()->getRedeclContext()->isTranslationUnit() ||
-        !ctx.hasSameType(callee->getReturnType().getUnqualifiedType(), ctx.VoidPtrTy))
+        !ctx.hasSameType(callee->getReturnType().getUnqualifiedType(),
+                         returnType.isNull() ? ctx.VoidPtrTy : returnType))
         return false;
     return true;
 }
@@ -432,9 +435,24 @@ bool isSourceCopy(const CallExpr* call, ASTContext& ctx) {
                            ctx.getSizeType());
 }
 
-// A rule-local sole-binding guard. The element ExtentMap is intentionally not
-// changed: source reads need raw allocation BYTES, including a partial final
-// element, and must also reject reference/capture/constructor mutations.
+bool isDestinationCopy(const CallExpr* call, ASTContext& ctx) {
+    if (isSourceCopy(call, ctx)) return true;
+    const auto* callee = call->getDirectCallee();
+    const auto matches = [&](unsigned index, QualType type) {
+        return ctx.hasSameType(callee->getParamDecl(index)->getType().getUnqualifiedType(), type);
+    };
+    if (isGlobalMemoryFunction(call, "memset", 3, ctx))
+        return matches(0, ctx.VoidPtrTy) && matches(1, ctx.IntTy) && matches(2, ctx.getSizeType());
+    const QualType chars = ctx.getPointerType(ctx.CharTy);
+    if (isGlobalMemoryFunction(call, "strncpy", 3, ctx, chars))
+        return matches(0, chars) && matches(1, ctx.getPointerType(ctx.CharTy.withConst())) &&
+               matches(2, ctx.getSizeType());
+    return false;
+}
+
+// A rule-local sole-binding guard for pointers and integer offset constants.
+// The element ExtentMap is unchanged: copy slices need raw allocation BYTES,
+// including a partial final element, and reject reference/capture mutations.
 struct SourceBindings : RecursiveASTVisitor<SourceBindings> {
     std::set<const VarDecl*> unstable;
     bool hasAssembly = false;
@@ -446,7 +464,8 @@ struct SourceBindings : RecursiveASTVisitor<SourceBindings> {
         // to locate it: src[0]=0 and *src=0 only change the allocation's contents.
         if (const auto* ref = dyn_cast<DeclRefExpr>(expr)) {
             if (const auto* var = dyn_cast<VarDecl>(ref->getDecl());
-                var && var->getType().getNonReferenceType()->isPointerType())
+                var && (var->getType().getNonReferenceType()->isPointerType() ||
+                        var->getType().getNonReferenceType()->isIntegralOrEnumerationType()))
                 unstable.insert(var);
         } else if (const auto* choice = dyn_cast<ConditionalOperator>(expr)) {
             invalidate(choice->getTrueExpr());
@@ -540,47 +559,264 @@ codeskeptic::Interval sourceByteCapacity(const Expr* source,
     return bytes.isEmpty() || bytes.loIsInf() || bytes.lo() < 0 ? Interval::top() : bytes;
 }
 
+// Offset constants must not inherit a lossy shared numeric snapshot (notably
+// unsigned literal -> local -> wider local). Prove executed sole-initializer
+// chains and preserve each operation/cast's actual type. Unsupported or
+// int64-unrepresentable intermediate values remain unknown, never truncated.
+class CopyOffsetEvaluator {
+    const SourceBindings& bindings_;
+    const std::set<const VarDecl*>& initialized_;
+    ASTContext& ctx_;
+    std::set<const VarDecl*> active_;
+    unsigned budget_ = 128;
+
+    static std::optional<int64_t> bounded(const llvm::APInt& value, bool sign) {
+        if (sign) {
+            if (!value.isSignedIntN(64)) return std::nullopt;
+            return value.sextOrTrunc(64).getSExtValue();
+        }
+        if (value.getActiveBits() > 63) return std::nullopt;
+        return static_cast<int64_t>(value.zextOrTrunc(64).getZExtValue());
+    }
+public:
+    CopyOffsetEvaluator(const SourceBindings& bindings,
+                        const std::set<const VarDecl*>& initialized, ASTContext& ctx)
+        : bindings_(bindings), initialized_(initialized), ctx_(ctx) {}
+
+    std::optional<int64_t> evaluate(const Expr* expr, unsigned depth = 0) {
+        if (!expr || !budget_ || depth >= 32) return std::nullopt;
+        --budget_;
+        expr = expr->IgnoreParens();
+        if (expr->isValueDependent() || expr->isTypeDependent() ||
+            !expr->getType()->isIntegralOrEnumerationType() || expr->HasSideEffects(ctx_))
+            return std::nullopt;
+        if (const auto* constant = dyn_cast<ConstantExpr>(expr))
+            return evaluate(constant->getSubExpr(), depth + 1);
+        const auto recurse = [&](const Expr* child) { return evaluate(child, depth + 1); };
+        if (const auto* ref = dyn_cast<DeclRefExpr>(expr)) {
+            if (const auto* var = dyn_cast<VarDecl>(ref->getDecl())) {
+                if (!var->hasInit() || var->hasGlobalStorage() || var->getType()->isReferenceType() ||
+                    var->getType().isVolatileQualified() || bindings_.hasAssembly ||
+                    bindings_.unstable.count(var) || !initialized_.count(var) ||
+                    !active_.insert(var).second) return std::nullopt;
+                const auto value = recurse(var->getInit());
+                active_.erase(var);
+                return value;
+            }
+        }
+        const unsigned width = ctx_.getIntWidth(expr->getType());
+        const bool sign = expr->getType()->isSignedIntegerOrEnumerationType();
+        if (!width || width > 128) return std::nullopt;
+        if (const auto* cast = dyn_cast<CastExpr>(expr)) {
+            const auto value = recurse(cast->getSubExpr());
+            if (!value) return std::nullopt;
+            if (cast->getCastKind() == CK_IntegralToBoolean) return *value != 0;
+            if (cast->getCastKind() != CK_LValueToRValue && cast->getCastKind() != CK_NoOp &&
+                cast->getCastKind() != CK_IntegralCast) return std::nullopt;
+            return bounded(llvm::APInt(64, static_cast<uint64_t>(*value)).sextOrTrunc(width), sign);
+        }
+        if (const auto* op = dyn_cast<UnaryOperator>(expr)) {
+            const auto value = recurse(op->getSubExpr());
+            if (!value) return std::nullopt;
+            if (op->getOpcode() == UO_Plus) return value;
+            if (op->getOpcode() == UO_LNot) return *value == 0;
+            if (op->getOpcode() != UO_Minus) return std::nullopt;
+            const llvm::APInt operand = llvm::APInt(64, static_cast<uint64_t>(*value)).sextOrTrunc(width);
+            bool overflow = false;
+            const auto result = sign ? llvm::APInt(width, 0).ssub_ov(operand, overflow)
+                                     : -operand;
+            return overflow ? std::nullopt : bounded(result, sign);
+        }
+        if (const auto* op = dyn_cast<BinaryOperator>(expr)) {
+            const auto left = recurse(op->getLHS()), right = recurse(op->getRHS());
+            if (!left || !right) return std::nullopt;
+            const auto a = llvm::APInt(64, static_cast<uint64_t>(*left)).sextOrTrunc(width);
+            const auto b = llvm::APInt(64, static_cast<uint64_t>(*right)).sextOrTrunc(width);
+            bool overflow = false;
+            llvm::APInt result(width, 0);
+            switch (op->getOpcode()) {
+            case BO_Add: result = sign ? a.sadd_ov(b, overflow) : a + b; break;
+            case BO_Sub: result = sign ? a.ssub_ov(b, overflow) : a - b; break;
+            case BO_Mul: result = sign ? a.smul_ov(b, overflow) : a * b; break;
+            case BO_And: result = a & b; break;
+            case BO_Or: result = a | b; break;
+            case BO_Xor: result = a ^ b; break;
+            case BO_Shl:
+                if (*right < 0 || static_cast<uint64_t>(*right) >= width ||
+                    (sign && (*left < 0 || a.getActiveBits() + *right >= width)))
+                    return std::nullopt;
+                result = a.shl(static_cast<unsigned>(*right));
+                break;
+            case BO_Shr:
+                if (*right < 0 || static_cast<uint64_t>(*right) >= width) return std::nullopt;
+                result = sign ? a.ashr(static_cast<unsigned>(*right))
+                              : a.lshr(static_cast<unsigned>(*right));
+                break;
+            default: return std::nullopt;
+            }
+            return overflow ? std::nullopt : bounded(result, sign);
+        }
+        if (const auto* size = dyn_cast<UnaryExprOrTypeTraitExpr>(expr)) {
+            if (size->getKind() != UETT_SizeOf) return std::nullopt;
+            return codeskeptic::boundedTypeSizeInChars(ctx_, size->getTypeOfArgument());
+        }
+        if (!isa<IntegerLiteral>(expr) && !isa<CharacterLiteral>(expr) &&
+            !isa<CXXBoolLiteralExpr>(expr) && !isa<DeclRefExpr>(expr)) return std::nullopt;
+        Expr::EvalResult result;
+        if (!expr->EvaluateAsInt(result, ctx_) || !result.Val.isInt()) return std::nullopt;
+        const auto& value = result.Val.getInt();
+        return bounded(value, value.isSigned());
+    }
+};
+
+struct CopySlice {
+    codeskeptic::Interval bytes;  // root storage's raw allocation bytes
+    int64_t offset = 0;          // byte displacement, not element count
+    bool hasOffset = false;
+};
+
+CopySlice copySlice(const Expr* expr, const SourceBindings& bindings,
+                    const std::set<const VarDecl*>& initialized, ASTContext& ctx,
+                    unsigned depth = 0) {
+    using codeskeptic::Interval;
+    if (!expr || depth >= 32) return {};
+    expr = expr->IgnoreParens();
+    if (const auto* cast = dyn_cast<CastExpr>(expr)) {
+        // Only address-preserving casts; derived-base adjustments and
+        // integer/pointer round trips do not establish a root storage address.
+        const CastKind kind = cast->getCastKind();
+        if (cast->getType()->isPointerType() &&
+            (kind == CK_ArrayToPointerDecay || kind == CK_BitCast ||
+             kind == CK_NoOp || kind == CK_LValueToRValue))
+            return copySlice(cast->getSubExpr(), bindings, initialized, ctx, depth + 1);
+        return {};
+    }
+    const Expr* base = nullptr;
+    const Expr* index = nullptr;
+    bool subtract = false;
+    if (const auto* op = dyn_cast<BinaryOperator>(expr)) {
+        if ((op->getOpcode() == BO_Add || op->getOpcode() == BO_Sub) &&
+            op->getLHS()->getType()->isPointerType()) {
+            base = op->getLHS(); index = op->getRHS();
+            subtract = op->getOpcode() == BO_Sub;
+        } else if (op->getOpcode() == BO_Add && op->getRHS()->getType()->isPointerType()) {
+            base = op->getRHS(); index = op->getLHS();
+        }
+    } else if (const auto* address = dyn_cast<UnaryOperator>(expr);
+               address && address->getOpcode() == UO_AddrOf) {
+        const Expr* operand = address->getSubExpr()->IgnoreParens();
+        if (const auto* sub = dyn_cast<ArraySubscriptExpr>(operand)) {
+            base = sub->getBase(); index = sub->getIdx();
+        } else if (operand->getType()->isArrayType()) {
+            return copySlice(operand, bindings, initialized, ctx, depth + 1);
+        }
+    }
+    if (base && index) {
+        CopySlice result = copySlice(base, bindings, initialized, ctx, depth + 1);
+        result.hasOffset = true;
+        const auto offset = CopyOffsetEvaluator(bindings, initialized, ctx).evaluate(index);
+        const QualType element = base->getType()->getPointeeType();
+        const auto scale = element.isNull() || element->isVoidType()
+            ? std::nullopt : codeskeptic::boundedTypeSizeInChars(ctx, element);
+        if (!offset || !scale || *scale <= 0) return {Interval::top(), 0, true};
+        const auto delta = Interval::mul(Interval::constant(*offset), Interval::constant(*scale));
+        const auto combined = subtract ? Interval::sub(Interval::constant(result.offset), delta)
+                                       : Interval::add(Interval::constant(result.offset), delta);
+        if (!combined.isSingleton(&result.offset)) return {Interval::top(), 0, true};
+        return result;
+    }
+    const auto* ref = dyn_cast<DeclRefExpr>(expr);
+    const auto* var = ref ? dyn_cast<VarDecl>(ref->getDecl()) : nullptr;
+    if (var && var->getType()->isPointerType() && !initialized.count(var)) return {};
+    const auto capacity = sourceByteCapacity(expr, bindings, ctx);
+    if (!capacity.isEmpty() && !capacity.hiIsInf()) return {capacity, 0, false};
+    // Bounded stable aliases may name an offset expression. A changed or
+    // escaped pointer anywhere in the chain cannot contribute stale capacity.
+    if (var && var->getType()->isPointerType() && var->hasInit() &&
+        !var->hasGlobalStorage() && !bindings.hasAssembly && !bindings.unstable.count(var))
+        return copySlice(var->getInit(), bindings, initialized, ctx, depth + 1);
+    return {};
+}
+
+// Taking &array[N] forms the legal one-past pointer; it does not read element
+// N. A plain array[N] read and an address strictly beyond N remain distinct.
+bool isAddressOperand(const ArraySubscriptExpr* sub, ASTContext& ctx) {
+    auto node = DynTypedNode::create(*sub);
+    for (unsigned depth = 0; depth < 32; ++depth) {
+        const auto parents = ctx.getParents(node);
+        if (parents.size() != 1) return false;
+        if (const auto* paren = parents[0].get<ParenExpr>()) {
+            node = DynTypedNode::create(*paren);
+            continue;
+        }
+        const auto* op = parents[0].get<UnaryOperator>();
+        return op && op->getOpcode() == UO_AddrOf;
+    }
+    return false;
+}
+
 // Keep infeasibility explicit for the new source model. A constant copy size
 // does not inherit an unrelated variable's empty interval. Nor can a later
 // assignment or loop widening make a contradictory path executable again.
-// This adapter leaves the existing destination analysis/semantics untouched.
+// This adapter also governs new offset destinations; the legacy direct
+// destination analysis is unchanged.
 class SourceReadAnalysis : public codeskeptic::IntervalAnalysis {
     using Base = codeskeptic::IntervalAnalysis;
+    std::map<const Stmt*, std::set<const VarDecl*>> initializedAt_;
 public:
     using Base::Base;
     struct State {
         codeskeptic::IntervalState numeric;
         bool feasible = true;
+        std::set<const VarDecl*> initialized;
         bool operator==(const State& other) const {
-            return feasible == other.feasible && (!feasible || numeric == other.numeric);
+            return feasible == other.feasible && (!feasible ||
+                (numeric == other.numeric && initialized == other.initialized));
         }
         bool operator!=(const State& other) const { return !(*this == other); }
     };
-    static State checked(codeskeptic::IntervalState numeric) {
+    static State checked(codeskeptic::IntervalState numeric,
+                         std::set<const VarDecl*> initialized = {}) {
         const bool feasible = std::none_of(numeric.iv.begin(), numeric.iv.end(),
             [](const auto& entry) { return entry.second.isEmpty(); });
-        return {std::move(numeric), feasible};
+        return {std::move(numeric), feasible, std::move(initialized)};
     }
     State initialState() const { return checked(Base::initialState()); }
     State merge(const State& a, const State& b) const {
         if (!a.feasible) return b;
         if (!b.feasible) return a;
-        return checked(Base::merge(a.numeric, b.numeric));
+        std::set<const VarDecl*> initialized;
+        for (const auto* var : a.initialized)
+            if (b.initialized.count(var)) initialized.insert(var);
+        return checked(Base::merge(a.numeric, b.numeric), std::move(initialized));
     }
     State transfer(const Stmt* stmt, const State& in, ASTContext& ctx) const {
-        return in.feasible ? checked(Base::transfer(stmt, in.numeric, ctx)) : in;
+        if (!in.feasible) return in;
+        State out = checked(Base::transfer(stmt, in.numeric, ctx), in.initialized);
+        if (const auto* declarations = dyn_cast<DeclStmt>(stmt))
+            for (const auto* declaration : declarations->decls())
+                if (const auto* var = dyn_cast<VarDecl>(declaration); var && var->hasInit())
+                    out.initialized.insert(var);
+        return out;
     }
     void refineOnEdge(const Stmt* cond, bool truth, State& state, ASTContext& ctx) const {
         if (!state.feasible) return;
         Base::refineOnEdge(cond, truth, state.numeric, ctx);
-        state = checked(std::move(state.numeric));
+        state = checked(std::move(state.numeric), std::move(state.initialized));
     }
     void widen(State& state) const {
         if (state.feasible) Base::widen(state.numeric);
     }
     void onStatement(const Stmt* stmt, const State& before, const State& after,
                      ASTContext& ctx) {
-        if (before.feasible) Base::onStatement(stmt, before.numeric, after.numeric, ctx);
+        if (before.feasible) {
+            Base::onStatement(stmt, before.numeric, after.numeric, ctx);
+            initializedAt_[stmt] = before.initialized;
+        }
+    }
+    const std::set<const VarDecl*>* initializedAt(const Stmt* stmt) const {
+        const auto found = initializedAt_.find(stmt);
+        return found == initializedAt_.end() ? nullptr : &found->second;
     }
 };
 
@@ -626,7 +862,7 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         //    (idx.lo >= extent.hi); needs a finite extent upper bound.
         //  - low: every value is negative (idx.hi < 0); extent-independent.
         const bool definiteHigh = !idx.loIsInf() && !extent.hiIsInf() &&
-                                  idx.lo() >= extent.hi();
+            (isAddressOperand(sub, ctx) ? idx.lo() > extent.hi() : idx.lo() >= extent.hi());
         const bool definiteLow = !idx.hiIsInf() && idx.hi() < 0;
         if (!definiteHigh && !definiteLow) continue;
 
@@ -709,10 +945,11 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         results.push_back(std::move(diag));
     }
 
-    // Source over-read is independent of destination capacity/diagnostics.
-    // Only definite reads are reported; partial overlap or unknown stays silent.
+    // Byte slices share checked offset/alias semantics, but source and
+    // destination diagnostics remain independent. Direct destinations above
+    // retain their existing model; this pass adds offset destinations only.
     if (df.converged && std::any_of(copies.begin(), copies.end(),
-                                  [&](const CallExpr* call) { return isSourceCopy(call, ctx); })) {
+                                  [&](const CallExpr* call) { return isDestinationCopy(call, ctx); })) {
         SourceReadAnalysis sourceAnalysis(collectIntVars(fn),
                                           codeskeptic::paramSeeds(paramMap, fn));
         const auto sourceDf = codeskeptic::runDataflow(fn, ctx, sourceAnalysis);
@@ -721,32 +958,55 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
                 fn->getQualifiedNameAsString(), sourceDf.failure);
         SourceBindings bindings;
         bindings.TraverseStmt(fn->getBody());
-        std::set<const CallExpr*> sourceReported;
         for (const auto* call : copies) {
-            if (!sourceDf.converged || !isSourceCopy(call, ctx)) continue;
+            if (!sourceDf.converged || !isDestinationCopy(call, ctx)) continue;
             const auto* state = sourceAnalysis.stateAt(call);
-            if (!state) continue;
-            const auto capacity = sourceByteCapacity(call->getArg(1), bindings, ctx);
+            const auto* initialized = sourceAnalysis.initializedAt(call);
+            if (!state || !initialized) continue;
             const auto size = codeskeptic::evalSizeInterval(call->getArg(2), ctx, *state);
-            if (capacity.isEmpty() || capacity.hiIsInf() || size.isEmpty() ||
-                size.loIsInf() || size.lo() <= capacity.hi() ||
-                !sourceReported.insert(call).second) continue;
-            const SourceLocation loc = sm.getExpansionLoc(call->getBeginLoc());
-            codeskeptic::Diagnostic diag;
-            diag.file = sm.getFilename(loc).str();
-            diag.line = sm.getSpellingLineNumber(loc);
-            diag.column = sm.getSpellingColumnNumber(loc);
-            diag.rule_id = "bounds";
-            diag.function = fn->getQualifiedNameAsString();
-            diag.severity = codeskeptic::Severity::Error;
-            diag.message = codeskeptic::currentLang() == codeskeptic::Lang::TR
-                ? "kaynak tampon siniri disinda okuma (CWE-125): " + size.toString() +
-                  " baytlik kopya, kaynagin " + std::to_string(capacity.hi()) +
-                  " baytlik kapasitesini asiyor"
-                : "source buffer over-read (CWE-125): copy size " + size.toString() +
-                  " exceeds the source's capacity of " + std::to_string(capacity.hi()) +
-                  " byte(s)";
-            results.push_back(std::move(diag));
+            if (size.isEmpty()) continue;
+            const auto report = [&](unsigned argument, bool source) {
+                const auto slice = copySlice(call->getArg(argument), bindings, *initialized, ctx);
+                if ((!source && !slice.hasOffset) || slice.bytes.isEmpty() || slice.bytes.hiIsInf())
+                    return;
+                const bool beforeStart = slice.offset < 0;
+                const int64_t remaining = beforeStart || slice.offset > slice.bytes.hi()
+                    ? 0 : slice.bytes.hi() - slice.offset;
+                const bool definite = !size.loIsInf() && size.lo() > remaining;
+                const auto* origins = sourceAnalysis.untrustedAt(call);
+                const bool possible = !source && !definite && !size.hiIsInf() &&
+                    size.hi() > remaining && origins &&
+                    codeskeptic::exprDerivesFromUntrusted(call->getArg(2), *origins);
+                if (!definite && !possible) return;
+                const SourceLocation loc = sm.getExpansionLoc(call->getBeginLoc());
+                codeskeptic::Diagnostic diag;
+                diag.file = sm.getFilename(loc).str();
+                diag.line = sm.getSpellingLineNumber(loc);
+                diag.column = sm.getSpellingColumnNumber(loc);
+                diag.rule_id = "bounds";
+                diag.function = fn->getQualifiedNameAsString();
+                diag.severity = definite ? codeskeptic::Severity::Error : codeskeptic::Severity::Warning;
+                if (beforeStart) {
+                    diag.message = codeskeptic::currentLang() == codeskeptic::Lang::TR
+                        ? std::string(source ? "kaynak (CWE-125)" : "hedef (CWE-787)") + " pointer tampon baslangicindan once; " +
+                          size.toString() + " baytlik kopya sinir disina erisebilir"
+                        : std::string(source ? "source (CWE-125)" : "destination (CWE-787)") + " pointer is before its buffer; " +
+                          size.toString() + " byte copy can access outside the buffer";
+                } else if (!source) {
+                    diag.message = codeskeptic::msg(definite ? codeskeptic::MsgId::BoundsCopyOverflow
+                                                            : codeskeptic::MsgId::BoundsCopyUntrustedLen,
+                                                    size.toString(), std::to_string(remaining));
+                } else {
+                    diag.message = codeskeptic::currentLang() == codeskeptic::Lang::TR
+                        ? "kaynak tampon siniri disinda okuma (CWE-125): " + size.toString() +
+                          " baytlik kopya, kaynagin " + std::to_string(remaining) + " baytlik kapasitesini asiyor"
+                        : "source buffer over-read (CWE-125): copy size " + size.toString() +
+                          " exceeds the source's capacity of " + std::to_string(remaining) + " byte(s)";
+                }
+                results.push_back(std::move(diag));
+            };
+            report(0, false);
+            if (isSourceCopy(call, ctx)) report(1, true);
         }
     }
 

@@ -28,7 +28,12 @@ namespace codeskeptic {
 // ambiguous pointer bindings and non-definite length ranges stay silent.
 // Contradictory paths stay infeasible through later assignments and loops.
 // memset does not read a source; strncpy's termination/padding differs and is
-// not part of the source-read model. Pointer-offset capacity is a separate unit.
+// not part of the source-read model. Constant pointer offsets (buf+k, &buf[k])
+// and bounded stable alias chains use the arithmetic pointer's element size
+// for independent source/destination remaining-byte capacity. One-past address
+// formation is not an element read; a positive copy still exceeds its zero
+// remaining capacity. Offset integer initializers must actually have executed
+// and remain unchanged. Unsupported/oversized calculations remain unknown.
 class BoundsRule : public Rule {
 public:
     std::string id() const override { return "bounds"; }
