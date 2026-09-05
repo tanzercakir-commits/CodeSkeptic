@@ -257,6 +257,36 @@ TEST(FdResourceRuleTest, PipeNativeStatusOverridesOwnedReturnSummaryOnlyForNativ
     )"));
 }
 
+TEST(FdResourceRuleTest, PipeIndirectStatusAssignmentInvalidatesOnlyTheWrittenValue) {
+    for (const auto* call : {"pipe(fds)", "pipe2(fds,0)"}) {
+        SCOPED_TRACE(call);
+        const auto prefix = std::string("void f(){int fds[2];int rc=") + call + ";";
+        EXPECT_EQ(runFdRule(prefix +
+            "int* p=&rc;*p=-1;if(rc<0)return;close(fds[0]);close(fds[1]);}").size(), 2u);
+        EXPECT_TRUE(runFdRule(prefix +
+            "int saved=rc;int* p=&rc;*p=-1;if(saved<0)return;close(fds[0]);close(fds[1]);}").empty());
+    }
+}
+
+TEST(FdResourceRuleTest, PipeFailureRestoresAlreadyAppliedOutputOwnershipEffects) {
+    for (const auto* call : {"pipe(fds)", "pipe2(fds,0)"}) {
+        SCOPED_TRACE(call);
+        const auto prefix = std::string("void f(){int a=open(\"a\",0),b=open(\"b\",0);int fds[2]={a,b};int rc=") + call + ";";
+        EXPECT_TRUE(runFdRule(prefix +
+            "close(fds[0]);close(fds[1]);if(rc<0)return;close(a);close(b);}").empty());
+        const auto missingOld = runFdRule(prefix +
+            "close(fds[0]);close(fds[1]);if(rc<0)return;close(a);}");
+        expectSingleResourceLeak(missingOld);
+        if (!missingOld.empty()) EXPECT_NE(missingOld[0].message.find("'b'"), std::string::npos);
+        EXPECT_TRUE(runFdRule(prefix +
+            "close(fds[0]);if(rc<0){close(fds[1]);return;}close(a);close(b);close(fds[1]);}").empty());
+        expectSingleResourceLeak(runFdRule(prefix +
+            "close(fds[0]);if(rc<0)return;close(a);close(b);close(fds[1]);}"));
+        EXPECT_EQ(runFdRule(prefix +
+            "close(fds[0]);close(fds[1]);if(rc<0)return;}").size(), 2u);
+    }
+}
+
 TEST(FdResourceRuleTest, AcceptFamilyAcquiresReturnedDescriptors) {
     for (const auto* acquisition : {"accept(listener,0,0)", "accept4(listener,0,0,0)"}) {
         SCOPED_TRACE(acquisition);

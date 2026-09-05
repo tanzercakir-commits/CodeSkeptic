@@ -558,11 +558,24 @@ void acquirePipe(const CallExpr* call, State& state) {
     }
 }
 
+void escape(const Binding& binding, State& state);
+void returnOwnership(const Binding& binding, State& state);
+void release(const Binding& binding, State& state);
+
 void pipeFailed(const CallExpr* call, State& state) {
     for (unsigned end = 1; end != 3; ++end) {
         const Origin origin{call, end};
+        const auto disposition = resourceLife(state, origin);
         state.resources[origin] = ResourceLife::None;
         const auto before = state.pipePrevious.find(origin);
+        // Failure leaves the output values unchanged. Effects performed on
+        // those values before checking status therefore consumed/transferred
+        // the old descriptors on this edge, not nonexistent new descriptors.
+        if (before != state.pipePrevious.end()) {
+            if (disposition == ResourceLife::Closed) release(before->second, state);
+            else if (disposition == ResourceLife::Returned) returnOwnership(before->second, state);
+            else if (disposition == ResourceLife::Escaped) escape(before->second, state);
+        }
         for (auto& [slot, binding] : state.bindings) {
             (void)slot;
             if (!binding.origins.erase(origin)) continue;
@@ -937,8 +950,8 @@ public:
                 return finish();
             }
             const Expr* rhs = assignment->getRHS();
-            const VarDecl* target = asVar(assignment->getLHS());
             const Slot cell = valueSlot(assignment->getLHS(), out);
+            const VarDecl* target = cell && cell.index == -1 ? cell.variable : asVar(assignment->getLHS());
             if (cell && cell.index >= 0) {
                 if (Origin origin = acquisition(rhs)) {
                     out.resources[origin] = ResourceLife::Open;
