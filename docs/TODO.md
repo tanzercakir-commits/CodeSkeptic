@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH01-S04-U001
-
-### CS3-CH01-S04-U001 — accept/accept4 descriptor sahipliğini modelle
-
-**Sonuç:** Başarılı accept ailesi çağrısından dönen descriptor için close/transfer/leak takibi yapılır.
-
-**Kabul:**
-
-- Başarı sonrası kapatma, dönüşle ownership transferi ve leak ayrılır.
-- −1 hata yolu kaynak yaratmaz; aynı isimli kullanıcı metodu yanlış eşleşmez.
-- Mevcut open/socket/dup ve FILE/DIR modelleri korunur.
-
-**Test bütçesi:** T1
-**Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/rules/FdResourceRule.cpp, src/rules/FdResourceRule.h, tests/FdResourceRuleTest.cpp
-**Bağımlılıklar:** Yok
+## FRONT — CS3-CH01-S04-U002
 
 ### CS3-CH01-S04-U002 — pipe/pipe2 çift descriptor çıkışını modelle
 

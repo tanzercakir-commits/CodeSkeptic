@@ -2,6 +2,20 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH01-S04-U001 — accept/accept4 descriptor sahipliğini modelle
+
+- Commit: `6512d771063a830a39756efccaf6e077aca71f67`
+- Dal: `agent/cs3-ch01-s04-u001-accept-ownership`
+- Implementer: `root-cs3-ch01-s04-u001-20260905`
+- Bağımsız denetçi: `independent-cwe-ch01-s04-u001-6512d77-20260905`
+- İnceleme SHA-256: `a6593431f3149b268daf122810af44106d13306220b9189cc983798af02771d0`
+- Tarih: 2026-09-05T04:40:47.110254+00:00
+- Sonuç: Başarılı accept ailesi çağrısından dönen descriptor için close/transfer/leak takibi yapılır.
+- focused-tests: PASS; SHA-256 `ffd8c02a1e576992a4f319ff17f1344d972d80abfc7557205e0864a37f6d4ec6`; `bash scripts/local_test.sh focused 'FdResourceRuleTest.*:MemoryLeakRuleExTest.*:FunctionFilterTest.*:CapabilitiesTest.*'`
+- cli-smoke: PASS; SHA-256 `71ce91eb0c20a771fb46b68dc676824840b0060f7ae31627c95a3eedf4d25e58`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH01-S04-U001/cli_smoke.py`
+- generic-cli-smoke: PASS; SHA-256 `37d698d52c5bdd03030ed70c155b9afa3b1ad47e3d50bfcf70ed13554c90baa9`; `bash scripts/local_test.sh smoke`
+- queue-check: PASS; SHA-256 `bc678359734e5677f7efed2bdb8c3f942b5b26b60912db46f883b62f4f85c244`; `python3 -B scripts/project_queue.py check && python3 -B scripts/project_queue.py guard --base 8ccf1d4c953da113b8a47cc270c517a2985f5a18 && python3 -B scripts/check_capabilities_sync.py`
+
 ## CS3-CH01-S03-U002 — Scalar initialization durumunu CFG birleşimlerinde koru
 
 - Commit: `51a20952deae5ec9520d680d8312816c823a5b83`
