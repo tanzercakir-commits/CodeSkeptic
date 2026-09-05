@@ -67,7 +67,7 @@ DIA SDK (idempotent, survives caching). Note the package is a static-CRT
   of this.
 
 ### 3. System-header discovery for the *analyzed* code (the real functional gap) — LANDED (by measurement, not code)
-The plan assumed a Windows branch in `SourceManager.cpp` (mirroring the
+The original plan assumed a Windows branch in `SourceManager.cpp` (mirroring the
 `#ifdef __APPLE__` isysroot logic) would have to discover MSVC + SDK
 include paths. **Measured on CI: unnecessary.** Clang's MSVC toolchain
 driver carries its own discovery — `INCLUDE` env when present (Developer
@@ -78,13 +78,25 @@ simulation), the freshly built exe still resolved `#include <stdio.h>` in
 analyzed code, in plain point-at-a-directory mode, and reported the
 planted bounds/null-deref/leak findings with exit 1. That behavior is now
 pinned by a hard windows.yml step ("Directory mode without a Developer
-Prompt") — if a future LLVM upgrade regresses it, the lane goes red and
+Prompt"). The CH02 strict-input restart now gives that directory probe an
+explicit minimal `compile_commands.json`: the same C source, `gnu11`, and
+no SDK/include-path flags. It still strips the same environment, requires the
+same null-dereference finding and exit 1, and executes no compiler. This changes
+the old database-free directory interface, not the SDK-discovery quality floor.
+If a future LLVM upgrade regresses header discovery, the lane goes red and
 the vswhere-style fallback becomes real work again.
 
 Inherent requirement (not a gap): an MSVC toolset + Windows SDK must be
 installed on the machine — there is nothing to discover otherwise. A
-user-supplied `compile_commands.json` bypasses discovery entirely, on
-every platform.
+user-supplied `compile_commands.json` establishes source commands; SDK discovery
+can still be needed when those commands do not provide system-header paths.
+Directory scans require that database; only a direct isolated source file with
+no discovered database has explicitly announced synthetic single-file mode.
+Windows smoke and relocated-package checks therefore use isolated source copies
+outside the repository's unrelated build database, preserving their original
+source bytes, findings, exit checks and hidden-LLVM/plain-terminal conditions.
+These CH02 fixture changes still require a fresh native hosted run; prior
+Windows results certify the prior candidate, not the new implementation.
 
 ### 4. SARIF absolute-path detection (small correctness bug) — LANDED
 `SarifReporter.cpp` used to classify a path as absolute only when
@@ -118,11 +130,11 @@ The 682 C++ unit tests are the portable floor and all run on Windows.
 - **Tier 1 — "builds and runs with a `compile_commands.json` (or from a
   Developer Prompt)":** items 1 + 2 + 4 + 5 + 6. **DONE** — landed as
   phase7-windows-native with the ratchet guarding it.
-- **Tier 2 — "point-at-a-directory" parity anywhere:** item 3. **DONE** —
-  closed by measurement (phase8-windows-sdk): the clang driver's own
-  VS/SDK discovery covers it; guarded by the no-dev-prompt CI step
-  instead of new code. What the plan called "the largest single piece"
-  cost two probe rounds and zero engine lines.
+- **Tier 2 — SDK discovery without a Developer Prompt:** item 3 was closed by
+  measurement (phase8-windows-sdk), using the clang driver's VS/SDK discovery.
+  The current directory interface requires an explicit compilation database;
+  the no-dev-prompt gate keeps the same SDK and finding conditions without
+  returning to silently inferred directory commands.
 - **Packaging — DONE** (v0.4.5, phase9-windows-package):
   `package_release.sh` runs under Git Bash on the runner with a small
   Windows branch (zip via 7z, falling back to PowerShell

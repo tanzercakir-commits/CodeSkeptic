@@ -33,6 +33,31 @@ BASELINE = {
 }
 ADDED_IDS = {"workflow-policy", "agent-evidence", "agent-upload"}
 
+# CH02 explicit-input compatibility: reverse ONLY these exact probe-input
+# deltas before comparing the original frozen baseline. Assertions, source
+# bodies, stripped environment and relocation conditions remain hashed.
+WINDOWS_INPUT_EDITS = {
+    "smoke": [
+        ("cat > smoke.cpp << 'EOF'", "probe_root=$(mktemp -d)\ncat > \"$probe_root/smoke.cpp\" << 'EOF'"),
+        ("./build/src/codeskeptic.exe smoke.cpp", "./build/src/codeskeptic.exe \"$probe_root/smoke.cpp\""),
+    ],
+    "nodev-dirmode": [(
+        "$out = & .\\build\\src\\codeskeptic.exe probe_dir 2>&1 | Out-String",
+        "$probeRoot = (Resolve-Path probe_dir).Path\n"
+        "$probeSource = Join-Path $probeRoot 'probe.c'\n"
+        "$entry = @{ directory = $probeRoot; file = $probeSource; arguments = @('clang', '-std=gnu11', '-c', $probeSource) }\n"
+        "ConvertTo-Json -InputObject @($entry) -Depth 5 | Set-Content -Encoding utf8 (Join-Path $probeRoot 'compile_commands.json')\n"
+        "$out = & .\\build\\src\\codeskeptic.exe probe_dir --build-path probe_dir 2>&1 | Out-String",
+    )],
+    "reloc-smoke": [(
+        "$out = & $exe.FullName docs\\demo.c 2>&1 | Out-String",
+        "$probeSource = Join-Path $exe.DirectoryName 'demo.c'\n"
+        "  Copy-Item docs\\demo.c $probeSource\n"
+        "  if ((Get-FileHash docs\\demo.c).Hash -ne (Get-FileHash $probeSource).Hash) { throw 'relocation fixture copy changed' }\n"
+        "  $out = & $exe.FullName $probeSource 2>&1 | Out-String",
+    )],
+}
+
 
 class StrictLoader(yaml.BaseLoader):
     """Keep `on` a string; reject duplicate keys rather than silently hiding one."""
@@ -116,6 +141,9 @@ def baseline_digest(document):
     job = next(iter(old["jobs"].values()))
     job["steps"] = [s for s in job["steps"] if s.get("id") not in ADDED_IDS]
     for step in job["steps"]:
+        for before, after in WINDOWS_INPUT_EDITS.get(step.get("id"), []):
+            if step.get("run", "").count(after) == 1:
+                step["run"] = step["run"].replace(after, before, 1)
         suffix = " && " + DENY
         if step.get("if", "").endswith(suffix):
             step["if"] = step["if"][:-len(suffix)]
@@ -136,6 +164,30 @@ class WorkflowPolicyTest(unittest.TestCase):
         for name, document in self.docs.items():
             with self.subTest(name=name):
                 self.assertEqual(baseline_digest(document), BASELINE[name])
+
+    def test_windows_probes_declare_their_real_inputs(self):
+        indexed = {step.get("id"): step for step in steps(self.docs["windows"])}
+        for step_id, edits in WINDOWS_INPUT_EDITS.items():
+            for _, after in edits:
+                with self.subTest(step=step_id):
+                    self.assertEqual(indexed[step_id]["run"].count(after), 1)
+
+    def test_windows_input_normalization_does_not_hide_weakened_gates(self):
+        for step_id, before, after in (
+                ("smoke", 'test "$code" -eq 1', 'test "$code" -eq 0'),
+                ("nodev-dirmode", "$code -eq 1", "$code -eq 0"),
+                ("nodev-dirmode", "Remove-Item", "Write-Host"),
+                ("nodev-dirmode", "null-deref", "clean"),
+                ("nodev-dirmode", "'-std=gnu11'", "'-Iinjected', '-std=gnu11'"),
+                ("reloc-smoke", "Rename-Item C:\\llvm C:\\llvm-hidden", "Write-Host 'LLVM still visible'"),
+                ("reloc-smoke", "$code -eq 1", "$code -eq 0"),
+                ("reloc-smoke", "$exe.FullName $probeSource", "$exe.FullName docs\\demo.c")):
+            with self.subTest(step=step_id, mutation=before):
+                changed = copy.deepcopy(self.docs["windows"])
+                target = next(step for step in steps(changed) if step.get("id") == step_id)
+                self.assertIn(before, target["run"])
+                target["run"] = target["run"].replace(before, after, 1)
+                self.assertNotEqual(baseline_digest(changed), BASELINE["windows"])
 
     def test_agent_push_source_test_checkpoint_and_docs_matrix(self):
         for name, document in self.docs.items():

@@ -62,7 +62,8 @@ jobs:
         id: smoke
         shell: bash
         run: |
-          cat > smoke.cpp << 'EOF'
+          probe_root=$(mktemp -d)
+          cat > "$probe_root/smoke.cpp" << 'EOF'
           int use_after_free() {
               int* p = new int(42);
               delete p;
@@ -70,7 +71,7 @@ jobs:
           }
           EOF
           code=0
-          ./build/src/codeskeptic.exe smoke.cpp || code=$?
+          ./build/src/codeskeptic.exe "$probe_root/smoke.cpp" || code=$?
           test "$code" -eq 1
 
       - name: Directory mode without a Developer Prompt (Tier 2 guard)
@@ -81,7 +82,9 @@ jobs:
         # second stripped the ENTIRE 28-variable vcvars family), then
         # promoted to this hard step: plain-terminal simulation, the
         # analyzer must still resolve <stdio.h> in analyzed code and
-        # report the planted bug. If this regresses, the lane goes red.
+        # report the planted bug. The explicit minimal database names the
+        # probe input, but supplies no SDK/include paths and runs no compiler.
+        # If SDK discovery regresses, the lane still goes red.
         shell: pwsh
         run: |
           $family = '^(INCLUDE|EXTERNAL_INCLUDE|LIB|LIBPATH|DevEnvDir|VSINSTALLDIR|VCINSTALLDIR|VCIDEInstallDir|VCToolsInstallDir|VCToolsVersion|VCToolsRedistDir|WindowsSdkDir|WindowsSDKVersion|WindowsSdkBinPath|WindowsSdkVerBinPath|WindowsSDKLibVersion|UniversalCRTSdkDir|UCRTVersion|VSCMD_.*|Framework.*|ExtensionSdkDir)$'
@@ -97,7 +100,11 @@ jobs:
               return *p;
           }
           '@ | Set-Content probe_dir\probe.c
-          $out = & .\build\src\codeskeptic.exe probe_dir 2>&1 | Out-String
+          $probeRoot = (Resolve-Path probe_dir).Path
+          $probeSource = Join-Path $probeRoot 'probe.c'
+          $entry = @{ directory = $probeRoot; file = $probeSource; arguments = @('clang', '-std=gnu11', '-c', $probeSource) }
+          ConvertTo-Json -InputObject @($entry) -Depth 5 | Set-Content -Encoding utf8 (Join-Path $probeRoot 'compile_commands.json')
+          $out = & .\build\src\codeskeptic.exe probe_dir --build-path probe_dir 2>&1 | Out-String
           $code = $LASTEXITCODE
           "exit=$code`n$out" | Set-Content probe_result.txt
           if (-not ($code -eq 1 -and $out -match 'null-deref')) {
@@ -164,7 +171,8 @@ jobs:
         # The unpacked zip must carry itself: C:\llvm (the baked
         # resource-dir path AND the build LLVM) is renamed away, the
         # vcvars family stripped, and the packaged exe must still
-        # analyze docs/demo.c via its exe-relative bundled headers +
+        # analyze a byte-checked isolated copy of docs/demo.c via its
+        # exe-relative bundled headers +
         # driver SDK discovery, with the exit-1 findings contract.
         shell: pwsh
         run: |
@@ -177,7 +185,10 @@ jobs:
             $zip = Get-ChildItem dist\codeskeptic-*-windows-*.zip | Select-Object -First 1
             Expand-Archive $zip.FullName -DestinationPath "$env:TEMP\cs_pkg" -Force
             $exe = Get-ChildItem "$env:TEMP\cs_pkg" -Recurse -Filter codeskeptic.exe | Select-Object -First 1
-            $out = & $exe.FullName docs\demo.c 2>&1 | Out-String
+            $probeSource = Join-Path $exe.DirectoryName 'demo.c'
+            Copy-Item docs\demo.c $probeSource
+            if ((Get-FileHash docs\demo.c).Hash -ne (Get-FileHash $probeSource).Hash) { throw 'relocation fixture copy changed' }
+            $out = & $exe.FullName $probeSource 2>&1 | Out-String
             $code = $LASTEXITCODE
           } finally {
             Rename-Item C:\llvm-hidden C:\llvm

@@ -73,8 +73,16 @@ bool commandTargetsDeclaredFile(const clang::tooling::CompileCommand& command) {
     if (missingCount != 0) return false;
     const auto inputs = parsed.getAllArgValues(clang::driver::options::OPT_INPUT);
     if (inputs.size() != 1) return false;
+    fs::path working = command.Directory;
+    // The driver resolves relative inputs after its last working-directory
+    // override, not necessarily against the database's directory field.
+    if (const auto* override = parsed.getLastArg(clang::driver::options::OPT_working_directory)) {
+        fs::path selected(override->getValue());
+        if (selected.empty()) return false;
+        working = selected.is_absolute() ? selected : working / selected;
+    }
     fs::path input(inputs.front());
-    if (input.is_relative()) input = fs::path(command.Directory) / input;
+    if (input.is_relative()) input = working / input;
     return normalized(input) == fs::path(command.Filename);
 }
 

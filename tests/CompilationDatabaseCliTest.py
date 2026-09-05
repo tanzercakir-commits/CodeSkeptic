@@ -273,6 +273,34 @@ class CompilationDatabaseCliTest(unittest.TestCase):
         self.doctor(self.source, expected=2)
         self.scan(self.source, expected=2)
 
+    def test_working_directory_cannot_substitute_a_same_named_source(self):
+        self.source.write_text("int f(){return 12/0;}\n", encoding="utf-8")
+        other = self.root / "other"
+        other.mkdir()
+        (other / "input.cpp").write_text("int f(){return 12;}\n", encoding="utf-8")
+        path = self.database(self.root / "build")
+        for option in (["-working-directory=other"], ["-working-directory", "other"]):
+            with self.subTest(option=option):
+                entry = {"directory": str(self.root), "file": str(self.source),
+                         "arguments": ["clang++", *option, "-c", "input.cpp"]}
+                path.write_text(json.dumps([entry]), encoding="utf-8")
+                self.doctor(self.source, expected=2)
+                self.scan(self.source, expected=2)
+
+    def test_working_directory_preserves_matching_absolute_and_last_option_inputs(self):
+        self.source.write_text("int f(){return 12/0;}\n", encoding="utf-8")
+        other = self.root / "other"
+        other.mkdir()
+        path = self.database(self.root / "build")
+        for options, source in ((["-working-directory=other"], self.source.as_posix()),
+                                (["-working-directory=other", "-working-directory=."], "input.cpp")):
+            with self.subTest(options=options):
+                entry = {"directory": str(self.root), "file": str(self.source),
+                         "arguments": ["clang++", *options, "-c", source]}
+                path.write_text(json.dumps([entry]), encoding="utf-8")
+                self.doctor(self.source)
+                self.scan(self.source, expected=1)
+
     def test_option_values_are_not_mistaken_for_other_source_inputs(self):
         include = self.root / "included.cpp"
         include.write_text("#define INCLUDED_VALUE 42\n", encoding="utf-8")
