@@ -484,11 +484,22 @@ TEST(FdResourceRuleTest, AcceptSignatureLookalikesAreNotProducers) {
     }
 }
 
-TEST(FdResourceRuleTest, AcceptActualSystemHeaderForms) {
-    const std::string code = R"(
-        #define _GNU_SOURCE 1
-        #include <sys/socket.h>
-        #include <unistd.h>
+namespace {
+
+#if defined(__linux__)
+// accept4 and these real system declarations are GNU/Linux integration inputs,
+// not Windows SDK inputs. Portable semantic coverage below runs on every host.
+const char* kLinuxSocketHeaders = R"(
+    #ifndef _GNU_SOURCE
+    #define _GNU_SOURCE 1
+    #endif
+    #include <sys/socket.h>
+    #include <unistd.h>
+)";
+#endif
+
+void expectAcceptFormsInCAndCpp(const std::string& declarations) {
+    const std::string code = declarations + R"(
         void bad_accept(int listener){int fd=accept(listener,0,0);(void)fd;}
         void bad_accept4(int listener){int fd=accept4(listener,0,0,0);(void)fd;}
         void good_accept(int listener){int fd=accept(listener,0,0);if(fd>=0)close(fd);}
@@ -506,6 +517,18 @@ TEST(FdResourceRuleTest, AcceptActualSystemHeaderForms) {
         EXPECT_EQ(results[1].function, "bad_accept4");
     }
 }
+
+} // namespace
+
+TEST(FdResourceRuleTest, AcceptPortableDeclarationsInCAndCpp) {
+    expectAcceptFormsInCAndCpp(kPosixDecls);
+}
+
+#if defined(__linux__)
+TEST(FdResourceRuleTest, AcceptActualSystemHeaderForms) {
+    expectAcceptFormsInCAndCpp(kLinuxSocketHeaders);
+}
+#endif
 
 TEST(FdResourceRuleTest, ShutdownAloneDoesNotCloseDescriptor) {
     expectSingleResourceLeak(runFdRule(R"(
@@ -744,13 +767,10 @@ TEST(FdResourceRuleTest, AcceptWrapperNarrowedNumberIsNotCallerOwned) {
     }
 }
 
-TEST(FdResourceRuleTest, AcceptWrapperRealHeadersInCAndCpp) {
-    const std::string code = R"(
-        #ifndef _GNU_SOURCE
-        #define _GNU_SOURCE
-        #endif
-        #include <sys/socket.h>
-        #include <unistd.h>
+namespace {
+
+void expectAcceptWrappersInCAndCpp(const std::string& declarations) {
+    const std::string code = declarations + R"(
         int first(int listener){return accept(listener,0,0);}
         int second(int listener){return accept4(listener,0,0,0);}
         int chain(int listener){return second(listener);}
@@ -770,6 +790,18 @@ TEST(FdResourceRuleTest, AcceptWrapperRealHeadersInCAndCpp) {
         EXPECT_EQ(results[2].function, "nested");
     }
 }
+
+} // namespace
+
+TEST(FdResourceRuleTest, AcceptWrapperPortableDeclarationsInCAndCpp) {
+    expectAcceptWrappersInCAndCpp(kPosixDecls);
+}
+
+#if defined(__linux__)
+TEST(FdResourceRuleTest, AcceptWrapperRealHeadersInCAndCpp) {
+    expectAcceptWrappersInCAndCpp(kLinuxSocketHeaders);
+}
+#endif
 
 TEST(FdResourceRuleTest, AcceptWrapperLookalikesNeverSeedNativeOwnership) {
     const char* cases[] = {
