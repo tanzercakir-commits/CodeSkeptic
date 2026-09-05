@@ -8,7 +8,7 @@ name: Windows
 
 on:
   push:
-    branches: [main, "phase*"]
+    branches: [main, "phase*", "agent/cs3-*"]
   pull_request:
 
 # Job-status mirroring (refs/status/*) needs push rights.
@@ -188,11 +188,67 @@ jobs:
           }
           exit 0
 
+      - name: Collect agent job diagnostics (not a qualification receipt)
+        id: agent-evidence
+        if: always() && startsWith(github.ref, 'refs/heads/agent/cs3-')
+        shell: bash
+        env:
+          SNAPSHOT_DIR: ${{ runner.temp }}/codeskeptic-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          STEPS_JSON: ${{ toJSON(steps) }}
+        run: |
+          python - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          target = Path(os.environ["SNAPSHOT_DIR"])
+          target.mkdir()  # Never reuse a stale snapshot or follow its symlink.
+          checkout = subprocess.run(["git", "rev-parse", "HEAD"], text=True,
+                                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+          snapshot = {
+              "schema": "codeskeptic-ci-snapshot/v1",
+              "purpose": "diagnostics-only; not a final job verdict or qualification receipt",
+              "event_sha": os.environ["GITHUB_SHA"],
+              "checkout_sha": checkout.stdout.strip() if checkout.returncode == 0 else None,
+              "workflow_sha": os.environ["WORKFLOW_SHA"],
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "job": os.environ["GITHUB_JOB"],
+              "steps": {key: {field: value.get(field) for field in ("outcome", "conclusion")}
+                        for key, value in json.loads(os.environ["STEPS_JSON"]).items()},
+              "logs": {},
+          }
+          # Fixed allowlist, no recursive workspace upload, no test reruns.
+          for name in ("build/Testing/Temporary/LastTest.log",
+                       "build/Testing/Temporary/LastTestsFailed.log",
+                       "build/CMakeFiles/CMakeConfigureLog.yaml", "probe_result.txt"):
+              source = Path(name)
+              if any(p.is_symlink() for p in (source, *source.parents)) or not source.is_file():
+                  snapshot["logs"][name] = {"available": False}
+                  continue
+              with source.open("rb") as stream:
+                  size = stream.seek(0, 2)
+                  stream.seek(max(0, size - 65536))
+                  data = stream.read(65536)
+              (target / source.name).write_bytes(data)
+              snapshot["logs"][name] = {"available": True, "bytes": len(data), "truncated": size > len(data)}
+          (target / "snapshot.json").write_text(json.dumps(snapshot, indent=2) + "\n", encoding="utf-8")
+          PY
+
+      - name: Upload agent job diagnostics
+        id: agent-upload
+        if: always() && startsWith(github.ref, 'refs/heads/agent/cs3-') && steps.agent-evidence.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-${{ github.job }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/codeskeptic-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Failure diagnostics -> refs/ci-logs/*
         # Same contract as ci.yml: the dev sandbox reads Actions results
         # over the git protocol only. Configure/build logs matter most
         # here — MSVC compile errors are this lane's likely failure mode.
-        if: failure()
+        if: failure() && !startsWith(github.ref, 'refs/heads/agent/cs3-')
         shell: bash
         env:
           STEPS_JSON: ${{ toJSON(steps) }}
@@ -220,7 +276,7 @@ jobs:
           git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/windows-native"
 
       - name: Mirror job status to refs/status/*
-        if: always()
+        if: always() && !startsWith(github.ref, 'refs/heads/agent/cs3-')
         shell: bash
         run: |
           git push --force origin \

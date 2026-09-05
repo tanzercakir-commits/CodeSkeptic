@@ -26,9 +26,9 @@ on:
       - "tests/**"
       - "CMakeLists.txt"
   push:
-    # Same paths, phase* branches: the sandbox-driven loop (see ci.yml)
-    # gets the score guard on analysis-code pushes without a PR.
-    branches: ["phase*"]
+    # Existing phase path filters plus the explicit agent checkpoint path.
+    # Agent pushes need no PR or default-branch workflow_dispatch registration.
+    branches: ["phase*", "agent/cs3-*"]
     paths:
       - ".github/workflows/juliet.yml"
       - "scripts/run_juliet.sh"
@@ -39,6 +39,7 @@ on:
       - "src/**"
       - "tests/**"
       - "CMakeLists.txt"
+      - "ci/regression-checkpoint.json"
 
 # Job-status mirroring (refs/status/*, see ci.yml) needs push rights.
 permissions:
@@ -133,7 +134,7 @@ jobs:
         # Always (not just on failure): the FN classification and FP
         # samples in this output ARE the working data of the recall
         # rounds — the sandbox reads them over the git protocol.
-        if: always()
+        if: always() && !startsWith(github.ref, 'refs/heads/agent/cs3-')
         run: |
           tail -c 120000 juliet-output.txt > juliet-output.tail.txt 2>/dev/null || true
           git config user.name "ci-logs"
@@ -145,7 +146,7 @@ jobs:
           git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/juliet"
 
       - name: Mirror job status to refs/status/*
-        if: always()
+        if: always() && !startsWith(github.ref, 'refs/heads/agent/cs3-')
         run: |
           git push --force origin \
             "HEAD:refs/status/${{ github.sha }}/juliet/${{ job.status }}"
