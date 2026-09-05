@@ -2,6 +2,19 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH01-S07-U001 — Mevcut CI kapılarını agent dalı push olayına bağla
+
+- Commit: `971d8c85c7de059de35b663db467c02dbb057895`
+- Dal: `agent/cs3-ch01-s07-u001-ci-push-wiring`
+- Implementer: `root-cs3-ch01-s07-u001-20260905`
+- Bağımsız denetçi: `independent-cwe-ch01-s07-u001-971d8c8-20260905`
+- İnceleme SHA-256: `6d77b378f978a38aac192f6659a754d0f6cc17bca1ff22241798d7fb7f79a661`
+- Tarih: 2026-09-05T15:19:56.534113+00:00
+- Sonuç: Yeni görev dalları mevcut Linux, Windows ve ilgili Juliet kontrollerini tetikleyebilir; FIFO yeşili ürün yeterliliğiyle karıştırılmaz.
+- workflow-policy-tests: PASS; SHA-256 `92df9a24bf033ad7502589cb2289758db52027d4267c0cfcc16ceffd28923721`; `python3 -B tests/WorkflowPolicyTest.py`
+- workflow-validation: PASS; SHA-256 `f6c24d79f4b9514df0b631ed0ac304a345f423a48d640c6529e7305c576aa4d6`; `/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH01-S07-U001/971d8c8/actionlint -shellcheck= -pyflakes= .github/workflows/ci.yml .github/workflows/windows.yml .github/workflows/juliet.yml && python3 -B tests/MeasurementWorkflowTest.py && python3 -B tests/ReleaseWorkflowTest.py && python3 -B tests/DockerWorkflowTest.py`
+- queue-check: PASS; SHA-256 `ce2ca4274a15d0d68ea17a866abf3496f8ffc718f81d54a74f554a5a14b9aaa1`; `python3 -B scripts/project_queue.py check && python3 -B scripts/project_queue.py guard --base 67ae9204218176e003b56fe8f9553f9cb991d008 && python3 -B tests/test_project_queue.py && python3 -B tests/StatusAutomationTest.py && bash scripts/check_docs_sync.sh && git diff --check`
+
 ## CS3-CH01-S06-U003 — accept ailesinin wrapper sahipliğini ortak özette koru
 
 - Commit: `aedcf460a0d81cd0b4ef9f44a728aa698c155573`

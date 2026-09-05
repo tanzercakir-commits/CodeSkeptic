@@ -2,24 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH01-S07-U001
-
-### CS3-CH01-S07-U001 — Mevcut CI kapılarını agent dalı push olayına bağla
-
-**Sonuç:** Yeni görev dalları mevcut Linux, Windows ve ilgili Juliet kontrollerini tetikleyebilir; FIFO yeşili ürün yeterliliğiyle karıştırılmaz.
-
-**Kabul:**
-
-- agent/cs3-* push olayları Linux ve Windows işlerini; kaynak/test veya ci/regression-checkpoint.json değişikliği varsa Juliet'i seçer. Mevcut main, phase*, PR ve schedule davranışları korunur.
-- build-and-test adı, self-scan, corpus, thesis ve Juliet adımları korunur; eski pin, tolerans, quality floor ve destek kararları değiştirilmez.
-- Yeni agent olayları eski refs/status veya refs/ci-logs force-push adımlarını çalıştırmaz; normal job sonucu ve artifact kullanılır. Main ruleset değişimi, yeni PR veya merge yapılmaz.
-- Dal/olay/yol matrisi ve seçilmemesi gereken negatifler yerel testle, workflow yapısı ayrı doğrulamayla sınanır; varsayılan dalda olmayan dispatch kaydına güvenilmez.
-- Bu bir yerel tetikleme bağlantısı teslimidir; hosted PASS ve gerçek dünya yeterliliği sonraki exact-head checkpoint görevinin kabulüdür.
-
-**Test bütçesi:** T0
-**Kontroller:** workflow-policy-tests, workflow-validation, queue-check
-**Kapsam:** .github/workflows/ci.yml, .github/workflows/windows.yml, .github/workflows/juliet.yml, tests/WorkflowPolicyTest.py, docs/CI_GATES.md
-**Bağımlılıklar:** CS3-CH01-S06-U003
+## FRONT — CS3-CH01-S07-U002
 
 ### CS3-CH01-S07-U002 — Exact base-head checkpoint ve kanıt doğrulayıcısını kur
 
