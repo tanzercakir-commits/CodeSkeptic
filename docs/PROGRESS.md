@@ -2,6 +2,19 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH01-S06-U002 — Ortak integer literal ve guard çözümünde unsigned değeri koru
+
+- Commit: `d1ddc8d64fb9f669af1ca82b0d76583307a097bc`
+- Dal: `agent/cs3-ch01-s06-u002-unsigned-literal-guards`
+- Implementer: `root-cs3-ch01-s06-u002-20260905`
+- Bağımsız denetçi: `independent-cwe-ch01-s06-u002-d1ddc8d-20260905`
+- İnceleme SHA-256: `7b0bbecafa8f234a93175eb76c68bbfeae5108099a25ce92598ac3aa0ed1a9f0`
+- Tarih: 2026-09-05T12:36:03.928336+00:00
+- Sonuç: Paylaşılan interval literal/guard çözümünde unsigned sabitin gerçek değeri korunur; sahte negatif değerle erişilebilirlik veya kapasite kanıtı üretilmez.
+- linux-suite: PASS; SHA-256 `587dea6d0ca9ce7a34ae004bd5f774313b05ee457eef40d12c79f7122448377a`; `bash scripts/local_test.sh full`
+- relevant-corpus: PASS; SHA-256 `91c270cc806f7f788a8e05c968d559d32b05937be326569069ebb1462d36ba63`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH01-S06-U002/corpus.py`
+- queue-check: PASS; SHA-256 `d4a384a4fad7ec40439f006b3f14651dc7c49b684cf3112721b9939ba31d41be`; `python3 -B scripts/project_queue.py check && python3 -B scripts/project_queue.py guard --base 0e27486`
+
 ## CS3-CH01-S06-U001 — uint64 out-param kaynak kökenini sayısal aralıktan ayır
 
 - Commit: `c0b14253d08cb144f56e496f5dbd9d3fde73f450`
