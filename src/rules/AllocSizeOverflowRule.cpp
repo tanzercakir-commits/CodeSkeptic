@@ -1298,8 +1298,10 @@ public:
                     out.outputs[var] = *origin;
         };
         const auto bindAlias = [&](const VarDecl* var, Targets targets) {
-            if (var->hasGlobalStorage())
-                out.escaped.insert(targets.begin(), targets.end());
+            if (var->hasGlobalStorage() || out.escaped.count(var)) {
+                auto reachable = reachableTargets(targets, out);
+                out.escaped.insert(reachable.begin(), reachable.end());
+            }
             out.aliases[var] = std::move(targets);
         };
 
@@ -1324,8 +1326,7 @@ public:
             } else {
                 // A callee may retain an escaped pointer/reference and write
                 // it on a later call, even after a fresh checked result exists.
-                for (const auto* var : input.escaped) forget(var);
-                Targets targets;
+                Targets targets = input.escaped;
                 for (const Expr* arg : call->arguments()) {
                     auto current = pointedTargets(arg, input);
                     targets.insert(current.begin(), current.end());
@@ -1334,7 +1335,11 @@ public:
                     auto current = writtenTargets(arg, input);
                     targets.insert(current.begin(), current.end());
                 });
-                for (const auto* var : targets) forget(var);
+                targets = reachableTargets(targets, input);
+                for (const auto* var : targets) {
+                    forget(var);
+                    if (var->getType()->isPointerType()) out.aliases.erase(var);
+                }
                 out.escaped.insert(targets.begin(), targets.end());
             }
         } else if (const auto* decls = llvm::dyn_cast<DeclStmt>(stmt)) {
@@ -1415,6 +1420,29 @@ public:
     }
 
 private:
+    static Targets loadedTargets(const Targets& pointers, const State& state) {
+        Targets result;
+        for (const auto* pointer : pointers) {
+            auto pointees = state.aliases.find(pointer);
+            if (pointees != state.aliases.end())
+                result.insert(pointees->second.begin(), pointees->second.end());
+        }
+        return result;
+    }
+    static Targets reachableTargets(Targets roots, const State& state) {
+        // A callee receiving &p can write p and anything reachable through p.
+        // The visited set bounds traversal even for cyclic pointer aliases.
+        std::vector<const VarDecl*> pending(roots.begin(), roots.end());
+        while (!pending.empty()) {
+            const auto* var = pending.back();
+            pending.pop_back();
+            auto aliases = state.aliases.find(var);
+            if (aliases == state.aliases.end()) continue;
+            for (const auto* target : aliases->second)
+                if (roots.insert(target).second) pending.push_back(target);
+        }
+        return roots;
+    }
     static const VarDecl* plainStorage(const Expr* expr) {
         if (!expr) return nullptr;
         const auto* ref = llvm::dyn_cast<DeclRefExpr>(expr->IgnoreParenImpCasts());
@@ -1448,8 +1476,14 @@ private:
     static Targets pointedTargets(const Expr* expr, const State& state) {
         if (!expr || !expr->getType()->isPointerType()) return {};
         expr = expr->IgnoreParenCasts();
-        if (const auto* op = llvm::dyn_cast<UnaryOperator>(expr);
-            op && op->getOpcode() == UO_AddrOf) return writtenTargets(op->getSubExpr(), state);
+        if (const auto* op = llvm::dyn_cast<UnaryOperator>(expr)) {
+            if (op->getOpcode() == UO_AddrOf)
+                return writtenTargets(op->getSubExpr(), state);
+            if (op->getOpcode() == UO_Deref)
+                return loadedTargets(pointedTargets(op->getSubExpr(), state), state);
+        }
+        if (const auto* subscript = llvm::dyn_cast<ArraySubscriptExpr>(expr))
+            return loadedTargets(pointedTargets(subscript->getBase(), state), state);
         if (const auto* ref = llvm::dyn_cast<DeclRefExpr>(expr)) {
             const auto* var = llvm::dyn_cast<VarDecl>(ref->getDecl());
             auto alias = state.aliases.find(var);
@@ -1457,13 +1491,7 @@ private:
             if (var->getType()->isReferenceType()) {
                 // A reference-to-pointer aliases the pointer storage, not the
                 // ultimate integer. Follow its current binding after reassignments.
-                Targets targets;
-                for (const auto* pointer : alias->second) {
-                    auto pointees = state.aliases.find(pointer);
-                    if (pointees != state.aliases.end())
-                        targets.insert(pointees->second.begin(), pointees->second.end());
-                }
-                return targets;
+                return loadedTargets(alias->second, state);
             }
             return alias->second;
         }

@@ -687,6 +687,14 @@ TEST(AllocSizeOverflowRuleTest, BuiltinAddOverflowUseAndStatus) {
         {"status reference to pointer invalidates", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool* p=&overflow; bool*& q=p; *q=false; if(overflow) return 0; return malloc(bytes);", 1},
         {"reference rebinds status pointer", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool other=true; bool* p=&other; bool*& q=p; q=&overflow; *p=false; if(overflow) return 0; return malloc(bytes);", 1},
         {"reference rebind away preserves status", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool other=true; bool* p=&overflow; bool*& q=p; q=&other; *q=false; if(overflow) return 0; return malloc(bytes);", 0},
+        {"two pointer levels invalidate status", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool* p=&overflow; bool** q=&p; **q=false; if(overflow) return 0; return malloc(bytes);", 1},
+        {"three pointer levels invalidate status", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool* p=&overflow; bool** q=&p; bool*** r=&q; ***r=false; if(overflow) return 0; return malloc(bytes);", 1},
+        {"pointer subscript load invalidates status", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool* p=&overflow; bool** q=&p; q[0][0]=false; if(overflow) return 0; return malloc(bytes);", 1},
+        {"unrelated nested pointer preserves status", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool other=true; bool* p=&other; bool** q=&p; **q=false; if(overflow) return 0; return malloc(bytes);", 0},
+        {"status escapes through pointer chain", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool* p=&overflow; mutate_status_chain(&p); if(overflow) return 0; return malloc(bytes);", 1},
+        {"status escapes through global pointer chain", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool* p=&overflow; saved_chain=&p; mutate_saved(); if(overflow) return 0; return malloc(bytes);", 1},
+        {"escaped pointer rebind exposes new status", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool other=true; bool* p=&other; saved_chain=&p; p=&overflow; mutate_saved(); if(overflow) return 0; return malloc(bytes);", 1},
+        {"nested output pointer replaces origin", "__builtin_add_overflow(n,16,&bytes); size_t* p=&bytes; size_t** q=&p; **q=16; return malloc(bytes);", 0},
         {"status escapes through global pointer", "bool overflow=__builtin_add_overflow(n,16,&bytes); saved_status=&overflow; mutate_saved(); if(overflow) return 0; return malloc(bytes);", 1},
         {"status reference alias invalidates", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool& alias=overflow; alias=false; if(overflow) return 0; return malloc(bytes);", 1},
         {"status pointer passed to callee", "bool overflow=__builtin_add_overflow(n,16,&bytes); bool* p=&overflow; mutate_status_ptr(p); if(overflow) return 0; return malloc(bytes);", 1},
@@ -715,9 +723,11 @@ TEST(AllocSizeOverflowRuleTest, BuiltinAddOverflowUseAndStatus) {
             extern void mutate_output(size_t&);
             extern void mutate_status(bool&);
             extern void mutate_status_ptr(bool*);
+            extern void mutate_status_chain(bool**);
             extern void mutate_saved(void);
             bool global_status=false;
             bool* saved_status=nullptr;
+            bool** saved_chain=nullptr;
             void* f(void) { size_t n=read_size(), bytes=0;
         )") + item.body + "}");
         EXPECT_EQ(results.size(), item.reports);
