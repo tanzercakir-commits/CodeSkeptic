@@ -19,6 +19,8 @@ const char* kPosixDecls = R"(
     struct sockaddr;
     extern int accept(int, struct sockaddr*, unsigned int*);
     extern int accept4(int, struct sockaddr*, unsigned int*, int);
+    extern int pipe(int*);
+    extern int pipe2(int*, int);
     extern int dup(int);
     extern int mkstemp(char*);
     extern int close(int);
@@ -74,6 +76,185 @@ TEST(FdResourceRuleTest, CloseReleasesDescriptor) {
         void f(const char* p) { int fd = open(p, 0); close(fd); }
     )");
     EXPECT_TRUE(results.empty());
+}
+
+TEST(FdResourceRuleTest, PipePairHasTwoIndependentOwnershipObligations) {
+    for (const auto* call : {"pipe(fds)", "pipe2(fds,0)"}) {
+        SCOPED_TRACE(call);
+        const auto prefix = std::string("void f(){int fds[2];") + call + ";";
+        const auto both = runFdRule(prefix + "}");
+        ASSERT_EQ(both.size(), 2u);
+        EXPECT_NE(both[0].message, both[1].message);
+        for (const auto& d : both) EXPECT_EQ(d.rule_id, "resource-leak");
+        expectSingleResourceLeak(runFdRule(prefix + "close(fds[0]);}"));
+        expectSingleResourceLeak(runFdRule(prefix + "close(fds[1]);}"));
+        EXPECT_TRUE(runFdRule(prefix + "close(fds[0]);close(fds[1]);}").empty());
+    }
+}
+
+TEST(FdResourceRuleTest, PipeFailureGuardsDoNotCreateDescriptors) {
+    for (const auto* call : {"pipe(fds)", "pipe2(fds,0)"}) {
+        SCOPED_TRACE(call);
+        for (const auto* condition : {"rc<0", "rc==-1", "rc!=0", "rc", "!(rc==0)"}) {
+            SCOPED_TRACE(condition);
+            const auto prefix = std::string("void f(){int fds[2];int rc=") + call +
+                ";if(" + condition + ")return;";
+            EXPECT_TRUE(runFdRule(prefix + "close(fds[0]);close(fds[1]);}").empty());
+            EXPECT_EQ(runFdRule(prefix + "}").size(), 2u);
+        }
+        EXPECT_TRUE(runFdRule(std::string("void f(){int fds[2];if(") + call +
+            "==0){close(fds[0]);close(fds[1]);}}").empty());
+        EXPECT_TRUE(runFdRule(std::string("void f(){int fds[2];if(!") + call +
+            "){close(fds[0]);close(fds[1]);}}").empty());
+        EXPECT_EQ(runFdRule(std::string("void f(){int fds[2];int rc=") + call +
+            ";rc=-1;if(rc<0)return;close(fds[0]);close(fds[1]);}").size(), 2u);
+    }
+}
+
+TEST(FdResourceRuleTest, PipeSlotAliasesAndReturnTransferAreIndependent) {
+    EXPECT_TRUE(runFdRule(R"(
+        int f(){int fds[2];if(pipe(fds)!=0)return -1;
+            int read_end=fds[0];close(read_end);return fds[1];}
+    )").empty());
+    expectSingleResourceLeak(runFdRule(R"(
+        int f(){int fds[2];pipe(fds);return fds[1];}
+    )"));
+    expectSingleResourceLeak(runFdRule(R"(
+        void f(){int fds[2];pipe(fds);fds[0]=-1;close(fds[0]);close(fds[1]);}
+    )"));
+    EXPECT_TRUE(runFdRule(R"(
+        void f(){int fds[2];pipe(fds);int saved=fds[0];fds[0]=-1;
+            close(saved);close(fds[1]);}
+    )").empty());
+}
+
+TEST(FdResourceRuleTest, PipeOutputTargetIsNotTheStatusReturn) {
+    EXPECT_EQ(runFdRule(R"(
+        void f(){int fds[2];int rc=pipe(fds);close(rc);}
+    )").size(), 2u);
+    EXPECT_EQ(runFdRule(R"(
+        int f(){int fds[2];return pipe2(fds,0);}
+    )").size(), 2u);
+    EXPECT_TRUE(runFdRule(R"(
+        int f(int fds[2]){return pipe(fds);}
+    )").empty());
+    EXPECT_TRUE(runFdRule(R"(
+        struct User {int pipe(int*){return 0;}};
+        void f(){int fds[2];User u;u.pipe(fds);}
+    )").empty());
+}
+
+TEST(FdResourceRuleTest, PipeReassignedOutputAndStatusLoseStaleIdentity) {
+    for (const auto* mutation : {"++fds[0];", "fds[0]+=1;"}) {
+        SCOPED_TRACE(mutation);
+        expectSingleResourceLeak(runFdRule(std::string("void f(){int fds[2];pipe(fds);") +
+            mutation + "close(fds[0]);close(fds[1]);}"));
+    }
+    for (const auto* mutation : {"--rc;", "rc-=1;", "change(&rc);"}) {
+        SCOPED_TRACE(mutation);
+        EXPECT_EQ(runFdRule(std::string("extern void change(int*);void f(){int fds[2];int rc=pipe(fds);") +
+            mutation + "if(rc<0)return;close(fds[0]);close(fds[1]);}").size(), 2u);
+    }
+    EXPECT_TRUE(runFdRule(R"(
+        void f(){int fds[2];int rc=pipe(fds);int copy=rc;rc=-1;
+            if(copy<0)return;close(fds[0]);close(fds[1]);}
+    )").empty());
+}
+
+TEST(FdResourceRuleTest, PipeLocalOutputPointerTracksReassignmentAndOffset) {
+    for (const auto* move : {"p=fds+1;", "p=&fds[1];", "++p;", "p+=1;"}) {
+        SCOPED_TRACE(move);
+        EXPECT_TRUE(runFdRule(std::string("void f(){int fds[3];int* p=fds;") + move +
+            "if(pipe(p)<0)return;close(fds[1]);close(fds[2]);}").empty());
+    }
+    EXPECT_TRUE(runFdRule(R"(
+        void f(){int a[2],b[2];int* p=a;p=b;if(pipe2(p,0)<0)return;
+            close(b[0]);close(b[1]);}
+    )").empty());
+    EXPECT_EQ(runFdRule(R"(
+        void f(){int a[2],b[2];int* p=a;pipe(p);p=b;close(p[0]);close(p[1]);}
+    )").size(), 2u);
+}
+
+TEST(FdResourceRuleTest, PipeFailedReplacementPreservesPreviousOutputValues) {
+    EXPECT_TRUE(runFdRule(R"(
+        void f(){int a=open("a",0),b=open("b",0);int fds[2]={a,b};
+            if(pipe(fds)<0){close(fds[0]);close(fds[1]);return;}
+            close(a);close(b);close(fds[0]);close(fds[1]);}
+    )").empty());
+    EXPECT_EQ(runFdRule(R"(
+        void f(){int fds[2];pipe(fds);pipe2(fds,0);close(fds[0]);close(fds[1]);}
+    )").size(), 2u);
+}
+
+TEST(FdResourceRuleTest, PipePointerDereferenceAndStoredFailurePredicate) {
+    EXPECT_TRUE(runFdRule(R"(
+        void f(){int fds[2];pipe(fds);int* p=fds;close(*p);close(p[1]);}
+    )").empty());
+    EXPECT_TRUE(runFdRule(R"(
+        int f(){int fds[2];pipe(fds);close(fds[0]);int saved;return(saved=fds[1]);}
+    )").empty());
+    for (const auto* setup : {
+        "bool failed=pipe(fds)!=0;if(failed)return;",
+        "bool failed=pipe(fds);if(failed)return;",
+        "bool success=pipe(fds)==0;if(!success)return;"}) {
+        SCOPED_TRACE(setup);
+        EXPECT_TRUE(runFdRule(std::string("void f(){int fds[2];") + setup +
+            "close(fds[0]);close(fds[1]);}").empty());
+        EXPECT_EQ(runFdRule(std::string("void f(){int fds[2];") + setup + "}").size(), 2u);
+    }
+    EXPECT_EQ(runFdRule(R"(
+        extern void change(int*);
+        void f(){int fds[2];int rc=pipe(fds);int* p=&rc;change(p);
+            if(rc<0)return;close(fds[0]);close(fds[1]);}
+    )").size(), 2u);
+}
+
+TEST(FdResourceRuleTest, PipeStatusConversionsUseTheActualStoredValues) {
+    for (const auto* setup : {
+        "unsigned short rc=pipe(fds);if(rc==65535)return;",
+        "unsigned rc=pipe(fds);if(rc==4294967295U)return;",
+        "unsigned long long rc=pipe(fds);if(rc==18446744073709551615ULL)return;",
+        "unsigned short rc=pipe(fds);if(rc==static_cast<unsigned short>(-1))return;",
+        "bool rc=pipe(fds);if(rc==true)return;"}) {
+        SCOPED_TRACE(setup);
+        EXPECT_TRUE(runFdRule(std::string("void f(){int fds[2];") + setup +
+            "close(fds[0]);close(fds[1]);}").empty());
+        EXPECT_EQ(runFdRule(std::string("void f(){int fds[2];") + setup + "}").size(), 2u);
+    }
+}
+
+TEST(FdResourceRuleTest, PipeSignatureLookalikesDoNotAcquireOutputs) {
+    FdResourceRule rule;
+    for (const auto* code : {
+        "long pipe(int*);void f(){int fds[2];pipe(fds);}",
+        "int pipe(void*);void f(){int fds[2];pipe(fds);}",
+        "int pipe(const int*);void f(){int fds[2];pipe(fds);}",
+        "int pipe(int*,...);void f(){int fds[2];pipe(fds);}",
+        "int pipe2(int*,bool);void f(){int fds[2];pipe2(fds,false);}",
+        "int pipe(int*){return 0;}void f(){int fds[2];pipe(fds);}",
+        "namespace custom{int pipe(int*);}void f(){int fds[2];custom::pipe(fds);}",
+        "struct User{static int pipe2(int*,int);};void f(){int fds[2];User::pipe2(fds,0);}"}) {
+        SCOPED_TRACE(code);
+        EXPECT_TRUE(runRule(rule, code).empty());
+    }
+}
+
+TEST(FdResourceRuleTest, PipeNativeStatusOverridesOwnedReturnSummaryOnlyForNativeSignature) {
+    GlobalStoreGuard guard;
+    const std::string model = writeModel("pipe_native_status.csk",
+        "codeskeptic-summaries v10\n"
+        "pipe/1\tU\tO\tU\t-\t-\t-\t-\tO\tU\tU\tC\tO\t?\n");
+    ASSERT_TRUE(SummaryRegistry::instance().loadGlobal(model));
+    EXPECT_EQ(runFdRule("void f(){int fds[2];int status=pipe(fds);close(status);}").size(), 2u);
+    EXPECT_TRUE(runFdRule("void f(){int fds[2];pipe(fds);close(fds[0]);close(fds[1]);}").empty());
+    expectSingleResourceLeak(runFdRule(R"(
+        extern int pipe(double*);
+        void f(){double values[2];int fd=pipe(values);}
+    )"));
+    expectSingleResourceLeak(runFdRule(R"(
+        void f(){int flags=open("flags",0);int fds[2];pipe2(fds,flags);close(fds[0]);close(fds[1]);}
+    )"));
 }
 
 TEST(FdResourceRuleTest, AcceptFamilyAcquiresReturnedDescriptors) {
