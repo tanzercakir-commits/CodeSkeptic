@@ -1,6 +1,6 @@
 # CodeSkeptic — CWE Ürün Planı
 
-Sürüm: 5. Eski planın devamı değil; main tabanlı yeni program.
+Sürüm: 6. Eski planın devamı değil; main tabanlı yeni program.
 
 PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.
 
@@ -202,7 +202,7 @@ PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. G
 
 **Test bütçesi:** T2
 **Kontroller:** linux-suite, relevant-corpus, queue-check
-**Kapsam:** src/engine/IntervalEval.cpp, src/engine/IntervalEval.h, tests/IntervalAnalysisTest.cpp, tests/AllocSizeOverflowRuleTest.cpp, tests/IntOverflowRuleTest.cpp, tests/SignConversionRuleTest.cpp
+**Kapsam:** src/engine/IntervalEval.cpp, src/engine/IntervalEval.h, tests/IntervalAnalysisTest.cpp, tests/AllocSizeOverflowRuleTest.cpp, tests/IntOverflowRuleTest.cpp, tests/SignConversionRuleTest.cpp, src/rules/AllocSizeOverflowRule.cpp
 **Bağımlılıklar:** CS3-CH01-S01-U002
 
 #### CS3-CH01-S06-U002 — Ortak integer literal ve guard çözümünde unsigned değeri koru
