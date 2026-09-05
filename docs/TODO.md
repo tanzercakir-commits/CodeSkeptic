@@ -20,7 +20,7 @@ Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter aç
 
 **Test bütçesi:** T3
 **Kontroller:** hosted-regressions, hosted-realworld-base-head, checkpoint-receipt-validation, queue-check
-**Kapsam:** ci/regression-checkpoint.json, docs/CI_GATES.md, tests/FdResourceRuleTest.cpp, src/rules/FdResourceRule.cpp
+**Kapsam:** ci/regression-checkpoint.json, docs/CI_GATES.md, tests/FdResourceRuleTest.cpp, src/rules/FdResourceRule.cpp, src/rules/UninitScalarRule.cpp, tests/UninitScalarRuleTest.cpp, scripts/run_regression_checkpoint.py, scripts/verify_regression_checkpoint.py, tests/RegressionCheckpointTest.py, ci/regression-adjudications.json
 **Bağımlılıklar:** CS3-CH01-S07-U002
 
 ## Sonraki chapter kuyruğu — henüz yürütülemez
