@@ -2561,13 +2561,13 @@ public:
         if (const auto* declaration = dyn_cast<DeclStmt>(stmt)) {
             for (const Decl* decl : declaration->decls()) {
                 const auto* var = dyn_cast<VarDecl>(decl);
-                // References are outside this value-copy model. Their
-                // initializer may later be closed or rewritten through the
-                // reference, so never keep a strong return-ownership proof.
-                if (var && var->getType()->isReferenceType() && var->hasInit())
-                    kill(var->getInit(), out);
+                // References and aggregate storage are outside this value-
+                // copy model; an untracked copy may later close the resource.
                 auto it = var ? out.find(var) : out.end();
-                if (it == out.end()) continue;
+                if (it == out.end()) {
+                    if (var && var->hasInit()) kill(var->getInit(), out);
+                    continue;
+                }
                 it->second = var->hasInit()
                                  ? ownershipOf(var->getInit(), out)
                                  : FdReturnValue{};
@@ -2578,21 +2578,32 @@ public:
                 const auto* var = dyn_cast_or_null<VarDecl>(
                     asVarOrParam(assignment->getLHS()));
                 auto it = var ? out.find(var) : out.end();
-                if (it != out.end())
-                    it->second = assignment->getOpcode() == BO_Assign
-                                     ? ownershipOf(assignment->getRHS(), in)
-                                     : FdReturnValue{};
+                if (it != out.end()) {
+                    if (assignment->getOpcode() == BO_Assign) {
+                        it->second = ownershipOf(assignment->getRHS(), in);
+                    } else {
+                        it->second = mergeFdReturnValue(it->second,
+                            ownershipOf(assignment->getRHS(), in));
+                        it->second.kind = FdReturnState::Unknown;
+                    }
+                } else {
+                    // Untracked storage may retain a descriptor copy that
+                    // can be consumed later; do not assert an owned return.
+                    kill(assignment->getRHS(), out);
+                }
             }
         } else if (const auto* unary = dyn_cast<UnaryOperator>(stmt)) {
             if (unary->isIncrementDecrementOp()) {
                 const auto* var = dyn_cast_or_null<VarDecl>(asVarOrParam(unary->getSubExpr()));
                 auto it = var ? out.find(var) : out.end();
-                if (it != out.end()) it->second = FdReturnValue{};
+                if (it != out.end()) it->second.kind = FdReturnState::Unknown;
             } else if (unary->getOpcode() == UO_AddrOf) {
                 kill(unary->getSubExpr(), out);
             }
         } else if (const auto* call = dyn_cast<CallExpr>(stmt)) {
             applyCallEffects(call, out);
+        } else if (const auto* lambda = dyn_cast<LambdaExpr>(stmt)) {
+            for (const Expr* capture : lambda->capture_inits()) kill(capture, out);
         }
         return out;
     }
@@ -2632,21 +2643,28 @@ private:
             return qualify(mergeFdReturnValue(
                 ownershipOf(conditional->getTrueExpr(), state),
                 ownershipOf(conditional->getFalseExpr(), state)));
-        const Expr* resultExpr = nullptr;
-        if (const auto* binary = dyn_cast<BinaryOperator>(expr)) {
-            if (binary->getOpcode() == BO_Comma || binary->getOpcode() == BO_Assign)
-                resultExpr = binary->getRHS();
-        } else if (const auto* unary = dyn_cast<UnaryOperator>(expr)) {
-            if (unary->getOpcode() == UO_Plus) resultExpr = unary->getSubExpr();
-        }
-        if (resultExpr) {
-            auto value = ownershipOf(resultExpr, state);
-            value.kind = FdReturnState::Unknown;
+        const auto* call = dyn_cast<CallExpr>(expr);
+        if (!call) {
+            // Unsupported arithmetic/aggregate expressions can still copy a
+            // descriptor for some values. Union possible origins, but never
+            // use this conservative provenance as an Owned proof.
+            FdReturnValue value;
+            std::vector<const Stmt*> pending;
+            for (const Stmt* child : expr->children()) pending.push_back(child);
+            while (!pending.empty()) {
+                const Stmt* child = pending.back();
+                pending.pop_back();
+                if (const auto* childExpr = dyn_cast_or_null<Expr>(child)) {
+                    const auto possible = ownershipOf(childExpr, state);
+                    value.origins.insert(possible.origins.begin(), possible.origins.end());
+                } else if (child) {
+                    // GNU statement expressions interpose a CompoundStmt.
+                    for (const Stmt* nested : child->children()) pending.push_back(nested);
+                }
+            }
             return value;
         }
-        const auto* call = dyn_cast<CallExpr>(expr);
-        if (!call || !isFdIntegerType(call->getType()))
-            return {};
+        if (!isFdIntegerType(call->getType())) return {};
         if (codeskeptic::isNativeFdAcquisition(call))
             return qualify({FdReturnState::Owned, {call}});
         const auto summary = lookupPrev(previous_, call);
@@ -2771,11 +2789,31 @@ FdParamEffect sequenceFdParamEffect(FdParamEffect current,
 
 FdParamBinding fdParamBindingFor(const Expr* expr,
                                  const FdParamState& state) {
+    if (!expr) return FdParamBinding{{}, true};
     const auto* var = dyn_cast_or_null<VarDecl>(asVarOrParam(expr));
-    if (!var) return FdParamBinding{{}, true};
-    auto it = state.bindings.find(var);
-    return it == state.bindings.end()
-               ? FdParamBinding{{}, true} : it->second;
+    if (var) {
+        auto it = state.bindings.find(var);
+        return it == state.bindings.end()
+                   ? FdParamBinding{{}, true} : it->second;
+    }
+    expr = expr->IgnoreParenCasts();
+    // Native acquisitions return a new resource, not their input listener.
+    // Other call effects are handled separately by the reviewed summary.
+    FdParamBinding possible{{}, true};
+    if (isa<CallExpr>(expr)) return possible;
+    std::vector<const Stmt*> pending;
+    for (const Stmt* child : expr->children()) pending.push_back(child);
+    while (!pending.empty()) {
+        const Stmt* child = pending.back();
+        pending.pop_back();
+        if (const auto* childExpr = dyn_cast_or_null<Expr>(child)) {
+            const auto binding = fdParamBindingFor(childExpr, state);
+            possible.sources.insert(binding.sources.begin(), binding.sources.end());
+        } else if (child) {
+            for (const Stmt* nested : child->children()) pending.push_back(nested);
+        }
+    }
+    return possible;
 }
 
 void applyFdParamEffect(const FdParamBinding& binding,
@@ -2864,7 +2902,7 @@ public:
         if (const auto* declaration = dyn_cast<DeclStmt>(stmt)) {
             for (const Decl* decl : declaration->decls()) {
                 const auto* var = dyn_cast<VarDecl>(decl);
-                if (var && var->getType()->isReferenceType() && var->hasInit())
+                if (var && !isFdIntegerType(var->getType()) && var->hasInit())
                     blockBorrow(var->getInit(), out);
                 if (!var || !isFdIntegerType(var->getType()) ||
                     !var->hasInit())
@@ -2881,17 +2919,25 @@ public:
         }
 
         if (const auto* assignment = dyn_cast<BinaryOperator>(stmt)) {
-            if (assignment->getOpcode() != BO_Assign) return out;
+            if (!assignment->isAssignmentOp()) return out;
             FdParamBinding source =
                 fdParamBindingFor(assignment->getRHS(), out);
+            if (assignment->getOpcode() != BO_Assign) {
+                const auto prior = fdParamBindingFor(assignment->getLHS(), out);
+                source.sources.insert(prior.sources.begin(), prior.sources.end());
+                source.opaque = true;
+            }
             const auto* target = dyn_cast_or_null<VarDecl>(
                 asVarOrParam(assignment->getLHS()));
-            if (target && (isa<ParmVarDecl>(target) ||
+            if (target && isFdIntegerType(target->getType()) && (isa<ParmVarDecl>(target) ||
                            target->hasLocalStorage()))
                 out.bindings[target] = std::move(source);
-            else
+            else {
                 applyFdParamEffect(source,
-                                   FdParamEffect::Transferred, out);
+                    target && target->hasLocalStorage() ? FdParamEffect::Unknown
+                                                       : FdParamEffect::Transferred, out);
+                blockBorrow(assignment->getRHS(), out);
+            }
             return out;
         }
 
@@ -2902,7 +2948,14 @@ public:
         if (const auto* unary = dyn_cast<UnaryOperator>(stmt)) {
             if (unary->getOpcode() == UO_AddrOf)
                 blockBorrow(unary->getSubExpr(), out);
+            if (unary->isIncrementDecrementOp()) {
+                const auto* target = dyn_cast_or_null<VarDecl>(asVarOrParam(unary->getSubExpr()));
+                auto it = target ? out.bindings.find(target) : out.bindings.end();
+                if (it != out.bindings.end()) it->second.opaque = true;
+            }
         }
+        if (const auto* lambda = dyn_cast<LambdaExpr>(stmt))
+            for (const Expr* capture : lambda->capture_inits()) blockBorrow(capture, out);
         return out;
     }
 
@@ -2910,25 +2963,6 @@ public:
 
 private:
     static void blockBorrow(const Expr* expr, State& state) {
-        if (!expr) return;
-        expr = expr->IgnoreParenCasts();
-        if (const auto* conditional = dyn_cast<ConditionalOperator>(expr)) {
-            blockBorrow(conditional->getTrueExpr(), state);
-            blockBorrow(conditional->getFalseExpr(), state);
-            return;
-        }
-        if (const auto* binary = dyn_cast<BinaryOperator>(expr)) {
-            if (binary->getOpcode() == BO_Comma || binary->getOpcode() == BO_Assign) {
-                blockBorrow(binary->getRHS(), state);
-                return;
-            }
-        }
-        if (const auto* unary = dyn_cast<UnaryOperator>(expr)) {
-            if (unary->getOpcode() == UO_Plus) {
-                blockBorrow(unary->getSubExpr(), state);
-                return;
-            }
-        }
         for (unsigned source : fdParamBindingFor(expr, state).sources)
             state.borrowEscaped[source] = true;
     }

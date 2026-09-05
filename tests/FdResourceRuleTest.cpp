@@ -951,6 +951,38 @@ TEST(FdResourceRuleTest, AcceptReturnedListenerExpressionIsNotNonEscapingBorrow)
     }
 }
 
+TEST(FdResourceRuleTest, AcceptUnsupportedCopiesNeverRetainClosedOwnershipProof) {
+    for (const auto* copy : {
+             "int saved=fd;saved+=0;close(saved);",
+             "int saved=fd+0;close(saved);",
+             "int saved=({fd;});close(saved);",
+             "int saved[1]={fd};close(saved[0]);",
+             "int saved[1];saved[0]=fd;close(saved[0]);",
+             "struct Holder{int value;};Holder saved={fd};close(saved.value);",
+             "[&]{close(fd);}();"}) {
+        SCOPED_TRACE(copy);
+        auto results = runFdRule(std::string("int wrapper(int l){int fd=accept(l,0,0);") +
+            copy + "return fd;}void caller(int l){int fd=wrapper(l);(void)fd;}");
+        for (const auto& result : results) EXPECT_NE(result.function, "caller");
+    }
+}
+
+TEST(FdResourceRuleTest, AcceptBorrowedListenerRejectsUnsupportedValueEffects) {
+    for (const auto* effect : {
+             "return l+0;", "close(l+0);return 0;",
+             "return ({l;});",
+             "int alias=0;alias+=l;close(alias);return 0;",
+             "int x=0;int& r=x;r=l;close(x);return 0;",
+             "int saved[1]={l};close(saved[0]);return 0;",
+             "[&]{close(l);}();return 0;"}) {
+        SCOPED_TRACE(effect);
+        auto results = runFdRule(std::string("int step(int l){int n=accept(l,0,0);close(n);") +
+            effect + "}int wrapper(){int l=socket(2,1,0);close(step(l));return l;}"
+            "void caller(){int l=wrapper();(void)l;}");
+        for (const auto& result : results) EXPECT_NE(result.function, "caller");
+    }
+}
+
 TEST(FdResourceRuleTest, ClosingWrappedAcquisitionIsClean) {
     auto results = runFdRule(R"(
         int acquire(const char* p) { return open(p, 0); }
