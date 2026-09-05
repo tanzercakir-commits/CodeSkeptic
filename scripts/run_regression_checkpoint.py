@@ -16,6 +16,7 @@ import verify_regression_checkpoint as verify
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUEST = "ci/regression-checkpoint.json"
+ADJUDICATIONS = "ci/regression-adjudications.json"
 
 
 def git(repo, *arguments):
@@ -179,11 +180,14 @@ def measure_pair(base_binary, head_binary, repo, build, base_sha, head_sha, outp
 def execute(args):
     repo = ROOT
     config = verify.validate_config(verify.load_json(repo / REQUEST))
+    adjudications = verify.load_adjudications(config, repo / ADJUDICATIONS
+                                             if config["schema"].endswith("/v2") else None)
     context = environment_context(args.lane)
     selected = verify.request_selected(config, request_at_head(repo, config, context))
     if args.command == "plan":
         manifest = campaign.validate_manifest(verify.load_json(repo / "scripts/realworld_manifest.json"))
         verify.require(campaign.digest_json(manifest) == config["manifest_sha256"], "request manifest mismatch")
+        verify.derive_expectations(config, manifest, adjudications)
         rows = verify.full_matrix(manifest)
         outputs = {"selected": "true" if selected else "false", "base_sha": config["base_sha"],
                    "matrix": json.dumps({"include": rows}, separators=(",", ":"))}
@@ -196,6 +200,7 @@ def execute(args):
     verify.require(selected, "no fresh enabled checkpoint at event head")
     workspace, output = fresh_dir(args.workspace), fresh_dir(args.output)
     inputs, input_identity, manifest = prepare_inputs(repo, workspace, config)
+    manifests, _ = verify.derive_expectations(config, manifest, adjudications)
     if args.command == "build":
         verify.require(args.lane == "realworld", "wrong build lane")
         source = inputs if args.side == "base" else repo
@@ -219,16 +224,17 @@ def execute(args):
         verify.require(artifact["details"] == {"side": args.side, "source_sha": revision, "binary_sha256": binary_sha} and
                        artifact["files"] == {"codeskeptic": binary_sha}, "wrong shared analyzer artifact")
         binary.chmod(0o755)  # upload-artifact does not retain executable permission.
-        code = campaign.run_shard(manifest, args.project, args.repetition, binary, workspace / "campaign",
+        code = campaign.run_shard(manifests[args.side], args.project, args.repetition, binary, workspace / "campaign",
                                   output / "receipt.json", None, inputs)
         verify.require(code == 0, "real-world shard unavailable; raw diagnostic receipt retained")
         verify.require(verify.file_digest(binary) == binary_sha, "analyzer changed during shard")
-        verify.verify_raw_shard(output, manifest, args.project, args.repetition, binary_sha)
+        verify.verify_raw_shard(output, manifests[args.side], args.project, args.repetition, binary_sha)
         details = {"side": args.side, "project": args.project, "repetition": args.repetition, "binary_sha256": binary_sha}
         kind = "shard"
     elif args.command == "aggregate":
         needs = verify.load_json(args.needs)
-        result = verify.verify_realworld_bundle(args.artifacts, config, context, input_identity, manifest, needs)
+        result = verify.verify_realworld_bundle(args.artifacts, config, context, input_identity, manifest, needs,
+                                               adjudications=adjudications)
         write_json(output / "result.json", result)
         details, kind = {"validated_shards": 48}, "aggregate"
     else:

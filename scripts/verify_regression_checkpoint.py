@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import copy
 import json
 import math
 import re
@@ -91,9 +92,15 @@ def load_json(path, root_type=dict):
 
 
 def validate_config(value):
-    keys(value, ("schema", "enabled", "request_id", "base_sha", "inputs_sha", "profile",
-                 "manifest_sha256"), "checkpoint request")
-    require(value["schema"] == "codeskeptic-regression-checkpoint/v1", "unsupported request schema")
+    require(type(value) is dict, "checkpoint request: not an object")
+    require(value.get("schema") in ("codeskeptic-regression-checkpoint/v1",
+                                     "codeskeptic-regression-checkpoint/v2"), "unsupported request schema")
+    fields = {"schema", "enabled", "request_id", "base_sha", "inputs_sha", "profile", "manifest_sha256"}
+    if value["schema"].endswith("/v2"):
+        fields.add("adjudications_sha256")
+    keys(value, fields, "checkpoint request")
+    if "adjudications_sha256" in fields:
+        digest(value["adjudications_sha256"])
     require(type(value["enabled"]) is bool, "enabled must be Boolean")
     require(type(value["request_id"]) is str and
             re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", value["request_id"]) is not None,
@@ -104,6 +111,127 @@ def validate_config(value):
     require(value["inputs_sha"] == value["base_sha"], "checkpoint inputs must use exact base")
     require(value["profile"] == "nightly-weekend-three-repeats", "unreviewed checkpoint profile")
     return value
+
+
+def load_adjudications(config, path=None):
+    """V2 binds exact canonical bytes; v1 cannot silently activate a sidecar."""
+    validate_config(config)
+    if config["schema"].endswith("/v1"):
+        require(path is None, "v1 does not admit adjudications")
+        return None
+    require(path is not None, "v2 requires the bound adjudication file")
+    path = regular(path)
+    require(path.stat().st_size <= 512 * 1024, "oversized adjudications")
+    value = load_json(path)
+    require(path.read_bytes() == canonical(value), "adjudications must be exact canonical JSON")
+    require(file_digest(path) == config["adjudications_sha256"], "adjudication file digest differs")
+    return value
+
+
+def _bounded_text(value, label, maximum=4096):
+    require(type(value) is str and value.strip() and len(value) <= maximum and
+            not any(ord(c) < 32 for c in value), f"invalid {label}")
+
+
+def _source_path(value):
+    _bounded_text(value, "evidence path", 512)
+    require(re.fullmatch(r"[A-Za-z0-9_./-]+", value) is not None and not value.startswith("/") and
+            all(p not in ("", ".", "..") for p in value.split("/")), "unsafe evidence path")
+
+
+def derive_expectations(config, manifest, adjudications=None):
+    """Keep immutable base inputs; derive only two head finding expectations.
+
+    Review identities/evidence hashes are procedural references, not signatures
+    or a runtime proof of the human classification. Exact-head independent review
+    must inspect that evidence. This function enforces its precise multiset scope.
+    """
+    validate_config(config)
+    require(campaign.digest_json(manifest) == config["manifest_sha256"], "wrong expected manifest")
+    if config["schema"].endswith("/v1"):
+        require(adjudications is None, "v1 does not admit adjudications")
+        return {"base": manifest, "head": manifest}, {}
+    require(type(adjudications) is dict and json_digest(adjudications) == config["adjudications_sha256"],
+            "missing or unbound adjudications")
+    keys(adjudications, ("schema", "base_sha", "manifest_sha256", "projects"), "adjudications")
+    require(adjudications["schema"] == "codeskeptic-semantic-adjudications/v1" and
+            adjudications["base_sha"] == config["base_sha"] and
+            adjudications["manifest_sha256"] == config["manifest_sha256"], "adjudication baseline differs")
+    records = adjudications["projects"]
+    require(type(records) is list and 1 <= len(records) <= 8, "empty or oversized adjudication catalog")
+    head = copy.deepcopy(manifest)
+    deltas = {}
+    for record in records:
+        keys(record, ("project", "revision", "original_expected", "baseline_fingerprints", "changes"),
+             "project adjudication")
+        identity = record["project"]
+        require(type(identity) is str and identity not in deltas and
+                identity in {p["id"] for p in manifest["projects"]}, "duplicate or unknown adjudicated project")
+        project = campaign.project_by_id(manifest, identity)
+        require(record["revision"] == project["revision"], "adjudicated revision differs")
+        expected = project["expected"]
+        # Dict equality would accept False == 0 or 1.0 == 1 here.
+        require(canonical(record["original_expected"]) == canonical(expected), "original expectation differs")
+        baseline = record["baseline_fingerprints"]
+        require(type(baseline) is list and len(baseline) <= 100000 and
+                all(type(f) is str and re.fullmatch(r"csf1-[0-9a-f]{16}", f) for f in baseline),
+                "invalid baseline fingerprint multiset")
+        require(baseline == sorted(baseline) and len(baseline) == expected["findings"] and
+                campaign.fingerprint_digest(baseline) == expected["fingerprint_sha256"],
+                "baseline fingerprint count/digest differs")
+        changes = record["changes"]
+        require(type(changes) is list and 1 <= len(changes) <= 256, "empty or oversized changes")
+        counts, removed, added, seen = Counter(baseline), Counter(), Counter(), set()
+        for change in changes:
+            keys(change, ("fingerprint", "count", "direction", "classification", "reason", "source",
+                          "regression", "review"), "classified change")
+            fingerprint = change["fingerprint"]
+            require(type(fingerprint) is str and re.fullmatch(r"csf1-[0-9a-f]{16}", fingerprint) and
+                    fingerprint not in seen, "invalid, duplicate or cancelling change")
+            seen.add(fingerprint)
+            integer(change["count"], "change occurrence count", 1)
+            require(change["count"] <= 100000, "oversized change count")
+            require((change["direction"], change["classification"]) in
+                    (("remove", "false-positive"), ("add", "true-positive")), "unclassified semantic change")
+            _bounded_text(change["reason"], "classification reason")
+            source = change["source"]
+            keys(source, ("path", "sha256", "line"), "source evidence")
+            _source_path(source["path"])
+            digest(source["sha256"])
+            integer(source["line"], "source line", 1)
+            regression = change["regression"]
+            keys(regression, ("path", "test", "commit"), "regression evidence")
+            _source_path(regression["path"])
+            _bounded_text(regression["test"], "regression test", 256)
+            digest(regression["commit"], 40)
+            review = change["review"]
+            keys(review, ("implementer", "verifier", "verdict", "evidence_sha256"), "semantic review")
+            for field in ("implementer", "verifier"):
+                _bounded_text(review[field], field, 256)
+            require(review["implementer"] != review["verifier"] and review["verdict"] == "PASS",
+                    "independent semantic review required")
+            digest(review["evidence_sha256"])
+            count = change["count"]
+            if change["direction"] == "remove":
+                # Counter subtraction otherwise silently drops negative counts.
+                require(count <= counts[fingerprint], "removal exceeds baseline multiplicity")
+                counts[fingerprint] -= count
+                removed[fingerprint] = count
+            else:
+                counts[fingerprint] += count
+                added[fingerprint] = count
+        require(sum(counts.values()) <= 100000, "oversized head multiset")
+        fingerprints = sorted(counts.elements())
+        # Retain the legacy exit contract; this policy does not invent a new
+        # interpretation for report-only findings or change exit classification.
+        require(expected["exit_code"] == int(bool(fingerprints)), "adjudication changes exit classification")
+        effective = campaign.project_by_id(head, identity)["expected"]
+        effective["findings"] = len(fingerprints)
+        effective["fingerprint_sha256"] = campaign.fingerprint_digest(fingerprints)
+        deltas[identity] = {"base": baseline, "head": fingerprints,
+                            "removed": dict(removed), "added": dict(added)}
+    campaign.validate_manifest(head)
+    return {"base": manifest, "head": head}, deltas
 
 
 def validate_context(value):
@@ -345,10 +473,11 @@ def verify_needs(needs, expected):
             "failed/skipped/cancelled/unavailable predecessor job")
 
 
-def verify_realworld_bundle(root, config, context, inputs, manifest, needs, require_aggregate=False):
+def verify_realworld_bundle(root, config, context, inputs, manifest, needs, require_aggregate=False,
+                            adjudications=None):
     require(context["lane"] == "realworld", "wrong bundle lane")
     verify_needs(needs, ("checkpoint-plan", "checkpoint-build", "checkpoint-scan"))
-    require(campaign.digest_json(manifest) == config["manifest_sha256"], "wrong expected manifest")
+    manifests, allowed = derive_expectations(config, manifest, adjudications)
     root = Path(root)
     rows = full_matrix(manifest)
     expected_names = {artifact_name(context, "binary", side) for side in ("base", "head")}
@@ -375,7 +504,7 @@ def verify_realworld_bundle(root, config, context, inputs, manifest, needs, requ
             require(canonical(envelope["details"]) == canonical({"side": side, "project": project, "repetition": repetition,
                                                                  "binary_sha256": binaries[side]}), "wrong shard binding")
             require(set(envelope["files"]) == SHARD_FILES, "incomplete shard raw evidence")
-            receipt = verify_raw_shard(directory, manifest, project, repetition, binaries[side])
+            receipt = verify_raw_shard(directory, manifests[side], project, repetition, binaries[side])
             receipts[(side, project, repetition)] = receipt
             target = staging / side / project / f"repeat-{repetition}"
             target.mkdir(parents=True)
@@ -385,11 +514,21 @@ def verify_realworld_bundle(root, config, context, inputs, manifest, needs, requ
         for side in ("base", "head"):
             for tier in PROJECTS:
                 try:
-                    groups[f"{side}/{tier}"] = campaign.aggregate_receipts(manifest, tier, staging / side)
+                    groups[f"{side}/{tier}"] = campaign.aggregate_receipts(manifests[side], tier, staging / side)
                 except campaign.CampaignError as error:
                     raise CheckpointError(str(error)) from error
     deltas = {}
     for project in sum(PROJECTS.values(), ()):
+        if adjudications is not None:
+            classified = allowed.get(project, {"added": {}, "removed": {}})
+            for repetition in (1, 2, 3):
+                a = Counter(receipts[("base", project, repetition)]["semantic"]["fingerprints"])
+                b = Counter(receipts[("head", project, repetition)]["semantic"]["fingerprints"])
+                require(dict(b - a) == classified["added"] and dict(a - b) == classified["removed"],
+                        "unclassified raw base/head multiset delta")
+                if project in allowed:
+                    require(a == Counter(classified["base"]) and b == Counter(classified["head"]),
+                            "raw multiset differs from adjudicated baseline/head")
         old = receipts[("base", project, 1)]
         new = receipts[("head", project, 1)]
         a, b = Counter(old["semantic"]["fingerprints"]), Counter(new["semantic"]["fingerprints"])
@@ -400,6 +539,10 @@ def verify_realworld_bundle(root, config, context, inputs, manifest, needs, requ
               "config_sha256": json_digest(config), "inputs": inputs, "status": "accepted",
               "scope": "artifact validation; hosted completion must be verified separately",
               "binary_sha256": binaries, "groups": groups, "deltas": deltas}
+    if adjudications is not None:
+        result["expectations"] = {"original_base_manifest_sha256": campaign.digest_json(manifests["base"]),
+                                   "effective_head_manifest_sha256": campaign.digest_json(manifests["head"]),
+                                   "adjudications_sha256": config["adjudications_sha256"]}
     if require_aggregate:
         directory = root / artifact_name(context, "aggregate")
         envelope = load_artifact(directory, config, context, inputs, "aggregate")
@@ -571,6 +714,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="Verify externally fetched exact-run checkpoint evidence; never run a campaign")
     parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument("--adjudications", type=Path, help="exact canonical v2 head-adjudication file; forbidden for v1")
     parser.add_argument("--context", type=Path, required=True)
     parser.add_argument("--inputs-root", type=Path, required=True)
     parser.add_argument("--run-json", type=Path, required=True)
@@ -581,9 +725,11 @@ def main():
     args = parser.parse_args()
     try:
         config = validate_config(load_json(args.config))
+        adjudications = load_adjudications(config, args.adjudications)
         require(config["enabled"], "disabled preparation cannot qualify")
         context = validate_context(load_json(args.context))
         inputs, manifest = runner.collect_inputs(args.inputs_root, config)
+        derive_expectations(config, manifest, adjudications)  # Also validate control data in the measurement lane.
         verify_hosted(load_json(args.run_json), load_json(args.jobs_json), context, expected_jobs(context, manifest))
         selected = verify_catalog(load_json(args.catalog_json), context, expected_artifacts(context, manifest))
         with tempfile.TemporaryDirectory(prefix="codeskeptic-checkpoint-download-") as directory:
@@ -592,14 +738,17 @@ def main():
             if context["lane"] == "realworld":
                 result = verify_realworld_bundle(root, config, context, inputs, manifest,
                                                 {name: "success" for name in ("checkpoint-plan", "checkpoint-build", "checkpoint-scan")},
-                                                require_aggregate=True)
+                                                require_aggregate=True, adjudications=adjudications)
             else:
                 result = verify_measurement_bundle(root / artifact_name(context, "measurement"), config, context,
                                                    inputs, runner.thesis_cases(args.inputs_root))
+        source_digests = {name: file_digest(path) for name, path in (
+            ("run", args.run_json), ("jobs", args.jobs_json), ("catalog", args.catalog_json))}
+        if adjudications is not None:
+            source_digests["adjudications"] = file_digest(args.adjudications)
         runner.write_json(args.output, {"schema": "codeskeptic-hosted-checkpoint-validation/v1", "context": context,
                                        "config_sha256": json_digest(config), "status": "accepted", "result": result,
-                                       "source_digests": {name: file_digest(path) for name, path in (
-                                           ("run", args.run_json), ("jobs", args.jobs_json), ("catalog", args.catalog_json))},
+                                       "source_digests": source_digests,
                                        "provenance": "caller must obtain API evidence from GitHub independently; not a signed attestation"})
         print("CHECKPOINT_VALIDATION_OK exact run/attempt, jobs, archive digests and raw evidence")
     except (ValueError, campaign.CampaignError, OSError, zipfile.BadZipFile) as error:

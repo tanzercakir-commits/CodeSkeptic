@@ -120,6 +120,105 @@ TEST(UninitScalarRuleTest, CIntegerAndBoolSurface) {
     EXPECT_EQ(result[1].rule_id, "uninit-scalar");
 }
 
+TEST(UninitScalarRuleTest, DeliberateVoidDiscardDoesNotReadOrInitialize) {
+    struct Case { const char* body; unsigned reports; };
+    for (const bool cLanguage : {true, false}) {
+        for (const bool cfg : {false, true}) {
+            for (const auto& test : {
+                Case{"(void)x;", 0},
+                Case{"(void)(((x)));", 0},
+                Case{"LV_UNUSED(x);", 0},
+                Case{"LV_UNUSED(((x)));", 0},
+                Case{"(void)x;return x;", 1},
+                Case{"LV_UNUSED(x);return x;", 1},
+                Case{"(void)(x=1);return x;", 0}}) {
+                SCOPED_TRACE(cLanguage ? "C11" : "C++17");
+                SCOPED_TRACE(cfg ? "CFG" : "straight-line");
+                SCOPED_TRACE(test.body);
+                const std::string code =
+                    std::string("#define LV_UNUSED(x) ((void)x)\nint f(int c){int x;") +
+                    (cfg ? "if(c){}" : "") + test.body + "return 0;}";
+                UninitScalarRule rule;
+                const auto result = runRuleWithArgs(rule, code,
+                    {cLanguage ? "-std=gnu11" : "-std=c++17"},
+                    cLanguage ? "discard.c" : "discard.cpp");
+                EXPECT_EQ(result.size(), test.reports);
+                for (const auto& diagnostic : result) {
+                    EXPECT_EQ(diagnostic.rule_id, "uninit-scalar");
+                    EXPECT_EQ(diagnostic.severity, Severity::Error);
+                }
+            }
+        }
+    }
+}
+
+TEST(UninitScalarRuleTest, DeliberateVoidDiscardRetainsRealReads) {
+    for (const bool cLanguage : {true, false}) {
+        for (const bool cfg : {false, true}) {
+            for (const auto* body : {
+                "(void)(x+1);", "(void)+x;", "(void)(int)x;",
+                "(void)(x++);", "(void)(x+=1);", "(void)sink(x);",
+                // Never use directReference's comma-RHS peeling to recognize
+                // a bare discard: the LHS can contain the actual read.
+                "int y=0;(void)(sink(x),y);", "(void)(x?1:2);",
+                "volatile int v=0;(void)(v=x);"}) {
+                SCOPED_TRACE(cLanguage ? "C11" : "C++17");
+                SCOPED_TRACE(cfg ? "CFG" : "straight-line");
+                SCOPED_TRACE(body);
+                const std::string code = std::string("void sink(int);int f(int c){int x;") +
+                    (cfg ? "if(c){}" : "") + body + "return 0;}";
+                UninitScalarRule rule;
+                const auto result = runRuleWithArgs(rule, code,
+                    {cLanguage ? "-std=gnu11" : "-std=c++17"},
+                    cLanguage ? "discard.c" : "discard.cpp");
+                ASSERT_EQ(result.size(), 1u);
+                EXPECT_EQ(result[0].rule_id, "uninit-scalar");
+                EXPECT_EQ(result[0].severity, Severity::Error);
+            }
+        }
+    }
+}
+
+TEST(UninitScalarRuleTest, DeliberateVoidDiscardKeepsUnsupportedVolatileBoundary) {
+    // Volatile arithmetic already invalidates the rule's sequencing proof.
+    // Do not silently claim new coverage while fixing ordinary bare discards.
+    for (const bool cLanguage : {true, false}) {
+        UninitScalarRule rule;
+        EXPECT_TRUE(runRuleWithArgs(rule,
+            "void f(){int x;volatile int v=0;(void)(v+x);}",
+            {cLanguage ? "-std=gnu11" : "-std=c++17"},
+            cLanguage ? "discard.c" : "discard.cpp").empty());
+    }
+}
+
+TEST(UninitScalarRuleTest, DeliberateVoidDiscardPreservesConditionalWritesAndLoops) {
+    struct Case { const char* body; unsigned reports; Severity severity; };
+    for (const bool cLanguage : {true, false}) {
+        for (const auto& test : {
+            Case{"(void)(c?(x=1):(x=2));return x;", 0, Severity::Error},
+            Case{"(void)(c?(x=1):0);return x;", 1, Severity::Warning},
+            Case{"if(c){LV_UNUSED(x);}else{LV_UNUSED(x);}return x;", 1, Severity::Error},
+            // Same declaration/discard/assignment ordering as the pinned LVGL
+            // blend functions, without importing their dirty source files.
+            Case{"int y;LV_UNUSED(x);LV_UNUSED(y);"
+                 "for(y=0;y<c;++y){for(x=0;x<c;++x){sink(x+y);}}return 0;",
+                 0, Severity::Error}}) {
+            SCOPED_TRACE(cLanguage ? "C11" : "C++17");
+            SCOPED_TRACE(test.body);
+            const std::string code =
+                std::string("#define LV_UNUSED(x) ((void)x)\nvoid sink(int);int f(int c){int x;") +
+                test.body + "}";
+            UninitScalarRule rule;
+            const auto result = runRuleWithArgs(rule, code,
+                {cLanguage ? "-std=gnu11" : "-std=c++17"},
+                cLanguage ? "discard.c" : "discard.cpp");
+            EXPECT_EQ(result.size(), test.reports);
+            for (const auto& diagnostic : result)
+                EXPECT_EQ(diagnostic.severity, test.severity);
+        }
+    }
+}
+
 TEST(UninitScalarRuleTest, NoReturnInsideExpressionStopsLaterReads) {
     for (const auto* code : {
         "[[noreturn]] int die();int f(){int x;return (die(),x);}",

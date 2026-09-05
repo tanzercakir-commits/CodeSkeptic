@@ -12,6 +12,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
+from types import SimpleNamespace
 import warnings
 import zipfile
 from pathlib import Path
@@ -217,11 +219,38 @@ def full_fixture_manifest():
     return campaign.validate_manifest(raw)
 
 
-def make_bundle(root, cfg=None, ctx=None, inputs=None, manifest=None):
+def adjudication_manifest():
+    manifest = full_fixture_manifest()
+    baseline = ["csf1-0000000000000003", "csf1-0000000000000003", "csf1-00000000000000ff"]
+    campaign.project_by_id(manifest, "abseil")["expected"].update(
+        findings=3, fingerprint_sha256=campaign.fingerprint_digest(baseline))
+    return manifest
+
+
+def adjudicated_config(manifest, cfg=None):
+    cfg = copy.deepcopy(config() if cfg is None else cfg)
+    cfg.update(schema="codeskeptic-regression-checkpoint/v2", manifest_sha256=campaign.digest_json(manifest))
+    project = campaign.project_by_id(manifest, "abseil")
+    document = {"schema": "codeskeptic-semantic-adjudications/v1", "base_sha": cfg["base_sha"],
+                "manifest_sha256": cfg["manifest_sha256"], "projects": [{
+        "project": "abseil", "revision": project["revision"], "original_expected": copy.deepcopy(project["expected"]),
+        "baseline_fingerprints": ["csf1-0000000000000003", "csf1-0000000000000003", "csf1-00000000000000ff"],
+        "changes": [{"fingerprint": "csf1-0000000000000003", "count": 1, "direction": "remove",
+                     "classification": "false-positive", "reason": "Synthetic fixture only, not a product adjudication.",
+                     "source": {"path": "src/fixture.c", "sha256": "d" * 64, "line": 1},
+                     "regression": {"path": "tests/FixtureTest.cpp", "test": "Fixture.ExactRead", "commit": "e" * 40},
+                     "review": {"implementer": "fixture-implementer", "verifier": "fixture-verifier",
+                                "verdict": "PASS", "evidence_sha256": "f" * 64}}]}]}
+    cfg["adjudications_sha256"] = verify.json_digest(document)
+    return cfg, document
+
+
+def make_bundle(root, cfg=None, ctx=None, inputs=None, manifest=None, adjudications=None):
     manifest = full_fixture_manifest() if manifest is None else manifest
     cfg = config() if cfg is None else cfg
     ctx = context() if ctx is None else ctx
     cfg["manifest_sha256"] = campaign.digest_json(manifest)
+    manifests, allowed = verify.derive_expectations(cfg, manifest, adjudications)
     inputs = {"fixture_only": True, "source_sha": cfg["inputs_sha"]} if inputs is None else inputs
     binary_digests = {}
     for side in ("base", "head"):
@@ -235,8 +264,9 @@ def make_bundle(root, cfg=None, ctx=None, inputs=None, manifest=None):
     for row in verify.full_matrix(manifest):
         side, project, repetition = row["side"], row["project"], row["repetition"]
         index = next(i for i, p in enumerate(manifest["projects"]) if p["id"] == project)
-        receipt = fixtures.accepted_receipt(manifest, repetition, index, binary_digests[side])
-        fingerprints = [] if index == 1 else [f"csf1-{index + 1:016x}"]
+        receipt = fixtures.accepted_receipt(manifests[side], repetition, index, binary_digests[side])
+        fingerprints = allowed[project][side] if project in allowed else (
+            [] if index == 1 else [f"csf1-{index + 1:016x}"])
         receipt["semantic"]["fingerprints"] = fingerprints
         directory = root / verify.artifact_name(ctx, "shard", side, project, repetition)
         directory.mkdir()
@@ -381,14 +411,227 @@ class ArtifactBundleTest(unittest.TestCase):
             verify.verify_needs({"checkpoint-scan": "success"}, NEEDS)
 
 
+class AdjudicationContractTest(unittest.TestCase):
+    def test_v1_remains_strict_and_v2_needs_exact_bound_document(self):
+        manifest = adjudication_manifest()
+        cfg, document = adjudicated_config(manifest)
+        verify.validate_config(cfg)
+        for value in (None, {}, {**document, "base_sha": "e" * 40}):
+            with self.subTest(value=value), self.assertRaises(verify.CheckpointError):
+                verify.derive_expectations(cfg, manifest, value)
+        for value in (None, True, "e" * 63):
+            changed = {**cfg, "adjudications_sha256": value}
+            with self.subTest(value=value), self.assertRaises(verify.CheckpointError):
+                verify.validate_config(changed)
+        missing = dict(cfg)
+        del missing["adjudications_sha256"]
+        with self.assertRaises(verify.CheckpointError):
+            verify.validate_config(missing)
+        old = config()
+        old["manifest_sha256"] = campaign.digest_json(manifest)
+        with self.assertRaises(verify.CheckpointError):
+            verify.derive_expectations(old, manifest, document)
+        with self.assertRaises(verify.CheckpointError):
+            verify.validate_config({**old, "adjudications_sha256": cfg["adjudications_sha256"]})
+
+    def test_duplicate_multiplicity_and_every_protected_field_are_preserved(self):
+        manifest = adjudication_manifest()
+        before = verify.canonical(manifest)
+        cfg, document = adjudicated_config(manifest)
+        manifests, allowed = verify.derive_expectations(cfg, manifest, document)
+        self.assertEqual(verify.canonical(manifest), before)
+        self.assertEqual(verify.canonical(manifests["base"]), before)
+        self.assertEqual(allowed["abseil"]["head"], ["csf1-0000000000000003", "csf1-00000000000000ff"])
+        self.assertEqual(allowed["abseil"]["removed"], {"csf1-0000000000000003": 1})
+        restored = copy.deepcopy(manifests["head"])
+        original = campaign.project_by_id(manifest, "abseil")["expected"]
+        actual = campaign.project_by_id(restored, "abseil")["expected"]
+        for key in ("findings", "fingerprint_sha256"):
+            self.assertNotEqual(actual[key], original[key])
+            actual[key] = original[key]
+        self.assertEqual(verify.canonical(restored), before)
+
+    def test_semantic_forgery_is_rejected_even_with_recomputed_document_digest(self):
+        mutations = ("revision", "unknown", "duplicate", "bool-pin", "float-pin", "baseline-count",
+                     "baseline-digest", "baseline-order", "empty", "no-change", "bool-count", "over-removal",
+                     "cancelling", "classification", "source-path", "source-digest", "regression-sha",
+                     "self-review", "failed-review", "extra-protected-field", "exit-change", "too-large")
+        for mutation in mutations:
+            manifest = adjudication_manifest()
+            cfg, document = adjudicated_config(manifest)
+            record = document["projects"][0]
+            change = record["changes"][0]
+            if mutation == "revision": record["revision"] = "d" * 40
+            elif mutation == "unknown": record["project"] = "not-in-manifest"
+            elif mutation == "duplicate": document["projects"].append(copy.deepcopy(record))
+            elif mutation == "bool-pin": record["original_expected"]["broken_tus"] = False
+            elif mutation == "float-pin": record["original_expected"]["findings"] = 3.0
+            elif mutation == "baseline-count": record["baseline_fingerprints"].pop()
+            elif mutation == "baseline-digest": record["baseline_fingerprints"][0] = "csf1-0000000000000002"
+            elif mutation == "baseline-order": record["baseline_fingerprints"].reverse()
+            elif mutation == "empty": document["projects"] = []
+            elif mutation == "no-change": record["changes"] = []
+            elif mutation == "bool-count": change["count"] = True
+            elif mutation == "over-removal": change["count"] = 3
+            elif mutation == "cancelling": record["changes"].append({**change, "direction": "add", "classification": "true-positive"})
+            elif mutation == "classification": change["classification"] = "true-positive"
+            elif mutation == "source-path": change["source"]["path"] = "../outside"
+            elif mutation == "source-digest": change["source"]["sha256"] = "missing"
+            elif mutation == "regression-sha": change["regression"]["commit"] = "main"
+            elif mutation == "self-review": change["review"]["verifier"] = change["review"]["implementer"]
+            elif mutation == "failed-review": change["review"]["verdict"] = "FAIL"
+            elif mutation == "extra-protected-field": record["timeout_minutes"] = 999
+            elif mutation == "exit-change":
+                change["count"] = 2
+                record["changes"].append({**copy.deepcopy(change), "fingerprint": "csf1-00000000000000ff", "count": 1})
+            else:
+                change.update(direction="add", classification="true-positive", count=100000)
+            cfg["adjudications_sha256"] = verify.json_digest(document)
+            with self.subTest(mutation=mutation), self.assertRaises(verify.CheckpointError):
+                verify.derive_expectations(cfg, manifest, document)
+
+    def test_classified_addition_is_exact_and_does_not_change_base_or_exit_policy(self):
+        manifest = adjudication_manifest()
+        cfg, document = adjudicated_config(manifest)
+        change = document["projects"][0]["changes"][0]
+        change.update(direction="add", classification="true-positive", fingerprint="csf1-0000000000000004")
+        cfg["adjudications_sha256"] = verify.json_digest(document)
+        manifests, allowed = verify.derive_expectations(cfg, manifest, document)
+        self.assertEqual(campaign.project_by_id(manifests["head"], "abseil")["expected"]["findings"], 4)
+        self.assertEqual(allowed["abseil"]["added"], {"csf1-0000000000000004": 1})
+        self.assertEqual(campaign.project_by_id(manifests["base"], "abseil")["expected"]["findings"], 3)
+
+    def test_actual_file_requires_canonical_bytes_matching_v2_digest(self):
+        cfg, document = adjudicated_config(adjudication_manifest())
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "adjudications.json"
+            path.write_bytes(verify.canonical(document))
+            self.assertEqual(verify.load_adjudications(cfg, path), document)
+            for bad in (None, path.with_name("missing.json")):
+                with self.assertRaises(verify.CheckpointError): verify.load_adjudications(cfg, bad)
+            with self.assertRaises(verify.CheckpointError): verify.load_adjudications(config(), path)
+            path.write_bytes(verify.canonical(document) + b"\n")
+            with self.assertRaises(verify.CheckpointError): verify.load_adjudications(cfg, path)
+            path.write_bytes(verify.canonical({**document, "base_sha": "d" * 40}))
+            with self.assertRaises(verify.CheckpointError): verify.load_adjudications(cfg, path)
+
+    def test_all_48_raw_shards_have_named_base_and_head_expectations(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = adjudication_manifest()
+            cfg, document = adjudicated_config(manifest)
+            cfg, ctx, inputs, manifest = make_bundle(root, cfg=cfg, manifest=manifest, adjudications=document)
+            result = verify.verify_realworld_bundle(root, cfg, ctx, inputs, manifest, NEEDS, adjudications=document)
+            self.assertEqual(result["deltas"]["abseil"]["fingerprints_removed"], {"csf1-0000000000000003": 1})
+            self.assertEqual(result["expectations"]["original_base_manifest_sha256"], cfg["manifest_sha256"])
+            self.assertNotEqual(result["expectations"]["effective_head_manifest_sha256"], cfg["manifest_sha256"])
+
+    def test_rehashed_wrong_side_manifest_and_unexplained_repeat_deltas_fail(self):
+        for mutation in ("head-original", "base-effective", "unchanged-project", "repeat-2", "repeat-3"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                manifest = adjudication_manifest()
+                cfg, document = adjudicated_config(manifest)
+                cfg, ctx, inputs, manifest = make_bundle(root, cfg=cfg, manifest=manifest, adjudications=document)
+                side = "base" if mutation == "base-effective" else "head"
+                project = "curl" if mutation == "unchanged-project" else "abseil"
+                repetition = int(mutation[-1]) if mutation.startswith("repeat-") else 1
+                shard = root / verify.artifact_name(ctx, "shard", side, project, repetition)
+                receipt = verify.load_json(shard / "receipt.json")
+                if mutation.startswith("repeat-"):
+                    report = verify.load_json(shard / "report.json")
+                    report["diagnostics"][0]["fingerprint"] = "csf1-0000000000000005"
+                    (shard / "report.json").write_bytes(verify.canonical(report))
+                    fingerprints = sorted(d["fingerprint"] for d in report["diagnostics"])
+                    receipt["semantic"].update(fingerprints=fingerprints,
+                                                fingerprint_sha256=campaign.fingerprint_digest(fingerprints))
+                else:
+                    manifests, _ = verify.derive_expectations(cfg, manifest, document)
+                    wrong = manifests["head" if side == "base" else "base"]
+                    receipt["identity"]["manifest_sha256"] = campaign.digest_json(wrong)
+                campaign.write_receipt(shard / "receipt.json", receipt)
+                refresh_fixture_envelope(shard)
+                with self.assertRaises(verify.CheckpointError):
+                    verify.verify_realworld_bundle(root, cfg, ctx, inputs, manifest, NEEDS, adjudications=document)
+
+    def test_controller_routes_side_specific_manifests_and_rejects_bad_adjudications_before_scan(self):
+        for side, invalid in (("base", False), ("head", False), ("head", True)):
+            with self.subTest(side=side, invalid=invalid), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / "ci").mkdir()
+                manifest = adjudication_manifest()
+                cfg, document = adjudicated_config(manifest)
+                if invalid:
+                    document["projects"][0]["changes"][0]["count"] = 3
+                    cfg["adjudications_sha256"] = verify.json_digest(document)
+                runner.write_json(root / runner.REQUEST, cfg)
+                runner.write_json(root / runner.ADJUDICATIONS, document)
+                ctx, inputs = context(), {"fixture_only": True}
+                artifact = root / "binary"
+                artifact.mkdir()
+                (artifact / "codeskeptic").write_bytes(b"synthetic binary, never executed")
+                binary_sha = verify.file_digest(artifact / "codeskeptic")
+                runner.seal_artifact(artifact, cfg, ctx, inputs, "binary", {
+                    "side": side, "source_sha": cfg["base_sha"] if side == "base" else ctx["head_sha"],
+                    "binary_sha256": binary_sha})
+                args = SimpleNamespace(command="shard", lane="realworld", side=side, project="abseil", repetition=1,
+                                       workspace=root / "work", output=root / "output", binary_artifact=artifact)
+                def synthetic_scan(*arguments):
+                    arguments[5].write_bytes(verify.canonical({"fixture_only": True}))
+                    return 0
+                with mock.patch.object(runner, "ROOT", root), mock.patch.object(runner, "environment_context", return_value=ctx), \
+                     mock.patch.object(runner, "request_at_head", return_value=True), \
+                     mock.patch.object(runner, "prepare_inputs", return_value=(root / "inputs", inputs, manifest)), \
+                     mock.patch.object(runner, "collect_inputs", return_value=(inputs, manifest)), \
+                     mock.patch.object(runner, "clean_revision"), mock.patch.object(campaign, "run_shard", side_effect=synthetic_scan) as run, \
+                     mock.patch.object(verify, "verify_raw_shard") as raw:
+                    if invalid:
+                        with self.assertRaises(verify.CheckpointError): runner.execute(args)
+                        run.assert_not_called()
+                        raw.assert_not_called()
+                    else:
+                        runner.execute(args)
+                        manifests, _ = verify.derive_expectations(cfg, manifest, document)
+                        self.assertEqual(verify.canonical(run.call_args.args[0]), verify.canonical(manifests[side]))
+                        self.assertEqual(run.call_args.args[-1], root / "inputs")
+                        self.assertEqual(raw.call_args.args[1], manifests[side])
+
+    def test_plan_validates_semantics_before_any_execution(self):
+        for invalid in (False, True):
+            with self.subTest(invalid=invalid), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / "ci").mkdir()
+                (root / "scripts").mkdir()
+                manifest = adjudication_manifest()
+                cfg, document = adjudicated_config(manifest)
+                if invalid:
+                    document["projects"][0]["revision"] = "e" * 40
+                    cfg["adjudications_sha256"] = verify.json_digest(document)
+                runner.write_json(root / runner.REQUEST, cfg)
+                runner.write_json(root / runner.ADJUDICATIONS, document)
+                runner.write_json(root / "scripts/realworld_manifest.json", manifest)
+                args = SimpleNamespace(command="plan", lane="realworld", github_output=None)
+                with mock.patch.object(runner, "ROOT", root), \
+                     mock.patch.object(runner, "environment_context", return_value=context()), \
+                     mock.patch.object(runner, "request_at_head", return_value=True), \
+                     mock.patch.object(runner, "prepare_inputs") as prepare, \
+                     mock.patch.object(campaign, "run_shard") as scan, mock.patch("builtins.print"):
+                    if invalid:
+                        with self.assertRaises(verify.CheckpointError): runner.execute(args)
+                    else:
+                        runner.execute(args)
+                    prepare.assert_not_called()
+                    scan.assert_not_called()
+
+
 class ControllerContractTest(unittest.TestCase):
-    def input_fixture(self, root):
+    def input_fixture(self, root, manifest=None):
         def git(*args):
             return subprocess.check_output(["git", "-C", str(root), *args], text=True).strip()
         git("init", "-q", "--initial-branch=fixture")
         git("config", "user.name", "fixture")
         git("config", "user.email", "fixture@invalid.local")
-        manifest = full_fixture_manifest()
+        manifest = full_fixture_manifest() if manifest is None else copy.deepcopy(manifest)
         manifest["projects"][0]["copies"] = [{"from": "profiles/contracts/fixture.csk", "to": "fixture.csk"}]
         for relative, content in {
             "scripts/realworld_manifest.json": json.dumps(manifest),
@@ -496,6 +739,15 @@ class ControllerContractTest(unittest.TestCase):
             git("commit", "-qm", "new exact checkpoint")
             ctx["head_sha"] = ctx["workflow_sha"] = git("rev-parse", "HEAD")
             self.assertTrue(runner.request_at_head(root, cfg, ctx))
+            # A newly bound sidecar with an inherited request id cannot launch
+            # a campaign. A fresh id still belongs in the FINAL candidate.
+            cfg.update(schema="codeskeptic-regression-checkpoint/v2", adjudications_sha256="e" * 64)
+            request.write_bytes(verify.canonical(cfg))
+            (root / runner.ADJUDICATIONS).write_bytes(verify.canonical({"fixture_only": True}))
+            git("add", "ci")
+            git("commit", "-qm", "adjudication with inherited request")
+            ctx["head_sha"] = ctx["workflow_sha"] = git("rev-parse", "HEAD")
+            self.assertFalse(runner.request_at_head(root, cfg, ctx))
 
 
 class HostedContractTest(unittest.TestCase):
@@ -712,16 +964,21 @@ class ArchiveContractTest(unittest.TestCase):
 
 
 class ExternalVerifierCliTest(unittest.TestCase):
-    def fixture(self, root, lane):
+    def fixture(self, root, lane, v2=False):
         inputs_root, bundle, archives = root / "inputs", root / "bundle", root / "archives"
         for directory in (inputs_root, bundle, archives):
             directory.mkdir()
-        cfg, _ = ControllerContractTest().input_fixture(inputs_root)
+        cfg, _ = ControllerContractTest().input_fixture(inputs_root, adjudication_manifest() if v2 else None)
         ctx = context(lane)
         inputs, manifest = runner.collect_inputs(inputs_root, cfg)
+        adjudications = None
+        if v2:
+            cfg, adjudications = adjudicated_config(manifest, cfg)
+            runner.write_json(root / "adjudications.json", adjudications)
         if lane == "realworld":
-            make_bundle(bundle, cfg, ctx, inputs, manifest)
-            result = verify.verify_realworld_bundle(bundle, cfg, ctx, inputs, manifest, NEEDS)
+            make_bundle(bundle, cfg, ctx, inputs, manifest, adjudications)
+            result = verify.verify_realworld_bundle(bundle, cfg, ctx, inputs, manifest, NEEDS,
+                                                    adjudications=adjudications)
             aggregate = bundle / verify.artifact_name(ctx, "aggregate")
             aggregate.mkdir()
             runner.write_json(aggregate / "result.json", result)
@@ -755,7 +1012,39 @@ class ExternalVerifierCliTest(unittest.TestCase):
                 "--config", str(root / "config.json"), "--context", str(root / "context.json"),
                 "--inputs-root", str(inputs_root), "--run-json", str(root / "run.json"),
                 "--jobs-json", str(root / "jobs.json"), "--catalog-json", str(root / "catalog.json"),
-                "--archives", str(archives)]
+                "--archives", str(archives)] + (["--adjudications", str(root / "adjudications.json")] if v2 else [])
+
+    def test_v2_external_cli_both_lanes_and_bound_adjudication_failures(self):
+        for lane in ("measurement", "realworld"):
+            with self.subTest(lane=lane), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                command = self.fixture(root, lane, v2=True)
+                output = root / "accepted.json"
+                process = subprocess.run([*command, "--output", str(output)], capture_output=True, text=True, timeout=30)
+                self.assertEqual(process.returncode, 0, process.stdout + process.stderr)
+                result = verify.load_json(output)
+                self.assertEqual(set(result["source_digests"]), {"run", "jobs", "catalog", "adjudications"})
+                self.assertEqual(result["source_digests"]["adjudications"], verify.file_digest(root / "adjudications.json"))
+                if lane == "realworld":
+                    self.assertEqual(result["result"]["deltas"]["abseil"]["fingerprints_removed"],
+                                     {"csf1-0000000000000003": 1})
+                originals = {name: (root / f"{name}.json").read_bytes() for name in ("config", "adjudications")}
+                for mutation in ("missing", "wrong-bytes", "rehashed-invalid"):
+                    for name, raw in originals.items(): (root / f"{name}.json").write_bytes(raw)
+                    args = command[:-2] if mutation == "missing" else command
+                    if mutation != "missing":
+                        document = verify.load_json(root / "adjudications.json")
+                        document["projects"][0]["changes"][0]["source"]["path"] = "../outside"
+                        (root / "adjudications.json").write_bytes(verify.canonical(document))
+                        if mutation == "rehashed-invalid":
+                            cfg = verify.load_json(root / "config.json")
+                            cfg["adjudications_sha256"] = verify.json_digest(document)
+                            (root / "config.json").write_bytes(verify.canonical(cfg))
+                    rejected = root / f"{mutation}.json"
+                    process = subprocess.run([*args, "--output", str(rejected)], capture_output=True, text=True, timeout=30)
+                    with self.subTest(mutation=mutation):
+                        self.assertEqual(process.returncode, 2, process.stdout + process.stderr)
+                        self.assertFalse(rejected.exists())
 
     def test_complete_external_cli_composition_both_lanes_and_closed_failures(self):
         for lane in ("measurement", "realworld"):

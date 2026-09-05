@@ -127,7 +127,9 @@ most six running concurrently. The two analyzers are built once per side and
 shared as digest-bound artifacts. Each shard keeps the existing project timeout;
 base and head are not squeezed sequentially into one shard's time limit. Four
 existing aggregates validate base/nightly, base/weekend, head/nightly and
-head/weekend with unchanged pins and three-repeat determinism.
+head/weekend with exact pins and three-repeat determinism. V1 uses the original
+pins for both sides; V2 can use the independently adjudicated head expectations
+described below. The original base manifest and inputs remain unchanged.
 
 ### What actually blocks acceptance
 
@@ -160,9 +162,9 @@ diagnosis/correction and are not accepted by the Abseil decision.
 After that evidence, the owner explicitly approved a narrow acceptance-policy
 revision. It permits independently classified, source/regression-backed exact
 head semantic deltas while preserving the original base manifest and pins.
-This section records authorization, **not an implemented exception or PASS**.
-The existing producer/verifier still enforce the original pins until separately
-scoped implementation and its independent review are complete.
+This section records authorization, **not hosted qualification or PASS**.
+The separately scoped V2 producer/verifier implements the exact distinction
+below. Its candidate still requires independent review and fresh hosted results.
 
 The required implementation must identify any head-effective manifest separately
 from the unchanged baseline, preserve every input/recipe/coverage/timeout pin,
@@ -176,6 +178,56 @@ The original failed run and receipts remain failed and preserved. Only a fresh
 successful exact-head campaign with the same48-shard profile and independent
 raw-evidence audit may complete U003. This authorization does not change main,
 hosted protections, experimental tiers, existing quality floors or FIFO order.
+
+### V2 candidate control data, not modified campaign inputs
+
+The V2 request adds `adjudications_sha256`, the exact byte SHA-256 of the
+canonical JSON+LF file `ci/regression-adjudications.json`. V1 remains unchanged
+and cannot activate that sidecar. The current record classifies only the one
+Abseil removal above; LVGL has no allowance. Each adjudicated project binds its
+revision, the entire original expectation object and sorted full baseline
+fingerprint list, preserving duplicate occurrences. Each added/removed
+occurrence binds classification, rationale, pinned-source path/digest/line,
+regression commit/test and distinct implementer/verifier evidence references.
+
+The derived head manifest changes only `findings` and `fingerprint_sha256` for
+listed projects. Exit classification cannot change under this policy. No other
+recipe, source, coverage, resource, timeout or campaign field may change. Every
+head shard uses the separately named effective **whole-manifest** digest, even
+for unchanged projects; every base shard still uses the original digest.
+Artifacts continue binding the original immutable input identity. The result
+reports `original_base_manifest_sha256`, `effective_head_manifest_sha256` and
+`adjudications_sha256` separately. It never relabels the effective expectations
+as original inputs or rehabilitates an unavailable old receipt.
+
+Plan validation rejects malformed control data before any build. Shards execute
+against their side's expectations from the outset. Aggregation revalidates raw
+reports/receipts and requires the exact classified base/head Counter difference
+for repetitions1,2 and3, with zero unexplained changes in all other projects.
+Excessive removal, duplicate/cancelling records, wrong revisions, bool/float pin
+substitutions, no-op changes and unbound evidence files are rejected.
+
+Reviewer identities and source/evidence digests are procedural review records,
+not signatures or a runtime proof that a classification is true. The independent
+candidate reviewer must inspect the referenced source, regression and retained
+raw evidence. The current Abseil classification review inspected raw base1 and
+head1/2/3; it does not claim inspection of the old raw base2/3 or campaign success.
+Fresh qualification still requires all48 raw shards.
+
+### LVGL deliberate-unused precision boundary
+
+The four added LVGL reports came from `LV_UNUSED(x/y)`, defined as `((void)x)`.
+The narrow correction treats only a C-style void cast of a bare nonvolatile
+automatic integer/bool local, possibly parenthesized, as an intentional unused
+marker. It follows the precision convention in Clang's
+[uninitialized-value classifier](https://clang.llvm.org/doxygen/UninitializedValues_8cpp_source.html),
+not a claim that all C void expressions are unevaluated or ISO-C-safe.
+No initialization or escape is inferred. Arithmetic, intermediate explicit
+casts, call arguments, increments and comma-LHS reads are still evaluated by
+the existing rule. Straight-line and CFG C11/C++17 tests protect these boundaries
+and the later real read after a bare discard. Unsupported volatile arithmetic
+remains outside the existing sequencing model; this fix claims no new coverage
+there. The original LVGL count16 and fingerprint pins stay unchanged.
 
 ### Evidence collection and independent validation
 
@@ -211,6 +263,12 @@ python3 -B scripts/verify_regression_checkpoint.py \
   --jobs-json /evidence/jobs.json --catalog-json /evidence/artifacts.json \
   --archives /evidence/archives --output /evidence/validated.json
 ```
+
+For a V2 candidate, also supply
+`--adjudications ci/regression-adjudications.json` in **both** lanes. The file
+must match the candidate's bound canonical bytes. Missing or mismatched data
+fails; a V1 invocation rejects an adjudication argument. The validation output
+also records this source-file digest.
 
 The output must not already exist. The verifier makes no network requests and
 executes no downloaded binary. It requires actual completed/successful run and

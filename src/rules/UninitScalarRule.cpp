@@ -45,6 +45,25 @@ const VarDecl* directVariable(const Expr* expr) {
     return ref ? dyn_cast<VarDecl>(ref->getDecl()) : nullptr;
 }
 
+bool deliberateBareVoidDiscard(const CastExpr* cast) {
+    // Precision policy for the conventional C unused-local marker, also used
+    // by Clang's uninitialized-value analysis. This is NOT a claim that C void
+    // operands are unevaluated. Only parentheses and the single implicit value
+    // conversion of a bare tracked local may be ignored; never peel commas,
+    // explicit intermediate casts, arithmetic, calls or side effects.
+    if (!isa<CStyleCastExpr>(cast) || !cast->getType()->isVoidType()) return false;
+    const Expr* operand = cast->getSubExpr()->IgnoreParens();
+    if (const auto* implicit = dyn_cast<ImplicitCastExpr>(operand)) {
+        if (implicit->getCastKind() != CK_LValueToRValue) return false;
+        operand = implicit->getSubExpr()->IgnoreParens();
+    }
+    const auto* reference = dyn_cast<DeclRefExpr>(operand);
+    const auto* var = reference ? dyn_cast<VarDecl>(reference->getDecl()) : nullptr;
+    return var && var->isLocalVarDecl() && !var->hasGlobalStorage() &&
+           var->getType()->isIntegerType() && !var->getType()->isEnumeralType() &&
+           !var->getType().isVolatileQualified();
+}
+
 void reportRead(const Expr* expr, Initialization state, ASTContext& ctx,
                 const FunctionDecl* function, codeskeptic::DiagnosticList& results) {
     if (state != Initialization::Uninitialized && state != Initialization::Maybe)
@@ -212,6 +231,7 @@ private:
         if (const auto* paren = dyn_cast<ParenExpr>(expr))
             return expression(paren->getSubExpr(), depth + 1);
         if (const auto* cast = dyn_cast<CastExpr>(expr)) {
+            if (deliberateBareVoidDiscard(cast)) return true;
             if (!expression(cast->getSubExpr(), depth + 1)) return false;
             if (cast->getCastKind() == CK_LValueToRValue) read(cast->getSubExpr());
             // A glvalue cast can expose the same storage under a different
@@ -555,6 +575,7 @@ private:
             return true;
         }
         if (const auto* cast = dyn_cast<CastExpr>(expr)) {
+            if (deliberateBareVoidDiscard(cast)) return true;
             if ((cast->getCastKind() == CK_LValueToRValue || cast->isGLValue()) &&
                 selectedStorage(cast->getSubExpr())) return false;
             if (!expression(cast->getSubExpr(), depth + 1, escapeAt)) return false;
