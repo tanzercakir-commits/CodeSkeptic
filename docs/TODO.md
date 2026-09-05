@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH01-S05-U001
-
-### CS3-CH01-S05-U001 — Uzunluk ve index sink'lerinde kanıtlı narrowing kaybını raporla
-
-**Sonuç:** Implicit sayısal daraltmada hedef türe sığmayan kanıtlı aralık sink'e bağlanır.
-
-**Kabul:**
-
-- Exact fit, promotion, explicit intentional cast, enum/dependent ve unknown sınırları açıktır.
-- Allocator dışındaki uzunluk/index sink'leri dar kapsamlı fixture'larla sınanır.
-- Mevcut signed-overflow/narrowing ile çift rapor üretilmez; genel cast uyarıcısına dönüşmez.
-
-**Test bütçesi:** T1
-**Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/rules/SignConversionRule.cpp, src/rules/SignConversionRule.h, tests/SignConversionRuleTest.cpp
-**Bağımlılıklar:** Yok
+## FRONT — CS3-CH01-S06-U001
 
 ### CS3-CH01-S06-U001 — uint64 out-param kaynak kökenini sayısal aralıktan ayır
 

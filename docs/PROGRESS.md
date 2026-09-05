@@ -2,6 +2,20 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH01-S05-U001 — Uzunluk ve index sink'lerinde kanıtlı narrowing kaybını raporla
+
+- Commit: `8359ce4804ad04a7e13da69c84dbb2d4e2e3550f`
+- Dal: `agent/cs3-ch01-s05-u001-narrowing-sinks`
+- Implementer: `root-cs3-ch01-s05-u001-20260905`
+- Bağımsız denetçi: `independent-cwe-ch01-s05-u001-8359ce4-20260905`
+- İnceleme SHA-256: `8932f49efcdac133fd499a13aab44486ca4554f2fab66fc85c736bf482e943d5`
+- Tarih: 2026-09-05T06:37:56.883574+00:00
+- Sonuç: Implicit sayısal daraltmada hedef türe sığmayan kanıtlı aralık sink'e bağlanır.
+- focused-tests: PASS; SHA-256 `3fcd3aab9874425b7c5b38267650697a0f4f885b23861ffc4536198eb4092129`; `bash scripts/local_test.sh focused 'SignConversionRuleTest.*:IntOverflowRuleTest.*:IntervalTest.*:FunctionFilterTest.*:CapabilitiesTest.*'`
+- cli-smoke: PASS; SHA-256 `696830334325284d642ee57ffcbbbb20ca0fdb9b1bfa60bb940223a5ef892e32`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH01-S05-U001/cli_smoke.py`
+- queue-check: PASS; SHA-256 `e4bdc57937d77036c0dc3a828c4c2dae5c023feea3d97f72289a3a8af6e096ff`; `python3 -B scripts/project_queue.py check && python3 -B scripts/project_queue.py guard --base c6832f90bf8f5b430ed99e581c302bcac7e743e1 && python3 -B scripts/check_capabilities_sync.py`
+- generic-cli-smoke: PASS; SHA-256 `37d698d52c5bdd03030ed70c155b9afa3b1ad47e3d50bfcf70ed13554c90baa9`; `bash scripts/local_test.sh smoke`
+
 ## CS3-CH01-S04-U002 — pipe/pipe2 çift descriptor çıkışını modelle
 
 - Commit: `7b94bd30c61ece2e3733351fb3898d841dbc3db1`
