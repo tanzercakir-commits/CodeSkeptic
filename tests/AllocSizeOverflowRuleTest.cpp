@@ -320,6 +320,50 @@ TEST(AllocSizeOverflowRuleTest, Uint64OutParamMultiplyKeepsMorePreciseNumericPro
     }
 }
 
+TEST(AllocSizeOverflowRuleTest, Uint64OutParamLifetimeEffectsCannotSupplyStaleSafetyProof) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    const std::string prelude = R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern void read_size(size_t*);
+        static void observe(const size_t*){}
+        struct Writer {
+            Writer(const size_t* p){*const_cast<size_t*>(p)+=((size_t)-1)/2;}
+        };
+        struct Deferred {size_t* p;~Deferred(){*p+=((size_t)-1)/2;}};
+        void* f(){size_t n=0;read_size(&n);if(n>100)return 0;
+    )";
+    for (const char* action : {"Writer change(&n);", "{Deferred change{&n};}",
+                              "{Deferred changes[1]={{&n}};}",
+                              "observe(&n);Writer change(&n);",
+                              "observe(&n);{Deferred change{&n};}"}) {
+        SCOPED_TRACE(action);
+        EXPECT_EQ(runRule(rule, prelude + action + "return malloc(n*4);}").size(), 1u);
+    }
+    for (const char* action : {"observe(&n);Writer change(&n);",
+                              "observe(&n);{Deferred change{&n};}"}) {
+        SCOPED_TRACE(action);
+        EXPECT_EQ(runRule(rule, prelude + action + "return malloc(n+((size_t)-1)/2);}").size(), 1u);
+    }
+}
+
+TEST(AllocSizeOverflowRuleTest, Uint64OutParamCleanupCannotSupplyStaleSafetyProof) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    const auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern void read_size(size_t*);
+        static void observe(const size_t* p){}
+        static void cleanup(size_t** p){**p+=((size_t)-1)/2;}
+        void* f(){size_t n=0;read_size(&n);if(n>100)return 0;observe(&n);
+            {size_t* held __attribute__((cleanup(cleanup)))=&n;}
+            return malloc(n*4);}
+    )", "observer_cleanup.c");
+    EXPECT_EQ(results.size(), 1u);
+}
+
 // Phase 6.1: a 64-bit allocation-size expression needs operand-corner
 // reasoning because the mathematical product does not fit the int64
 // interval domain. A declared untrusted size_t and a finite factor are
