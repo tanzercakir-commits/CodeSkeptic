@@ -1,6 +1,6 @@
 # CodeSkeptic — CWE Ürün Planı
 
-Sürüm: 16. Eski planın devamı değil; main tabanlı yeni program.
+Sürüm: 17. Eski planın devamı değil; main tabanlı yeni program.
 
 PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.
 
@@ -339,7 +339,7 @@ PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. G
 
 **Test bütçesi:** T1
 **Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/analyzer/StaticAnalyzer*, src/config/Config*, src/engine/RuleEngine*, src/core/Capabilities*, src/core/RuleCapabilities.def, src/server/McpServer*, src/main.cpp, tests/McpServerTest.cpp, tests/ConfigTest.cpp, tests/CapabilitiesTest.cpp, tests/CapabilitiesCliTest.py, tests/AnalysisResultTest.cpp, tests/MemoryLeakRuleExTest.cpp, tests/FdResourceRuleTest.cpp
+**Kapsam:** src/analyzer/StaticAnalyzer*, src/config/Config*, src/engine/RuleEngine*, src/core/Capabilities*, src/core/RuleCapabilities.def, src/server/McpServer*, src/main.cpp, tests/McpServerTest.cpp, tests/ConfigTest.cpp, tests/CapabilitiesTest.cpp, tests/CapabilitiesCliTest.py, tests/AnalysisResultTest.cpp, tests/MemoryLeakRuleExTest.cpp, tests/FdResourceRuleTest.cpp, tests/VerdictIntegrityTest.cpp
 **Bağımlılıklar:** CS3-CH01-S04-U001
 
 ### CH02-S02 — Kalıcı ve dış girdiler

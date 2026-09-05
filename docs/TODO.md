@@ -17,7 +17,7 @@ Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter aç
 
 **Test bütçesi:** T1
 **Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/analyzer/StaticAnalyzer*, src/config/Config*, src/engine/RuleEngine*, src/core/Capabilities*, src/core/RuleCapabilities.def, src/server/McpServer*, src/main.cpp, tests/McpServerTest.cpp, tests/ConfigTest.cpp, tests/CapabilitiesTest.cpp, tests/CapabilitiesCliTest.py, tests/AnalysisResultTest.cpp, tests/MemoryLeakRuleExTest.cpp, tests/FdResourceRuleTest.cpp
+**Kapsam:** src/analyzer/StaticAnalyzer*, src/config/Config*, src/engine/RuleEngine*, src/core/Capabilities*, src/core/RuleCapabilities.def, src/server/McpServer*, src/main.cpp, tests/McpServerTest.cpp, tests/ConfigTest.cpp, tests/CapabilitiesTest.cpp, tests/CapabilitiesCliTest.py, tests/AnalysisResultTest.cpp, tests/MemoryLeakRuleExTest.cpp, tests/FdResourceRuleTest.cpp, tests/VerdictIntegrityTest.cpp
 **Bağımlılıklar:** CS3-CH01-S04-U001
 
 ### CS3-CH02-S02-U001 — Fonksiyon özeti/model parser sınırlarını sağlamlaştır
