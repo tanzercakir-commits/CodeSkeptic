@@ -2,6 +2,21 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH01-S07-U002 — Exact base-head checkpoint ve kanıt doğrulayıcısını kur
+
+- Commit: `b18ed2546f838f9d5ef6882a8fc1597420f6848d`
+- Dal: `agent/cs3-ch01-s07-u002-regression-checkpoint`
+- Implementer: `root-cs3-ch01-s07-u002-20260905`
+- Bağımsız denetçi: `independent-cwe-ch01-s07-u002-b18ed25-20260905`
+- İnceleme SHA-256: `ba5d296b8c2fb7fe8bf4280b531b0660a733390d032ab58a9f489b75ea24bf11`
+- Tarih: 2026-09-05T18:41:47.077721+00:00
+- Sonuç: Açıkça seçilen feature checkpoint'i sabit girdilerde kesin base/head analyzer sürümlerini karşılaştırır; eksik veya farklı kimlikte kanıt kabul edilmez.
+- checkpoint-tests: PASS; SHA-256 `e557b04d0c9797188007e8e22f296b424230625c01bd6aabc347b630d21739c3`; `python3 -B tests/RegressionCheckpointTest.py && python3 -B tests/RealworldCampaignTest.py`
+- workflow-validation: PASS; SHA-256 `24c465acc866198409ddb8e32b36495fcfb988a71aa35c39439e6eca45c11ac3`; `python3 -B tests/WorkflowPolicyTest.py && python3 -B tests/MeasurementWorkflowTest.py && /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH01-S07-U001/971d8c8/actionlint -shellcheck= -pyflakes= .github/workflows/ci.yml .github/workflows/windows.yml .github/workflows/juliet.yml .github/workflows/measurement.yml .github/workflows/realworld.yml`
+- linux-suite: PASS; SHA-256 `3a98b81bd0aab4b8865ad7b209098063234d7da96fd6634654a0defc32ed37ef`; `bash scripts/local_test.sh full`
+- checkpoint-cli-smoke: PASS; SHA-256 `2b16f31414153cea1521f53c883fca66e2e99e9cd28a1eb0819c0d2cb62cbd43`; `timeout --signal=TERM --kill-after=10s 120s podman run --rm --pull=never --network=none --read-only --userns=keep-id --user "$(id -u):$(id -g)" --security-opt=label=disable --cap-drop=all --cpus=2 --memory=6g --pids-limit=256 --tmpfs /tmp:rw,size=1g -e PYTHONDONTWRITEBYTECODE=1 -e CODESKEPTIC_CHECKPOINT_BINARY=/workspace/build/src/codeskeptic -v /home/tanzer/Projects/CodeSkeptic:/workspace/src:ro -v /home/tanzer/Projects/CodeSkeptic/build/cwe-restart:/workspace/build:ro -w /workspace/src 25640c190484acc04e0dab2c64f8683668ad33930a3670900ff407023efc7fc5 python3 -B tests/RegressionCheckpointTest.py RealCliSliceTest`
+- queue-check: PASS; SHA-256 `30d6475667b276337a8cc61e3ef20ab25f79eb3e52a76b95e08ffc2e37841867`; `python3 -B scripts/project_queue.py check && python3 -B scripts/project_queue.py guard --base 4a1626f4f809bb4261993b277bead6395719974b && python3 -B tests/test_project_queue.py && python3 -B tests/StatusAutomationTest.py && bash scripts/check_docs_sync.sh && git diff --check`
+
 ## CS3-CH01-S07-U001 — Mevcut CI kapılarını agent dalı push olayına bağla
 
 - Commit: `971d8c85c7de059de35b663db467c02dbb057895`

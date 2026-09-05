@@ -2,24 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH01-S07-U002
-
-### CS3-CH01-S07-U002 — Exact base-head checkpoint ve kanıt doğrulayıcısını kur
-
-**Sonuç:** Açıkça seçilen feature checkpoint'i sabit girdilerde kesin base/head analyzer sürümlerini karşılaştırır; eksik veya farklı kimlikte kanıt kabul edilmez.
-
-**Kabul:**
-
-- Checkpoint tam base SHA'yı belirtir; head olayın kesin SHA'sıdır. Kanıt workflow SHA, binary ve manifest digest, proje revision, run ID/attempt ve kapsamı taşır.
-- Mevcut PR measurement ve manuel/zamanlanmış real-world yolları korunur. Yeni yol push ile açık checkpoint seçer; sıradan ledger push'ları ağır kampanyayı yeniden başlatmaz.
-- Mevcut measurement ve real-world runner'ları ile aynı immutable manifest/proje girdileri iki analyzer için kullanılır; eski kalite koşulları ve pinler aynen uygulanır.
-- Doğrulayıcı yanlış SHA/manifest, eksik proje/tekrar, skipped/cancelled/unavailable iş, coverage kaybı ve bozuk artifact/digest'i reddeder. Başarılı kontrol yanında bu negatifler ayrı test edilir.
-- Süre/fingerprint raporu ile gerçekten engelleyen kalite koşulları ayrılır. Yerel fixture ve gerçek CLI dilimi çalışır; sentetik receipt veya hazırlanmış workflow hosted başarı sayılmaz.
-
-**Test bütçesi:** T2
-**Kontroller:** checkpoint-tests, workflow-validation, linux-suite, checkpoint-cli-smoke, queue-check
-**Kapsam:** .github/workflows/measurement.yml, .github/workflows/realworld.yml, scripts/run_regression_checkpoint.py, scripts/verify_regression_checkpoint.py, tests/RegressionCheckpointTest.py, ci/regression-checkpoint.json, docs/CI_GATES.md
-**Bağımlılıklar:** CS3-CH01-S07-U001
+## FRONT — CS3-CH01-S07-U003
 
 ### CS3-CH01-S07-U003 — İlk hosted regresyon checkpoint'ini gerçek exact-head kanıtıyla kapat
 
