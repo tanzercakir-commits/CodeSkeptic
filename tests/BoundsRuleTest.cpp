@@ -257,10 +257,183 @@ namespace {
 // __SIZE_TYPE__ for the same LLP64 reason as kAlloc above.
 const char* kCopy =
     "void* memcpy(void*, const void*, __SIZE_TYPE__);\n"
+    "void* memmove(void*, const void*, __SIZE_TYPE__);\n"
     "void* memset(void*, int, __SIZE_TYPE__);\n"
     "void* malloc(__SIZE_TYPE__);\n";
 std::string copy(const std::string& body) { return std::string(kCopy) + body; }
 } // namespace
+
+// CS3-CH01-S02-U001: the source has its own read capacity even when
+// the destination is large enough (or its capacity is unknown).
+TEST(BoundsRuleTest, MemoryCopySourceCapacity) {
+    struct Case { const char* name; const char* setup; const char* args; unsigned reports; };
+    const Case cases[] = {
+        {"large destination small source", "char dst[64]={}, src[4]={};", "dst,src,8", 1},
+        {"source exact fit", "char dst[64]={}, src[4]={};", "dst,src,4", 0},
+        {"zero length", "char dst[64]={}, src[4]={};", "dst,src,0", 0},
+        {"unknown source", "char dst[64]={};", "dst,unknown_src,8", 0},
+        {"unknown destination known source", "char src[4]={};", "unknown_dst,src,8", 1},
+        {"typed source capacity in bytes", "char dst[64]={}; int src[2]={};", "dst,src,sizeof(src)+1", 1},
+        {"typed source exact bytes", "char dst[64]={}; int src[2]={};", "dst,src,sizeof(src)", 0},
+        {"string source includes terminator", "char dst[64]={};", "dst,\"abc\",5", 1},
+        {"string source exact fit", "char dst[64]={};", "dst,\"abc\",4", 0},
+        {"heap source", "char dst[64]={}; char* src=(char*)malloc(4);", "dst,src,8", 1},
+        {"member source", "struct S {char data[4];}; S src={}; char dst[64]={};", "dst,src.data,8", 1},
+    };
+    for (const char* function : {"memcpy", "memmove"}) {
+        for (const auto& item : cases) {
+            SCOPED_TRACE(function);
+            SCOPED_TRACE(item.name);
+            BoundsRule rule;
+            auto results = runRule(rule, copy(
+                std::string("void f(void* unknown_dst,const void* unknown_src){") +
+                item.setup + function + "(" + item.args + ");}"));
+            EXPECT_EQ(results.size(), item.reports);
+            for (const auto& result : results) {
+                EXPECT_EQ(result.rule_id, "bounds");
+                EXPECT_EQ(result.severity, Severity::Error);
+                EXPECT_NE(result.message.find("source"), std::string::npos);
+            }
+        }
+    }
+}
+
+TEST(BoundsRuleTest, SourceReadExcludesMemsetAndStrncpy) {
+    BoundsRule rule;
+    auto results = runRule(rule, copy(R"(
+        char* strncpy(char*, const char*, __SIZE_TYPE__);
+        void f() {
+            char dst[64]={}, src[4]={};
+            memset(dst, 0, 8);
+            strncpy(dst, src, 8);
+        }
+    )"));
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(BoundsRuleTest, SourceReadHeapBytesAndBindingStability) {
+    struct Case { const char* body; unsigned reports; };
+    const Case cases[] = {
+        {"char* src=(char*)malloc(4); src[0]=0; memcpy(dst,src,8);", 1},
+        {"char* src=(char*)malloc(4); *src=0; memcpy(dst,src,8);", 1},
+        {"int* src=(int*)malloc(6); memcpy(dst,src,6);", 0},
+        {"int* src=(int*)malloc(6); memcpy(dst,src,7);", 1},
+        {"int* src=(int*)calloc(2,3); memcpy(dst,src,6);", 0},
+        {"int* src=(int*)calloc(2,3); memcpy(dst,src,7);", 1},
+        {"void* src=malloc(4); memcpy(dst,src,8);", 1},
+        {"char* src=(char*)malloc(4); src=large; memcpy(dst,src,8);", 0},
+        {"char* src=(char*)malloc(4); char*& alias=src; alias=large; memcpy(dst,src,8);", 0},
+        {"char* src=(char*)malloc(4); replace(src); memcpy(dst,src,8);", 0},
+        {"char* src=(char*)malloc(4); Replace change(src); memcpy(dst,src,8);", 0},
+        {"char* src=(char*)malloc(4); auto change=[&src,&large](){src=large;}; change(); memcpy(dst,src,8);", 0},
+        {"char* src=(char*)malloc(4); char** alias=&src; *alias=large; memcpy(dst,src,8);", 0},
+        {"char* src=(char*)malloc(n); memcpy(dst,src,8);", 0},
+        {"char* src; src=(char*)malloc(4); memcpy(dst,src,8);", 0},
+    };
+    for (const auto& item : cases) {
+        SCOPED_TRACE(item.body);
+        BoundsRule rule;
+        auto results = runRule(rule, copy(std::string(R"(
+            void* calloc(__SIZE_TYPE__, __SIZE_TYPE__);
+            void replace(char*&);
+            struct Replace { Replace(char*&); };
+            void f(__SIZE_TYPE__ n) { char dst[64]={}, large[64]={};
+        )") + item.body + "}"));
+        EXPECT_EQ(results.size(), item.reports);
+        for (const auto& result : results)
+            EXPECT_NE(result.message.find("source"), std::string::npos);
+    }
+}
+
+TEST(BoundsRuleTest, SourceReadRejectsNoncanonicalMemoryFunctions) {
+    const char* cases[] = {
+        "extern void* memcpy(void*,const void*,unsigned char); void f(){char dst[64],src[4]; memcpy(dst,src,8);}",
+        "extern void* memcpy(const void*,const void*,__SIZE_TYPE__); void f(){char dst[64],src[4]; memcpy(dst,src,8);}",
+        "extern const void* memcpy(void*,const void*,__SIZE_TYPE__); void f(){char dst[64],src[4]; memcpy(dst,src,8);}",
+        "namespace custom {void* memcpy(void*,const void*,__SIZE_TYPE__);} void f(){char dst[64],src[4]; custom::memcpy(dst,src,8);}",
+        "struct Custom {void* memcpy(void*,const void*,__SIZE_TYPE__);}; void f(Custom& c){char dst[64],src[4]; c.memcpy(dst,src,8);}",
+        "void* memcpy(void* d,const void*,__SIZE_TYPE__){return d;} void f(){char dst[64],src[4]; memcpy(dst,src,8);}",
+        "void* malloc(unsigned char); void* memcpy(void*,const void*,__SIZE_TYPE__); void f(){char dst[64]; char* src=(char*)malloc(4); memcpy(dst,src,8);}",
+    };
+    for (const char* code : cases) {
+        SCOPED_TRACE(code);
+        BoundsRule rule;
+        EXPECT_TRUE(runRule(rule, code).empty());
+    }
+}
+
+TEST(BoundsRuleTest, SourceReadRejectsUnknownArrayViews) {
+    BoundsRule rule;
+    auto results = runRule(rule, copy(R"(
+        void* calloc(__SIZE_TYPE__, __SIZE_TYPE__);
+        void heap_view() {
+            char (*src)[4]=(char(*)[4])calloc(2,4);
+            char dst[8]; memcpy(dst,*src,8);
+        }
+        void cast_view() {
+            char src[8], dst[8];
+            memcpy(dst,*reinterpret_cast<char(*)[4]>(src),8);
+        }
+        void reference_view(char (&src)[4]) {
+            char dst[8]; memcpy(dst,src,8);
+        }
+    )"));
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(BoundsRuleTest, SourceReadFlexibleTailAndRealArrayControls) {
+    BoundsRule rule;
+    auto results = runRule(rule, copy(R"(
+        struct Tail {int n; char data[1];};
+        struct Middle {char data[1]; int n;};
+        struct Fixed {int n; char data[4];};
+        void unknown_tail(Tail* src) {char dst[64]; memcpy(dst,src->data,8);}
+        void direct_tail() {Tail src; char dst[64]; memcpy(dst,src.data,8);}
+        void middle(Middle* src) {char dst[64]; memcpy(dst,src->data,8);}
+        void fixed_tail(Fixed* src) {char dst[64]; memcpy(dst,src->data,8);}
+    )"));
+    ASSERT_EQ(results.size(), 3u);
+    for (const auto& result : results) {
+        EXPECT_NE(result.function, "unknown_tail");
+        EXPECT_NE(result.message.find("source"), std::string::npos);
+    }
+}
+
+TEST(BoundsRuleTest, SourceReadDefiniteRangeOnly) {
+    struct Case { const char* condition; unsigned reports; };
+    const Case cases[] = {
+        {"if(n>4) return;", 0},
+        {"if(n<8 || n>16) return;", 1},
+        {"if(n>8) return;", 0},
+        {"", 0},
+    };
+    for (const auto& item : cases) {
+        SCOPED_TRACE(item.condition);
+        BoundsRule rule;
+        auto results = runRule(rule, copy(
+            std::string("void f(unsigned n){char dst[64],src[4];") +
+            item.condition + "memcpy(dst,src,n);}"));
+        EXPECT_EQ(results.size(), item.reports);
+        for (const auto& result : results)
+            EXPECT_NE(result.message.find("source"), std::string::npos);
+    }
+}
+
+TEST(BoundsRuleTest, SourceReadDoesNotHideDestinationOrSameLineCalls) {
+    BoundsRule rule;
+    auto both = runRule(rule, copy(
+        "void f(){char dst[2],src[4]; memcpy(dst,src,8);}"));
+    ASSERT_EQ(both.size(), 2u);
+    EXPECT_EQ(both[0].message.find("source"), std::string::npos);
+    EXPECT_NE(both[1].message.find("source"), std::string::npos);
+    EXPECT_EQ(both[0].line, both[1].line);
+
+    auto sameLine = runRule(rule, copy(
+        "void f(){char dst[64],src[4]; memcpy(dst,src,8); memmove(dst,src,8);}"));
+    ASSERT_EQ(sameLine.size(), 2u);
+    EXPECT_EQ(sameLine[0].line, sameLine[1].line);
+    EXPECT_NE(sameLine[0].column, sameLine[1].column);
+}
 
 TEST(BoundsRuleTest, MemcpyPastFixedArray) {
     // 50 bytes into a 16-byte buffer.

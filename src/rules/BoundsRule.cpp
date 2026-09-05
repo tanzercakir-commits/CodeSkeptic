@@ -2,6 +2,7 @@
 
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
+#include "engine/CallRefArgs.h"
 #include "engine/CoverageReport.h"
 #include "engine/DataflowEngine.h"
 #include "engine/ExtentMap.h"
@@ -404,6 +405,140 @@ BufExtent bufferExtent(const Expr* e, const codeskeptic::ExtentMap& extents,
     return r;
 }
 
+// New source-read semantics must not be inferred from a user's same-named
+// method, namespace function, definition or incompatible declaration.
+bool isGlobalMemoryFunction(const CallExpr* call, llvm::StringRef name,
+                            unsigned arity, ASTContext& ctx) {
+    const FunctionDecl* callee = call ? call->getDirectCallee() : nullptr;
+    if (!callee || !callee->getIdentifier() || callee->getName() != name ||
+        call->getNumArgs() != arity || callee->getNumParams() != arity ||
+        callee->isVariadic() || callee->hasBody() ||
+        !callee->getDeclContext()->getRedeclContext()->isTranslationUnit() ||
+        !ctx.hasSameType(callee->getReturnType().getUnqualifiedType(), ctx.VoidPtrTy))
+        return false;
+    return true;
+}
+
+bool isSourceCopy(const CallExpr* call, ASTContext& ctx) {
+    if (!isGlobalMemoryFunction(call, "memcpy", 3, ctx) &&
+        !isGlobalMemoryFunction(call, "memmove", 3, ctx)) return false;
+    const auto* callee = call->getDirectCallee();
+    return ctx.hasSameType(callee->getParamDecl(0)->getType().getUnqualifiedType(),
+                           ctx.VoidPtrTy) &&
+           ctx.hasSameType(callee->getParamDecl(1)->getType().getUnqualifiedType(),
+                           ctx.getPointerType(ctx.VoidTy.withConst())) &&
+           ctx.hasSameType(callee->getParamDecl(2)->getType().getUnqualifiedType(),
+                           ctx.getSizeType());
+}
+
+// A rule-local sole-binding guard. The element ExtentMap is intentionally not
+// changed: source reads need raw allocation BYTES, including a partial final
+// element, and must also reject reference/capture/constructor mutations.
+struct SourceBindings : RecursiveASTVisitor<SourceBindings> {
+    std::set<const VarDecl*> unstable;
+    bool hasAssembly = false;
+
+    void invalidate(const Expr* expr) {
+        if (!expr) return;
+        expr = expr->IgnoreParenCasts();
+        // Invalidate the binding being written/escaped, not every pointer used
+        // to locate it: src[0]=0 and *src=0 only change the allocation's contents.
+        if (const auto* ref = dyn_cast<DeclRefExpr>(expr)) {
+            if (const auto* var = dyn_cast<VarDecl>(ref->getDecl());
+                var && var->getType().getNonReferenceType()->isPointerType())
+                unstable.insert(var);
+        } else if (const auto* choice = dyn_cast<ConditionalOperator>(expr)) {
+            invalidate(choice->getTrueExpr());
+            invalidate(choice->getFalseExpr());
+        } else if (const auto* comma = dyn_cast<BinaryOperator>(expr);
+                   comma && comma->getOpcode() == BO_Comma) {
+            invalidate(comma->getRHS());
+        }
+    }
+    bool VisitVarDecl(VarDecl* var) {
+        if (var->getType()->isReferenceType()) invalidate(var->getInit());
+        return true;
+    }
+    bool VisitBinaryOperator(BinaryOperator* op) {
+        if (op->isAssignmentOp()) invalidate(op->getLHS());
+        return true;
+    }
+    bool VisitUnaryOperator(UnaryOperator* op) {
+        if (op->getOpcode() == UO_AddrOf || op->isIncrementDecrementOp())
+            invalidate(op->getSubExpr());
+        return true;
+    }
+    bool VisitCallExpr(CallExpr* call) {
+        codeskeptic::forEachNonConstRefArg(call, [&](const Expr* arg) { invalidate(arg); });
+        return true;
+    }
+    bool VisitCXXConstructExpr(CXXConstructExpr* call) {
+        const auto* constructor = call->getConstructor();
+        for (unsigned i = 0; constructor && i < constructor->getNumParams() &&
+                             i < call->getNumArgs(); ++i) {
+            const QualType type = constructor->getParamDecl(i)->getType();
+            if (type->isReferenceType() && !type.getNonReferenceType().isConstQualified())
+                invalidate(call->getArg(i));
+        }
+        return true;
+    }
+    bool VisitLambdaExpr(LambdaExpr* lambda) {
+        for (const auto& capture : lambda->captures())
+            if (capture.capturesVariable() && capture.getCaptureKind() == LCK_ByRef)
+                if (const auto* var = dyn_cast<VarDecl>(capture.getCapturedVar()))
+                    unstable.insert(var);
+        return true;
+    }
+    bool VisitAsmStmt(AsmStmt*) { hasAssembly = true; return true; }
+};
+
+codeskeptic::Interval sourceByteCapacity(const Expr* source,
+                                        const SourceBindings& bindings,
+                                        ASTContext& ctx) {
+    using codeskeptic::Interval;
+    if (!source) return Interval::top();
+    source = source->IgnoreParenCasts();
+    // Actual declared array storage and literals carry byte sizes. An array
+    // expression created by dereferencing/casting a pointer is only a view,
+    // not proof of an allocation upper bound; reference parameters are unknown.
+    if (ctx.getAsConstantArrayType(source->getType())) {
+        if (const auto* member = dyn_cast<MemberExpr>(source)) {
+            if (!isa<FieldDecl>(member->getMemberDecl()) ||
+                isFlexibleTailMember(member, ctx)) return Interval::top();
+        } else if (const auto* ref = dyn_cast<DeclRefExpr>(source)) {
+            const auto* var = dyn_cast<VarDecl>(ref->getDecl());
+            if (!var || !ctx.getAsConstantArrayType(var->getType()))
+                return Interval::top();
+        } else if (!isa<clang::StringLiteral>(source)) {
+            return Interval::top();
+        }
+        if (const auto bytes = codeskeptic::boundedTypeSizeInChars(ctx, source->getType()))
+            return Interval::constant(*bytes);
+        return Interval::top();
+    }
+    const auto* ref = dyn_cast<DeclRefExpr>(source);
+    const auto* var = ref ? dyn_cast<VarDecl>(ref->getDecl()) : nullptr;
+    if (!var || !var->getType()->isPointerType() || !var->hasInit() ||
+        var->hasGlobalStorage() || bindings.hasAssembly || bindings.unstable.count(var))
+        return Interval::top();
+    const auto* alloc = dyn_cast<CallExpr>(var->getInit()->IgnoreParenCasts());
+    if (!alloc) return Interval::top();
+    const codeskeptic::IntervalMap empty;
+    Interval bytes = Interval::top();
+    if (isGlobalMemoryFunction(alloc, "malloc", 1, ctx) &&
+        ctx.hasSameType(alloc->getDirectCallee()->getParamDecl(0)->getType().getUnqualifiedType(),
+                        ctx.getSizeType()))
+        bytes = codeskeptic::evalSizeInterval(alloc->getArg(0), ctx, empty);
+    else if (isGlobalMemoryFunction(alloc, "calloc", 2, ctx) &&
+             ctx.hasSameType(alloc->getDirectCallee()->getParamDecl(0)->getType().getUnqualifiedType(),
+                             ctx.getSizeType()) &&
+             ctx.hasSameType(alloc->getDirectCallee()->getParamDecl(1)->getType().getUnqualifiedType(),
+                             ctx.getSizeType()))
+        bytes = Interval::mul(codeskeptic::evalSizeInterval(alloc->getArg(0), ctx, empty),
+                              codeskeptic::evalSizeInterval(alloc->getArg(1), ctx, empty));
+    return bytes.isEmpty() || bytes.loIsInf() || bytes.lo() < 0 ? Interval::top() : bytes;
+}
+
 void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
                      const codeskeptic::ParamIntervalMap& paramMap,
                      codeskeptic::DiagnosticList& results) {
@@ -527,6 +662,40 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
                            codeskeptic::MsgId::BoundsCopyUntrustedLen,
                            sz.toString(), std::to_string(capacity.hi()));
         results.push_back(std::move(diag));
+    }
+
+    // Source over-read is independent of destination capacity/diagnostics.
+    // Only definite reads are reported; partial overlap or unknown stays silent.
+    if (df.converged) {
+        SourceBindings bindings;
+        bindings.TraverseStmt(fn->getBody());
+        std::set<const CallExpr*> sourceReported;
+        for (const auto* call : copies) {
+            if (!isSourceCopy(call, ctx)) continue;
+            const auto* state = analysis.stateAt(call);
+            if (!state) continue;
+            const auto capacity = sourceByteCapacity(call->getArg(1), bindings, ctx);
+            const auto size = codeskeptic::evalSizeInterval(call->getArg(2), ctx, *state);
+            if (capacity.isEmpty() || capacity.hiIsInf() || size.isEmpty() ||
+                size.loIsInf() || size.lo() <= capacity.hi() ||
+                !sourceReported.insert(call).second) continue;
+            const SourceLocation loc = sm.getExpansionLoc(call->getBeginLoc());
+            codeskeptic::Diagnostic diag;
+            diag.file = sm.getFilename(loc).str();
+            diag.line = sm.getSpellingLineNumber(loc);
+            diag.column = sm.getSpellingColumnNumber(loc);
+            diag.rule_id = "bounds";
+            diag.function = fn->getQualifiedNameAsString();
+            diag.severity = codeskeptic::Severity::Error;
+            diag.message = codeskeptic::currentLang() == codeskeptic::Lang::TR
+                ? "kaynak tampon siniri disinda okuma (CWE-125): " + size.toString() +
+                  " baytlik kopya, kaynagin " + std::to_string(capacity.hi()) +
+                  " baytlik kapasitesini asiyor"
+                : "source buffer over-read (CWE-125): copy size " + size.toString() +
+                  " exceeds the source's capacity of " + std::to_string(capacity.hi()) +
+                  " byte(s)";
+            results.push_back(std::move(diag));
+        }
     }
 
     // Unbounded string copy (#95, CWE-120): strcpy/strcat/stpcpy/gets

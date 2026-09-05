@@ -20,8 +20,14 @@ namespace codeskeptic {
 // have left the valid range. Partial overlaps (some paths in range, some
 // out) are deliberately silent for now: on real loops they are the FP
 // minefield, and the interval domain over-approximates loop counters.
-// Heap extents (`malloc(n)`) and the memcpy/strcpy size family are the
-// v0.2 follow-ups; only definite OOB is reported, at Error severity.
+// Copy destination extents and the string-copy family are also modeled.
+// memcpy/memmove source reads use independent byte capacities (CWE-125):
+// fixed arrays/literals and stable local constant malloc/calloc allocations.
+// Definite source over-read is Error, still subject to the rule's experimental
+// report-only capability. Unknown capacities, flexible pointer-based tails,
+// ambiguous pointer bindings and non-definite length ranges stay silent.
+// memset does not read a source; strncpy's termination/padding differs and is
+// not part of the source-read model. Pointer-offset capacity is a separate unit.
 class BoundsRule : public Rule {
 public:
     std::string id() const override { return "bounds"; }
