@@ -1,6 +1,6 @@
 # CodeSkeptic — CWE Ürün Planı
 
-Sürüm: 9. Eski planın devamı değil; main tabanlı yeni program.
+Sürüm: 10. Eski planın devamı değil; main tabanlı yeni program.
 
 PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.
 
@@ -288,7 +288,7 @@ PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. G
 
 **Test bütçesi:** T3
 **Kontroller:** hosted-regressions, hosted-realworld-base-head, checkpoint-receipt-validation, queue-check
-**Kapsam:** ci/regression-checkpoint.json, docs/CI_GATES.md
+**Kapsam:** ci/regression-checkpoint.json, docs/CI_GATES.md, tests/FdResourceRuleTest.cpp
 **Bağımlılıklar:** CS3-CH01-S07-U002
 
 ## CH02 — Güvenilir analiz girdisi ve kapsam
