@@ -19,7 +19,7 @@ Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter aç
 
 **Test bütçesi:** T3
 **Kontroller:** hosted-regressions, hosted-realworld-base-head, checkpoint-receipt-validation, queue-check
-**Kapsam:** ci/regression-checkpoint.json, docs/CI_GATES.md, tests/FdResourceRuleTest.cpp
+**Kapsam:** ci/regression-checkpoint.json, docs/CI_GATES.md, tests/FdResourceRuleTest.cpp, src/rules/FdResourceRule.cpp
 **Bağımlılıklar:** CS3-CH01-S07-U002
 
 ## Sonraki chapter kuyruğu — henüz yürütülemez
