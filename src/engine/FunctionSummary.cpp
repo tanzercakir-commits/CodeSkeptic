@@ -2463,7 +2463,7 @@ bool isKnownFdPrimitive(const CallExpr* call) {
 }
 
 bool isMinusOneFdFailure(const Expr* expr, const ASTContext& ctx) {
-    if (!expr || !expr->getType()->isSignedIntegerType() ||
+    if (!expr || expr->getType().isNull() || !expr->getType()->isSignedIntegerType() ||
         expr->isValueDependent() || expr->isTypeDependent()) return false;
     Expr::EvalResult result;
     if (!expr->EvaluateAsInt(result, ctx) || !result.Val.isInt() ||
