@@ -10,7 +10,7 @@
 
 PLAN'ın tamamı kilitli değildir. JSON elle güncellenerek kuyruğa iş sokulmaz;
 amend komutu geleceğe yönelik değişikliği gerekçesiyle kaydeder. Eski task ID'leri
-silinmez/sıralanmaz, front ve bitmiş işler değiştirilmez. Aktif chapter'a ek iş
+silinmez/sıralanmaz, sıradan amend front ve bitmiş işleri değiştiremez. Aktif chapter'a ek iş
 ancak mevcut bekleyen işlerin arkasından girebilir. Gelecek chapter'lar henüz
 açılmadığından section sonlarına yeni atomik işler eklenebilir.
 
@@ -65,6 +65,36 @@ bir proposal JSON'a hazırla; önce bağımsız incelet, sonra temiz dalda
 dosyaları commit et, `guard --base HEAD^` çalıştır. Bu kontrol edilen plan bakımıdır;
 TODO dışı ürün işi değildir. Front'u zayıflatmak veya engeli atlamak için kullanılamaz.
 Front'un kabulü gerçekten olanaksızsa kullanıcıya somut engeli bildir; sahte POP yok.
+
+### Aynı iş için eksik dosya kapsamı
+
+Kullanıcının2026-09-05 kalıcı izni: aynı kabulü gerçekleştirmek için gerekli dar
+dosya eklemelerinde tekrar insan onayı istenmez. Önce bağımsız salt-okunur denetçi
+gerekliliği, exact temiz HEAD'i, mevcut sözleşmeyi ve ek dosyaları doğrular.
+Sonra `extend-scope --review /absolute/scope-review.json` yalnız FRONT scope'una
+1–8 açık dosya yolu ekler. Glob/dizin, zaten kapsamda olan yol, .git/.agents/.codex
+ve yönetişim çekirdeği eklenemez. Yeni ürün özelliği bu işlemle içeri sokulmaz.
+
+Receipt schema `codeskeptic-scope-review/v1`; exact alanlar: schema, task_id,
+head, branch, contract_sha256, additions, reason, implementer, verifier, verdict,
+findings. Kanonik JSON+LF; distinct implementer/verifier, PASS ve boş findings.
+Bu ürün tamamlanma PASS'i değildir. Denetçi dosyayı repo dışında primary'ye verir.
+Primary komutu çalıştırır; yalnız BOOK/PLAN/TODO dosyalarını birlikte commit eder
+ve `guard --base HEAD^` çalıştırır. PROGRESS byte-byte aynı kalır; hiçbir POP yok.
+Uygulanan geçiş bağımsız denetlenmeden ek dosyada ürün değişikliği başlamaz.
+
+Outcome, Acceptance, budget/checks, bağımlılıklar, diğer bütün task'lar ve FIFO
+sırası aynen korunur. Yeni contract digest eski ürün receipt'ini geçersiz kılar.
+Guard önceki commit'leri eski kapsamla yeniden doğrular: kapsam dışı bir dosyayı
+önceden değiştirip sonra izin eklemek mümkün değildir. Scope ledger'ına ürün kodu
+karıştırılamaz. Yeni review mevcut ekleme HEAD'ine bağlı olduğu için replay olmaz.
+
+Bu komutu kuran bir defalık politika checkpoint'i sahibin açık iznine bağlıdır:
+parent `0e589b5e9e7084a4f2a88e8ff9b1633d0e2d5ee1`, mevcut S06-U001 dalı, yalnız
+AGENTS/INVARIANTS/QUEUE_GUIDE/project_queue.py/test_project_queue.py. Kitap ve ürün
+değişmez; bağımsız exact-head denetim ve T0 kanıt gerekir. Sabit historical edge
+başka commit'te yönetişim düzenleme yetkisi vermez; root'a karşı kriptografik
+koruma iddiası da değildir.
 
 Yazma hatasında araç eski dört dosyayı geri yükler. Ani kapanmada `.git` içindeki
 recovery journal kalabilir: `check` fail eder. Aynı HEAD'de `recover` çalıştır;

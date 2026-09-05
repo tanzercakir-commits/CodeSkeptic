@@ -35,6 +35,16 @@ BOOTSTRAP_SCOPE = (*FILES, "AGENTS.md", "INVARIANTS.md", "MASTER_PROMPT.md",
                    "tests/test_project_queue.py", "tests/StatusAutomationTest.py",
                    "tests/CMakeLists.txt", ".github/workflows/project-queue.yml")
 MAX_BYTES = 2 * 1024 * 1024
+# Owner2026-09-05 explicitly authorized this policy-only migration, then gave
+# standing permission for independently reviewed narrow file-scope additions.
+# This exact historical edge is not a reusable governance-edit permission.
+SCOPE_POLICY_PARENT = "0e589b5e9e7084a4f2a88e8ff9b1633d0e2d5ee1"
+SCOPE_POLICY_TASK = "CS3-CH01-S06-U001"
+SCOPE_POLICY_FILES = ("AGENTS.md", "INVARIANTS.md", "docs/QUEUE_GUIDE.md",
+                      "scripts/project_queue.py", "tests/test_project_queue.py")
+SCOPE_PROTECTED = {*FILES, *SCOPE_POLICY_FILES, "MASTER_PROMPT.md",
+                   ".github/workflows/project-queue.yml", "scripts/check_docs_sync.sh",
+                   "scripts/progress_status.py", "tests/StatusAutomationTest.py"}
 
 
 class QueueError(ValueError):
@@ -126,7 +136,16 @@ def validate_book(book):
         require(text(record["completed_at"]), "completion time")
         done.append(task["id"])
     require(done == ids[:len(done)], "completed work is not exact FIFO prefix")
-    require(isinstance(book["decisions"], list) and all(isinstance(x, dict) and set(x) == {"revision", "reason", "previous_plan_sha256"} and type(x["revision"]) is int and text(x["reason"]) and DIGEST_RE.fullmatch(x["previous_plan_sha256"]) for x in book["decisions"]), "decision records")
+    require(isinstance(book["decisions"], list), "decision records")
+    decision_fields = {"revision", "reason", "previous_plan_sha256"}
+    for decision in book["decisions"]:
+        require(isinstance(decision, dict) and set(decision) in
+                (decision_fields, decision_fields | {"scope_review"}) and
+                type(decision["revision"]) is int and text(decision["reason"]) and
+                DIGEST_RE.fullmatch(decision["previous_plan_sha256"]), "decision records")
+        if "scope_review" in decision:
+            validate_scope_review(decision["scope_review"])
+            require(decision["reason"] == decision["scope_review"]["reason"], "scope decision reason")
     return book
 
 
@@ -187,6 +206,57 @@ def amend(book, chapters, reason):
             require(len(matches_sec) == 1, "section removed")
             require([t["id"] for t in matches_sec[0]["tasks"]][:len(old_sec["tasks"])] == [t["id"] for t in old_sec["tasks"]], "new tasks must append to section back")
     return updated
+
+
+def validate_scope_review(review):
+    fields = {"schema", "task_id", "head", "branch", "contract_sha256", "additions",
+              "reason", "implementer", "verifier", "verdict", "findings"}
+    require(isinstance(review, dict) and set(review) == fields, "scope review fields")
+    require(review["schema"] == "codeskeptic-scope-review/v1", "scope review schema")
+    require(isinstance(review["task_id"], str) and TASK_RE.fullmatch(review["task_id"]), "scope task ID")
+    require(isinstance(review["head"], str) and SHA_RE.fullmatch(review["head"]), "scope review head")
+    require(isinstance(review["contract_sha256"], str) and DIGEST_RE.fullmatch(review["contract_sha256"]), "scope review contract")
+    require(isinstance(review["branch"], str) and review["branch"].startswith(
+            "agent/" + review["task_id"].lower() + "-"), "scope review branch")
+    require(text(review["reason"]) and text(review["implementer"]) and text(review["verifier"]) and
+            review["implementer"] != review["verifier"], "independent scope review required")
+    require(review["verdict"] == "PASS" and review["findings"] == [], "scope review has not passed")
+    additions = review["additions"]
+    require(isinstance(additions, list) and 1 <= len(additions) <= 8 and
+            all(isinstance(p, str) for p in additions) and len(set(additions)) == len(additions), "scope addition count")
+    for path in additions:
+        require(re.fullmatch(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*", path) and
+                not any(part in (".", "..") for part in path.split("/")) and
+                path.split("/")[0] not in (".git", ".agents", ".codex") and
+                path not in SCOPE_PROTECTED and not path.startswith("-"),
+                "scope additions must be exact non-governance paths")
+
+
+def extend_scope(book, review, head, branch):
+    validate_book(book)
+    require(bool(pending(book)), "queue complete")
+    validate_scope_review(review)
+    front = pending(book)[0]
+    require(review["head"] == head and review["branch"] == branch, "stale scope review context")
+    require(review["task_id"] == front["id"] and review["contract_sha256"] == digest(front), "stale scope review contract")
+    require(all(not any(fnmatch.fnmatchcase(path, pattern) for pattern in front["scope"])
+                for path in review["additions"]), "scope path already admitted")
+    updated = copy.deepcopy(book)
+    pending(updated)[0]["scope"].extend(review["additions"])
+    updated["revision"] += 1
+    updated["decisions"].append({"revision": updated["revision"], "reason": review["reason"],
+        "previous_plan_sha256": digest(book["chapters"]), "scope_review": copy.deepcopy(review)})
+    return validate_book(updated)
+
+
+def validate_plan_transition(old, book, parent, branch):
+    require(book["decisions"], "unrecorded plan change")
+    decision = book["decisions"][-1]
+    if "scope_review" in decision:
+        require(book == extend_scope(old, decision["scope_review"], parent, branch), "invalid scope extension")
+        return "scope-extension"
+    require(book == amend(old, book["chapters"], decision["reason"]), "invalid plan amendment")
+    return "plan-amendment"
 
 
 def task_block(task, level=3):
@@ -320,6 +390,15 @@ def clean_context(root):
     return git(root, "rev-parse", "HEAD"), branch
 
 
+def scope_policy_edge(root, parent, head, book, changed):
+    return (parent == SCOPE_POLICY_PARENT and bool(pending(book)) and
+            pending(book)[0]["id"] == SCOPE_POLICY_TASK and
+            set(changed) == set(SCOPE_POLICY_FILES) and
+            git(root, "rev-parse", head + "^") == parent and
+            git(root, "symbolic-ref", "--short", "HEAD").startswith(
+                "agent/" + SCOPE_POLICY_TASK.lower() + "-"))
+
+
 def implementation_span(root, head, book):
     """Check every implementation edge, not just the last commit or final diff.
 
@@ -343,7 +422,8 @@ def implementation_span(root, head, book):
         old = validate_book(json.loads(git(root, "show", f"{parent}:{FILES[0]}"), object_pairs_hook=unique))
         changed = git(root, "diff", "--name-only", parent, cursor).splitlines()
         if old == book:
-            require(all(any(fnmatch.fnmatchcase(p, pattern) for pattern in task["scope"]) for p in changed), "out-of-scope unit history")
+            require(scope_policy_edge(root, parent, cursor, book, changed) or
+                    all(any(fnmatch.fnmatchcase(p, pattern) for pattern in task["scope"]) for p in changed), "out-of-scope unit history")
             require(not set(changed) & set(FILES), "manual ledger history")
         elif len(book["progress"]) == len(old["progress"]) + 1:
             record = book["progress"][0]
@@ -351,9 +431,14 @@ def implementation_span(root, head, book):
             require(book == expected and set(changed) == {FILES[0], FILES[2], FILES[3]}, "invalid unit starting POP")
             return
         else:
-            require(book["decisions"] and book == amend(old, book["chapters"], book["decisions"][-1]["reason"]), "unrecorded unit history change")
+            decision = book["decisions"][-1] if book["decisions"] else {}
+            historical_branch = decision.get("scope_review", {}).get("branch", "")
+            validate_plan_transition(old, book, parent, historical_branch)
             require(set(changed) <= set(FILES), "amendment hides implementation")
             book = old
+            # Replay earlier edits under the earlier scope, not the expanded
+            # present one. A scope addition cannot grant retroactive amnesty.
+            task = pending(book)[0]
         cursor = parent
     raise QueueError("unit history exceeds bound")
 
@@ -379,10 +464,11 @@ def guard(root, base):
         require(bool(pending(old)), "work after terminal queue")
         task = pending(old)[0]
         require(branch.startswith("agent/" + task["id"].lower() + "-") or (task["id"] == BOOTSTRAP_TASK and branch == BOOTSTRAP_BRANCH), "wrong implementation branch")
-        require(all(any(fnmatch.fnmatchcase(p, pattern) for pattern in task["scope"]) for p in changed), "out-of-scope diff")
+        policy = scope_policy_edge(root, base, head, book, changed)
+        require(policy or all(any(fnmatch.fnmatchcase(p, pattern) for pattern in task["scope"]) for p in changed), "out-of-scope diff")
         require(not set(changed) & set(FILES), "manual ledger edit")
         implementation_span(root, head, book)
-        return "implementation"
+        return "scope-policy" if policy else "implementation"
     if len(book["progress"]) == len(old["progress"]) + 1:
         record = book["progress"][0]
         expected = complete(old, record["review"], git(root, "rev-parse", base), git(root, "symbolic-ref", "--short", "HEAD"), record["completed_at"])
@@ -390,11 +476,12 @@ def guard(root, base):
         require(git(root, "rev-parse", "HEAD^") == git(root, "rev-parse", base), "ledger parent mismatch")
         implementation_span(root, base, old)
         return "finalized"
-    require(book["decisions"], "unrecorded plan change")
-    require(book == amend(old, book["chapters"], book["decisions"][-1]["reason"]), "invalid plan amendment")
+    kind = validate_plan_transition(old, book, base, branch)
     require(set(changed) <= set(FILES), "plan amendment contains implementation")
+    if kind == "scope-extension":
+        require(git(root, "rev-parse", "HEAD^") == base and set(changed) == set(FILES[:3]), "scope ledger parent/files mismatch")
     implementation_span(root, base, old)
-    return "plan-amendment"
+    return kind
 
 
 def main(argv=None):
@@ -407,6 +494,8 @@ def main(argv=None):
     sub.add_parser("recover")
     review = sub.add_parser("finalize")
     review.add_argument("--review", type=Path, required=True)
+    scope = sub.add_parser("extend-scope")
+    scope.add_argument("--review", type=Path, required=True)
     revision = sub.add_parser("amend")
     revision.add_argument("--proposal", type=Path, required=True)
     revision.add_argument("--reason", required=True)
@@ -453,11 +542,18 @@ def main(argv=None):
                     require(root not in args.review.resolve().parents, "review must be outside repository")
                     receipt = read_json(args.review, 65536)
                     require(args.review.read_text(encoding="utf-8") == canonical(receipt), "review must be canonical JSON")
-                    updated = complete(book, receipt, head, branch, datetime.now(timezone.utc).isoformat())
-                    for evidence in receipt["checks"]:
-                        path = Path(evidence["evidence"])
-                        require(path.is_absolute() and path.is_file() and not path.is_symlink() and path.stat().st_size <= 10 * 1024 * 1024, "missing/unsafe evidence")
-                        require(hashlib.sha256(path.read_bytes()).hexdigest() == evidence["sha256"], "evidence changed")
+                    if args.command == "extend-scope":
+                        updated = extend_scope(book, receipt, head, branch)
+                        for name in receipt["additions"]:
+                            path = root / name
+                            require(not any(p.is_symlink() for p in (path, *path.parents) if p != root and root in p.parents), "scope path traverses symlink")
+                            require(not path.exists() or path.is_file(), "scope path must name a file")
+                    else:
+                        updated = complete(book, receipt, head, branch, datetime.now(timezone.utc).isoformat())
+                        for evidence in receipt["checks"]:
+                            path = Path(evidence["evidence"])
+                            require(path.is_absolute() and path.is_file() and not path.is_symlink() and path.stat().st_size <= 10 * 1024 * 1024, "missing/unsafe evidence")
+                            require(hashlib.sha256(path.read_bytes()).hexdigest() == evidence["sha256"], "evidence changed")
                 require(clean_context(root) == (head, branch), "source changed during preparation")
                 publish(root, updated)
             print("QUEUE_PREPARED: commit only the declared managed changes, then run guard against the parent; no publication claim")

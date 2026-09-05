@@ -30,7 +30,12 @@ T2: Linux suite and relevant corpus/sanitizer slice. T3: stated release profile.
 Do not run unrelated heavy suites repeatedly. No sudo or hidden downloads.
 
 Fixes necessary for the current outcome and inside its scope belong to that
-unit. Other discoveries are proposed future tasks through the controlled plan
+unit. If a necessary file is missing, the owner's2026-09-05 standing permission
+allows an independently reviewed `extend-scope` ledger transition before editing
+that file, without another human approval. Only exact file paths may be added;
+outcome, acceptance, test budget/checks, FIFO and completed records stay unchanged.
+This does not authorize changing governance itself or adding unrelated features.
+Other discoveries are proposed future tasks through the controlled plan
 amendment, not worked on immediately. A blocked front stays blocked: never
 skip it or weaken its acceptance to obtain PASS. No old wholesale merges or
 copies: donor behavior must be re-understood, narrowly reimplemented and tested.

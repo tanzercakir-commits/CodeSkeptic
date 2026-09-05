@@ -73,7 +73,76 @@ def advance(book):
     return queue.complete(book, review, HEAD, review["branch"], STAMP)
 
 
+def scope_review_for(book, head=HEAD, branch=None, additions=None):
+    task = queue.pending(book)[0]
+    return {
+        "schema": "codeskeptic-scope-review/v1", "task_id": task["id"],
+        "head": head, "branch": branch or branch_for(task),
+        "contract_sha256": queue.digest(task),
+        "additions": additions if additions is not None else ["include/cwe.h"],
+        "reason": "This exact helper file is necessary for the unchanged acceptance.",
+        "implementer": "scope-implementer-run", "verifier": "independent-scope-review-run",
+        "verdict": "PASS", "findings": [],
+    }
+
+
 class QueueContractTests(unittest.TestCase):
+    def test_38_reviewed_scope_extension_preserves_every_other_contract_field(self):
+        old = advance(make_book())
+        before = copy.deepcopy(old)
+        review = scope_review_for(old)
+        new = queue.extend_scope(old, review, HEAD, review["branch"])
+        expected = copy.deepcopy(queue.pending(old)[0])
+        expected["scope"].append("include/cwe.h")
+        self.assertEqual(queue.pending(new)[0], expected)
+        self.assertEqual(queue.pending(new)[1:], queue.pending(old)[1:])
+        self.assertEqual(new["progress"], old["progress"])
+        self.assertEqual(new["decisions"][-1]["scope_review"], review)
+        self.assertEqual(new["revision"], old["revision"] + 1)
+        self.assertEqual(old, before)
+        self.assertEqual(queue.render(new)["docs/PROGRESS.md"], queue.render(old)["docs/PROGRESS.md"])
+
+    def test_39_scope_review_requires_exact_head_contract_front_branch_and_independence(self):
+        book = advance(make_book())
+        good = scope_review_for(book)
+        for field, value in (("head", "b" * 40), ("contract_sha256", "c" * 64),
+                             ("task_id", queue.pending(book)[1]["id"]), ("branch", "main"),
+                             ("verifier", good["implementer"]), ("verdict", "FAIL"),
+                             ("findings", ["material"]), ("reason", "")):
+            review = dict(good, **{field: value})
+            with self.subTest(field=field), self.assertRaises(queue.QueueError):
+                queue.extend_scope(book, review, HEAD, good["branch"])
+
+    def test_40_scope_extension_rejects_globs_governance_aliases_and_already_covered_paths(self):
+        book = advance(make_book())
+        queue.pending(book)[0]["scope"] = ["src/already.cc", "tests/fixture.cc"]
+        for additions in ([], ["src/*"], ["../other"], ["/tmp/other"], ["include//x"],
+                          ["include/./x"], ["include/a", "include/a"], ["src/already.cc"],
+                          [".git/config"], [".codex/config.toml"], ["AGENTS.md"],
+                          ["scripts/project_queue.py"], ["docs/BOOK.json"],
+                          ["tests/test_project_queue.py"], ["scripts/check_docs_sync.sh"],
+                          ["scripts/progress_status.py"], ["tests/StatusAutomationTest.py"]):
+            review = scope_review_for(book, additions=additions)
+            with self.subTest(additions=additions), self.assertRaises(queue.QueueError):
+                queue.extend_scope(book, review, HEAD, review["branch"])
+
+    def test_41_ordinary_amendment_still_cannot_extend_front_scope(self):
+        book = advance(make_book())
+        chapters = copy.deepcopy(book["chapters"])
+        chapters[0]["sections"][0]["tasks"][1]["scope"].append("include/cwe.h")
+        with self.assertRaises(queue.QueueError):
+            queue.amend(book, chapters, "No independent scope receipt")
+
+    def test_42_scope_extension_invalidates_old_product_review_and_cannot_replay(self):
+        book = advance(make_book())
+        scope_review = scope_review_for(book)
+        old_review = review_for(queue.pending(book)[0])
+        changed = queue.extend_scope(book, scope_review, HEAD, scope_review["branch"])
+        with self.assertRaises(queue.QueueError):
+            queue.complete(changed, old_review, HEAD, old_review["branch"], STAMP)
+        with self.assertRaises(queue.QueueError):
+            queue.extend_scope(changed, scope_review, HEAD, scope_review["branch"])
+
     def test_01_pop_front_push_progress_and_keep_input_unchanged(self):
         old = make_book()
         before = copy.deepcopy(old)
@@ -611,6 +680,92 @@ q.publish(Path(sys.argv[2]), q.read_json(Path(sys.argv[3])))
         self.commit("In-scope final edge following laundering attempt")
         with self.assertRaises(queue.QueueError):
             queue.guard(self.root, "HEAD^")
+
+    def test_43_scope_extension_real_cli_ledger_guard_then_product_pop(self):
+        receipt = scope_review_for(self.book, self.head, self.branch)
+        self.receipt.write_text(queue.canonical(receipt), encoding="utf-8")
+        self.assertEqual(self.cli("extend-scope", "--review", str(self.receipt)), 0)
+        self.assertEqual(set(self.git("diff", "--name-only").splitlines()), set(queue.FILES[:3]))
+        self.assertEqual(queue.check(self.root)["progress"], self.book["progress"])
+        self.commit("Independently reviewed scope-only transition")
+        self.assertEqual(queue.guard(self.root, self.head), "scope-extension")
+        scope_head = self.git("rev-parse", "HEAD")
+        source = self.root / "include/cwe.h"
+        source.parent.mkdir()
+        source.write_text("int cwe_fixture;\n", encoding="utf-8")
+        self.commit("Implement newly admitted exact file")
+        self.assertEqual(queue.guard(self.root, scope_head), "implementation")
+        implementation_head = self.git("rev-parse", "HEAD")
+        task = queue.pending(queue.check(self.root))[0]
+        self.review = review_for(task, implementation_head, self.branch, self.evidence)
+        self.save_review()
+        self.assertEqual(self.cli("finalize", "--review", str(self.receipt)), 0)
+        self.commit("Verified actual product POP after scope extension")
+        self.assertEqual(queue.guard(self.root, implementation_head), "finalized")
+
+    def test_44_scope_extension_cannot_amnesty_earlier_out_of_scope_product(self):
+        source = self.root / "include/cwe.h"
+        source.parent.mkdir()
+        source.write_text("int too_early;\n", encoding="utf-8")
+        self.commit("Product edit before file was admitted")
+        prior = self.git("rev-parse", "HEAD")
+        receipt = scope_review_for(self.book, prior, self.branch)
+        self.receipt.write_text(queue.canonical(receipt), encoding="utf-8")
+        self.assertEqual(self.cli("extend-scope", "--review", str(self.receipt)), 2)
+        # A forged manual ledger must not reset the old scope during history replay.
+        queue.publish(self.root, queue.extend_scope(self.book, receipt, prior, self.branch))
+        self.commit("Manual attempted laundering through a scope extension")
+        source.write_text("int later_allowed;\n", encoding="utf-8")
+        self.commit("Apparently scoped last edge")
+        with self.assertRaises(queue.QueueError):
+            queue.guard(self.root, "HEAD^")
+
+    def test_45_scope_extension_cannot_mix_acceptance_future_tasks_or_product(self):
+        receipt = scope_review_for(self.book, self.head, self.branch)
+        valid = queue.extend_scope(self.book, receipt, self.head, self.branch)
+        for change in ("acceptance", "future"):
+            with self.subTest(change=change):
+                candidate = copy.deepcopy(valid)
+                if change == "acceptance":
+                    queue.pending(candidate)[0]["acceptance"] = ["Weakened"]
+                elif change == "future":
+                    queue.pending(candidate)[1]["outcome"] = "Unrelated future change"
+                # Pure replay requires exact equality, never just a changed digest.
+                with self.assertRaises(queue.QueueError):
+                    queue.validate_plan_transition(self.book, candidate, self.head, self.branch)
+        queue.publish(self.root, valid)
+        source = self.root / "include/cwe.h"
+        source.parent.mkdir()
+        source.write_text("int mixed_with_admission;\n", encoding="utf-8")
+        self.commit("Mix implementation with admission ledger")
+        with self.assertRaises(queue.QueueError):
+            queue.guard(self.root, self.head)
+
+    def test_46_scope_review_symlink_and_inside_repository_are_rejected(self):
+        receipt = scope_review_for(self.book, self.head, self.branch)
+        self.receipt.write_text(queue.canonical(receipt), encoding="utf-8")
+        inside = self.root / ".git/scope.json"
+        inside.write_text(queue.canonical(receipt), encoding="utf-8")
+        self.assertEqual(self.cli("extend-scope", "--review", str(inside)), 2)
+        (self.root / "include").symlink_to(self.directory, target_is_directory=True)
+        (self.root / ".git/info/exclude").write_text("include\n", encoding="utf-8")
+        self.assertEqual(self.git("status", "--porcelain=v1"), "")
+        self.assertEqual(self.cli("extend-scope", "--review", str(self.receipt)), 2)
+
+    def test_47_policy_checkpoint_is_exact_parent_branch_and_files_only(self):
+        with mock.patch.object(queue, "SCOPE_POLICY_PARENT", self.head), \
+             mock.patch.object(queue, "SCOPE_POLICY_TASK", queue.pending(self.book)[0]["id"]):
+            for name in queue.SCOPE_POLICY_FILES:
+                path = self.root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("Owner-authorized policy fixture\n", encoding="utf-8")
+            self.commit("Exact owner-authorized policy-only checkpoint")
+            self.assertEqual(queue.guard(self.root, self.head), "scope-policy")
+            policy_head = self.git("rev-parse", "HEAD")
+            (self.root / "AGENTS.md").write_text("Cannot replay policy permission\n", encoding="utf-8")
+            self.commit("Second policy edit is not covered by fixed parent")
+            with self.assertRaises(queue.QueueError):
+                queue.guard(self.root, policy_head)
 
 
 if __name__ == "__main__":

@@ -13,6 +13,11 @@
 5. Front and completed contracts cannot be changed by ordinary amendments.
    Future contracts can be clarified and new work appended with a reason and
    old-plan digest. Existing active chapter tasks cannot be jumped.
+   Under the owner's2026-09-05 standing permission, a separate independently
+   reviewed scope-only transition may append exact necessary non-governance files
+   to FRONT. Nothing else changes; old scope still governs earlier history and
+   the changed contract invalidates old product PASS receipts. No repeated owner
+   approval for those narrow additions; no acceptance weakening or scope amnesty.
 6. A review binds the clean implementation SHA, task, branch, full contract,
    distinct implementer/verifier identities and every required check's evidence.
    PASS with zero material findings is required. This shared-user procedure is
