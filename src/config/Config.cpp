@@ -107,7 +107,7 @@ bool Config::loadFromFile(const std::string& path) {
         }
 
         if (key == "source_path")        source_path_ = value;
-        else if (key == "build_path")    build_path_ = value;
+        else if (key == "build_path")    setBuildPath(value);
         else if (key == "output_format") {
             if (!isOutputFormat(value)) {
                 configError(path, lineNumber,
@@ -240,7 +240,9 @@ bool Config::parseArgs(int argc, char* argv[]) {
         if (arg == "--source" && i + 1 < argc) {
             source_path_ = argv[++i];
         } else if (arg == "--build-path" && i + 1 < argc) {
-            build_path_ = argv[++i];
+            setBuildPath(argv[++i]);
+        } else if (arg == "--doctor") {
+            doctor_ = true;
         } else if (arg == "--json" && i + 1 < argc) {
             output_format_ = "json";
             json_output_path_ = argv[++i];
@@ -334,6 +336,7 @@ bool Config::parseArgs(int argc, char* argv[]) {
             summary_diff_old_ = argv[++i];
             summary_diff_new_ = argv[++i];
         } else if (arg == "--files" && i + 1 < argc) {
+            file_list_specified_ = true;
             // List file: one source file path per line.
             // For large/hand-picked sets (benchmarks, agent batch requests).
             const char* listPath = argv[++i];
@@ -359,6 +362,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "Options:\n"
                       << "  --source <path>        Directory/file to analyze\n"
                       << "  --build-path <path>    compile_commands.json directory\n"
+                      << "  --doctor              Explain compilation-database selection;\n"
+                      << "                         does not build or run analysis\n"
                       << "  --json <file>          JSON output file\n"
                       << "  --sarif <file>         SARIF 2.1.0 output file\n"
                       << "  --html <file>          Self-contained HTML report (filters,\n"

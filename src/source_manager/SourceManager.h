@@ -28,6 +28,9 @@ std::vector<std::string> platformExtraArgs();
 class SourceManager {
 public:
     explicit SourceManager(const std::string& build_path);
+    SourceManager(const std::string& build_path,
+                  std::unique_ptr<clang::tooling::CompilationDatabase> database,
+                  bool synthetic_single_file);
     ~SourceManager();
 
     void addSourceFile(const std::string& path);
@@ -36,9 +39,11 @@ public:
 
     // Warm AST cache (MCP server / long-lived process): parsed TUs are
     // kept for the PROCESS lifetime, so subsequent calls do not pay the
-    // parse cost. The key is path+build-path; if the fingerprint
-    // (mtime+size) does not match, it is rebuilt — a STALE AST IS NEVER
-    // SERVED. Stays off in one-shot CLI runs (memory: we do not want to
+    // parse cost. The key includes path, build-path and loaded compile
+    // commands (so changed flags cannot reuse an old AST); if the fingerprint
+    // (source mtime+size) does not match, it is rebuilt. This is not a
+    // full transitive-header/environment dependency model. Stays off in
+    // one-shot CLI runs (memory: we do not want to
     // keep all ASTs alive during a large directory scan).
     void enableWarmCache(bool enabled) { warm_cache_ = enabled; }
 

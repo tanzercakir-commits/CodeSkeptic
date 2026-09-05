@@ -1,7 +1,12 @@
 #include "config/Config.h"
+#include "analyzer/StaticAnalyzer.h"
+#include "rules/DivByZeroRule.h"
 
 #include <gtest/gtest.h>
+#include <llvm/Support/FormatVariadic.h>
+#include <llvm/Support/JSON.h>
 
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <initializer_list>
@@ -145,4 +150,79 @@ TEST(ConfigTest, ModelFileOptionsAreRepeatableAndLayered) {
 
     Config missing;
     EXPECT_FALSE(parse(missing, {"codeskeptic", "--model-file"}));
+}
+
+TEST(ConfigTest, DiscoveryRetainsExplicitBuildAndFileListProvenance) {
+    Config defaults;
+    EXPECT_EQ(defaults.buildPath(), ".");
+    EXPECT_FALSE(defaults.buildPathSpecified());
+    EXPECT_FALSE(defaults.fileListSpecified());
+    ASSERT_TRUE(parse(defaults, {"codeskeptic", "--doctor", "--build-path", "."}));
+    EXPECT_TRUE(defaults.doctor());
+    EXPECT_TRUE(defaults.buildPathSpecified());
+
+    Config configured;
+    ASSERT_TRUE(configured.loadFromFile(writeConfig("doctor_build.conf", "build_path=.\n")));
+    EXPECT_TRUE(configured.buildPathSpecified());
+
+    Config listed;
+    const std::string list = writeConfig("doctor_empty_list.txt", "");
+    ASSERT_TRUE(parse(listed, {"codeskeptic", "--doctor", "--files", list.c_str()}));
+    EXPECT_TRUE(listed.fileListSpecified());
+    EXPECT_TRUE(listed.sourceFiles().empty());
+}
+
+TEST(ConfigTest, ChangedCompilationCommandsInvalidateWarmAstCache) {
+    namespace fs = std::filesystem;
+    const auto root = fs::path(::testing::TempDir()) /
+        ("codeskeptic-compdb-cache-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    ASSERT_TRUE(fs::create_directory(root));
+    struct FixtureCleanup {
+        fs::path root;
+        ~FixtureCleanup() {
+            codeskeptic::SourceManager::clearWarmCache();
+            std::error_code error;
+            fs::remove_all(root, error);
+        }
+    } cleanup{root};
+    const auto source = root / "input.cpp";
+    { std::ofstream file(source); file << "int divide() { return 12 / VALUE; }\n"; }
+    auto writeDatabase = [&](std::initializer_list<int> divisors) {
+        llvm::json::Array entries;
+        for (int divisor : divisors) {
+            entries.push_back(llvm::json::Object{
+                {"directory", root.string()}, {"file", source.string()},
+                {"arguments", llvm::json::Array{"clang++", "-std=c++17",
+                    "-DVALUE=" + std::to_string(divisor), "-c", source.string()}}});
+        }
+        std::ofstream file(root / "compile_commands.json");
+        file << llvm::formatv("{0}", llvm::json::Value(std::move(entries))).str();
+    };
+    auto analyze = [&]() {
+        Config config;
+        config.setBuildPath(root.string());
+        config.setSourcePath(source.string());
+        config.setWarmCache(true);
+        codeskeptic::StaticAnalyzer analyzer(std::move(config));
+        analyzer.addRule<codeskeptic::DivByZeroRule>();
+        return analyzer.run();
+    };
+    codeskeptic::SourceManager::clearWarmCache();
+    writeDatabase({1});
+    EXPECT_EQ(analyze().exitCode(), 0);
+    EXPECT_EQ(codeskeptic::SourceManager::warmCacheMisses(), 1u);
+    writeDatabase({0});  // Source content/mtime are unchanged; only DB flags differ.
+    const auto changed = analyze();
+    EXPECT_EQ(changed.exitCode(), 1);
+    EXPECT_EQ(changed.findings, 1u);
+    EXPECT_EQ(codeskeptic::SourceManager::warmCacheMisses(), 2u);
+    EXPECT_EQ(analyze().exitCode(), 1);
+    EXPECT_GE(codeskeptic::SourceManager::warmCacheHits(), 1u);
+    codeskeptic::SourceManager::clearWarmCache();
+    writeDatabase({1, 0});  // The second compile configuration must not disappear.
+    const auto multiple = analyze();
+    EXPECT_EQ(multiple.exitCode(), 1);
+    EXPECT_EQ(multiple.findings, 1u);
+    EXPECT_EQ(multiple.analyzed_tus, 2u);
 }

@@ -24,6 +24,9 @@ public:
         return source_files_;
     }
     const std::string& buildPath() const { return build_path_; }
+    bool buildPathSpecified() const { return build_path_specified_; }
+    bool fileListSpecified() const { return file_list_specified_; }
+    bool doctor() const { return doctor_; }
     const std::string& outputFormat() const { return output_format_; }
     const std::string& jsonOutputPath() const { return json_output_path_; }
     const std::string& sarifOutputPath() const { return sarif_output_path_; }
@@ -39,7 +42,10 @@ public:
     bool isRuleEnabled(const std::string& rule_id) const;
 
     void setSourcePath(const std::string& path) { source_path_ = path; }
-    void setBuildPath(const std::string& path) { build_path_ = path; }
+    void setBuildPath(const std::string& path) {
+        build_path_ = path;
+        build_path_specified_ = true;
+    }
     void setOutputFormat(const std::string& format) { output_format_ = format; }
     void setMinSeverity(Severity severity) { min_severity_ = severity; }
     bool serve() const { return serve_; }
@@ -198,6 +204,9 @@ private:
     bool assumptions_ = false;
     bool warm_cache_ = false;
     bool help_requested_ = false;
+    bool build_path_specified_ = false;
+    bool file_list_specified_ = false;
+    bool doctor_ = false;
     std::string summary_in_path_;
     std::string summary_out_path_;
     std::vector<std::string> model_files_;

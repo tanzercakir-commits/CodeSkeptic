@@ -38,6 +38,7 @@ public:
 
 private:
     Config config_;
+    bool compilation_input_ready_ = false;
     std::unique_ptr<SourceManager> source_mgr_;
     RuleEngine engine_;
     std::unique_ptr<Reporter> reporter_;

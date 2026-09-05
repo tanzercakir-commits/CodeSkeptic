@@ -1,5 +1,67 @@
 # Your first scan on a real codebase
 
+## First establish the compilation inputs
+
+Run the input doctor before interpreting findings:
+
+```sh
+cmake -S . -B build -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+codeskeptic --doctor --source src --build-path build
+codeskeptic --source src --build-path build --json findings.json
+```
+
+The first command is an example **you** run to configure your project; the
+doctor never runs CMake, a compiler, commands from the database, or analysis.
+`status: ready` means the requested files have usable compilation-command
+entries, not that those files compile or are free of defects. Actual analysis
+still checks parse/analysis coverage and can return exit 2.
+
+Doctor output lists the selected database, explicit/automatic selection,
+entry counts and requested source count. Normal analysis reports the same
+selection on stderr and consumes the already-loaded database from the same
+resolver. `--doctor` uses text output, not `--json`, `--sarif` or `--html`.
+Without a source or file-list argument it examines the current directory.
+
+Without `--build-path`, discovery searches the requested source's directory
+and bounded project ancestry, not an unrelated working directory. It checks
+`compile_commands.json` and the conventional `build`, `Build`, `build-debug`,
+`build-release`, `cmake-build-debug`, `cmake-build-release`, and `out/build`
+locations. A nested `.git` file/directory fences ancestry; without Git, the
+nearest CMake/Meson/Makefile project marker does. Search is bounded to eight
+ancestor levels and 128 distinct roots; unusual layouts need an explicit path.
+Symlink aliases to the same database are deduplicated.
+
+Two databases are an error, even if only one appears to cover the file. Select
+one with `--build-path`; an explicit CLI or `build_path` configuration value is
+authoritative, so an invalid explicit path never falls back to another database.
+Missing, malformed, empty or non-covering databases return exit 2 with `reason`
+and `next` guidance. `compile_flags.txt` cannot rescue malformed JSON. Relative
+command directories are resolved relative to the database, not the process CWD.
+
+Directory requests retain supported C/C++ source files in the requested tree.
+Only `.git` metadata and the selected CMake build's generated `CMakeFiles`
+internals are excluded from recursion; a database inside `src` cannot hide it.
+An unmapped source is an error, not silently omitted or compiled with inferred
+flags. Use `--source` for a narrower tree or `--files` for an explicit list.
+Existing CWD-relative listed files take precedence; a missing relative entry may
+be resolved against the selected build directory. Empty/missing lists cannot
+turn into a broad scan.
+
+The declared database `file` must match the command's actual input; unrelated
+source substitution is rejected. Response files are expanded and the selected
+commands frozen before analysis, without executing them. Warm-cache keys include
+compile commands, so changing flags invalidates cached ASTs; multiple command
+variants run uncached so no second configuration is lost.
+
+A direct, existing single `.c`, `.cpp`, `.cc` or `.cxx` file can still be analyzed
+without a database: both doctor and analysis explicitly announce
+`mode: synthetic-single-file` (`gnu11` for C, `c++17` for C++). This convenience
+does not reconstruct a project's defines, include paths or toolchain. It is
+not available to rescue invalid or ambiguous discovered/explicit databases,
+directory scans, or file-list requests.
+
+## Then interpret findings
+
 The first run on a mature C/C++ project surfaces a few well-known
 families of findings. This is the map: recognise the family, apply the
 lever. **Every lever below is precision — a fact you hand the analyzer,

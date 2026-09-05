@@ -4,6 +4,7 @@ add_library(codeskeptic_core STATIC
     core/FindingFingerprint.cpp
     core/FunctionFilter.cpp
     source_manager/SourceManager.cpp
+    source_manager/CompilationDatabaseDiscovery.cpp
     source_manager/ResourceDir.cpp
     engine/AllocFunctions.cpp
     engine/AssertGuards.cpp

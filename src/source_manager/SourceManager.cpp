@@ -178,6 +178,15 @@ SourceManager::SourceManager(const std::string& build_path)
 
 SourceManager::~SourceManager() = default;
 
+SourceManager::SourceManager(
+    const std::string& build_path,
+    std::unique_ptr<clang::tooling::CompilationDatabase> database,
+    bool synthetic_single_file)
+    : build_path_(build_path), comp_db_(std::move(database)) {
+    if (synthetic_single_file)
+        comp_db_ = std::make_unique<ExtensionAwareCompilationDatabase>();
+}
+
 void SourceManager::addSourceFile(const std::string& path) {
     auto abs = fs::absolute(path);
     if (!fs::exists(abs)) {
@@ -232,10 +241,9 @@ void applyPlatformAdjusters(clang::tooling::ClangTool& tool) {
 //
 // Deliberate global state (not the OPPOSITE of the filter-leak lesson,
 // but its complement): here cross-call persistence IS the feature, and
-// correctness is protected by a content-derived key — path+build-path
-// key, mtime+size fingerprint. If the fingerprint does not match, the
-// entry is rebuilt; there is no path by which a stale AST could be
-// served.
+// the key includes the loaded compile commands and paths, with a source
+// mtime+size freshness fingerprint. Changed commands/source metadata rebuild
+// the AST; transitive header/environment tracking is outside this cache model.
 struct CachedAst {
     std::string fingerprint;
     std::unique_ptr<clang::ASTUnit> unit;
@@ -300,11 +308,40 @@ int SourceManager::processAll(ASTCallback callback) {
 
 int SourceManager::processAllOnWorker(ASTCallback callback) {
     if (source_files_.empty()) return 0;
+    if (!comp_db_) return 1;
 
     if (warm_cache_) {
         bool anyFailed = false;
         for (const auto& file : source_files_) {
-            const std::string key = file + "|" + build_path_;
+            const auto commands = comp_db_->getCompileCommands(file);
+            if (commands.size() != 1) {
+                // One cached AST cannot represent multiple compile variants.
+                // Execute every variant through the normal path; retain caching
+                // for its supported one-command case without dropping evidence.
+                clang::tooling::ClangTool tool(*comp_db_, {file});
+                applyPlatformAdjusters(tool);
+                CodeSkepticActionFactory factory(callback);
+                if (tool.run(&factory) != 0) anyFailed = true;
+                continue;
+            }
+            // Length-prefix fields: separators inside paths/arguments cannot
+            // collide. Source freshness is still the existing mtime/size model;
+            // this specifically prevents changed database flags reusing an AST.
+            std::string key;
+            auto bind = [&](const std::string& field) {
+                key += std::to_string(field.size()) + ":" + field;
+            };
+            bind(file);
+            bind(build_path_);
+            bind(std::to_string(commands.size()));
+            for (const auto& command : commands) {
+                bind(command.Directory);
+                bind(command.Filename);
+                bind(command.Output);
+                bind(std::to_string(command.CommandLine.size()));
+                for (const auto& argument : command.CommandLine) bind(argument);
+            }
+            for (const auto& argument : platformExtraArgs()) bind(argument);
             const std::string fp = fingerprintOf(file);
 
             // The broken-TU guard applies to both cache paths — a

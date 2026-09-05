@@ -1,4 +1,5 @@
 #include "analyzer/StaticAnalyzer.h"
+#include "source_manager/CompilationDatabaseDiscovery.h"
 
 #include "analyzer/Baseline.h"
 #include "analyzer/SuppressionFilter.h"
@@ -72,31 +73,15 @@ StaticAnalyzer::StaticAnalyzer(Config config)
     // MCP server) must not inherit the previous run's non-convergence.
     CoverageReport::instance().clear();
 
-    source_mgr_ = std::make_unique<SourceManager>(config_.buildPath());
+    auto selection = discoverCompilationDatabase(config_);
+    compilation_input_ready_ = selection.ready;
+    writeCompilationDoctor(selection, std::cerr);
+    const auto buildDirectory = selection.database.empty() ? "." :
+        std::filesystem::path(selection.database).parent_path().string();
+    source_mgr_ = std::make_unique<SourceManager>(
+        buildDirectory, std::move(selection.commands), selection.synthetic);
     if (config_.warmCache()) source_mgr_->enableWarmCache(true);
-
-    if (!config_.sourcePath().empty()) {
-        if (std::filesystem::is_directory(config_.sourcePath())) {
-            source_mgr_->scanDirectory(config_.sourcePath());
-        } else {
-            source_mgr_->addSourceFile(config_.sourcePath());
-        }
-    }
-    for (const auto& file : config_.sourceFiles()) {
-        // Meson compile DBs carry build-dir-relative paths
-        // (`../src/foo.c`). An entry that does not exist as given is
-        // retried relative to --build-path before being reported —
-        // without this, a meson-driven file list silently analyzed
-        // NOTHING (the systemd lesson, 2026-07-12).
-        namespace fs = std::filesystem;
-        if (!fs::exists(file) && fs::path(file).is_relative()) {
-            fs::path viaBuild = fs::path(config_.buildPath()) / file;
-            if (fs::exists(viaBuild)) {
-                source_mgr_->addSourceFile(
-                    fs::weakly_canonical(viaBuild).string());
-                continue;
-            }
-        }
+    for (const auto& file : selection.files) {
         source_mgr_->addSourceFile(file);
     }
 
@@ -144,6 +129,12 @@ AnalysisResult StaticAnalyzer::run() {
     result.attempted_tus = source_mgr_->fileCount();
     result.analyze_broken_tus = config_.analyzeBrokenTUs();
     result.accept_partial_coverage = config_.acceptPartialCoverage();
+
+    if (!compilation_input_ready_) {
+        result.tool_failed = true;
+        if (!reporter_->report(diagnostics_, &result)) result.report_write_failed = true;
+        return result;
+    }
 
     if (source_mgr_->fileCount() == 0) {
         // Analyzing nothing must not look like a clean pass: a mistyped

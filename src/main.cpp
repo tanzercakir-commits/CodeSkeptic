@@ -17,6 +17,7 @@
 #include "rules/UninitPointerRule_Ex.h"
 #include "rules/UninitScalarRule.h"
 #include "server/McpServer.h"
+#include "source_manager/CompilationDatabaseDiscovery.h"
 
 #include <cstring>
 #include <iostream>
@@ -76,6 +77,19 @@ int main(int argc, char* argv[]) {
     if (config.helpRequested()) return 0;
 
     codeskeptic::setLang(codeskeptic::parseLang(config.lang()));
+
+    if (config.doctor()) {
+        if (config.serve() || !config.summaryDiffOld().empty() ||
+            config.outputFormat() != "console") {
+            std::cerr << "[CodeSkeptic] --doctor is a text-only input check; "
+                         "do not combine it with server, summary-diff or report output modes\n";
+            return 2;
+        }
+        auto selection = codeskeptic::discoverCompilationDatabase(config);
+        codeskeptic::writeCompilationDoctor(selection,
+                                            selection.ready ? std::cout : std::cerr);
+        return selection.ready ? 0 : 2;
+    }
 
     if (config.serve()) {
         return codeskeptic::runMcpServer();
