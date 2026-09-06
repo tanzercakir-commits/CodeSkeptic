@@ -1,5 +1,6 @@
 #include "config/Config.h"
 #include "core/Capabilities.h"
+#include "source_manager/InputIdentity.h"
 #include "analyzer/StaticAnalyzer.h"
 #include "rules/DivByZeroRule.h"
 #include "rules/MemoryLeakRule_Ex.h"
@@ -50,6 +51,9 @@ std::string snapshot(const Config& c) {
     for (const auto& capability : codeskeptic::ruleCapabilities())
         selection[std::string(capability.id)] = c.isRuleEnabled(std::string(capability.id));
     llvm::json::Object state{
+        {"checkpoint_identity", c.checkpointSettings()},
+        {"checkpoint_directory", c.checkpointDirectory()}, {"resume", c.resumeCheckpoint()},
+        {"checkpoint_bytes", c.checkpointBytes()}, {"checkpoint_units", c.checkpointUnits()},
         {"source", c.sourcePath()}, {"files", strings(c.sourceFiles())},
         {"build", c.buildPath()}, {"explicit_build", c.buildPathSpecified()},
         {"explicit_files", c.fileListSpecified()}, {"doctor", c.doctor()},
@@ -78,6 +82,87 @@ std::string snapshot(const Config& c) {
 }
 
 } // anonymous namespace
+
+TEST(ConfigTest, CheckpointSettingsAreExplicitBoundedAndResumePreservesInvocationIdentity) {
+    Config config;
+    EXPECT_TRUE(config.checkpointDirectory().empty());
+    EXPECT_FALSE(config.resumeCheckpoint());
+    EXPECT_EQ(config.checkpointBytes(), 268435456u);
+    EXPECT_EQ(config.checkpointUnits(), 128u);
+    const auto directory = (std::filesystem::absolute(::testing::TempDir()) / "checkpoint-config-only").string();
+    ASSERT_TRUE(parse(config, {"codeskeptic", "--checkpoint-dir", directory.c_str(),
+        "--checkpoint-bytes", "1073741824", "--checkpoint-units", "4096"}));
+    const auto identity = config.checkpointSettings();
+    ASSERT_TRUE(parse(config, {"codeskeptic", "--resume"}));
+    EXPECT_EQ(config.checkpointSettings(), identity);
+    ASSERT_TRUE(parse(config, {"codeskeptic", "--severity", "error"}));
+    EXPECT_NE(config.checkpointSettings(), identity);
+    Config request;
+    request.inheritAnalysisCache(config);
+    request.inheritWorkerLimits(config);
+    request.inheritRuleSelection(config);
+    EXPECT_TRUE(request.checkpointDirectory().empty());
+    EXPECT_FALSE(request.resumeCheckpoint()); // No implicit request-local persistence.
+}
+
+TEST(ConfigTest, CheckpointInvalidOptionsPreserveWholeConfiguration) {
+    const auto directory = (std::filesystem::absolute(::testing::TempDir()) / "checkpoint-invalid-only").string();
+    for (const char* option : {"--checkpoint-dir", "--checkpoint-bytes", "--checkpoint-units"}) {
+        Config config;
+        const auto before = snapshot(config);
+        EXPECT_FALSE(parse(config, {"codeskeptic", "--severity", "error", option}));
+        EXPECT_EQ(snapshot(config), before);
+    }
+    for (const char* value : {"0", "-1", "1.5", "99999999999999999999", "4097"}) {
+        Config config;
+        const auto before = snapshot(config);
+        EXPECT_FALSE(parse(config, {"codeskeptic", "--checkpoint-dir", directory.c_str(), "--checkpoint-units", value}));
+        EXPECT_EQ(snapshot(config), before);
+    }
+    for (const char* value : {"", ".", "relative", "/", "/tmp/../checkpoint"}) {
+        Config config;
+        const auto before = snapshot(config);
+        EXPECT_FALSE(parse(config, {"codeskeptic", "--checkpoint-dir", value}));
+        EXPECT_EQ(snapshot(config), before);
+    }
+    for (const char* conflict : {"--serve", "--doctor", "--analysis-cache"}) {
+        Config config;
+        const auto before = snapshot(config);
+        EXPECT_FALSE(parse(config, {"codeskeptic", "--checkpoint-dir", directory.c_str(), conflict}));
+        EXPECT_EQ(snapshot(config), before);
+    }
+    Config missing;
+    EXPECT_FALSE(parse(missing, {"codeskeptic", "--resume"}));
+    EXPECT_FALSE(missing.resumeCheckpoint());
+}
+
+TEST(ConfigTest, CheckpointBindsExactConsumedConfigAndFileListBytesIncludingAbsence) {
+    const auto root = std::filesystem::path(::testing::TempDir()) /
+        ("checkpoint-config-inputs-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    ASSERT_TRUE(std::filesystem::create_directory(root));
+    struct Cleanup { std::filesystem::path path; ~Cleanup() { std::error_code e; std::filesystem::remove_all(path, e); } } cleanup{root};
+    const auto path = (root / "config.conf").string();
+    Config missing;
+    ASSERT_TRUE(missing.loadFromFile(path));
+    ASSERT_EQ(missing.configurationInputs().at(path), "absent");
+    for (const std::string bytes : {"# exact CRLF\r\nmin_severity=error\r\n", "min_severity=error", ""}) {
+        { std::ofstream out(path, std::ios::binary); out << bytes; }
+        Config config;
+        ASSERT_TRUE(config.loadFromFile(path));
+        EXPECT_EQ(config.configurationInputs().at(path), codeskeptic::inputDigest(bytes));
+        const auto before = snapshot(config);
+        { std::ofstream out(path, std::ios::binary); out << "unknown_option=1\n"; }
+        EXPECT_FALSE(config.loadFromFile(path));
+        EXPECT_EQ(snapshot(config), before);
+    }
+    const auto list = (root / "files.txt").string();
+    const std::string bytes = "relative.cpp\r\nlast.cpp";
+    { std::ofstream out(list, std::ios::binary); out << bytes; }
+    Config config;
+    ASSERT_TRUE(parse(config, {"codeskeptic", "--files", list.c_str()}));
+    EXPECT_EQ(config.configurationInputs().at(list), codeskeptic::inputDigest(bytes));
+    EXPECT_EQ(config.sourceFiles(), (std::vector<std::string>{"relative.cpp", "last.cpp"}));
+}
 
 TEST(ConfigTest, DiskCachePreferencesAreExplicitFiniteAndInheritedTogether) {
     Config config;

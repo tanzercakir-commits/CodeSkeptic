@@ -26,7 +26,13 @@ struct WorkerExecution {
 std::vector<std::string> workerAnalysisArguments(const Config& config);
 WorkerExecution executeAnalysisWorker(const std::string& executable, const WorkerRequest& request,
     const WorkerLimits& limits = {}, const ResourceCancellation* cancellation = nullptr,
-    DiskEvidenceStore* disk_cache = nullptr);
+    DiskEvidenceStore* disk_cache = nullptr, const std::string* required_candidate = nullptr,
+    bool checkpoint_mode = false);
+// Checkpoint admission is stricter than successful transport. Partial coverage,
+// missing input/runtime proof and malformed summary payloads are never DONE.
+bool reusableWorkerResponse(const WorkerRequest& request, const WorkerResponse& response);
+std::string workerExecutableIdentity(const std::string& executable,
+                                    const std::function<bool()>& cancelled = {});
 // Private main dispatch; no normal argument scanning or config-file load.
 int runAnalysisWorker(const std::string& request_path, const std::string& response_path);
 

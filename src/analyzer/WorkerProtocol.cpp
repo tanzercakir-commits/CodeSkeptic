@@ -97,7 +97,7 @@ private:
 };
 
 WorkerPhase phase(std::uint32_t value) {
-    require(value <= static_cast<std::uint32_t>(WorkerPhase::Analyze), "invalid worker phase");
+    require(value <= static_cast<std::uint32_t>(WorkerPhase::Snapshot), "invalid worker phase");
     return static_cast<WorkerPhase>(value);
 }
 
@@ -221,8 +221,8 @@ void validateCoverage(const WorkerResponse& response, const WorkerRequest& reque
     require(!recovery_requested || source.skipped_commands == 0, "unexpected worker skip in recovery mode");
     require(source.prepass_status == "not_requested" && source.prepass_reason.empty() &&
             source.prepass_recovery_commands == 0, "worker cannot claim another phase");
-    require(request.phase != WorkerPhase::Harvest || response.diagnostics.empty(),
-            "harvest worker returned findings");
+    require(request.phase == WorkerPhase::Analyze || response.diagnostics.empty(),
+            "non-analysis worker returned findings");
 }
 
 } // namespace

@@ -20,7 +20,7 @@ constexpr std::size_t kWorkerPacketLimit = 64 * 1024 * 1024;
 constexpr std::size_t kWorkerFieldLimit = 16 * 1024 * 1024;
 constexpr std::size_t kWorkerCollectionLimit = 100000;
 
-enum class WorkerPhase : std::uint32_t { Harvest, Analyze };
+enum class WorkerPhase : std::uint32_t { Harvest, Analyze, Snapshot };
 
 struct WorkerRequest {
     std::uint32_t ordinal = 0;

@@ -1,5 +1,6 @@
 #include "analyzer/AnalysisCoordinator.h"
 #include "analyzer/AnalysisState.h"
+#include "core/Capabilities.h"
 #include "analyzer/BuiltinRules.h"
 #include "analyzer/StaticAnalyzer.h"
 #include "analyzer/UnitEvidenceStore.h"
@@ -20,6 +21,13 @@
 #include <thread>
 #include <chrono>
 #include <cstdlib>
+#include <atomic>
+#ifdef __linux__
+#include <cerrno>
+#include <signal.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
 
 namespace {
 using namespace codeskeptic;
@@ -90,7 +98,7 @@ protected:
         std::ofstream(root / "build/compile_commands.json") << text;
     }
     Scan scan(const std::string& executable, std::vector<std::string> extra = {}, bool synthetic = false,
-              std::shared_ptr<ResourceCancellation> cancellation = {}) {
+              std::shared_ptr<ResourceCancellation> cancellation = {}, const fs::path& config_path = {}) {
         setWorkerExecutable(executable);
         std::vector<std::string> arguments{"codeskeptic", "--source",
             synthetic ? sources.front().string() : (root / "src").string(),
@@ -100,6 +108,7 @@ protected:
         std::vector<char*> raw;
         for (auto& argument : arguments) raw.push_back(argument.data());
         Config config;
+        if (!config_path.empty()) EXPECT_TRUE(config.loadFromFile(config_path.string()));
         EXPECT_TRUE(config.parseArgs(static_cast<int>(raw.size()), raw.data()));
         config.setResourceCancellation(std::move(cancellation));
         StaticAnalyzer analyzer(config);
@@ -120,6 +129,415 @@ protected:
 };
 
 #ifdef __linux__
+TEST_F(AnalysisCacheTest, CheckpointSnapshotBindsPendingHeaderAndSidecarWithoutPublishingFindings) {
+    const auto source = file("snapshot.cpp", "#include \"snapshot.h\"\nint finding(){int *p=nullptr; return *p;}\n");
+    const auto header = root / "src/snapshot.h";
+    { std::ofstream out(header, std::ios::binary); out << "int pending(int *p);\n"; }
+    const auto tool = root / "checkpoint-worker";
+    fs::copy_file(CODESKEPTIC_BINARY_PATH, tool);
+    // The private copied tool must predate the new worker's startup identity.
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    WorkerRequest request;
+    request.source = source.string(); request.build_directory = root.string();
+    request.commands.emplace_back(root.string(), source.string(),
+        std::vector<std::string>{"clang++", "-std=c++17", "-c", source.string()}, "");
+    request.phase = WorkerPhase::Snapshot; request.record_inputs = true;
+    request.global_summaries = "# codeskeptic-summaries-v1\n";
+    std::string error;
+    ASSERT_TRUE(exportWorkerSummaries(request.global_summaries, error));
+    const auto initial = executeAnalysisWorker(tool.string(), request, {}, nullptr, nullptr, nullptr, true);
+    ASSERT_TRUE(initial.valid) << initial.reason << initial.detail;
+    EXPECT_TRUE(initial.response.diagnostics.empty());
+    ASSERT_TRUE(reusableWorkerResponse(request, initial.response));
+    const auto packet = encodeWorkerResponse(initial.response);
+    EXPECT_EQ(processUnitEvidenceStore().entries(), 0u);
+    const auto resume = executeAnalysisWorker(tool.string(), request, {}, nullptr, nullptr, &packet, true);
+    ASSERT_TRUE(resume.valid) << resume.reason << resume.detail;
+    EXPECT_TRUE(resume.cache_hit);
+    EXPECT_EQ(processUnitEvidenceStore().entries(), 0u);
+    const auto sidecar = root / "src/snapshot.h.csk";
+    { std::ofstream out(sidecar, std::ios::binary); out << "pending: requires p != null\n"; }
+    const auto changed_sidecar = executeAnalysisWorker(tool.string(), request, {}, nullptr, nullptr, &packet, true);
+    EXPECT_FALSE(changed_sidecar.valid);
+    EXPECT_FALSE(changed_sidecar.cache_hit);
+    fs::remove(sidecar); // Only this fixture's newly created sidecar.
+    const auto timestamp = fs::last_write_time(header);
+    { std::ofstream out(header, std::ios::binary); out << "int changed(int *p);\n"; }
+    fs::last_write_time(header, timestamp);
+    const auto changed_header = executeAnalysisWorker(tool.string(), request, {}, nullptr, nullptr, &packet, true);
+    EXPECT_FALSE(changed_header.valid);
+    EXPECT_FALSE(changed_header.cache_hit);
+}
+
+TEST_F(AnalysisCacheTest, CheckpointReplaysReportsAndRollingSummariesForBothExecutionModes) {
+    file("a.cpp", "int *make_pointer(){return nullptr;}\n");
+    file("b.cpp", "int *make_pointer(); int finding(){return *make_pointer();}\n");
+    database(true);
+    const auto tool = root / "checkpoint-worker";
+    fs::copy_file(CODESKEPTIC_BINARY_PATH, tool);
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    for (const bool whole : {false, true}) {
+        std::vector<std::string> settings{"--summary-out", (root / "summaries.txt").string()};
+        if (whole) settings.push_back("--whole-program");
+        const auto fresh = scan(tool.string(), settings);
+        ASSERT_TRUE(fresh.result.complete());
+        const auto summaries = readText(root / "summaries.txt");
+        settings.insert(settings.end(), {"--checkpoint-dir", (root / (whole ? "whole-checkpoint" : "plain-checkpoint")).string()});
+        const auto recorded = scan(tool.string(), settings);
+        ASSERT_TRUE(recorded.result.complete());
+        EXPECT_EQ(recorded.report, fresh.report);
+        EXPECT_EQ(readText(root / "summaries.txt"), summaries);
+        settings.push_back("--resume");
+        const auto resumed = scan(tool.string(), settings);
+        ASSERT_TRUE(resumed.result.complete());
+        EXPECT_EQ(resumed.report, fresh.report);
+        EXPECT_EQ(readText(root / "summaries.txt"), summaries);
+        EXPECT_EQ(processUnitEvidenceStore().entries(), 0u);
+    }
+}
+
+TEST_F(AnalysisCacheTest, CheckpointRejectsChangedInputsAndCorruptManifestWithoutOverwritingReport) {
+    file("a.cpp", "#include \"value.h\"\nint first(){return VALUE;}\n");
+    file("b.cpp", "#include \"value.h\"\nint second(){int *p=nullptr;return *p+VALUE;}\n");
+    const auto header = root / "src/value.h";
+    { std::ofstream out(header, std::ios::binary); out << "#define VALUE 1\n"; }
+    database();
+    const auto tool = root / "checkpoint-worker";
+    fs::copy_file(CODESKEPTIC_BINARY_PATH, tool);
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    const auto directory = root / "checkpoint";
+    const std::vector<std::string> fresh{"--checkpoint-dir", directory.string()};
+    const auto recorded = scan(tool.string(), fresh);
+    ASSERT_TRUE(recorded.result.complete());
+    const std::vector<std::string> resume{"--checkpoint-dir", directory.string(), "--resume"};
+    auto changed_settings = resume;
+    changed_settings.insert(changed_settings.end(), {"--severity", "error"});
+    EXPECT_EQ(scan(tool.string(), changed_settings).result.exitCode(), 2);
+    EXPECT_EQ(readText(root / "report.json"), recorded.report);
+    const auto modified = fs::last_write_time(header);
+    { std::ofstream out(header, std::ios::binary); out << "#define VALUE 2\n"; }
+    fs::last_write_time(header, modified);
+    EXPECT_EQ(scan(tool.string(), resume).result.exitCode(), 2);
+    EXPECT_EQ(readText(root / "report.json"), recorded.report);
+    { std::ofstream out(header, std::ios::binary); out << "#define VALUE 1\n"; }
+    fs::last_write_time(header, modified);
+    // Input identity also binds file metadata: a restored byte/mtime pair may
+    // still be refused. Corruption is independently exercised without replay.
+    const auto manifest = directory / "manifest.csk-checkpoint";
+    auto bytes = readText(manifest);
+    ASSERT_GT(bytes.size(), 100u);
+    bytes[90] ^= 1;
+    { std::ofstream out(manifest, std::ios::binary | std::ios::trunc); out << bytes; }
+    EXPECT_EQ(scan(tool.string(), resume).result.exitCode(), 2);
+    EXPECT_EQ(readText(root / "report.json"), recorded.report);
+}
+
+class CheckpointInterruptTest : public AnalysisCacheTest, public ::testing::WithParamInterface<bool> {};
+
+TEST_P(CheckpointInterruptTest, RealInterruptedCliResumesInAnotherProcessAndMatchesFresh) {
+    for (unsigned i = 0; i < 3; ++i)
+        file(std::to_string(i) + ".cpp", "int finding" + std::to_string(i) + "(){int *p=nullptr;return *p;}\n");
+    database();
+    const auto tool = root / "checkpoint-cli";
+    fs::copy_file(CODESKEPTIC_BINARY_PATH, tool);
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    const auto report = root / "cli-report.json";
+    const auto errors = root / "cli-errors.log";
+    std::vector<std::string> arguments{tool.string(), "--source", (root / "src").string(),
+        "--build-path", (root / "build").string(), "--json", report.string()};
+    if (GetParam()) arguments.push_back("--whole-program");
+    const std::string total = GetParam() ? "6" : "3";
+    const std::array<std::string, 3> redirects{{"", (root / "cli-stdout.log").string(), errors.string()}};
+    WorkerLimits limits; limits.timeout_ms = 90000;
+    const auto fresh = runResourceWorker(tool.string(), arguments, redirects, limits);
+    ASSERT_EQ(fresh.stop, ResourceStop::Exited);
+    ASSERT_EQ(fresh.exit_code, 1);
+    const auto expected = readText(report);
+    arguments.insert(arguments.end(), {"--checkpoint-dir", (root / "cli-checkpoint").string()});
+    std::vector<llvm::StringRef> raw(arguments.begin(), arguments.end());
+    const std::array<std::optional<llvm::StringRef>, 3> streams{{redirects[0], redirects[1], redirects[2]}};
+    std::string launch_error;
+    bool launch_failed = false;
+    const auto child = llvm::sys::ExecuteNoWait(tool.string(), raw, std::nullopt, streams, 0, &launch_error, &launch_failed);
+    ASSERT_FALSE(launch_failed) << launch_error;
+    ASSERT_GT(child.Pid, 0);
+    // Gracefully interrupt the actual CLI, allowing its existing owner to
+    // terminate/reap the active worker. Never use a second owner for that PID.
+    bool interrupted = false;
+    int status = 0;
+    pid_t waited = 0;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(90);
+    while (std::chrono::steady_clock::now() < deadline) {
+        waited = ::waitpid(child.Pid, &status, WNOHANG);
+        if (waited < 0 && errno == EINTR) continue;
+        if (waited != 0) break;
+        if (!interrupted && readText(errors).find("checkpoint: saved worker=1/" + total) != std::string::npos) {
+            EXPECT_EQ(::kill(child.Pid, SIGTERM), 0);
+            interrupted = true;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    if (waited == 0) {
+        ::kill(child.Pid, SIGKILL);
+        do { waited = ::waitpid(child.Pid, &status, 0); } while (waited < 0 && errno == EINTR);
+        ADD_FAILURE() << "checkpoint CLI did not stop before the bounded deadline";
+    }
+    ASSERT_EQ(waited, child.Pid);
+    ASSERT_TRUE(interrupted) << readText(errors);
+    ASSERT_TRUE(WIFEXITED(status));
+    ASSERT_EQ(WEXITSTATUS(status), 2);
+    ASSERT_TRUE(fs::exists(root / "cli-checkpoint/manifest.csk-checkpoint"));
+    arguments.push_back("--resume");
+    const auto resumed = runResourceWorker(tool.string(), arguments, redirects, limits);
+    ASSERT_EQ(resumed.stop, ResourceStop::Exited) << resumed.detail << readText(errors);
+    ASSERT_EQ(resumed.exit_code, 1) << readText(errors);
+    EXPECT_EQ(readText(report), expected);
+    EXPECT_NE(readText(errors).find("checkpoint: replayed worker=1/" + total), std::string::npos);
+    EXPECT_NE(readText(errors).find("checkpoint: saved worker=" + total + '/' + total), std::string::npos);
+}
+
+INSTANTIATE_TEST_SUITE_P(PlainAndWholeProgramPrepass, CheckpointInterruptTest, ::testing::Values(false, true));
+
+TEST_F(AnalysisCacheTest, CheckpointParentFilesBindConsumedBytesAbsenceAndSummaryFreshness) {
+    const auto source = file("a.cpp", "int finding(){int *p=nullptr;return *p;}\n");
+    database();
+    const auto config_file = root / "settings.conf";
+    const auto list = root / "files.txt", model = root / "model.txt";
+    const auto summary = root / "summary.txt", baseline = root / "baseline.txt";
+    { std::ofstream out(config_file, std::ios::binary); out << "min_severity=warning\n"; }
+    { std::ofstream out(list, std::ios::binary); out << source.string() << '\n'; }
+    for (const auto& path : {model, summary}) {
+        std::ofstream out(path, std::ios::binary); out << "codeskeptic-summaries v2\nkeep/1\tN\tR\tU\n";
+    }
+    { std::ofstream out(baseline, std::ios::binary); out << "# codeskeptic-baseline v3\n"; }
+    fs::last_write_time(summary, fs::last_write_time(source) + std::chrono::hours(1));
+    const auto tool = root / "checkpoint-worker";
+    fs::copy_file(CODESKEPTIC_BINARY_PATH, tool);
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    std::vector<std::string> settings{"--files", list.string(), "--model-file", model.string(),
+        "--summary-in", summary.string(), "--baseline", baseline.string(),
+        "--checkpoint-dir", (root / "checkpoint").string()};
+    const auto fresh = scan(tool.string(), settings, false, {}, config_file);
+    ASSERT_TRUE(fresh.result.complete());
+    settings.push_back("--resume");
+    const auto control = scan(tool.string(), settings, false, {}, config_file);
+    ASSERT_TRUE(control.result.complete()); EXPECT_EQ(control.report, fresh.report);
+    // Every mutated file remains parseable and retains its timestamp. Exact
+    // consumed bytes, not effective options or worker-request equivalence alone,
+    // must invalidate the run before any saved worker is replayed.
+    for (const auto& path : {config_file, list, model, summary, baseline, root / "build/compile_commands.json"}) {
+        SCOPED_TRACE(path.string());
+        const auto original = readText(path);
+        const auto stamp = fs::last_write_time(path);
+        std::string changed;
+        for (const char c : original) { if (c == '\n') changed += '\r'; changed += c; }
+        if (changed == original) changed += ' '; // compact JSON: valid trailing whitespace
+        { std::ofstream out(path, std::ios::binary); out << changed; }
+        fs::last_write_time(path, stamp);
+        ::testing::internal::CaptureStderr();
+        const auto rejected = scan(tool.string(), settings, false, {}, config_file);
+        const auto errors = ::testing::internal::GetCapturedStderr();
+        EXPECT_EQ(rejected.result.exitCode(), 2) << errors;
+        EXPECT_EQ(rejected.result.analyzed_tus, 0u);
+        EXPECT_EQ(rejected.report, fresh.report);
+        EXPECT_NE(errors.find("checkpoint_run_identity_changed"), std::string::npos) << errors;
+        { std::ofstream out(path, std::ios::binary); out << original; }
+        fs::last_write_time(path, stamp);
+    }
+    const auto stamp = fs::last_write_time(summary);
+    fs::last_write_time(summary, fs::last_write_time(source) - std::chrono::hours(1));
+    EXPECT_EQ(scan(tool.string(), settings, false, {}, config_file).result.exitCode(), 2);
+    EXPECT_EQ(readText(root / "report.json"), fresh.report);
+    fs::last_write_time(summary, stamp);
+    // Optional missing configuration becoming present is a change even if the
+    // new empty file leaves every effective option identical.
+    const auto absent = root / "optional.conf";
+    const std::vector<std::string> empty_settings{"--checkpoint-dir", (root / "absence-checkpoint").string()};
+    const auto absent_run = scan(tool.string(), empty_settings, false, {}, absent);
+    ASSERT_TRUE(absent_run.result.complete());
+    { std::ofstream out(absent, std::ios::binary); }
+    auto resume_absent = empty_settings; resume_absent.push_back("--resume");
+    EXPECT_EQ(scan(tool.string(), resume_absent, false, {}, absent).result.exitCode(), 2);
+    EXPECT_EQ(readText(root / "report.json"), absent_run.report);
+}
+
+TEST_F(AnalysisCacheTest, CheckpointInnerRecordsAreStrictAndMissingWorkersMustExecute) {
+    file("a.cpp", "int first(){int *p=nullptr;return *p;}\n");
+    const auto pending = file("b.cpp", "int second(){int *p=nullptr;return *p;}\n");
+    database();
+    const auto tool = root / "checkpoint-worker";
+    fs::copy_file(CODESKEPTIC_BINARY_PATH, tool);
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    const auto directory = root / "checkpoint";
+    const std::vector<std::string> settings{"--checkpoint-dir", directory.string()};
+    const auto fresh = scan(tool.string(), settings);
+    ASSERT_TRUE(fresh.result.complete());
+    std::string payload;
+    {
+        CheckpointStore store(directory.string(), 268435456);
+        ASSERT_TRUE(store.open(true, payload)) << store.state();
+    }
+    // Independently split the length-prefixed run fields. Re-publish mutations
+    // through the real store so the outer checksum remains valid: these must
+    // fail the inner run/worker contract, not merely the disk checksum.
+    std::vector<std::string> fields;
+    for (std::size_t at = 0; at < payload.size();) {
+        ASSERT_GE(payload.size() - at, 4u);
+        std::uint32_t size = 0;
+        for (unsigned i = 0; i < 4; ++i)
+            size |= std::uint32_t(static_cast<unsigned char>(payload[at++])) << (8 * i);
+        ASSERT_LE(size, payload.size() - at);
+        fields.push_back(payload.substr(at, size)); at += size;
+    }
+    ASSERT_EQ(fields.size(), 12u); ASSERT_EQ(fields[2], "2"); ASSERT_EQ(fields[7], "2");
+    auto encode = [](const std::vector<std::string>& values) {
+        std::string result;
+        for (const auto& value : values) {
+            for (unsigned i = 0; i < 4; ++i)
+                result += static_cast<char>((value.size() >> (8 * i)) & 255);
+            result += value;
+        }
+        return result;
+    };
+    auto publish = [&](const std::string& bytes) {
+        CheckpointStore store(directory.string(), 268435456);
+        std::string old;
+        ASSERT_TRUE(store.open(true, old)) << store.state();
+        ASSERT_EQ(store.save(bytes), DiskWriteResult::Committed) << store.state();
+    };
+    const std::vector<std::string> resume{"--checkpoint-dir", directory.string(), "--resume"};
+    for (unsigned mutation = 0; mutation < 9; ++mutation) {
+        SCOPED_TRACE(mutation);
+        auto changed = fields;
+        switch (mutation) {
+        case 0: changed[9].clear(); break;
+        case 1: changed[9] = "not a worker response"; break;
+        case 2: std::swap(changed[8], changed[10]); std::swap(changed[9], changed[11]); break;
+        case 3: changed[10] = changed[8]; changed[11] = changed[9]; break;
+        case 4: changed.pop_back(); break;
+        case 5: changed.push_back("trailing field"); break;
+        case 6: changed[2] = "02"; break;
+        case 7: changed[2] = "1"; break;
+        case 8: changed[7] = "3"; break;
+        }
+        const auto bytes = encode(changed);
+        publish(bytes);
+        ::testing::internal::CaptureStderr();
+        const auto rejected = scan(tool.string(), resume);
+        const auto errors = ::testing::internal::GetCapturedStderr();
+        EXPECT_EQ(rejected.result.exitCode(), 2) << errors;
+        EXPECT_EQ(rejected.report, fresh.report);
+        EXPECT_EQ(rejected.result.analyzed_tus, 0u);
+        EXPECT_NE(errors.find("checkpoint rejected:"), std::string::npos);
+    }
+    auto prefix = fields;
+    prefix[7] = "1"; prefix.resize(10);
+    publish(encode(prefix));
+    ::testing::internal::CaptureStderr();
+    const auto resumed = scan(tool.string(), resume);
+    const auto errors = ::testing::internal::GetCapturedStderr();
+    ASSERT_TRUE(resumed.result.complete()) << errors;
+    EXPECT_EQ(resumed.report, fresh.report);
+    EXPECT_NE(errors.find("checkpoint: replayed worker=1/2"), std::string::npos);
+    EXPECT_NE(errors.find("checkpoint: saved worker=2/2"), std::string::npos);
+    // A pending TU has no completed response in this manifest. Its initial
+    // inventory must still reject edits before replaying the saved first TU.
+    publish(encode(prefix));
+    const auto stamp = fs::last_write_time(pending);
+    { std::ofstream out(pending, std::ios::binary); out << "int second(){return 42;}\n"; }
+    fs::last_write_time(pending, stamp);
+    const auto changed = scan(tool.string(), resume);
+    EXPECT_EQ(changed.result.exitCode(), 2);
+    EXPECT_EQ(changed.result.analyzed_tus, 0u);
+    EXPECT_EQ(changed.report, fresh.report);
+}
+
+TEST_F(AnalysisCacheTest, CheckpointInvalidCompilationMustNotOpenAnyReportDestination) {
+    const auto source = file("preserve.cpp", "int preserve(){return 42;}\n");
+    database();
+    const auto checkpoint = root / "checkpoint";
+    fs::create_directory(checkpoint);
+    const auto manifest = checkpoint / "manifest.csk-checkpoint";
+    { std::ofstream out(manifest); out << "preserve manifest"; }
+    const auto safe = root / "report-sentinel.json";
+    { std::ofstream out(safe); out << "preserve report"; }
+    for (const auto& path : {source, manifest, safe}) {
+        const auto before = readText(path);
+        const auto result = scan(CODESKEPTIC_BINARY_PATH,
+            {"--build-path", (root / "missing-build").string(), "--checkpoint-dir", checkpoint.string(),
+             "--resume", "--json", path.string()});
+        EXPECT_EQ(result.result.exitCode(), 2);
+        EXPECT_EQ(readText(path), before);
+    }
+}
+
+TEST_F(AnalysisCacheTest, CheckpointProtectsSelectedCompilationDatabaseAndHardlinkOutputAlias) {
+    file("source.cpp", "int value(){return 42;}\n");
+    const auto tool = root / "checkpoint-worker";
+    fs::copy_file(CODESKEPTIC_BINARY_PATH, tool);
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    const auto database_path = root / "build/compile_commands.json";
+    for (const bool hardlink : {false, true}) {
+        SCOPED_TRACE(hardlink);
+        database();
+        const auto before = readText(database_path);
+        const auto output = hardlink ? root / "database-alias.json" : database_path;
+        if (hardlink) fs::create_hard_link(database_path, output);
+        const auto result = scan(tool.string(), {"--checkpoint-dir",
+            (root / (hardlink ? "link-checkpoint" : "direct-checkpoint")).string(), "--json", output.string()});
+        EXPECT_EQ(result.result.exitCode(), 2);
+        EXPECT_EQ(readText(database_path), before);
+        EXPECT_EQ(readText(output), before);
+    }
+}
+
+TEST_F(AnalysisCacheTest, CheckpointEmptyInputOrDisabledRulesPreservesExistingReport) {
+    file("source.cpp", "int value(){return 42;}\n");
+    database();
+    const auto empty_list = root / "empty-files.txt";
+    { std::ofstream out(empty_list); }
+    const auto checkpoint = (root / "checkpoint").string();
+    const auto report = root / "report.json";
+    { std::ofstream out(report); out << "preserve previous output"; }
+    EXPECT_EQ(scan(CODESKEPTIC_BINARY_PATH, {"--files", empty_list.string(),
+        "--checkpoint-dir", checkpoint, "--resume"}).result.exitCode(), 2);
+    EXPECT_EQ(readText(report), "preserve previous output");
+    std::string disabled;
+    for (const auto& capability : ruleCapabilities()) {
+        if (!disabled.empty()) disabled += ',';
+        disabled += capability.id;
+    }
+    EXPECT_EQ(scan(CODESKEPTIC_BINARY_PATH, {"--disable-rule", disabled,
+        "--checkpoint-dir", checkpoint, "--resume"}).result.exitCode(), 2);
+    EXPECT_EQ(readText(report), "preserve previous output");
+}
+
+TEST_F(AnalysisCacheTest, CheckpointBudgetsNeverPublishPartialWorkAsComplete) {
+    file("a.cpp", "int first(){return 42;}\n");
+    file("b.cpp", "int second(){return 43;}\n");
+    database();
+    const auto tool = root / "checkpoint-worker";
+    fs::copy_file(CODESKEPTIC_BINARY_PATH, tool);
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    const auto report = root / "report.json";
+    { std::ofstream out(report); out << "prior complete report"; }
+    const std::vector<std::pair<std::string, std::string>> limits{
+        {"--checkpoint-units", "1"}, {"--checkpoint-bytes", "1"}, {"--worker-timeout-ms", "1"}};
+    unsigned index = 0;
+    for (const auto& limit : limits) {
+        SCOPED_TRACE(limit.first);
+        const auto directory = root / ("checkpoint-" + std::to_string(index++));
+        const auto result = scan(tool.string(), {"--checkpoint-dir", directory.string(),
+            limit.first, limit.second, "--accept-partial-coverage"});
+        EXPECT_EQ(result.result.exitCode(), 2);
+        EXPECT_FALSE(result.result.complete());
+        EXPECT_EQ(result.result.analyzed_tus, 0u);
+        EXPECT_EQ(readText(report), "prior complete report");
+        EXPECT_FALSE(fs::exists(directory / "manifest.csk-checkpoint"));
+        EXPECT_FALSE(fs::exists(directory / ".pending"));
+    }
+}
+
 TEST_F(AnalysisCacheTest, DiskPreferencesCannotReuseHiddenMemoryOrAnotherDirectory) {
     file("persistent.cpp", "int finding(){ int* p=nullptr; return *p; }\n");
     database();

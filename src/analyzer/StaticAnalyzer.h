@@ -15,6 +15,7 @@
 namespace codeskeptic {
 
 struct WorkerRequest;
+class RunCheckpoint;
 
 class StaticAnalyzer {
 public:
@@ -44,7 +45,9 @@ private:
     std::vector<SourceCoverage> processIsolated(bool prepass);
     Config config_;
     std::unique_ptr<DiskEvidenceStore> disk_cache_;
+    std::unique_ptr<RunCheckpoint> checkpoint_;
     std::string worker_executable_;
+    std::string compilation_database_;
     std::vector<WorkerRequest> worker_requests_;
     bool compilation_input_ready_ = false;
     std::vector<SourceCoverage> requested_sources_;

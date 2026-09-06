@@ -119,6 +119,15 @@ public:
         analysis_cache_ = defaults.analysis_cache_;
     }
 
+    const std::string& checkpointDirectory() const { return checkpoint_directory_; }
+    bool resumeCheckpoint() const { return resume_checkpoint_; }
+    unsigned checkpointBytes() const { return checkpoint_bytes_; }
+    unsigned checkpointUnits() const { return checkpoint_units_; }
+    // Effective invocation identity; excludes only resume/new selection and the
+    // cancellation handle. It is not a substitute for consumed file identities.
+    std::string checkpointSettings() const;
+    const std::map<std::string, std::string>& configurationInputs() const { return configuration_inputs_; }
+
     // Programmatic scope settings (the MCP server uses these directly)
     bool addFunctions(const std::string& list, InputError* error = nullptr);
     bool addLines(const std::string& list, InputError* error = nullptr);
@@ -242,6 +251,11 @@ private:
     std::string analysis_cache_directory_;
     unsigned analysis_cache_bytes_ = 256 * 1024 * 1024;
     unsigned analysis_cache_entries_ = 128;
+    std::string checkpoint_directory_;
+    bool resume_checkpoint_ = false;
+    unsigned checkpoint_bytes_ = 256 * 1024 * 1024;
+    unsigned checkpoint_units_ = 128;
+    std::map<std::string, std::string> configuration_inputs_;
     bool help_requested_ = false;
     bool build_path_specified_ = false;
     bool file_list_specified_ = false;

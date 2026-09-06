@@ -51,9 +51,21 @@ __attribute__((constructor)) static void markRuntimeLoaded() {
 
 #elif defined(CODESKEPTIC_CACHE_TEST_CHILD)
 #include "analyzer/AnalysisCoordinator.h"
+#include "analyzer/UnitEvidenceStore.h"
+#include <iostream>
 
 int main(int argc, char** argv) {
     using namespace codeskeptic;
+    // Separate fixture entry point, never an option of the production CLI.
+    if (argc == 5 && std::string(argv[1]) == "--checkpoint-save") {
+        CheckpointStore store(argv[3], 1024 * 1024);
+        std::string old;
+        if (!store.open(std::string(argv[2]) == "resume", old)) return 3;
+        const auto result = store.save(argv[4]);
+        std::cerr << store.state() << '\n';
+        return result == DiskWriteResult::Committed ? 0 :
+            result == DiskWriteResult::CommittedDurabilityUncertain ? 5 : 4;
+    }
     if (argc != 4 || std::string(argv[1]) != "--codeskeptic-worker-v1") return 2;
     const auto status = runAnalysisWorker(argv[2], argv[3]);
     if (status) return status;
@@ -82,6 +94,9 @@ int main(int argc, char** argv) {
 #include <fstream>
 #include <thread>
 #ifdef __linux__
+#include <llvm/Support/Program.h>
+#include <array>
+#include <cstdlib>
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/file.h>
@@ -146,6 +161,240 @@ protected:
         ASSERT_TRUE(file.good());
     }
 };
+
+TEST_F(DiskEvidenceStoreTest, CheckpointLocksWholeSessionAndResumesExactPayload) {
+    std::string payload = "unchanged";
+    {
+        CheckpointStore writer(directory.string(), 1024 * 1024);
+        ASSERT_TRUE(writer.open(false, payload));
+        EXPECT_TRUE(payload.empty());
+        ASSERT_EQ(writer.save("first"), DiskWriteResult::Committed);
+        CheckpointStore concurrent(directory.string(), 1024 * 1024);
+        EXPECT_FALSE(concurrent.open(true, payload));
+        EXPECT_EQ(concurrent.state(), "busy");
+        EXPECT_FALSE(writer.open(false, payload));
+        CheckpointStore still_locked(directory.string(), 1024 * 1024);
+        EXPECT_FALSE(still_locked.open(true, payload));
+        EXPECT_EQ(still_locked.state(), "busy");
+        ASSERT_EQ(writer.save("second"), DiskWriteResult::Committed);
+    }
+    {
+        CheckpointStore new_run(directory.string(), 1024 * 1024);
+        EXPECT_FALSE(new_run.open(false, payload));
+        EXPECT_EQ(new_run.state(), "exists");
+    }
+    CheckpointStore resumed(directory.string(), 1024 * 1024);
+    ASSERT_TRUE(resumed.open(true, payload));
+    EXPECT_EQ(payload, "second");
+}
+
+TEST_F(DiskEvidenceStoreTest, CheckpointReplacementCountsOldAndPendingAndCancellationPreservesOld) {
+    std::string payload;
+    {
+        CheckpointStore writer(directory.string(), 200);
+        ASSERT_TRUE(writer.open(false, payload));
+        ASSERT_EQ(writer.save(std::string(20, 'a')), DiskWriteResult::Committed);
+        EXPECT_EQ(writer.save(std::string(21, 'b')), DiskWriteResult::NotStored);
+        EXPECT_EQ(writer.state(), "capacity");
+        EXPECT_EQ(writer.save(std::string(20, 'c')), DiskWriteResult::Committed);
+    }
+    {
+        CheckpointStore writer(directory.string(), 1024 * 1024);
+        ASSERT_TRUE(writer.open(true, payload));
+        ASSERT_EQ(payload, std::string(20, 'c'));
+        unsigned polls = 0;
+        EXPECT_EQ(writer.save(std::string(200000, 'd'), [&] { return ++polls > 6; }), DiskWriteResult::NotStored);
+        EXPECT_EQ(writer.state(), "cancelled");
+        EXPECT_FALSE(fs::exists(directory / ".pending"));
+    }
+    CheckpointStore resumed(directory.string(), 1024 * 1024);
+    ASSERT_TRUE(resumed.open(true, payload));
+    EXPECT_EQ(payload, std::string(20, 'c'));
+}
+
+TEST_F(DiskEvidenceStoreTest, CheckpointCorruptionMissingAndForeignNamespaceNeverBecomeEmptyResume) {
+    std::string payload = "preserve caller";
+    CheckpointStore missing(directory.string(), 4096);
+    EXPECT_FALSE(missing.open(true, payload));
+    EXPECT_FALSE(fs::exists(directory));
+    EXPECT_EQ(payload, "preserve caller");
+    {
+        CheckpointStore writer(directory.string(), 4096);
+        ASSERT_TRUE(writer.open(false, payload));
+        ASSERT_EQ(writer.save("original"), DiskWriteResult::Committed);
+    }
+    const auto manifest = directory / "manifest.csk-checkpoint";
+    const auto original = read(manifest);
+    for (auto bytes : {original.substr(0, 20), original + "tail", std::string("garbage")}) {
+        replace(manifest, bytes);
+        CheckpointStore corrupt(directory.string(), 4096);
+        payload = "preserve caller";
+        EXPECT_FALSE(corrupt.open(true, payload));
+        EXPECT_EQ(corrupt.state(), "rejected");
+        EXPECT_EQ(payload, "preserve caller");
+    }
+    replace(manifest, original);
+    replace(directory / "foreign.txt", "not ours");
+    replace(directory / ".pending", "not ours either");
+    ::chmod((directory / ".pending").c_str(), 0600);
+    CheckpointStore foreign(directory.string(), 4096);
+    EXPECT_FALSE(foreign.open(true, payload));
+    EXPECT_EQ(read(directory / "foreign.txt"), "not ours");
+    EXPECT_EQ(read(directory / ".pending"), "not ours either");
+    EXPECT_EQ(read(manifest), original);
+}
+
+TEST_F(DiskEvidenceStoreTest, CheckpointActualSyscallFailuresDistinguishUncommittedAndUncertainCommit) {
+    const auto control = root / "fault-control";
+    const auto errors = (root / "fault-errors").string();
+    struct RestoreEnvironment {
+        std::vector<std::pair<std::string, std::optional<std::string>>> prior;
+        void set(const std::string& key, const std::string& value) {
+            const auto* old = std::getenv(key.c_str());
+            prior.emplace_back(key, old ? std::optional<std::string>(old) : std::nullopt);
+            ASSERT_EQ(::setenv(key.c_str(), value.c_str(), 1), 0);
+        }
+        ~RestoreEnvironment() {
+            for (const auto& item : prior)
+                if (item.second) ::setenv(item.first.c_str(), item.second->c_str(), 1);
+                else ::unsetenv(item.first.c_str());
+        }
+    } environment;
+    environment.set("LD_PRELOAD", CODESKEPTIC_RUNTIME_FIXTURE_ONE);
+    environment.set("CS_DISK_FAULT_DIR", directory.string());
+    environment.set("CS_DISK_FAULT_CONTROL", control.string());
+    auto save = [&](char mode, bool resume, const std::string& payload) {
+        replace(control, std::string(1, mode));
+        const std::vector<std::string> arguments{CODESKEPTIC_CACHE_FIXTURE_PATH,
+            "--checkpoint-save", resume ? "resume" : "new", directory.string(), payload};
+        const std::vector<llvm::StringRef> refs(arguments.begin(), arguments.end());
+        const std::array<std::optional<llvm::StringRef>, 3> redirects{{llvm::StringRef(""), llvm::StringRef(""), errors}};
+        std::string error;
+        const auto code = llvm::sys::ExecuteAndWait(CODESKEPTIC_CACHE_FIXTURE_PATH,
+            refs, std::nullopt, redirects, 20, 0, &error);
+        EXPECT_TRUE(error.empty()) << error;
+        return code;
+    };
+    const auto manifest = directory / "manifest.csk-checkpoint";
+    for (const char mode : {'f', 'r'}) {
+        EXPECT_EQ(save(mode, false, "original"), 4);
+        EXPECT_EQ(read(errors), "write_failed\n");
+        EXPECT_FALSE(fs::exists(manifest));
+        EXPECT_FALSE(fs::exists(directory / ".pending"));
+    }
+    ASSERT_EQ(save('0', false, "original"), 0);
+    const auto old = read(manifest);
+    for (const char mode : {'f', 'r'}) {
+        EXPECT_EQ(save(mode, true, "replacement"), 4);
+        EXPECT_EQ(read(errors), "write_failed\n");
+        EXPECT_EQ(read(manifest), old);
+        EXPECT_FALSE(fs::exists(directory / ".pending"));
+        CheckpointStore resumed(directory.string(), 1024 * 1024);
+        std::string payload;
+        ASSERT_TRUE(resumed.open(true, payload)); EXPECT_EQ(payload, "original");
+    }
+    EXPECT_EQ(save('d', true, "replacement"), 5);
+    EXPECT_EQ(read(errors), "committed_durability_uncertain\n");
+    EXPECT_NE(read(manifest), old);
+    EXPECT_FALSE(fs::exists(directory / ".pending"));
+    CheckpointStore resumed(directory.string(), 1024 * 1024);
+    std::string payload;
+    ASSERT_TRUE(resumed.open(true, payload)); EXPECT_EQ(payload, "replacement");
+}
+
+TEST_F(DiskEvidenceStoreTest, CheckpointAbruptWriterExitReleasesLockAndPreservesOldManifest) {
+    std::string payload;
+    {
+        CheckpointStore store(directory.string(), 1024 * 1024);
+        ASSERT_TRUE(store.open(false, payload));
+        ASSERT_EQ(store.save("original"), DiskWriteResult::Committed);
+    } // Do not inherit an open lock descriptor in the forked fixture.
+    const auto manifest = directory / "manifest.csk-checkpoint";
+    const auto old = read(manifest);
+    const auto child = ::fork();
+    ASSERT_GE(child, 0);
+    if (child == 0) {
+        CheckpointStore writer(directory.string(), 1024 * 1024);
+        std::string previous;
+        if (!writer.open(true, previous) || previous != "original") ::_exit(3);
+        writer.save(std::string(180000, 'x'), [&] {
+            std::error_code error;
+            const auto size = fs::file_size(directory / ".pending", error);
+            if (!error && size > 0) ::_exit(73); // no destructor or unlock/cleanup
+            return false;
+        });
+        ::_exit(4);
+    }
+    int status = 0;
+    ASSERT_EQ(::waitpid(child, &status, 0), child);
+    ASSERT_TRUE(WIFEXITED(status)); ASSERT_EQ(WEXITSTATUS(status), 73);
+    ASSERT_TRUE(fs::exists(directory / ".pending"));
+    EXPECT_EQ(read(manifest), old);
+    EXPECT_LE(fs::file_size(manifest) + fs::file_size(directory / ".pending"), 1024 * 1024u);
+    {
+        CheckpointStore resumed(directory.string(), 1024 * 1024);
+        ASSERT_TRUE(resumed.open(true, payload)) << resumed.state();
+        EXPECT_EQ(payload, "original");
+        EXPECT_FALSE(fs::exists(directory / ".pending"));
+    }
+    payload = "unchanged caller";
+    CheckpointStore too_small(directory.string(), old.size() - 1);
+    EXPECT_FALSE(too_small.open(true, payload));
+    EXPECT_EQ(too_small.state(), "capacity");
+    EXPECT_EQ(payload, "unchanged caller");
+    EXPECT_EQ(read(manifest), old);
+}
+
+TEST_F(DiskEvidenceStoreTest, CheckpointRejectsSymlinkHardlinkAndInvalidLimitsWithoutWrites) {
+    std::string payload;
+    CheckpointStore invalid(directory.string(), 0);
+    EXPECT_FALSE(invalid.open(false, payload));
+    EXPECT_EQ(invalid.state(), "invalid_limits");
+    EXPECT_FALSE(fs::exists(directory));
+    {
+        CheckpointStore writer(directory.string(), 4096);
+        ASSERT_TRUE(writer.open(false, payload));
+        ASSERT_EQ(writer.save("original"), DiskWriteResult::Committed);
+    }
+    const auto manifest = directory / "manifest.csk-checkpoint";
+    fs::create_hard_link(manifest, root / "extra-link");
+    {
+        CheckpointStore linked(directory.string(), 4096);
+        EXPECT_FALSE(linked.open(true, payload));
+        EXPECT_EQ(linked.state(), "rejected");
+    }
+    fs::remove(manifest); // Only the exact fixture entry; retain external target.
+    fs::create_symlink(root / "extra-link", manifest);
+    CheckpointStore linked(directory.string(), 4096);
+    EXPECT_FALSE(linked.open(true, payload));
+    EXPECT_EQ(linked.state(), "rejected");
+    EXPECT_TRUE(fs::exists(root / "extra-link"));
+}
+
+TEST_F(DiskEvidenceStoreTest, OrdinaryCacheCannotAdoptEvictOrModifyCheckpointManifest) {
+    for (const std::uint64_t cap : {1ULL, 1024ULL * 1024}) {
+        const auto checkpoint_dir = root / ("checkpoint-exclusive-" + std::to_string(cap));
+        std::string payload;
+        {
+            CheckpointStore checkpoint(checkpoint_dir.string(), 4096);
+            ASSERT_TRUE(checkpoint.open(false, payload));
+            ASSERT_EQ(checkpoint.save("completed worker prefix"), DiskWriteResult::Committed);
+        }
+        const auto manifest = fs::directory_iterator(checkpoint_dir)->path();
+        const auto original = read(manifest);
+        ASSERT_FALSE(original.empty());
+        DiskEvidenceStore cache(checkpoint_dir.string(), cap, 8);
+        EXPECT_FALSE(cache.candidate(key, digest));
+        EXPECT_EQ(cache.status().state, "rejected");
+        EXPECT_EQ(cache.rememberCandidate(key, digest, "foreign cache result", proof), DiskWriteResult::NotStored);
+        EXPECT_EQ(cache.status().state, "rejected");
+        EXPECT_EQ(read(manifest), original);
+        EXPECT_EQ(std::distance(fs::directory_iterator(checkpoint_dir), fs::directory_iterator()), 1);
+        CheckpointStore resumed(checkpoint_dir.string(), 4096);
+        EXPECT_TRUE(resumed.open(true, payload));
+        EXPECT_EQ(payload, "completed worker prefix");
+    }
+}
 
 TEST_F(DiskEvidenceStoreTest, SeparateStoresRoundtripOnlyBoundedValidatedEnvelopes) {
     DiskEvidenceStore writer(directory.string(), 1024 * 1024, 8);
@@ -387,6 +636,13 @@ TEST(DiskEvidenceStoreTest, UnsupportedPlatformNeverTouchesDisk) {
     EXPECT_EQ(store.rememberCandidate(inputDigest("key"), inputDigest("request"), "packet", "proof"),
               DiskWriteResult::NotStored);
     EXPECT_EQ(store.status().state, "unsupported");
+    EXPECT_FALSE(fs::exists(directory));
+    CheckpointStore checkpoint(directory.string(), 1024);
+    std::string payload = "preserve caller";
+    EXPECT_FALSE(checkpoint.open(false, payload));
+    EXPECT_EQ(checkpoint.state(), "unsupported");
+    EXPECT_EQ(payload, "preserve caller");
+    EXPECT_EQ(checkpoint.save("not stored"), DiskWriteResult::NotStored);
     EXPECT_FALSE(fs::exists(directory));
 }
 #endif

@@ -72,5 +72,28 @@ private:
     mutable std::mutex mutex_;
     DiskCacheStatus status_;
 };
+
+// A checkpoint is one run, not an evictable cache. The directory lock is held
+// for this object's lifetime; only the owning coordinator thread may use it.
+// A new run refuses an existing manifest. Resume never turns a corrupt/missing
+// manifest into an empty successful run. The payload is still untrusted until
+// the run-level decoder and supervised worker validation accept it.
+class CheckpointStore {
+public:
+    CheckpointStore(std::string directory, std::uint64_t byte_limit);
+    ~CheckpointStore();
+    CheckpointStore(const CheckpointStore&) = delete;
+    CheckpointStore& operator=(const CheckpointStore&) = delete;
+    bool open(bool resume, std::string& payload,
+              const std::function<bool()>& cancelled = {});
+    DiskWriteResult save(const std::string& payload,
+                        const std::function<bool()>& cancelled = {});
+    const std::string& state() const { return state_; }
+private:
+    const std::string directory_;
+    const std::uint64_t byte_limit_;
+    int descriptor_ = -1;
+    std::string state_ = "closed";
+};
 } // namespace codeskeptic
 #endif

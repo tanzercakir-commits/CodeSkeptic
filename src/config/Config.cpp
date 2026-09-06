@@ -11,6 +11,9 @@
 #include <stdexcept>
 #include <algorithm>
 #include <charconv>
+#include <sstream>
+#include <llvm/Support/SHA256.h>
+#include <llvm/ADT/StringRef.h>
 
 namespace {
 
@@ -68,13 +71,22 @@ const std::set<std::string>& singleValueOptions() {
         "--owning-pointers", "--report-paths", "--policy", "--gate",
         "--lines", "--summary-in", "--summary-out", "--model-file",
         "--files", "--worker-timeout-ms", "--worker-memory-mb",
-        "--write-baseline", "--analysis-cache-dir", "--analysis-cache-bytes", "--analysis-cache-entries"
+        "--write-baseline", "--analysis-cache-dir", "--analysis-cache-bytes", "--analysis-cache-entries",
+        "--checkpoint-dir", "--checkpoint-bytes", "--checkpoint-units"
     };
     return options;
 }
 
 bool looksLikeOption(const char* value) {
     return value && value[0] == '-' && value[1] == '-';
+}
+
+std::string consumedDigest(llvm::SHA256& hash) {
+    const auto digest = hash.final();
+    std::string encoded;
+    const char* hex = "0123456789abcdef";
+    for (const auto byte : digest) { encoded += hex[byte >> 4]; encoded += hex[byte & 15]; }
+    return encoded;
 }
 
 void configError(const std::string& path, std::size_t line,
@@ -111,7 +123,8 @@ bool Config::loadFromFile(const std::string& path, InputError* error) {
 bool Config::loadFromFileInPlace(const std::string& path, InputError* error) {
     if (path.find('\0') != std::string::npos)
         return rejectInput(error, "invalid_path", "config", "Path contains NUL");
-    std::ifstream file(path);
+    const auto input_path = std::filesystem::absolute(path).lexically_normal().string();
+    std::ifstream file(path, std::ios::binary);
     // The default project config is optional. Once the file exists, every
     // non-comment line is a contract and is validated strictly.
     if (!file.is_open()) {
@@ -121,14 +134,18 @@ bool Config::loadFromFileInPlace(const std::string& path, InputError* error) {
             std::cerr << "[CodeSkeptic] cannot read config: " << path << "\n";
             return rejectInput(error, "read_error", "config", "Cannot read configuration file");
         }
+        configuration_inputs_[input_path] = "absent";
         return true;
     }
 
+    llvm::SHA256 consumed;
     std::string line;
     std::size_t lineNumber = 0;
     bool ok = true;
     std::string selectedOutput;
     while (std::getline(file, line)) {
+        consumed.update(line);
+        if (!file.eof()) consumed.update("\n");
         ++lineNumber;
         if (line.find('\0') != std::string::npos)
             return rejectInput(error, "invalid_value", "config", "Configuration contains NUL");
@@ -260,6 +277,17 @@ bool Config::loadFromFileInPlace(const std::string& path, InputError* error) {
                 ok = false;
             }
         }
+        else if (key == "checkpoint_dir") {
+            if (!cacheDirectory(value))
+                return rejectInput(error, "invalid_path", key, "Checkpoint directory requires an absolute non-root path without dot components");
+            checkpoint_directory_ = value;
+        }
+        else if (key == "checkpoint_bytes" || key == "checkpoint_units") {
+            const bool bytes = key == "checkpoint_bytes";
+            auto& target = bytes ? checkpoint_bytes_ : checkpoint_units_;
+            if (!parseResourceNumber(value, 1, bytes ? 1073741824 : 4096, target))
+                return rejectInput(error, "invalid_value", key, "Checkpoint limit is outside its integer range");
+        }
         else if (key == "analysis_cache") {
             if (!parseBool(value, analysis_cache_))
                 return rejectInput(error, "invalid_value", key, "analysis_cache expects true/false/1/0");
@@ -293,6 +321,9 @@ bool Config::loadFromFileInPlace(const std::string& path, InputError* error) {
         std::cerr << "[CodeSkeptic] failed while reading config: " << path
                   << "\n";
         ok = false;
+    }
+    if (ok) {
+        configuration_inputs_[input_path] = consumedDigest(consumed);
     }
     return ok;
 }
@@ -348,6 +379,18 @@ bool Config::parseArgsInPlace(int argc, char* argv[], InputError* error) {
             setBuildPath(argv[++i]);
         } else if (arg == "--doctor") {
             doctor_ = true;
+        } else if (arg == "--checkpoint-dir") {
+            const std::string value(argv[++i]);
+            if (!cacheDirectory(value))
+                return rejectInput(error, "invalid_path", arg, "Checkpoint directory requires an absolute non-root path without dot components");
+            checkpoint_directory_ = value;
+        } else if (arg == "--checkpoint-bytes" || arg == "--checkpoint-units") {
+            const bool bytes = arg == "--checkpoint-bytes";
+            auto& target = bytes ? checkpoint_bytes_ : checkpoint_units_;
+            if (!parseResourceNumber(argv[++i], 1, bytes ? 1073741824 : 4096, target))
+                return rejectInput(error, "invalid_value", arg, "Checkpoint limit is outside its integer range");
+        } else if (arg == "--resume") {
+            resume_checkpoint_ = true;
         } else if (arg == "--analysis-cache") {
             analysis_cache_ = true;
         } else if (arg == "--no-analysis-cache") {
@@ -464,7 +507,7 @@ bool Config::parseArgsInPlace(int argc, char* argv[], InputError* error) {
             // List file: one source file path per line.
             // For large/hand-picked sets (benchmarks, agent batch requests).
             const char* listPath = argv[++i];
-            std::ifstream listFile(listPath);
+            std::ifstream listFile(listPath, std::ios::binary);
             // A missing LIST file must say so — silently leaving the
             // set empty surfaced as the generic "no source path"
             // usage message and cost a 20-minute scan-diff hunt
@@ -474,8 +517,11 @@ bool Config::parseArgsInPlace(int argc, char* argv[], InputError* error) {
                           << listPath << "\n";
                 return false;
             }
+            llvm::SHA256 consumed;
             std::string fileLine;
             while (std::getline(listFile, fileLine)) {
+                consumed.update(fileLine);
+                if (!listFile.eof()) consumed.update("\n");
                 if (!fileLine.empty() && fileLine.back() == '\r') fileLine.pop_back();
                 if (fileLine.find('\0') != std::string::npos)
                     return rejectInput(error, "invalid_path", "files", "File list contains NUL");
@@ -483,6 +529,7 @@ bool Config::parseArgsInPlace(int argc, char* argv[], InputError* error) {
             }
             if (listFile.bad())
                 return rejectInput(error, "read_error", "files", "Cannot read source file list");
+            configuration_inputs_[std::filesystem::absolute(listPath).lexically_normal().string()] = consumedDigest(consumed);
         } else if (arg == "--write-baseline" && i + 1 < argc) {
             write_baseline_path_ = argv[++i];
         } else if (arg == "--help") {
@@ -493,6 +540,10 @@ bool Config::parseArgsInPlace(int argc, char* argv[], InputError* error) {
                       << "  --build-path <path>    compile_commands.json directory\n"
                       << "  --doctor              Explain compilation-database selection;\n"
                       << "                         does not build or run analysis\n"
+                      << "  --checkpoint-dir <path> Explicit private directory for one resumable CLI run\n"
+                      << "  --resume              Resume that checkpoint; changed inputs are rejected\n"
+                      << "  --checkpoint-bytes <N> Byte ceiling including old+temporary manifest, 1..1073741824\n"
+                      << "  --checkpoint-units <N> Maximum source units, 1..4096 (default 128)\n"
                       << "  --analysis-cache       Opt in to bounded process-local worker reuse\n"
                       << "  --no-analysis-cache    Disable worker reuse (default)\n"
                       << "  --analysis-cache-dir <path> Explicit absolute private disk directory\n"
@@ -605,6 +656,11 @@ bool Config::parseArgsInPlace(int argc, char* argv[], InputError* error) {
         }
     }
 
+    if (resume_checkpoint_ && checkpoint_directory_.empty())
+        return rejectInput(error, "missing_value", "--resume", "Resume requires --checkpoint-dir");
+    if (!checkpoint_directory_.empty() &&
+        (serve_ || doctor_ || !summary_diff_old_.empty() || analysis_cache_))
+        return rejectInput(error, "conflict", "--checkpoint-dir", "Checkpoint is a CLI analysis mode and cannot combine with server, doctor, summary-diff or analysis-cache");
     if (output_format_ == "json" && json_output_path_.empty()) {
         std::cerr << "[CodeSkeptic] json output requires a file path\n";
         return false;
@@ -618,6 +674,39 @@ bool Config::parseArgsInPlace(int argc, char* argv[], InputError* error) {
         return false;
     }
     return true;
+}
+
+std::string Config::checkpointSettings() const {
+    std::ostringstream out;
+    auto text = [&](const std::string& value) { out << value.size() << ':' << value; };
+    auto number = [&](auto value) { text(std::to_string(value)); };
+    auto strings = [&](const auto& values) {
+        number(values.size());
+        for (const auto& value : values) text(value);
+    };
+    text("codeskeptic-checkpoint-settings/v1");
+    text(source_path_); strings(source_files_); text(build_path_);
+    number(build_path_specified_); number(file_list_specified_);
+    text(output_format_); text(json_output_path_); text(sarif_output_path_); text(html_output_path_);
+    text(baseline_path_); text(write_baseline_path_); text(lang_);
+    number(static_cast<unsigned>(min_severity_)); strings(enabled_rules_); strings(disabled_rules_);
+    strings(functions_); number(lines_.size());
+    for (const auto& range : lines_) { number(range.first); number(range.second); }
+    strings(fatal_asserts_); strings(assert_macros_); strings(negative_assert_macros_);
+    strings(alloc_functions_); strings(free_functions_); strings(owning_pointers_);
+    strings(untrusted_int_sources_); number(allocator_pairs_.size());
+    for (const auto& pair : allocator_pairs_) { text(pair.first); strings(pair.second); }
+    strings(report_paths_); strings(policies_); text(summary_diff_gate_);
+    number(whole_program_); number(analyze_broken_tus_); number(accept_partial_coverage_);
+    number(assert_recovery_); number(assumptions_); number(warm_cache_);
+    number(worker_limits_.timeout_ms); number(worker_limits_.memory_mb);
+    text(summary_in_path_); text(summary_out_path_); strings(model_files_);
+    number(analysis_cache_); text(analysis_cache_directory_);
+    number(analysis_cache_bytes_); number(analysis_cache_entries_);
+    text(checkpoint_directory_); number(checkpoint_bytes_); number(checkpoint_units_);
+    number(configuration_inputs_.size());
+    for (const auto& entry : configuration_inputs_) { text(entry.first); text(entry.second); }
+    return out.str();
 }
 
 bool Config::isRuleEnabled(const std::string& rule_id) const {

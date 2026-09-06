@@ -157,7 +157,7 @@ bool sameFile(const struct stat& a, const struct stat& b) {
 // Never canonicalize through symlinks, and never recursively create parents.
 // Descriptor-relative operations pin the selected private directory throughout
 // this transaction. Cooperating clients must not rename/remove that directory.
-int openDiskDirectory(const std::string& path) {
+int openDiskDirectory(const std::string& path, bool create = true) {
     diskCheck(!path.empty() && path.size() <= 4096 && path.front() == '/' &&
               path.find('\0') == std::string::npos, "rejected");
     std::vector<std::string> components;
@@ -172,7 +172,7 @@ int openDiskDirectory(const std::string& path) {
     for (std::size_t i = 0; i < components.size(); ++i) {
         const auto& name = components[i];
         int next = ::openat(directory.fd, name.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
-        if (next < 0 && errno == ENOENT && i + 1 == components.size()) {
+        if (next < 0 && errno == ENOENT && create && i + 1 == components.size()) {
             diskCheck(::mkdirat(directory.fd, name.c_str(), 0700) == 0 || errno == EEXIST, "unavailable");
             next = ::openat(directory.fd, name.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
         }
@@ -193,7 +193,8 @@ struct Inventory {
     std::uint64_t bytes = 0;
 };
 Inventory inventory(int directory, DiskCacheStatus& status,
-                    const std::function<bool()>& cancelled) {
+                    const std::function<bool()>& cancelled,
+                    const std::string& only_name = {}) {
     // Reopen rather than dup: directory streams must not share an offset.
     const int scan_fd = ::openat(directory, ".", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
     diskCheck(scan_fd >= 0, "unavailable");
@@ -209,8 +210,9 @@ Inventory inventory(int directory, DiskCacheStatus& status,
         if (!entry) { diskCheck(errno == 0, "unavailable"); break; }
         const std::string name(entry->d_name);
         if (name == "." || name == "..") continue;
+        diskCheck(only_name.empty() || name == ".pending" || name == only_name, "rejected");
         diskCheck(result.files.size() < 4096, "capacity");
-        diskCheck(name == ".pending" || (name.size() == 70 &&
+        diskCheck(name == ".pending" || (!only_name.empty() && name == only_name) || (name.size() == 70 &&
                   name.substr(64) == ".entry" && digestName(name.substr(0, 64))), "rejected");
         struct stat info{};
         diskCheck(::fstatat(directory, name.c_str(), &info, AT_SYMLINK_NOFOLLOW) == 0 &&
@@ -358,4 +360,111 @@ DiskWriteResult DiskEvidenceStore::rememberCandidate(const std::string& key, con
 }
 void DiskEvidenceStore::confirmHit() { std::lock_guard<std::mutex> lock(mutex_); ++status_.hits; }
 DiskCacheStatus DiskEvidenceStore::status() const { std::lock_guard<std::mutex> lock(mutex_); return status_; }
+
+namespace {
+const std::string& checkpointName() {
+    // Intentionally outside DiskEvidenceStore's digest.entry namespace so
+    // cache retention can never adopt or delete a closed checkpoint's manifest.
+    static const std::string name = "manifest.csk-checkpoint";
+    return name;
+}
+#ifdef __linux__
+Inventory checkpointInventory(int directory, const std::function<bool()>& cancelled) {
+    DiskCacheStatus status;
+    auto files = inventory(directory, status, cancelled, checkpointName());
+    diskCheck(files.files.empty() || (files.files.size() == 1 &&
+              files.files.front().name == checkpointName()), "rejected");
+    return files;
+}
+#endif
+}
+
+CheckpointStore::CheckpointStore(std::string directory, std::uint64_t byte_limit)
+    : directory_(std::move(directory)), byte_limit_(byte_limit) {}
+CheckpointStore::~CheckpointStore() {
+#ifdef __linux__
+    if (descriptor_ >= 0) ::close(descriptor_);
+#endif
+}
+bool CheckpointStore::open(bool resume, std::string& payload,
+                           const std::function<bool()>& cancelled) {
+    if (descriptor_ >= 0) { state_ = "already_open"; return false; }
+    try {
+        diskCheck(state_ == "closed", "already_open");
+        diskCheck(byte_limit_ > 0 && byte_limit_ <= 1024ULL * 1024 * 1024, "invalid_limits");
+        checkCancellation(cancelled);
+#ifdef __linux__
+        descriptor_ = openDiskDirectory(directory_, !resume);
+        auto files = checkpointInventory(descriptor_, cancelled);
+        diskCheck(files.bytes <= byte_limit_, "capacity");
+        if (resume) {
+            diskCheck(files.files.size() == 1, "missing");
+            const auto bytes = readDiskEntry(descriptor_, files.files.front(), cancelled);
+            diskCheck(bytes.size() >= 80 && bytes.size() <= kWorkerPacketLimit &&
+                      bytes.compare(0, 8, "CSKCP001") == 0 && readSize(bytes, 8) == bytes.size() - 80 &&
+                      inputDigest(bytes.substr(0, bytes.size() - 64)) == bytes.substr(bytes.size() - 64), "rejected");
+            auto decoded = bytes.substr(16, bytes.size() - 80);
+            checkCancellation(cancelled);
+            payload = std::move(decoded);
+        } else {
+            diskCheck(files.files.empty(), "exists");
+            payload.clear();
+        }
+        state_ = "ready";
+        return true;
+#else
+        throw DiskFailure{"unsupported"};
+#endif
+    } catch (const DiskFailure& error) { state_ = error.state; }
+      catch (...) { state_ = "unavailable"; }
+#ifdef __linux__
+    if (descriptor_ >= 0) { ::close(descriptor_); descriptor_ = -1; }
+#endif
+    return false;
+}
+DiskWriteResult CheckpointStore::save(const std::string& payload,
+                                     const std::function<bool()>& cancelled) {
+    try {
+        checkCancellation(cancelled);
+        diskCheck(descriptor_ >= 0, "not_open");
+        diskCheck(payload.size() <= kWorkerPacketLimit - 80, "capacity");
+#ifdef __linux__
+        const auto files = checkpointInventory(descriptor_, cancelled);
+        const auto size = payload.size() + 80;
+        // Reserve the whole next record while preserving the previous one.
+        // No retention/eviction is permitted to turn a failed save into data loss.
+        diskCheck(size <= byte_limit_ && files.bytes <= byte_limit_ - size, "capacity");
+        std::string bytes("CSKCP001");
+        appendSize(bytes, payload.size()); bytes += payload; bytes += inputDigest(bytes);
+        DiskFd pending(::openat(descriptor_, ".pending", O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600));
+        diskCheck(pending.fd >= 0, "write_failed");
+        struct RemovePending {
+            int directory;
+            ~RemovePending() { ::unlinkat(directory, ".pending", 0); }
+        } cleanup{descriptor_};
+        diskCheck(::fchmod(pending.fd, 0600) == 0, "write_failed");
+        for (std::size_t offset = 0; offset < bytes.size();) {
+            checkCancellation(cancelled);
+            const auto n = ::write(pending.fd, bytes.data() + offset,
+                                  std::min<std::size_t>(65536, bytes.size() - offset));
+            if (n < 0 && errno == EINTR) continue;
+            diskCheck(n > 0, "write_failed");
+            offset += n;
+        }
+        diskCheck(::fsync(pending.fd) == 0, "write_failed");
+        checkCancellation(cancelled);
+        diskCheck(::renameat(descriptor_, ".pending", descriptor_, checkpointName().c_str()) == 0, "write_failed");
+        if (::fsync(descriptor_) != 0) {
+            state_ = "committed_durability_uncertain";
+            return DiskWriteResult::CommittedDurabilityUncertain;
+        }
+        state_ = "stored";
+        return DiskWriteResult::Committed;
+#else
+        throw DiskFailure{"unsupported"};
+#endif
+    } catch (const DiskFailure& error) { state_ = error.state; }
+      catch (...) { state_ = "write_failed"; }
+    return DiskWriteResult::NotStored;
+}
 } // namespace codeskeptic

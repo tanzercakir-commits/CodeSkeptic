@@ -222,7 +222,8 @@ set `--analysis-cache-dir /absolute/private/cache`. The final directory can be
 created, but its parents must already exist. Neither directory nor limit options
 enable caching by themselves; `--no-analysis-cache` performs no cache storage I/O.
 Each MCP request inherits the complete launch preference without adding
-client-controlled RPC write paths. There is no checkpoint/resume or daemon.
+client-controlled RPC write paths. The cache is separate from the opt-in CLI
+checkpoint below; neither mode is a daemon.
 
 The key binds the exact worker request, tool bytes, environment, working
 directory and resource settings. Evidence records the frontend's actual source
@@ -302,6 +303,61 @@ no storage access was needed; it does not prove a reusable entry exists. A read
 candidate counts as a hit only after the supervised worker confirms it. Storage
 failure never substitutes missing analysis evidence; the ordinary fresh worker
 still has to succeed. No benchmarked cross-invocation speedup is claimed.
+
+## Optional CLI checkpoint and resume
+
+For a native Linux scan with verifiable plain-text inputs, start one explicitly
+resumable run with a dedicated absolute directory:
+
+```bash
+codeskeptic --source ./src --build-path ./build --json report.json \
+  --checkpoint-dir /absolute/private/checkpoint
+```
+
+After interruption, repeat the same invocation with `--resume`. Keep all other
+options, paths and inputs unchanged. A new run refuses an existing manifest;
+resume refuses a missing, corrupt or incompatible manifest. The checkpoint is
+separate from the ordinary analysis cache: combining it with `--analysis-cache`,
+`--serve`, `--doctor` or summary-diff is rejected. There are no new MCP write paths.
+
+Before the run becomes resumable, a supervised input-inventory pass parses every
+requested source and compile variant, recording headers and `.csk` sidecars
+(including absence) without publishing analysis findings. Interruption before
+this inventory finishes does not create a resumable manifest. Afterwards both
+whole-program harvest and ordinary analysis save only a successfully validated
+worker prefix. Failed, missing, partial or cancelled workers are not saved as
+completed. Resume reconstructs rolling summaries in their original order; each
+saved worker still has to pass the normal child runtime/input/ACK/exit checks.
+This adds an initial parse pass and validation work; no speedup is guaranteed.
+
+The run identity includes effective settings, actually consumed configuration
+and file-list bytes, selected compilation database, initial models/summaries, applicable baseline input,
+summary freshness, ordered compiler commands, working directory/environment
+and output/report-path resolution. Changes to pending inputs are checked too.
+Configuration/model/summary/baseline files must be readable regular files under
+the checkpoint input profile. Volatile or otherwise unwitnessable inputs cannot
+be resumed; use ordinary analysis without checkpoint for those inputs. Files must
+remain stable throughout the run; this is not a filesystem snapshot or protection
+against a malicious same-user writer/root.
+
+The directory is private and locked for the run; concurrent use is rejected.
+`manifest.csk-checkpoint` is outside the normal cache namespace. Updates use an
+atomic temporary-to-final replacement. `--checkpoint-bytes` bounds the previous
+manifest plus its complete pending replacement (default 268435456, range
+1..1073741824). `--checkpoint-units` bounds source units (default 128, range
+1..4096). The encoded manifest also has a fixed 64 MiB envelope ceiling. Limits
+apply to logical owned file bytes, not filesystem allocation overhead. Parent
+directories must already exist; storage symlinks, hardlinks and foreign files
+are rejected. Existing per-worker timeout/memory/cancellation limits still apply.
+
+Checkpoint rejection exits `2` and leaves report/baseline/summary destinations
+unopened, including early invalid-input/no-rule paths. Output/input aliases and
+incompatible output aliases are rejected before writes. A stored worker prefix
+does not claim that report, baseline or summary publication succeeded: those
+operations run again after successful replay and keep their ordinary exit policy.
+
+Configuration-file equivalents are `checkpoint_dir`, `checkpoint_bytes` and
+`checkpoint_units`; `--resume` is an explicit invocation choice.
 
 ## Configuration file
 

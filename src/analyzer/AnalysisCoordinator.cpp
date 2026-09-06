@@ -5,10 +5,12 @@
 #include "analyzer/RuntimeIdentity.h"
 #include "core/Capabilities.h"
 #include "core/FindingFingerprint.h"
+#include "contracts/Sidecar.h"
 #include "engine/CfgCache.h"
 #include "engine/FunctionSummary.h"
 #include "engine/RuleEngine.h"
 #include "source_manager/SourceManager.h"
+#include <clang/AST/RecursiveASTVisitor.h>
 #include <llvm/ADT/SmallString.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/Program.h>
@@ -66,6 +68,22 @@ public:
 private:
     std::string source_;
     std::vector<clang::tooling::CompileCommand> commands_;
+};
+
+// Snapshot observes the same sidecar consumer used by rules, including absence
+// and declaring-header aliases. Results/issues remain private to this worker;
+// no analysis diagnostics or summary state are published by the traversal.
+class CheckpointInputVisitor : public clang::RecursiveASTVisitor<CheckpointInputVisitor> {
+public:
+    explicit CheckpointInputVisitor(clang::ASTContext& context) : context_(context) {}
+    bool shouldVisitTemplateInstantiations() const { return true; }
+    bool shouldVisitImplicitCode() const { return true; }
+    bool VisitFunctionDecl(clang::FunctionDecl* declaration) {
+        sidecarContractsForDecl(declaration, context_);
+        return true;
+    }
+private:
+    clang::ASTContext& context_;
 };
 
 void check(bool value, const std::string& message) {
@@ -223,8 +241,17 @@ bool importWorkerSummaries(const std::string& bytes, std::string& error) {
     }
 }
 
+bool reusableWorkerResponse(const WorkerRequest& request, const WorkerResponse& response) {
+    return cacheableResponse(request, response);
+}
+std::string workerExecutableIdentity(const std::string& executable,
+                                    const std::function<bool()>& cancelled) {
+    return cacheToolIdentity(executable, cancelled);
+}
+
 WorkerExecution executeAnalysisWorker(const std::string& executable, const WorkerRequest& request,
-    const WorkerLimits& limits, const ResourceCancellation* cancellation, DiskEvidenceStore* disk_cache) {
+    const WorkerLimits& limits, const ResourceCancellation* cancellation, DiskEvidenceStore* disk_cache,
+    const std::string* required_candidate, bool checkpoint_mode) {
     WorkerExecution execution;
     execution.reason = "worker_transport_failed";
     try {
@@ -243,7 +270,14 @@ WorkerExecution executeAnalysisWorker(const std::string& executable, const Worke
             inputDigest(digest + tool_identity + environment + ":" + std::to_string(limits.timeout_ms) +
                         ":" + std::filesystem::current_path().string());
         std::optional<std::string> candidate;
-        if (!key.empty()) {
+        if (required_candidate) {
+            WorkerResponse supplied;
+            std::string error;
+            check(request.record_inputs && !key.empty() &&
+                  decodeWorkerResponse(*required_candidate, request, digest, supplied, error) &&
+                  cacheableResponse(request, supplied), "checkpoint candidate is not qualified");
+            candidate = *required_candidate;
+        } else if (!checkpoint_mode && !key.empty()) {
             try {
                 candidate = disk_cache ? disk_cache->candidate(key, digest, cancelled) :
                     processUnitEvidenceStore().candidate(key, digest, cancelled);
@@ -305,9 +339,10 @@ WorkerExecution executeAnalysisWorker(const std::string& executable, const Worke
             check(execution.detail.empty() && cacheableResponse(request, execution.response) &&
                   encodeWorkerResponse(supplied) == response_packet, "worker reuse did not match its supplied candidate");
         }
+        check(!required_candidate || execution.response.cache_hit, "checkpoint inputs or runtime changed");
         execution.valid = true;
         execution.reason.clear();
-        if (!key.empty() && execution.detail.empty() && !cancelled()) {
+        if (!checkpoint_mode && !required_candidate && !key.empty() && execution.detail.empty() && !cancelled()) {
             try {
                 if (tool_identity == cacheToolIdentity(executable, cancelled) && environment == inputEnvironmentIdentity() &&
                     cacheableResponse(request, execution.response)) {
@@ -320,7 +355,7 @@ WorkerExecution executeAnalysisWorker(const std::string& executable, const Worke
         if (cancelled()) { execution.valid = false; execution.reason = "worker_cancelled"; }
         if (execution.valid && execution.response.cache_hit) {
             execution.cache_hit = true;
-            processUnitEvidenceStore().confirmHit();
+            if (!checkpoint_mode) processUnitEvidenceStore().confirmHit();
             if (disk_cache) disk_cache->confirmHit();
         }
         return execution;
@@ -368,7 +403,7 @@ int runAnalysisWorker(const std::string& request_path, const std::string& respon
             const auto* capability = findRuleCapability(id);
             return !capability || selected.count(std::string(capability->id)) != 0;
         });
-        check(request.phase == WorkerPhase::Harvest || engine.enabledRuleCount() > 0,
+        check(request.phase != WorkerPhase::Analyze || engine.enabledRuleCount() > 0,
               "worker has no enabled producers");
         engine.enableGlobalHarvest(request.harvest);
         auto database = std::make_unique<FrozenWorkerDatabase>(request);
@@ -402,7 +437,9 @@ int runAnalysisWorker(const std::string& request_path, const std::string& respon
         }
         if (request.record_inputs) source.recordInputs(response.request_digest);
         source.processAll([&](clang::ASTContext& context) {
-            if (request.phase == WorkerPhase::Harvest) {
+            if (request.phase == WorkerPhase::Snapshot) {
+                CheckpointInputVisitor(context).TraverseDecl(context.getTranslationUnitDecl());
+            } else if (request.phase == WorkerPhase::Harvest) {
                 auto& registry = SummaryRegistry::instance();
                 registry.rebuild(context);
                 registry.harvestGlobal();
