@@ -2,6 +2,20 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH04-S01-U001 — Dosya başına taşınabilir worker protokolü kur
+
+- Commit: `3e0627ecd3fa5740875456619e702403f377b4b5`
+- Dal: `agent/cs3-ch04-s01-u001-worker-protocol`
+- Implementer: `root-cwe-ch04-s01-u001-20260906`
+- Bağımsız denetçi: `independent-cwe-ch04-s01-u001-product-3e0627e-20260906`
+- İnceleme SHA-256: `58534a357b0dec5b30a2ae472f5186eb2c1a455499044321daf3f6da481dfbda`
+- Tarih: 2026-09-06T16:22:19.370072+00:00
+- Sonuç: Bir dosyanın çökmesi diğer dosyaların sonuçlarını kaybettirmez.
+- linux-suite: PASS; SHA-256 `960e6c25dc85e853c060878b92b00218f0e81493d58a123a9abf1d1a0fa6e38b`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S01-U001/qualify.sh 3e0627ecd3fa5740875456619e702403f377b4b5`
+- relevant-corpus: PASS; SHA-256 `2dcf072a96332c1e88df525c0df62d9e08482c71263df96e56a0aa37d70b1887`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S01-U001/qualify.sh 3e0627ecd3fa5740875456619e702403f377b4b5`
+- queue-check: PASS; SHA-256 `59f0ccead4c09f9c2755e0cc096bc7115366aaf6b53e02e791f098688ae77cea`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S01-U001/qualify.sh 3e0627ecd3fa5740875456619e702403f377b4b5`
+- worker-and-reporter-regressions: PASS; SHA-256 `b12b342db8cfdb7fe56f70577fc4764e098db9f3e8b10488bed6195b66e6b560`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S01-U001/qualify.sh 3e0627ecd3fa5740875456619e702403f377b4b5`
+
 ## CS3-CH03-S02-U002 — Minimal ilk tarama ve CI kullanımını doğrula
 
 - Commit: `4e283ddea28a0f47c671f7a7d37baee37aa7fa56`

@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH04-S01-U001
-
-### CS3-CH04-S01-U001 — Dosya başına taşınabilir worker protokolü kur
-
-**Sonuç:** Bir dosyanın çökmesi diğer dosyaların sonuçlarını kaybettirmez.
-
-**Kabul:**
-
-- Aynı binary ile sürümlü child protocol ve deterministik TU sırası vardır.
-- Crash/malformed child result ayrı failure olur; parent güvenilir temiz diyemez.
-- Eski worker dalı topluca taşınmaz; sudo, broker, systemd/cgroup bağımlılığı yoktur.
-
-**Test bütçesi:** T2
-**Kontroller:** linux-suite, relevant-corpus, queue-check
-**Kapsam:** src/analyzer/*, src/core/AnalysisResult.h, src/main.cpp, src/CMakeLists.txt, tests/WorkerProtocolTest.cpp, tests/AnalysisCoordinatorTest.cpp, tests/CMakeLists.txt, tests/HtmlReporterTest.cpp
-**Bağımlılıklar:** Yok
+## FRONT — CS3-CH04-S01-U002
 
 ### CS3-CH04-S01-U002 — Timeout/bellek/iptal bütçesini uygula
 
