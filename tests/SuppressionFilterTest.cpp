@@ -67,6 +67,26 @@ TEST(SuppressionMarkerTest, NoMarker_NoSuppression) {
                                       "div-by-zero"));
 }
 
+TEST(SuppressionMarkerTest, NonCommentAndMalformedMarkersNeverSuppress) {
+    for (const std::string line : {
+             "const char *text = \"codeskeptic-disable-line\";",
+             "// not-codeskeptic-disable-line",
+             "// codeskeptic-disable-line !!!",
+             "// codeskeptic-disable-line ,"}) {
+        SCOPED_TRACE(line);
+        EXPECT_FALSE(markerSuppressesRule(line, "codeskeptic-disable-line", "div-by-zero"));
+    }
+}
+
+TEST(SuppressionFilterTest, StringLiteralMarkerDoesNotHideRealFinding) {
+    const auto path = writeTempSource("suppression_literal.cpp",
+        "int f(){const char *text=\"codeskeptic-disable-line\";int zero=0;return 1/zero;}\n");
+    SuppressionFilter filter;
+    DiagnosticList findings = {makeDiag(path, 1, "div-by-zero")};
+    EXPECT_EQ(filter.filter(findings), 0u);
+    ASSERT_EQ(findings.size(), 1u);
+}
+
 // --- SuppressionFilter file tests ---
 
 TEST(SuppressionFilterTest, DisableLineSameLine) {

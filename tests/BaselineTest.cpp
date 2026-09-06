@@ -72,6 +72,43 @@ TEST(BaselineTest, EmptyDiagnostics_WritesEmptyFile) {
     EXPECT_EQ(baseline.filter(diags), 0u);
 }
 
+TEST(BaselineSafetyTest, NewFunctionCannotConsumeRemovedFunctionsBudget) {
+    const auto source = writeSource("baseline_function_identity.cpp",
+        "int old_function(){\nint zero=0;\nreturn 1/zero;\n}\n");
+    const std::string path = ::testing::TempDir() + "baseline_function_identity.txt";
+    auto original = makeDiag(source, 3, "div-by-zero", "division by zero");
+    original.function = "old_function";
+    original.fingerprint = "original-fingerprint";
+    ASSERT_TRUE(Baseline::write(path, {original}));
+    writeSource("baseline_function_identity.cpp",
+        "int replacement_function(){\nint zero=0;\nreturn 1/zero;\n}\n");
+    auto replacement = original;
+    replacement.function = "replacement_function";
+    replacement.fingerprint = "replacement-fingerprint";
+    Baseline baseline;
+    ASSERT_TRUE(baseline.load(path));
+    DiagnosticList current = {replacement};
+    EXPECT_EQ(baseline.filter(current), 0u);
+    ASSERT_EQ(current.size(), 1u);
+    EXPECT_EQ(current.front().function, "replacement_function");
+}
+
+TEST(BaselineSafetyTest, UnknownVersionsAndMalformedRowsRejectTheWholeLoad) {
+    const std::string path = ::testing::TempDir() + "baseline_malformed.txt";
+    for (const std::string contents : {
+             "# codeskeptic-baseline v999\n",
+             "# codeskeptic-baseline v2\nnot a baseline record\n",
+             "# codeskeptic-baseline v2\nr|a.cpp|not-a-hash|message\n"}) {
+        SCOPED_TRACE(contents);
+        { std::ofstream file(path); file << contents; }
+        Baseline baseline;
+        EXPECT_FALSE(baseline.load(path));
+        DiagnosticList current = {makeDiag("a.cpp", 1, "r", "message")};
+        EXPECT_EQ(baseline.filter(current), 0u);
+        EXPECT_EQ(current.size(), 1u);
+    }
+}
+
 // ===================================================================
 // Baseline v2: line-independent key (hash of the line content)
 // Invariants: (1) the baseline stays valid when code shifts, (2) the
