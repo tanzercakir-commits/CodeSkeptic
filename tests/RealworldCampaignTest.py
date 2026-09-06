@@ -8,6 +8,7 @@ import importlib.util
 import json
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -526,10 +527,69 @@ class SourceCoverageContractTest(unittest.TestCase):
             path.write_text(json.dumps(self.report), encoding="utf-8")
             self.assertEqual(campaign.load_analysis_report(path), self.report)
             for raw in ('{"coverage":{},"coverage":{}}', '{"sources":[{"commands":0,"commands":1}]}',
-                        '{"count":NaN}', '{"count":Infinity}', '{"count":-Infinity}', '{bad'):
+                        '{"count":NaN}', '{"count":Infinity}', '{"count":-Infinity}',
+                        '{"ignored":1e309}', '{"ignored":-1e309}', '{bad'):
                 path.write_text(raw, encoding="utf-8")
                 with self.subTest(raw=raw), self.assertRaises(campaign.EvidenceError):
                     campaign.load_analysis_report(path)
+
+
+class ResumeSourceCoverageTest(unittest.TestCase):
+    def test_matching_receipt_without_raw_coverage_cannot_resume(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = campaign.validate_manifest(fixture_manifest())
+            analyzer = root / "analyzer"
+            analyzer.write_bytes(b"synthetic binary, never executed")
+            prior = root / "prior" / "receipt.json"
+            prior.parent.mkdir()
+            receipt = accepted_receipt(manifest, 1, analyzer_sha=campaign.file_digest(analyzer))
+            campaign.write_receipt(prior, receipt)
+            with mock.patch.object(campaign, "_run_command",
+                                   side_effect=campaign.EvidenceError("fresh execution required")) as execute:
+                code = campaign.run_shard(manifest, "alpha", 1, analyzer, root / "workspace",
+                                           root / "output" / "receipt.json", prior, root)
+            self.assertEqual(code, 2)
+            execute.assert_called_once()
+            self.assertEqual(campaign.load_verified_receipt(root / "output" / "receipt.json")["status"], "unavailable")
+
+    def test_resume_replays_raw_evidence_under_the_current_schema_admission(self):
+        for mode in ("modern", "stripped", "legacy-base", "substituted", "prepass"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                paths = ["src/one.c", "src/two.c"]
+                manifest = fixture_manifest()
+                manifest["projects"][0]["expected"]["translation_unit_sha256"] = campaign.translation_unit_digest(paths)
+                analyzer = root / "analyzer"
+                analyzer.write_bytes(b"synthetic binary, never executed")
+                prior = root / "prior" / "receipt.json"
+                prior.parent.mkdir()
+                campaign.write_receipt(prior, accepted_receipt(
+                    manifest, 1, analyzer_sha=campaign.file_digest(analyzer)))
+                report = source_coverage_report(paths, "/fixture/alpha", [1, 1])
+                if mode in ("stripped", "legacy-base"):
+                    report["coverage"] = {key: report["coverage"][key] for key in
+                        ("attempted_tus", "analyzed_tus", "broken_tus", "incomplete_functions")}
+                elif mode == "substituted":
+                    report["coverage"]["sources"][0]["file"] = "/different/source.c"
+                elif mode == "prepass":
+                    report["coverage"]["sources"][0]["prepass"]["status"] = "failed"
+                (prior.parent / "report.json").write_text(json.dumps(report), encoding="utf-8")
+                (prior.parent / "translation-units.relative.txt").write_text("\n".join(paths) + "\n", encoding="utf-8")
+                (prior.parent / "translation-units.txt").write_text(
+                    "\n".join("/fixture/alpha/" + p for p in paths) + "\n", encoding="utf-8")
+                with mock.patch.object(campaign, "_run_command",
+                        side_effect=campaign.EvidenceError("fresh execution required")) as execute:
+                    code = campaign.run_shard(manifest, "alpha", 1, analyzer, root / "workspace",
+                        root / "output" / "receipt.json", prior, root, allow_legacy_coverage=mode == "legacy-base")
+                accepted = mode in ("modern", "legacy-base")
+                self.assertEqual(code, 0 if accepted else 2)
+                if accepted:
+                    execute.assert_not_called()
+                    result = campaign.load_verified_receipt(root / "output" / "receipt.json")
+                    self.assertTrue(result["execution"]["resumed"])
+                else:
+                    execute.assert_called_once()
 
 
 class EvidenceContractTest(unittest.TestCase):
@@ -565,7 +625,7 @@ class EvidenceContractTest(unittest.TestCase):
             "diagnostics": [{"fingerprint": "csf1-0000000000000001"}],
         }
 
-        semantic = campaign.semantic_from_report(project, 1, report, 2, "a" * 64)
+        semantic = campaign.semantic_from_report(project, 1, report, 2, "a" * 64, allow_legacy_coverage=True)
 
         self.assertEqual(semantic["coverage"]["attempted_tus"], 2)
         self.assertEqual(semantic["coverage"]["analyzed_tus"], 3)
@@ -584,7 +644,9 @@ class EvidenceContractTest(unittest.TestCase):
             },
             "diagnostics": [{"fingerprint": "csf1-0000000000000001"}],
         }
-        semantic = campaign.semantic_from_report(project, 1, report, 2, "a" * 64)
+        with self.assertRaisesRegex(campaign.EvidenceError, "source coverage schema"):
+            campaign.semantic_from_report(project, 1, report, 2, "a" * 64)
+        semantic = campaign.semantic_from_report(project, 1, report, 2, "a" * 64, allow_legacy_coverage=True)
         self.assertEqual(semantic["findings"], 1)
 
         with self.assertRaisesRegex(campaign.EvidenceError, "report root"):
@@ -602,7 +664,7 @@ class EvidenceContractTest(unittest.TestCase):
         broken = copy.deepcopy(report)
         broken["coverage"]["analyzed_tus"] = 1
         with self.assertRaisesRegex(campaign.EvidenceError, "exact TU coverage"):
-            campaign.semantic_from_report(project, 1, broken, 2, "a" * 64)
+            campaign.semantic_from_report(project, 1, broken, 2, "a" * 64, allow_legacy_coverage=True)
 
     def test_receipt_checksum_and_checkpoint_identity_fail_closed(self) -> None:
         manifest = campaign.validate_manifest(fixture_manifest())

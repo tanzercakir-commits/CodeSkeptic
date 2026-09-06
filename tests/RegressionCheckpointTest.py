@@ -246,7 +246,7 @@ def adjudicated_config(manifest, cfg=None):
 
 
 def make_bundle(root, cfg=None, ctx=None, inputs=None, manifest=None, adjudications=None,
-                source_coverage=False):
+                source_coverage=True):
     manifest = full_fixture_manifest() if manifest is None else manifest
     cfg = config() if cfg is None else cfg
     ctx = context() if ctx is None else ctx
@@ -452,7 +452,7 @@ class ArtifactBundleTest(unittest.TestCase):
                     refresh_fixture_envelope(shard)
                 elif mutation == "report-coverage":
                     value = verify.load_json(shard / "report.json")
-                    value["coverage"]["analyzed_tus"] = 2
+                    value["coverage"]["analyzed_commands"] = 2
                     (shard / "report.json").write_bytes(verify.canonical(value))
                     refresh_fixture_envelope(shard)
                 elif mutation == "substituted-tu":
@@ -649,7 +649,7 @@ class AdjudicationContractTest(unittest.TestCase):
                     "binary_sha256": binary_sha})
                 args = SimpleNamespace(command="shard", lane="realworld", side=side, project="abseil", repetition=1,
                                        workspace=root / "work", output=root / "output", binary_artifact=artifact)
-                def synthetic_scan(*arguments):
+                def synthetic_scan(*arguments, **kwargs):
                     arguments[5].write_bytes(verify.canonical({"fixture_only": True}))
                     return 0
                 with mock.patch.object(runner, "ROOT", root), mock.patch.object(runner, "environment_context", return_value=ctx), \
@@ -668,6 +668,8 @@ class AdjudicationContractTest(unittest.TestCase):
                         self.assertEqual(verify.canonical(run.call_args.args[0]), verify.canonical(manifests[side]))
                         self.assertEqual(run.call_args.args[-1], root / "inputs")
                         self.assertEqual(raw.call_args.args[1], manifests[side])
+                        self.assertEqual(run.call_args.kwargs, {"allow_legacy_coverage": side == "base"})
+                        self.assertEqual(raw.call_args.kwargs, {"allow_legacy_coverage": side == "base"})
 
     def test_plan_validates_semantics_before_any_execution(self):
         for invalid in (False, True):

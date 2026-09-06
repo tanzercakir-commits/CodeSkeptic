@@ -437,7 +437,7 @@ SHARD_FILES = {"receipt.json", "receipt.json.sha256", "report.json", "translatio
                "translation-units.relative.txt", "commands.log"}
 
 
-def verify_raw_shard(root, manifest, project, repetition, binary_sha256):
+def verify_raw_shard(root, manifest, project, repetition, binary_sha256, *, allow_legacy_coverage=False):
     root = Path(root)
     receipt = load_json(root / "receipt.json")
     validate_shard(receipt, manifest, project, repetition, binary_sha256)
@@ -461,7 +461,8 @@ def verify_raw_shard(root, manifest, project, repetition, binary_sha256):
         semantic = campaign.semantic_from_report(campaign.project_by_id(manifest, project),
                                                 receipt["semantic"]["exit_code"], report,
                                                 len(paths), campaign.translation_unit_digest(paths),
-                                                absolute_sources=absolute, relative_sources=paths)
+                                                absolute_sources=absolute, relative_sources=paths,
+                                                allow_legacy_coverage=allow_legacy_coverage)
     except campaign.CampaignError as error:
         raise CheckpointError(str(error)) from error
     require(semantic == receipt["semantic"], "raw report/TU list differs from accepted semantic receipt")
@@ -505,7 +506,8 @@ def verify_realworld_bundle(root, config, context, inputs, manifest, needs, requ
             require(canonical(envelope["details"]) == canonical({"side": side, "project": project, "repetition": repetition,
                                                                  "binary_sha256": binaries[side]}), "wrong shard binding")
             require(set(envelope["files"]) == SHARD_FILES, "incomplete shard raw evidence")
-            receipt = verify_raw_shard(directory, manifests[side], project, repetition, binaries[side])
+            receipt = verify_raw_shard(directory, manifests[side], project, repetition, binaries[side],
+                                       allow_legacy_coverage=side == "base")
             receipts[(side, project, repetition)] = receipt
             target = staging / side / project / f"repeat-{repetition}"
             target.mkdir(parents=True)

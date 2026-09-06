@@ -225,10 +225,11 @@ def execute(args):
                        artifact["files"] == {"codeskeptic": binary_sha}, "wrong shared analyzer artifact")
         binary.chmod(0o755)  # upload-artifact does not retain executable permission.
         code = campaign.run_shard(manifests[args.side], args.project, args.repetition, binary, workspace / "campaign",
-                                  output / "receipt.json", None, inputs)
+                                  output / "receipt.json", None, inputs, allow_legacy_coverage=args.side == "base")
         verify.require(code == 0, "real-world shard unavailable; raw diagnostic receipt retained")
         verify.require(verify.file_digest(binary) == binary_sha, "analyzer changed during shard")
-        verify.verify_raw_shard(output, manifests[args.side], args.project, args.repetition, binary_sha)
+        verify.verify_raw_shard(output, manifests[args.side], args.project, args.repetition, binary_sha,
+                                allow_legacy_coverage=args.side == "base")
         details = {"side": args.side, "project": args.project, "repetition": args.repetition, "binary_sha256": binary_sha}
         kind = "shard"
     elif args.command == "aggregate":

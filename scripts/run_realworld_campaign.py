@@ -7,6 +7,7 @@ import argparse
 import copy
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -488,9 +489,15 @@ def load_analysis_report(path: Path) -> dict[str, Any]:
     def invalid_constant(value):
         raise EvidenceError(f"nonfinite analyzer report number: {value}")
 
+    def finite_float(value):
+        parsed = float(value)
+        if not math.isfinite(parsed):
+            raise EvidenceError("nonfinite analyzer report number")
+        return parsed
+
     try:
         return json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=object_pairs,
-                          parse_constant=invalid_constant)
+                          parse_constant=invalid_constant, parse_float=finite_float)
     except (UnicodeError, json.JSONDecodeError) as error:
         raise EvidenceError(f"analyzer report is malformed: {error}") from error
 
@@ -579,6 +586,7 @@ def _report_semantic(
     absolute_sources: list[str] | None = None,
     relative_sources: list[str] | None = None,
     whole_program: bool | None = None,
+    allow_legacy_coverage: bool = False,
 ) -> dict[str, Any]:
     if not isinstance(report, dict):
         raise EvidenceError("analyzer report root is not an object")
@@ -592,11 +600,14 @@ def _report_semantic(
     coverage = report.get("coverage")
     if not isinstance(coverage, dict):
         raise EvidenceError("report has no coverage evidence")
-    # Only genuine legacy four-field objects use the historical path. A partial
-    # modern object (including a stripped/unknown schema) cannot fall back to it.
+    # Schema admission belongs to the trusted caller, not to the raw report.
+    # Default/head qualification always requires v1, even if ALL modern fields
+    # were removed. Only an explicitly admitted historical base may use legacy.
     legacy_fields = {"attempted_tus", "analyzed_tus", "broken_tus", "incomplete_functions"}
     command_count = None
-    if set(coverage) != legacy_fields:
+    if type(allow_legacy_coverage) is not bool:
+        raise EvidenceError("invalid legacy coverage admission")
+    if not allow_legacy_coverage or set(coverage) != legacy_fields:
         command_count = _source_coverage_commands(coverage, translation_units,
             translation_unit_sha256, absolute_sources, relative_sources, whole_program)
     normalized_coverage: dict[str, int] = {}
@@ -723,14 +734,39 @@ def semantic_from_report(
     *,
     absolute_sources: list[str] | None = None,
     relative_sources: list[str] | None = None,
+    allow_legacy_coverage: bool = False,
 ) -> dict[str, Any]:
     semantic = _report_semantic(
         process_exit, report, translation_units, translation_unit_sha256,
         absolute_sources=absolute_sources, relative_sources=relative_sources,
         whole_program="--whole-program" in project["analyzer_args"],
+        allow_legacy_coverage=allow_legacy_coverage,
     )
     _validate_semantic(project, semantic)
     return semantic
+
+
+def _checkpoint_raw_semantic(checkpoint, project, prior, allow_legacy_coverage):
+    root = checkpoint.parent
+    paths = [root / name for name in ("report.json", "translation-units.txt",
+                                      "translation-units.relative.txt")]
+    if any(not path.is_file() or any(part.is_symlink() for part in (path, *path.parents))
+           for path in paths):
+        raise EvidenceError("checkpoint lacks regular raw source coverage evidence")
+    report = load_analysis_report(paths[0])
+    absolute = paths[1].read_text(encoding="utf-8").splitlines()
+    relative = paths[2].read_text(encoding="utf-8").splitlines()
+    if (not relative or relative != sorted(set(relative)) or len(absolute) != len(relative)
+            or any(not p or p.startswith("/") or "\\" in p
+                   or any(c in ("", ".", "..") for c in p.split("/")) for p in relative)
+            or any(not PurePosixPath(a).is_absolute() or not a.endswith("/" + p)
+                   for a, p in zip(absolute, relative))):
+        raise EvidenceError("checkpoint requested source lists are malformed")
+    semantic = semantic_from_report(project, prior["semantic"]["exit_code"], report,
+        len(relative), translation_unit_digest(relative), absolute_sources=absolute,
+        relative_sources=relative, allow_legacy_coverage=allow_legacy_coverage)
+    if semantic != prior["semantic"]:
+        raise EvidenceError("checkpoint raw evidence differs from its receipt")
 
 
 def aggregate_receipts(
@@ -912,6 +948,8 @@ def run_shard(
     output: Path,
     checkpoint: Path | None,
     repository_root: Path,
+    *,
+    allow_legacy_coverage: bool = False,
 ) -> int:
     project = project_by_id(manifest, project_id)
     if repetition < 1 or repetition > 3:
@@ -933,11 +971,12 @@ def run_shard(
         try:
             prior = load_verified_receipt(checkpoint)
             if checkpoint_matches(prior, expected_identity):
+                _checkpoint_raw_semantic(checkpoint, project, prior, allow_legacy_coverage)
                 resumed = copy.deepcopy(prior)
                 resumed["execution"] = {"duration_seconds": 0.0, "resumed": True}
                 write_receipt(output, resumed)
                 return 0
-        except EvidenceError:
+        except (EvidenceError, OSError, UnicodeError, KeyError, TypeError):
             pass
 
     semantic: dict[str, Any] | None = None
@@ -1037,6 +1076,7 @@ def run_shard(
         semantic = semantic_from_report(
             project, result.returncode, report, len(files), actual_tu_sha,
             absolute_sources=[path.as_posix() for path in files], relative_sources=relative_files,
+            allow_legacy_coverage=allow_legacy_coverage,
         )
     except (CampaignError, OSError, subprocess.SubprocessError) as error:
         failures.append(str(error))

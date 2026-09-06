@@ -92,9 +92,13 @@ recovered or incomplete evidence. Prepass evidence must match the recipe's
 `--whole-program` mode. Only then is the validated `analyzed_commands` count
 projected into the unchanged legacy execution-count pin. Raw checkpoint replay
 performs the same validation without requiring the original worker filesystem.
-Malformed modern metadata cannot fall back to the legacy four-field format;
-genuine legacy base reports remain readable. This compatibility mapping does
-not itself prove fresh hosted qualification or accept any new semantic drift.
+New head qualification requires v1, including when all modern fields have been
+stripped. Only the controller's verified pinned `base` side explicitly admits
+the legacy four-field format; malformed modern metadata is still rejected there.
+Receipt resumption must revalidate the sibling raw report and requested lists
+under the current admission policy; a matching receipt alone is insufficient.
+Genuine legacy base reports remain readable. This compatibility mapping does not
+itself prove fresh hosted qualification or accept any new semantic drift.
 
 The single executable authority is
 [`scripts/realworld_manifest.json`](../scripts/realworld_manifest.json); the
