@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH02-S02-U002
-
-### CS3-CH02-S02-U002 — MCP istek zarfını ve yaşam döngüsünü sınırla
-
-**Sonuç:** Malformed JSON-RPC istekleri ve işlem hataları sunucuyu veya sonraki isteği bozmaz.
-
-**Kabul:**
-
-- Eksik/yanlış ID/version/method ve boyut sınırı deterministik hata üretir.
-- Başarısız istek sonrası geçerli istek temiz state ile çalışır.
-- CLI ile aynı analiz davranışı korunur; yeni ağ/cloud servisi eklenmez.
-
-**Test bütçesi:** T1
-**Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/server/McpServer*, src/config/Config*, tests/McpServerTest.cpp, src/source_manager/SourceManager.cpp, src/analyzer/StaticAnalyzer.cpp
-**Bağımlılıklar:** Yok
+## FRONT — CS3-CH02-S03-U001
 
 ### CS3-CH02-S03-U001 — İstenen/analiz edilen/atlanan/başarısız dosyaları uzlaştır
 

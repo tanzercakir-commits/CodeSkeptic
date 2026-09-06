@@ -2,6 +2,21 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH02-S02-U002 — MCP istek zarfını ve yaşam döngüsünü sınırla
+
+- Commit: `e9ec726d8a4b49a4eb5f0dd9cd5a6d2d237cffea`
+- Dal: `agent/cs3-ch02-s02-u002-mcp-request-envelope`
+- Implementer: `root-cs3-ch02-s02-u002-20260906`
+- Bağımsız denetçi: `independent-cwe-ch02-s02-u002-product-e9ec726-20260906`
+- İnceleme SHA-256: `930ca08ae9c6dd8862c12b8c497d9332cb2823df74062b9df1fbec81d29e3d51`
+- Tarih: 2026-09-06T06:12:51.860327+00:00
+- Sonuç: Malformed JSON-RPC istekleri ve işlem hataları sunucuyu veya sonraki isteği bozmaz.
+- build: PASS; SHA-256 `63ef5ec7db5848ed5d075c3c61bdbf1a5b4cd049ea5c3d38a37350ff2fe5e31c`; `bash scripts/local_test.sh build`
+- focused-tests: PASS; SHA-256 `c9fb16a5455e10374e22b84260372b8e93c50f68cfdb33e1ab821870b4f30177`; `bash scripts/local_test.sh focused 'McpServerTest.*:ConfigTest.*:SourceManagerTest.*:SourceManagerTargetTest.*:BrokenTuTest.*:VerdictIntegrityTest.*:ParamIntervalsTest.*:ImmutableFlagsTest.*:FunctionFilterTest.*:PolicyTest.*:SummaryPersistTest.*:CfgCacheTest.*:AssertRecoveryTest.*:CoverageReportTest.*'`
+- cli-smoke: PASS; SHA-256 `597cd3e126a9224dc4adb037d8f179cd0be641ce0ae02c30e0d36baac962e9e8`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S02-U002/verify_mcp_candidate.sh e9ec726d8a4b49a4eb5f0dd9cd5a6d2d237cffea`
+- queue-check: PASS; SHA-256 `ff57c37570555bc1914bd601a60a5a0af97e009ebe68d89f365983c1da1601f4`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S02-U002/verify_mcp_candidate.sh e9ec726d8a4b49a4eb5f0dd9cd5a6d2d237cffea`
+- numeric-id-oracle: PASS; SHA-256 `71a7feaba09aac19623f413631550d6c2f962a84b8436caf9e419a591bd2f2a2`; `python3 -B /evidence/numeric_cli_matrix.py /workspace/build/src/codeskeptic`
+
 ## CS3-CH02-S02-U001 — Fonksiyon özeti/model parser sınırlarını sağlamlaştır
 
 - Commit: `574fa3158093782407118e93b36caa252c1be09e`
