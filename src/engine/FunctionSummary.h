@@ -244,7 +244,8 @@ public:
     // strong claim.
     // Input ceilings (inclusive): 16 MiB raw bytes, 64 KiB per normalized
     // record, 100000 physical lines after the header (including duplicates
-    // and blanks), arity 4096, 256 written field names per parameter.
+    // and blanks), arity 4096, 256 written field names per parameter (also
+    // after duplicate-record or successive-file merging of imported models).
     // All historical versions have exact column counts. Effects cover every
     // formal parameter; O is unknown, while '-' means zero parameters only.
     // Regular-file inputs accept LF/CRLF, but reject binary NUL/bare CR.

@@ -4310,6 +4310,17 @@ bool SummaryRegistry::saveGlobal(const std::string& path) const {
     return out.good();
 }
 
+namespace {
+
+bool modelFieldsWithinLimit(const SummaryRegistry::FunctionSummary& summary) {
+    return std::all_of(summary.paramFieldWrites.begin(), summary.paramFieldWrites.end(),
+        [](const SummaryRegistry::FieldWriteSet& writes) {
+            return !writes.known || writes.fields.size() <= 256;
+        });
+}
+
+} // anonymous namespace
+
 bool SummaryRegistry::parseSummaryFile(
     const std::string& path,
     std::map<std::string, FunctionSummary>& out) try {
@@ -4581,6 +4592,9 @@ bool SummaryRegistry::parseSummaryFile(
         }
         auto [it, inserted] = parsed.emplace(key, summary);
         if (!inserted) mergeConservative(it->second, summary);
+        // Duplicates can each be within the limit yet their conservative
+        // union exceed it. Reject before publishing, never truncate claims.
+        if (!modelFieldsWithinLimit(it->second)) return false;
     }
 
     out = std::move(parsed);
@@ -4599,6 +4613,7 @@ bool SummaryRegistry::loadGlobal(const std::string& path) try {
     for (const auto& [key, summary] : parsed) {
         auto [it, inserted] = staged.emplace(key, summary);
         if (!inserted) mergeConservative(it->second, summary);
+        if (!modelFieldsWithinLimit(it->second)) return false;
     }
     globalStore_.swap(staged);
     return true;

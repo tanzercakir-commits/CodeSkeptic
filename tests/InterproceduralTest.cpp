@@ -836,17 +836,19 @@ auto summaryState(const SummaryRegistry::FunctionSummary& s) {
 
 void expectSummaryRejectedWithoutPublication(const std::string& content) {
     GlobalStoreGuard guard;
-    const auto good = writePersistFile("boundary_keep.txt",
+    const std::string prefix = std::string("boundary_") +
+        ::testing::UnitTest::GetInstance()->current_test_info()->name();
+    const auto good = writePersistFile(prefix + "_keep.txt",
         "codeskeptic-summaries v2\nkeep/1\tN\tR\tU\n");
     auto& registry = SummaryRegistry::instance();
     ASSERT_TRUE(registry.loadGlobal(good));
-    const auto saved = ::testing::TempDir() + "boundary_snapshot.txt";
+    const auto saved = ::testing::TempDir() + prefix + "_snapshot.txt";
     ASSERT_TRUE(registry.saveGlobal(saved));
     const auto before = readWholeFile(saved);
     std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
     ASSERT_TRUE(SummaryRegistry::parseSummaryFile(good, parsed));
     const auto prior = summaryState(parsed.at("keep/1"));
-    const auto malformed = writePersistFile("boundary_bad.txt", content);
+    const auto malformed = writePersistFile(prefix + "_bad.txt", content);
     EXPECT_FALSE(SummaryRegistry::parseSummaryFile(malformed, parsed));
     EXPECT_EQ(parsed.size(), 1u);
     ASSERT_EQ(parsed.count("keep/1"), 1u);
@@ -987,6 +989,48 @@ TEST(SummaryPersistTest, ParserHarvestRoundTripsCAndCppParameterShapes) {
         ASSERT_EQ(parsed.count("zero/0"), 1u);
         EXPECT_TRUE(parsed.at("zero/0").params.empty());
     }
+}
+
+TEST(SummaryPersistTest, ParserBoundedUnionRejectsAcrossRowsAndLoads) {
+    GlobalStoreGuard guard;
+    const std::string header = "codeskeptic-summaries v10\n";
+    const std::string row = "f/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t";
+    std::string names;
+    for (unsigned i = 0; i < 256; ++i)
+        names += (i ? "," : "") + std::string("field") + std::to_string(i);
+    const auto valid = writePersistFile("bounded_union_valid.txt", header + row + names + "\n");
+    const auto overlap = writePersistFile("bounded_union_overlap.txt",
+        header + row + names + "\n" + row + names + "\n");
+    std::string firstHalf, secondHalf;
+    for (unsigned i = 0; i < 256; ++i) {
+        auto& half = i < 128 ? firstHalf : secondHalf;
+        if (!half.empty()) half += ',';
+        half += "field" + std::to_string(i);
+    }
+    const auto disjoint = writePersistFile("bounded_union_disjoint.txt",
+        header + row + firstHalf + "\n" + row + secondHalf + "\n");
+    const auto extra = writePersistFile("bounded_union_extra.txt",
+        header + "incoming/0\tU\t-\tU\t-\t-\t-\t-\t-\t-\t-\t-\tU\t-\n" +
+        row + "extra\n");
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(overlap, parsed));
+    EXPECT_EQ(parsed.at("f/1").paramFieldWrites.at(0).fields.size(), 256u);
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(disjoint, parsed));
+    EXPECT_EQ(parsed.at("f/1").paramFieldWrites.at(0).fields.size(), 256u);
+    expectSummaryRejectedWithoutPublication(header + row + names + "\n" + row + "extra\n");
+    auto& registry = SummaryRegistry::instance();
+    ASSERT_TRUE(registry.loadGlobal(valid));
+    ASSERT_TRUE(registry.loadGlobal(overlap));
+    const auto saved = ::testing::TempDir() + "bounded_union_snapshot.txt";
+    ASSERT_TRUE(registry.saveGlobal(saved));
+    const auto before = readWholeFile(saved);
+    EXPECT_FALSE(registry.loadGlobal(extra));
+    ASSERT_TRUE(registry.saveGlobal(saved));
+    EXPECT_EQ(readWholeFile(saved), before);
+    // The exact-limit accepted union remains readable after serialization.
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(saved, parsed));
+    ASSERT_EQ(parsed.count("f/1"), 1u);
+    EXPECT_EQ(parsed.at("f/1").paramFieldWrites.at(0).fields.size(), 256u);
 }
 
 TEST(SummaryPersistTest, FileFormat_RoundTripDeterministic) {

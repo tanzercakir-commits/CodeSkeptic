@@ -18,7 +18,9 @@
 // legitimately live in another TU); a whole-program anchor coverage
 // check is a recorded residual.
 // The loader validates every clause before publishing any usable guarantee;
-// one malformed entry rejects that file, with issues reported once per load.
+// framing, binary/limit or clause-grammar errors reject the file, with issues
+// reported once per load. Parameter binding remains a later per-declaration
+// semantic check; this loader does not claim whole-program model validation.
 // Inclusive input ceilings: 1 MiB raw bytes, 16 KiB normalized physical line,
 // 4096 non-comment/nonblank entries (duplicates included). LF/CRLF accepted;
 // embedded NUL, bare CR, non-regular and unreadable inputs are rejected.
