@@ -162,11 +162,14 @@ bool importWorkerSummaries(const std::string& bytes, std::string& error) {
     }
 }
 
-WorkerExecution executeAnalysisWorker(const std::string& executable, const WorkerRequest& request) {
+WorkerExecution executeAnalysisWorker(const std::string& executable, const WorkerRequest& request,
+    const WorkerLimits& limits, const ResourceCancellation* cancellation) {
     WorkerExecution execution;
     execution.reason = "worker_transport_failed";
     try {
         check(!executable.empty(), "worker executable is not configured");
+        check(validWorkerLimits(limits) && request.memory_mb == limits.memory_mb,
+              "worker launch/request resource limit mismatch");
         const auto packet = encodeWorkerRequest(request);
         const auto digest = workerRequestDigest(packet);
         TemporaryDirectory directory;
@@ -175,30 +178,36 @@ WorkerExecution executeAnalysisWorker(const std::string& executable, const Worke
         const auto stdout_path = directory.file("stdout.txt");
         const auto stderr_path = directory.file("stderr.txt");
         check(writeWorkerPacket(input, packet, execution.detail), execution.detail);
-        const std::array<llvm::StringRef, 4> arguments{{executable, "--codeskeptic-worker-v1", input, output}};
-        const std::array<std::optional<llvm::StringRef>, 3> redirects{{llvm::StringRef(""), stdout_path, stderr_path}};
-        bool launch_failed = false;
-        std::string launch_error;
-        // Serial execution is intentional. Configured timeout/memory/cancel
-        // budgets belong to the next FIFO unit; this launcher owns only its child.
-        const int status = llvm::sys::ExecuteAndWait(executable, arguments, std::nullopt,
-            redirects, 0, 0, &launch_error, &launch_failed);
+        const std::vector<std::string> arguments{executable, "--codeskeptic-worker-v1", input, output};
+        const std::array<std::string, 3> redirects{{"", stdout_path, stderr_path}};
+        const auto process = runResourceWorker(executable, arguments, redirects, limits, cancellation);
+        switch (process.stop) {
+        case ResourceStop::LaunchFailed: execution.reason = "worker_launch_failed"; break;
+        case ResourceStop::Timeout: execution.reason = "worker_timeout"; break;
+        case ResourceStop::Cancelled: execution.reason = "worker_cancelled"; break;
+        case ResourceStop::Crashed: execution.reason = "worker_crashed"; break;
+        case ResourceStop::SupervisionFailed: execution.reason = "worker_supervision_failed"; break;
+        case ResourceStop::Exited:
+            execution.reason = process.exit_code == 90 ? "worker_memory_limit_unavailable" :
+                               process.exit_code == 91 ? "worker_memory_exhausted" : "worker_exit_nonzero";
+            break;
+        }
+        execution.detail = process.detail;
         std::string diagnostic_text, read_error;
-        if (!launch_failed) {
-            check(readWorkerPacket(stderr_path, diagnostic_text, read_error), read_error);
-        }
-        execution.detail = diagnostic_text;
-        if (launch_failed || status == -1) {
-            execution.reason = "worker_launch_failed";
-            execution.detail += launch_error;
-            return execution;
-        }
-        if (status != 0) {
-            execution.reason = status < 0 ? "worker_crashed" : "worker_exit_nonzero";
-            execution.detail += launch_error;
+        const bool stderr_ok = readWorkerPacket(stderr_path, diagnostic_text, read_error);
+        if (stderr_ok) execution.detail += diagnostic_text;
+        if (process.stop != ResourceStop::Exited || process.exit_code != 0) {
+            // Keep the actual timeout/cancellation/abnormal-exit classification
+            // even when the interrupted process did not finish its stderr file.
+            if (!stderr_ok) execution.detail += read_error;
             return execution;
         }
         execution.reason = "worker_result_invalid";
+        check(stderr_ok, read_error);
+        std::string acknowledgement;
+        check(readWorkerPacket(output + ".limits", acknowledgement, read_error), read_error);
+        check(acknowledgement == "codeskeptic-worker-memory/v1 " + std::to_string(request.memory_mb) + "\n",
+              "worker did not acknowledge its memory limit");
         std::string stdout_text, response_packet;
         check(readWorkerPacket(stdout_path, stdout_text, read_error), read_error);
         check(stdout_text.empty(), "unexpected worker stdout");
@@ -215,6 +224,8 @@ WorkerExecution executeAnalysisWorker(const std::string& executable, const Worke
 
 int runAnalysisWorker(const std::string& request_path, const std::string& response_path) {
     struct Cleanup { ~Cleanup() { clearAnalysisState(); } } cleanup;
+    WorkerMemoryLimit memory_limit;
+    bool memory_ready = false;
     try {
         check(!std::filesystem::exists(std::filesystem::symlink_status(response_path)),
               "worker output already exists");
@@ -222,6 +233,15 @@ int runAnalysisWorker(const std::string& request_path, const std::string& respon
         check(readWorkerPacket(request_path, packet, error), error);
         WorkerRequest request;
         check(decodeWorkerRequest(packet, request, error), error);
+        if (!memory_limit.apply(request.memory_mb, error)) {
+            std::cerr << "[CodeSkeptic] worker memory setup failed: " << error << '\n';
+            return 90;
+        }
+        memory_ready = true;
+        check(!std::filesystem::exists(std::filesystem::symlink_status(response_path + ".limits")),
+              "worker limit acknowledgement already exists");
+        check(writeWorkerPacket(response_path + ".limits",
+              "codeskeptic-worker-memory/v1 " + std::to_string(request.memory_mb) + "\n", error), error);
         Config config = decodeAnalysisArguments(request);
         initializeAnalysisState(config);
         check(importWorkerSummaries(request.global_summaries, error), error);
@@ -271,6 +291,9 @@ int runAnalysisWorker(const std::string& request_path, const std::string& respon
         check(exportWorkerSummaries(response.global_summaries, error), error);
         check(writeWorkerPacket(response_path, encodeWorkerResponse(response), error), error);
         return 0; // Transport succeeded; source coverage may still describe failure.
+    } catch (const std::bad_alloc&) {
+        std::cerr << "[CodeSkeptic] worker allocation failed\n";
+        return memory_ready ? 91 : 2;
     } catch (const std::exception& failure) {
         std::cerr << "[CodeSkeptic] worker failed: " << failure.what() << '\n';
         return 2;

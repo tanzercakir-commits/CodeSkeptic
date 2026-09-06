@@ -14,6 +14,9 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <future>
+#include <thread>
+#include <chrono>
 
 namespace {
 using namespace codeskeptic;
@@ -81,7 +84,8 @@ protected:
         output << llvm::json::Value(std::move(entries));
         std::ofstream(root / "build/compile_commands.json") << text;
     }
-    Scan scan(const std::string& executable, std::vector<std::string> extra = {}, bool synthetic = false) {
+    Scan scan(const std::string& executable, std::vector<std::string> extra = {}, bool synthetic = false,
+              std::shared_ptr<ResourceCancellation> cancellation = {}) {
         setWorkerExecutable(executable);
         std::vector<std::string> arguments{"codeskeptic", "--source",
             synthetic ? sources.front().string() : (root / "src").string(),
@@ -92,6 +96,7 @@ protected:
         for (auto& argument : arguments) raw.push_back(argument.data());
         Config config;
         EXPECT_TRUE(config.parseArgs(static_cast<int>(raw.size()), raw.data()));
+        config.setResourceCancellation(std::move(cancellation));
         StaticAnalyzer analyzer(config);
         addBuiltinRules(analyzer);
         Scan scan;
@@ -340,6 +345,57 @@ TEST_F(AnalysisCoordinatorTest, ProductionMcpStdioUsesWorkersWithoutPollutingFra
         EXPECT_EQ(coverage->getInteger("analyzed_tus"), 1);
     }
     EXPECT_FALSE(static_cast<bool>(std::getline(lines, line)));
+}
+
+TEST_F(AnalysisCoordinatorTest, ResourceFailurePreservesSurvivorsAndCannotBeAcceptedAsClean) {
+    for (const std::string failure : {"sleep", "memory", "no-ack", "wrong-ack"}) {
+        for (const auto& source : sources) fs::remove(source);
+        sources.clear();
+        file("a-good.cpp", "int before(){ int* p=nullptr; return *p; }\n");
+        file("b-budget-" + failure + ".cpp", "int failed(){ return 0; }\n");
+        file("c-good.cpp", "int after(){ int* p=nullptr; return *p; }\n");
+        database();
+        const auto result = scan(CODESKEPTIC_RESOURCE_FIXTURE_PATH,
+            {"--worker-timeout-ms", failure == "sleep" ? "300" : "5000", "--worker-memory-mb", "512",
+             "--accept-partial-coverage", "--analyze-broken-tus"});
+        EXPECT_EQ(result.result.exitCode(), 2);
+        EXPECT_FALSE(result.result.complete());
+        EXPECT_EQ(result.result.failed_tus, 1u);
+        EXPECT_EQ(result.result.analyzed_tus, 2u);
+        ASSERT_EQ(result.result.sources.size(), 3u);
+        EXPECT_EQ(result.result.sources[1].reason, failure == "sleep" ? "worker_timeout" :
+                  failure == "memory" ? "worker_memory_exhausted" : "worker_result_invalid");
+        ASSERT_EQ(result.diagnostics.size(), 2u);
+        EXPECT_EQ(result.diagnostics[0].function, "before");
+        EXPECT_EQ(result.diagnostics[1].function, "after");
+    }
+}
+
+TEST_F(AnalysisCoordinatorTest, CancellationKeepsCompletedFindingAndAccountsForUnstartedSources) {
+    file("a-good.cpp", "int before(){ int* p=nullptr; return *p; }\n");
+    const auto sleeping = file("b-budget-sleep.cpp", "int middle(){ return 0; }\n");
+    file("c-budget-sleep.cpp", "int tail(){ return 0; }\n");
+    database();
+    const auto token = std::make_shared<ResourceCancellation>();
+    auto canceller = std::async(std::launch::async, [&] {
+        const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+        while (!fs::exists(sleeping.string() + ".started") && std::chrono::steady_clock::now() < until)
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        const bool started = fs::exists(sleeping.string() + ".started");
+        token->request();
+        return started;
+    });
+    const auto result = scan(CODESKEPTIC_RESOURCE_FIXTURE_PATH, {}, false, token);
+    EXPECT_TRUE(canceller.get());
+    EXPECT_EQ(result.result.exitCode(), 2);
+    EXPECT_EQ(result.result.failed_tus, 2u);
+    EXPECT_EQ(result.result.analyzed_tus, 1u);
+    ASSERT_EQ(result.diagnostics.size(), 1u);
+    EXPECT_EQ(result.diagnostics.front().function, "before");
+    ASSERT_EQ(result.result.sources.size(), 3u);
+    EXPECT_EQ(result.result.sources[1].reason, "worker_cancelled");
+    EXPECT_EQ(result.result.sources[2].reason, "worker_cancelled");
+    EXPECT_FALSE(fs::exists(sources[2].string() + ".started"));
 }
 
 } // namespace

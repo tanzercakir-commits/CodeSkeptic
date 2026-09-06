@@ -10,6 +10,7 @@
 
 #include <cstring>
 #include <iostream>
+#include <memory>
 #include <llvm/Support/FileSystem.h>
 
 #ifndef CODESKEPTIC_VERSION
@@ -98,9 +99,21 @@ int main(int argc, char* argv[]) {
         return 2;
     }
     codeskeptic::setWorkerExecutable(executable);
+    // Private child dispatch returned above; only the coordinator owns these
+    // handlers, and signal callbacks never kill or reap a process.
+    std::unique_ptr<codeskeptic::WorkerSignalScope> worker_signals;
+    if (config.serve() || config.summaryDiffOld().empty()) {
+        try {
+            worker_signals = std::make_unique<codeskeptic::WorkerSignalScope>();
+        } catch (const std::exception& error) {
+            std::cerr << "[CodeSkeptic] worker cancellation setup failed: " << error.what() << '\n';
+            return 2;
+        }
+    }
 
     if (config.serve()) {
-        return codeskeptic::runMcpServer(config);
+        const int status = codeskeptic::runMcpServer(config);
+        return codeskeptic::workerSignalCancellationRequested() ? 2 : status;
     }
 
     // Summary-diff mode: not analysis, but a contract-diff report

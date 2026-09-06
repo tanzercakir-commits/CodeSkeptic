@@ -14,6 +14,10 @@ codeskeptic <source_path> [options]
   --build-path <path>    compile_commands.json directory
   --doctor              Explain compilation-input readiness (text only;
                          does not run analysis or generate report files)
+  --worker-timeout-ms <N> Per-worker deadline in milliseconds, 1..3600000
+                         (default 120000; zero/unlimited is not accepted)
+  --worker-memory-mb <N> Per-worker native memory cap in MiB, 16..65536
+                         (default 2048; platform semantics below)
   --json <file>          JSON output file
   --sarif <file>         SARIF 2.1.0 output file (GitHub code scanning)
   --html <file>          Self-contained HTML report: summary cards double
@@ -148,6 +152,59 @@ tarballs bundle the headers next to the binary (`lib/clang/<N>/include`,
 found automatically), and source builds bake the build machine's path.
 Set it only when analyzing with a resource dir in a non-standard place.
 
+## Worker resource limits and cancellation
+
+The CLI and `--serve` run each translation unit in a fresh same-build child.
+Workers are sequential in deterministic source order; whole-program mode has a
+separate bounded harvest pass and analysis pass. A crash, timeout, invalid or
+missing response, unavailable memory enforcement or allocation failure makes
+that source failed. Other successfully completed source results are retained.
+The report remains incomplete with exit `2`, even with
+`--accept-partial-coverage` or `--analyze-broken-tus`; it never becomes a clean
+result merely because the failed child produced no findings.
+
+`--worker-timeout-ms` bounds each launch/setup/wait using a monotonic clock,
+not the total project scan or parent discovery/report-writing time. The parent
+terminates and reaps only its own exact child PID or process handle. It does not
+use a process-group kill, host-wide process search, daemon, broker or privilege.
+Scheduling/OS termination latency means this is not a real-time deadline.
+
+`--worker-memory-mb` uses **MiB (1024 × 1024 bytes)**. The same-build child first
+loads and validates its bounded private request (at most 64 MiB), then applies
+the checked cap before configuration, summary import or AST analysis and
+acknowledges setup. This is not a limit on the parent, loader startup, aggregate
+machine memory, or an equal cross-platform RSS measurement:
+
+- Linux/POSIX uses `RLIMIT_AS`, bounding virtual address space; any stricter
+  inherited soft/hard limit is retained rather than raised.
+- The Windows implementation uses a private process-memory Job Object, retained
+  throughout that worker, to constrain committed memory. Failure to create or
+  assign it is a failure, not silently unlimited execution. Native Windows/macOS
+  runtime qualification of these new limits is not established by Linux tests.
+
+Source reasons distinguish `worker_timeout`, `worker_cancelled`,
+`worker_memory_limit_unavailable` and an observed allocation failure
+`worker_memory_exhausted`. Other crashes/nonzero exits remain classified as
+such: a configured cap alone does not prove that a crash was caused by memory
+exhaustion. The parent still requires a normal zero child exit, correct setup
+acknowledgement and a fully valid request-bound response before accepting results.
+
+During an active scan, `SIGINT`/`SIGTERM` handlers only record cancellation;
+normal control flow terminates/reaps the owned worker and marks unstarted
+sources cancelled. Completed findings remain available; the CLI exits `2`.
+For an active MCP analysis the complete failure response is flushed before the
+server exits `2`, without waiting for another request or EOF. Ordinary worker
+timeouts/memory failures do not terminate the MCP session. Launch-configured
+worker limits are inherited by each request; MCP clients cannot override them
+through new JSON-RPC fields. Existing schemas/framing stay unchanged.
+
+Library embedders that explicitly retain the in-process backend (no worker
+executable configured) do not receive subprocess resource isolation; custom rule
+objects cannot be transferred to a fresh executable. The subprocess backend
+does not preserve a process-lifetime warm AST cache between files or MCP calls.
+Embedders using it must retain exclusive ownership of their worker children and
+must not independently reap them. No sudo is required for these worker controls.
+
 ## Configuration file
 
 Options can also be set in a `.codeskeptic.conf` file (`key=value` lines;
@@ -157,7 +214,10 @@ fail with exit `2`):
 `sarif_output`, `min_severity`, `enable_rule`, `disable_rule`, `lang`,
 `function`, `fatal_asserts`, `assert_macros`, `assert_recovery`,
 `alloc_functions`, `free_functions`, `allocator_pairs`, and repeatable
-`model_file` entries. An allocator may appear in multiple `allocator_pairs`
+`model_file` entries. Resource keys `worker_timeout_ms` and `worker_memory_mb`
+have the same finite integer ranges/defaults as their CLI options; signed,
+fractional, overflowing and out-of-range values are rejected transactionally.
+An allocator may appear in multiple `allocator_pairs`
 entries to admit multiple exact deallocators.
 
 Project idioms are configuration, not code: allocator wrappers, exact

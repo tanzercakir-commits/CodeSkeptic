@@ -137,6 +137,7 @@ StaticAnalyzer::StaticAnalyzer(Config config)
                 request.commands = selection.commands->getCompileCommands(file);
             }
             request.arguments = workerAnalysisArguments(config_);
+            request.memory_mb = config_.workerLimits().memory_mb;
             for (const auto& family : ruleCapabilities()) {
                 const std::string id(family.id);
                 if ((id != "assumption" || config_.assumptions()) && config_.isRuleEnabled(id))
@@ -203,12 +204,15 @@ std::vector<SourceCoverage> StaticAnalyzer::processIsolated(bool prepass) {
         failed.commands = failed.failed_commands = request.commands.size();
         failed.reason = "worker_summary_export_failed";
         std::string error;
-        if (!exportWorkerSummaries(request.global_summaries, error)) {
+        const bool stopping = workerSignalCancellationRequested() ||
+            (config_.resourceCancellation() && config_.resourceCancellation()->requested());
+        if (!stopping && !exportWorkerSummaries(request.global_summaries, error)) {
             std::cerr << "[CodeSkeptic] worker summary export failed: " << error << '\n';
             coverage.push_back(std::move(failed));
             continue;
         }
-        auto execution = executeAnalysisWorker(worker_executable_, request);
+        auto execution = executeAnalysisWorker(worker_executable_, request, config_.workerLimits(),
+                                               config_.resourceCancellation());
         if (!execution.detail.empty()) std::cerr << execution.detail << '\n';
         if (!execution.valid) {
             failed.reason = execution.reason;

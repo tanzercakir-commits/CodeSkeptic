@@ -38,6 +38,17 @@ bool isOutputFormat(const std::string& value) {
            value == "sarif" || value == "html";
 }
 
+bool parseResourceNumber(const std::string& value, unsigned minimum, unsigned maximum,
+                         unsigned& result) {
+    unsigned parsed = 0;
+    if (value.empty() || value.find_first_not_of("0123456789") != std::string::npos) return false;
+    const auto converted = std::from_chars(value.data(), value.data() + value.size(), parsed);
+    if (converted.ec != std::errc{} || converted.ptr != value.data() + value.size() ||
+        parsed < minimum || parsed > maximum) return false;
+    result = parsed;
+    return true;
+}
+
 const std::set<std::string>& singleValueOptions() {
     static const std::set<std::string> options = {
         "--source", "--build-path", "--json", "--sarif", "--html",
@@ -47,7 +58,7 @@ const std::set<std::string>& singleValueOptions() {
         "--free-functions", "--allocator-pairs", "--untrusted-int-sources",
         "--owning-pointers", "--report-paths", "--policy", "--gate",
         "--lines", "--summary-in", "--summary-out", "--model-file",
-        "--files",
+        "--files", "--worker-timeout-ms", "--worker-memory-mb",
         "--write-baseline"
     };
     return options;
@@ -240,6 +251,12 @@ bool Config::loadFromFileInPlace(const std::string& path, InputError* error) {
                 ok = false;
             }
         }
+        else if (key == "worker_timeout_ms" || key == "worker_memory_mb") {
+            const bool timeout = key == "worker_timeout_ms";
+            unsigned& target = timeout ? worker_limits_.timeout_ms : worker_limits_.memory_mb;
+            if (!parseResourceNumber(value, timeout ? 1 : 16, timeout ? 3600000 : 65536, target))
+                return rejectInput(error, "invalid_value", key, "Worker resource limit is outside its integer range");
+        }
         else if (key == "enable_rule") { if (!addEnabledRules(value, error)) return false; }
         else if (key == "disable_rule") { if (!addDisabledRules(value, error)) return false; }
         else {
@@ -307,6 +324,11 @@ bool Config::parseArgsInPlace(int argc, char* argv[], InputError* error) {
             setBuildPath(argv[++i]);
         } else if (arg == "--doctor") {
             doctor_ = true;
+        } else if (arg == "--worker-timeout-ms" || arg == "--worker-memory-mb") {
+            const bool timeout = arg == "--worker-timeout-ms";
+            unsigned& target = timeout ? worker_limits_.timeout_ms : worker_limits_.memory_mb;
+            if (!parseResourceNumber(argv[++i], timeout ? 1 : 16, timeout ? 3600000 : 65536, target))
+                return rejectInput(error, "invalid_value", arg, "Worker resource limit is outside its integer range");
         } else if (arg == "--json" && i + 1 < argc) {
             output_format_ = "json";
             json_output_path_ = argv[++i];
@@ -433,6 +455,10 @@ bool Config::parseArgsInPlace(int argc, char* argv[], InputError* error) {
                       << "  --build-path <path>    compile_commands.json directory\n"
                       << "  --doctor              Explain compilation-database selection;\n"
                       << "                         does not build or run analysis\n"
+                      << "  --worker-timeout-ms <N> Per-worker deadline, 1..3600000 ms\n"
+                      << "                         (default 120000); includes startup\n"
+                      << "  --worker-memory-mb <N> Per-worker native memory cap, 16..65536\n"
+                      << "                         MiB (default 2048); see usage for platform semantics\n"
                       << "  --json <file>          JSON output file\n"
                       << "  --sarif <file>         SARIF 2.1.0 output file\n"
                       << "  --html <file>          Self-contained HTML report (filters,\n"

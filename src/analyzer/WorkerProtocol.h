@@ -2,6 +2,7 @@
 #define CODESKEPTIC_WORKER_PROTOCOL_H
 
 #include "core/AnalysisResult.h"
+#include "core/ResourceBudget.h"
 #include "engine/CoverageReport.h"
 #include <clang/Tooling/CompilationDatabase.h>
 #include <cstdint>
@@ -35,6 +36,7 @@ struct WorkerRequest {
     std::vector<std::string> selected_families;
     std::string global_summaries;
     bool harvest = false;
+    unsigned memory_mb = WorkerLimits{}.memory_mb;
 };
 
 struct WorkerResponse {

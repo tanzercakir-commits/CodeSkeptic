@@ -247,6 +247,7 @@ std::string encodeWorkerRequest(const WorkerRequest& request) {
     writer.strings(request.selected_families);
     writer.text(request.global_summaries);
     writer.flag(request.harvest);
+    writer.number(request.memory_mb);
     return std::move(writer.bytes);
 }
 
@@ -288,6 +289,8 @@ bool decodeWorkerRequest(const std::string& packet, WorkerRequest& request, std:
         candidate.selected_families = reader.strings();
         candidate.global_summaries = reader.text();
         candidate.harvest = reader.flag();
+        candidate.memory_mb = reader.number();
+        require(validWorkerLimits({1, candidate.memory_mb}), "invalid worker memory limit");
         reader.finish();
         request = std::move(candidate);
         error.clear();

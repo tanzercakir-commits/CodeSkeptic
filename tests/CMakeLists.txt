@@ -15,6 +15,7 @@ add_executable(codeskeptic_tests
     AnalysisResultTest.cpp
     WorkerProtocolTest.cpp
     AnalysisCoordinatorTest.cpp
+    ResourceBudgetTest.cpp
     CapabilitiesTest.cpp
     FindingFingerprintTest.cpp
     ConfigTest.cpp
@@ -69,14 +70,19 @@ target_link_libraries(codeskeptic_tests
 add_executable(codeskeptic_worker_fixture WorkerProtocolTest.cpp)
 target_compile_definitions(codeskeptic_worker_fixture PRIVATE CODESKEPTIC_WORKER_TEST_CHILD=1)
 target_link_libraries(codeskeptic_worker_fixture PRIVATE codeskeptic_core)
+add_executable(codeskeptic_resource_fixture ResourceBudgetTest.cpp)
+target_compile_definitions(codeskeptic_resource_fixture PRIVATE CODESKEPTIC_RESOURCE_TEST_CHILD=1)
+target_link_libraries(codeskeptic_resource_fixture PRIVATE codeskeptic_core)
 target_compile_definitions(codeskeptic_tests PRIVATE
     CODESKEPTIC_BINARY_PATH="$<TARGET_FILE:codeskeptic>"
-    CODESKEPTIC_WORKER_FIXTURE_PATH="$<TARGET_FILE:codeskeptic_worker_fixture>")
+    CODESKEPTIC_WORKER_FIXTURE_PATH="$<TARGET_FILE:codeskeptic_worker_fixture>"
+    CODESKEPTIC_RESOURCE_FIXTURE_PATH="$<TARGET_FILE:codeskeptic_resource_fixture>")
 if(MSVC)
     target_sources(codeskeptic_tests PRIVATE ../src/windows_utf8.manifest)
     target_sources(codeskeptic_worker_fixture PRIVATE ../src/windows_utf8.manifest)
+    target_sources(codeskeptic_resource_fixture PRIVATE ../src/windows_utf8.manifest)
 endif()
-add_dependencies(codeskeptic_tests codeskeptic_corpus_inputs codeskeptic codeskeptic_worker_fixture)
+add_dependencies(codeskeptic_tests codeskeptic_corpus_inputs codeskeptic codeskeptic_worker_fixture codeskeptic_resource_fixture)
 
 include(GoogleTest)
 gtest_discover_tests(codeskeptic_tests)

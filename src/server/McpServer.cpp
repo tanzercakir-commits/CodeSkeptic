@@ -300,7 +300,7 @@ json::Value handleToolsList(const json::Value& id) {
 }
 
 json::Value runAnalyze(const json::Value& id, const json::Object* args,
-                      const codeskeptic::Config& defaults) {
+                      const codeskeptic::Config& defaults, bool* analysis_cancelled) {
     if (!args) return makeError(id, -32602, "missing arguments");
 
     static const std::set<std::string> allowedFields = {
@@ -333,6 +333,7 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args,
 
     codeskeptic::Config config;
     config.inheritRuleSelection(defaults);
+    config.inheritWorkerLimits(defaults);
     codeskeptic::InputError inputError;
     if (auto disabled = args->getString("disable_rules")) {
         if (!config.addDisabledRules(disabled->str(), &inputError))
@@ -386,6 +387,10 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args,
     analyzer.addRule<codeskeptic::ContractRule>();
     analyzer.addRule<codeskeptic::PolicyRule>();
     const codeskeptic::AnalysisResult result = analyzer.run();
+    if (analysis_cancelled) {
+        for (const auto& source : result.sources)
+            if (source.reason == "worker_cancelled") *analysis_cancelled = true;
+    }
 
     json::Array findings;
     for (const auto& diag : analyzer.diagnostics()) {
@@ -461,24 +466,32 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args,
 
 json::Value handleToolsCall(const json::Value& id,
                             const json::Object* params,
-                            const codeskeptic::Config& defaults) {
+                            const codeskeptic::Config& defaults, bool* analysis_cancelled) {
     if (!params) return makeError(id, -32602, "missing params");
     auto name = params->getString("name");
     if (!name) return makeError(id, -32602, "missing tool name");
     if (*name != "analyze")
         return makeError(id, -32602, "unknown tool: " + name->str());
-    return runAnalyze(id, params->getObject("arguments"), defaults);
+    return runAnalyze(id, params->getObject("arguments"), defaults, analysis_cancelled);
 }
 
 } // anonymous namespace
 
 namespace codeskeptic {
 
+static std::string handleMcpMessageWithCancellation(const std::string& line,
+    const Config& defaults, bool* analysis_cancelled);
+
 std::string handleMcpMessage(const std::string& line) {
     return handleMcpMessage(line, Config{});
 }
 
 std::string handleMcpMessage(const std::string& line, const Config& defaults) {
+    return handleMcpMessageWithCancellation(line, defaults, nullptr);
+}
+
+static std::string handleMcpMessageWithCancellation(const std::string& line,
+    const Config& defaults, bool* analysis_cancelled) {
     json::Value id(nullptr);
     try {
         if (line.size() > kMaxMessageBytes || !withinDepthBudget(line))
@@ -519,7 +532,7 @@ std::string handleMcpMessage(const std::string& line, const Config& defaults) {
         } else if (*method == "tools/list") {
             response = handleToolsList(id);
         } else if (*method == "tools/call") {
-            response = handleToolsCall(id, msg->getObject("params"), defaults);
+            response = handleToolsCall(id, msg->getObject("params"), defaults, analysis_cancelled);
         } else {
             response = makeError(id, -32601, "method not found");
         }
@@ -561,12 +574,19 @@ int runMcpServer(const Config& defaults) {
             if (!line.empty() && line.back() == '\r') line.pop_back();
             oversized = oversized || line.size() > kMaxMessageBytes;
             if (oversized || !line.empty()) {
+                bool analysis_cancelled = false;
                 const std::string response = oversized
                     ? serialize(json::Value(makeError(nullptr, -32600, "request exceeds input budget")))
-                    : handleMcpMessage(line, defaults);
+                    : handleMcpMessageWithCancellation(line, defaults, &analysis_cancelled);
                 if (!response.empty()) {
                     std::cout << response << '\n' << std::flush;
                     if (!std::cout) return 2;
+                    // An active analysis has already reaped its cancelled
+                    // child. Deliver its complete frame before stopping; do
+                    // not block for a second request/EOF. Ordinary resource
+                    // failures do not mark this request cancelled. No state
+                    // from an earlier or unrelated call can stop this server.
+                    if (analysis_cancelled) return 2;
                 }
             }
             if (eof) return 0;

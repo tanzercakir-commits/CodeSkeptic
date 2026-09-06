@@ -3,6 +3,7 @@
 
 #include "core/Diagnostic.h"
 #include "core/Messages.h"
+#include "core/ResourceBudget.h"
 
 #include <map>
 #include <set>
@@ -28,6 +29,12 @@ public:
     bool buildPathSpecified() const { return build_path_specified_; }
     bool fileListSpecified() const { return file_list_specified_; }
     bool doctor() const { return doctor_; }
+    const WorkerLimits& workerLimits() const { return worker_limits_; }
+    void inheritWorkerLimits(const Config& defaults) { worker_limits_ = defaults.worker_limits_; }
+    void setResourceCancellation(std::shared_ptr<ResourceCancellation> cancellation) {
+        resource_cancellation_ = std::move(cancellation);
+    }
+    const ResourceCancellation* resourceCancellation() const { return resource_cancellation_.get(); }
     const std::string& outputFormat() const { return output_format_; }
     const std::string& jsonOutputPath() const { return json_output_path_; }
     const std::string& sarifOutputPath() const { return sarif_output_path_; }
@@ -224,6 +231,8 @@ private:
     bool build_path_specified_ = false;
     bool file_list_specified_ = false;
     bool doctor_ = false;
+    WorkerLimits worker_limits_;
+    std::shared_ptr<ResourceCancellation> resource_cancellation_;
     std::string summary_in_path_;
     std::string summary_out_path_;
     std::vector<std::string> model_files_;

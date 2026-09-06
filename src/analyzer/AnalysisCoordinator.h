@@ -21,7 +21,8 @@ struct WorkerExecution {
 };
 
 std::vector<std::string> workerAnalysisArguments(const Config& config);
-WorkerExecution executeAnalysisWorker(const std::string& executable, const WorkerRequest& request);
+WorkerExecution executeAnalysisWorker(const std::string& executable, const WorkerRequest& request,
+    const WorkerLimits& limits = {}, const ResourceCancellation* cancellation = nullptr);
 // Private main dispatch; no normal argument scanning or config-file load.
 int runAnalysisWorker(const std::string& request_path, const std::string& response_path);
 
