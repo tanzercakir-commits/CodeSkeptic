@@ -10,6 +10,9 @@
 
 #include <fstream>
 #include <filesystem>
+#include <iostream>
+#include <sstream>
+#include <stdexcept>
 #include <string>
 #include <gtest/gtest.h>
 
@@ -29,6 +32,256 @@ std::string writeTempSource(const std::string& name,
 }
 
 } // anonymous namespace
+
+namespace {
+
+constexpr std::size_t requestByteLimit = 1024 * 1024;
+
+void expectRpcError(const std::string& response, int code,
+                    const std::string& expectedId = "null") {
+    auto parsed = llvm::json::parse(response);
+    ASSERT_TRUE(static_cast<bool>(parsed)) << response.substr(0, 250);
+    const auto* object = parsed->getAsObject();
+    ASSERT_NE(object, nullptr);
+    EXPECT_EQ(object->getString("jsonrpc"), "2.0");
+    EXPECT_EQ(object->get("result"), nullptr);
+    const auto* error = object->getObject("error");
+    ASSERT_NE(error, nullptr) << response.substr(0, 250);
+    EXPECT_EQ(error->getInteger("code"), code);
+    ASSERT_NE(error->getString("message"), std::nullopt);
+    const auto* id = object->get("id");
+    ASSERT_NE(id, nullptr);
+    EXPECT_EQ(llvm::formatv("{0}", *id).str(), expectedId);
+}
+
+// Exercise the actual stdio entry point without a new testing-only server API.
+// CTest uses separate processes; within one process this scope restores streams.
+class ServerStreams {
+public:
+    explicit ServerStreams(const std::string& input) : input_(input),
+        inMask_(std::cin.exceptions()), outMask_(std::cout.exceptions()),
+        inState_(std::cin.rdstate()), outState_(std::cout.rdstate()) {
+        std::cin.exceptions(std::ios::goodbit);
+        std::cout.exceptions(std::ios::goodbit);
+        inBuf_ = std::cin.rdbuf(input_.rdbuf());
+        outBuf_ = std::cout.rdbuf(output_.rdbuf());
+    }
+    ~ServerStreams() {
+        std::cin.exceptions(std::ios::goodbit);
+        std::cout.exceptions(std::ios::goodbit);
+        std::cin.rdbuf(inBuf_);
+        std::cout.rdbuf(outBuf_);
+        std::cin.clear(inState_);
+        std::cout.clear(outState_);
+        std::cin.exceptions(inMask_);
+        std::cout.exceptions(outMask_);
+    }
+    std::string output() const { return output_.str(); }
+    std::istringstream input_;
+private:
+    std::ostringstream output_;
+    std::ios::iostate inMask_, outMask_, inState_, outState_;
+    std::streambuf *inBuf_, *outBuf_;
+};
+
+class ThrowingReadBuffer : public std::streambuf {
+    int_type underflow() override { throw std::runtime_error("injected read failure"); }
+};
+
+class ThrowingWriteBuffer : public std::streambuf {
+    int_type overflow(int_type) override { throw std::runtime_error("injected write failure"); }
+    std::streamsize xsputn(const char*, std::streamsize) override {
+        throw std::runtime_error("injected write failure");
+    }
+};
+
+} // namespace
+
+TEST(McpServerTest, EnvelopeRequiresVersionAndMethodBeforeNotificationHandling) {
+    for (const char* request : {
+        R"({"id":3,"method":"ping"})", R"({"jsonrpc":2,"id":3,"method":"ping"})",
+        R"({"jsonrpc":"1.0","id":3,"method":"ping"})", "{}",
+        R"({"jsonrpc":"2.0"})", R"({"jsonrpc":"2.0","method":false})",
+        R"({"jsonrpc":"2.0","method":""})",
+        R"({"jsonrpc":"2.0","id":3,"method":"pi\u0000ng"})",
+        R"({"method":"notifications/initialized"})"}) {
+        SCOPED_TRACE(request);
+        expectRpcError(handleMcpMessage(request), -32600);
+    }
+}
+
+TEST(McpServerTest, EnvelopeRejectsNonMcpIdsWithoutReflectingThem) {
+    for (const char* id : {"null", "true", "false", "[]", "{}", "1.5", "1e100"}) {
+        SCOPED_TRACE(id);
+        expectRpcError(handleMcpMessage(std::string(
+            R"({"jsonrpc":"2.0","method":"ping","id":)") + id + "}"), -32600);
+    }
+    for (const char* id : {"0", "-1", "9223372036854775807", "-9223372036854775808",
+                           "18446744073709551615", R"("")", R"("request-α")"}) {
+        SCOPED_TRACE(id);
+        auto response = llvm::json::parse(handleMcpMessage(std::string(
+            R"({"jsonrpc":"2.0","method":"ping","id":)") + id + "}"));
+        ASSERT_TRUE(static_cast<bool>(response));
+        ASSERT_NE(response->getAsObject(), nullptr);
+        ASSERT_NE(response->getAsObject()->get("result"), nullptr);
+        ASSERT_NE(response->getAsObject()->get("id"), nullptr);
+        EXPECT_EQ(llvm::formatv("{0}", *response->getAsObject()->get("id")).str(), id);
+    }
+}
+
+TEST(McpServerTest, EnvelopeValidNotificationsNeverAnalyzeOrReply) {
+    const auto misses = SourceManager::warmCacheMisses();
+    const auto hits = SourceManager::warmCacheHits();
+    for (const char* request : {
+        R"({"jsonrpc":"2.0","method":"notifications/initialized"})",
+        R"({"jsonrpc":"2.0","method":"unknown"})",
+        R"({"jsonrpc":"2.0","method":"tools/call","params":{"name":"analyze","arguments":{"path":"unused.cpp"}}})"})
+        EXPECT_TRUE(handleMcpMessage(request).empty());
+    EXPECT_EQ(SourceManager::warmCacheMisses(), misses);
+    EXPECT_EQ(SourceManager::warmCacheHits(), hits);
+}
+
+TEST(McpServerTest, EnvelopeRejectsInvalidParamsBeforeDispatch) {
+    for (const char* method : {"ping", "initialize", "tools/list", "tools/call"}) {
+        for (const char* params : {"null", "false", "3", "[]", R"("text")"}) {
+            SCOPED_TRACE(method);
+            SCOPED_TRACE(params);
+            expectRpcError(handleMcpMessage(std::string(
+                R"({"jsonrpc":"2.0","id":8,"method":")") + method +
+                R"(","params":)" + params + "}"), -32602, "8");
+        }
+    }
+}
+
+TEST(McpServerTest, EnvelopeBoundsBytesAndNestingWithoutRejectingValidBoundary) {
+    std::string ping = R"({"jsonrpc":"2.0","id":9,"method":"ping"})";
+    ping.resize(requestByteLimit, ' ');
+    EXPECT_NE(handleMcpMessage(ping).find("\"result\""), std::string::npos);
+    ping.push_back(' ');
+    expectRpcError(handleMcpMessage(ping), -32600);
+    // Root + params + 62 arrays = exactly 64 containers.
+    const std::string prefix = R"({"jsonrpc":"2.0","id":10,"method":"ping","params":{"nested":)";
+    EXPECT_NE(handleMcpMessage(prefix + std::string(62, '[') + "0" +
+        std::string(62, ']') + "}}").find("\"result\""), std::string::npos);
+    expectRpcError(handleMcpMessage(prefix + std::string(63, '[') + "0" +
+        std::string(63, ']') + "}}"), -32600);
+    // Delimiters and escaped quotes inside strings are not structural depth.
+    const std::string quoted = R"({"jsonrpc":"2.0","id":11,"method":"ping","params":{"text":"\"\\)" +
+        std::string(128, '[') + R"("}})";
+    EXPECT_NE(handleMcpMessage(quoted).find("\"result\""), std::string::npos);
+}
+
+TEST(McpServerTest, EnvelopeBoundedStdioDrainsFrameAndResumesIncludingCrlfAndEof) {
+    std::string exact = R"({"jsonrpc":"2.0","id":12,"method":"ping"})";
+    exact.resize(requestByteLimit, ' ');
+    std::string output;
+    int result = -1;
+    {
+        ServerStreams streams(exact + "\r\n" + exact + " \n" +
+            R"({"jsonrpc":"2.0","method":"notifications/initialized"})" + "\n" +
+            "{broken\n" + R"({"jsonrpc":"2.0","id":13,"method":"ping"})");
+        result = runMcpServer();
+        output = streams.output();
+    }
+    EXPECT_EQ(result, 0);
+    std::istringstream lines(output);
+    std::string line;
+    ASSERT_TRUE(static_cast<bool>(std::getline(lines, line)));
+    EXPECT_NE(line.find("\"id\":12"), std::string::npos);
+    ASSERT_TRUE(static_cast<bool>(std::getline(lines, line)));
+    expectRpcError(line, -32600);
+    ASSERT_TRUE(static_cast<bool>(std::getline(lines, line)));
+    expectRpcError(line, -32700);
+    ASSERT_TRUE(static_cast<bool>(std::getline(lines, line)));
+    EXPECT_NE(line.find("\"id\":13"), std::string::npos);
+    EXPECT_FALSE(static_cast<bool>(std::getline(lines, line)));
+}
+
+TEST(McpServerTest, LifecycleStreamFailuresAreTerminalNotCleanEof) {
+    int readResult = -1, writeResult = -1, throwingResult = -1;
+    bool noReadAfterWriteFailure = false;
+    {
+        ServerStreams streams("");
+        std::cin.setstate(std::ios::badbit);
+        readResult = runMcpServer();
+    }
+    {
+        ServerStreams streams(R"({"jsonrpc":"2.0","id":14,"method":"ping"})" "\nnext\n");
+        std::cout.setstate(std::ios::badbit);
+        writeResult = runMcpServer();
+        noReadAfterWriteFailure = streams.input_.peek() == 'n';
+    }
+    {
+        ServerStreams streams("");
+        ThrowingReadBuffer buffer;
+        std::cin.rdbuf(&buffer);
+        std::cin.exceptions(std::ios::badbit);
+        EXPECT_NO_THROW(throwingResult = runMcpServer());
+        std::cin.exceptions(std::ios::goodbit);
+        std::cin.rdbuf(streams.input_.rdbuf());
+    }
+    EXPECT_EQ(readResult, 2);
+    EXPECT_EQ(writeResult, 2);
+    EXPECT_TRUE(noReadAfterWriteFailure);
+    EXPECT_EQ(throwingResult, 2);
+}
+
+TEST(McpServerTest, LifecycleConstructorFailureReturnsErrorAndClearsPublishedScope) {
+    const auto path = writeTempSource("mcp_constructor_failure.cpp",
+        "void first(){int* a;int x=*a;(void)x;}\n"
+        "void second(){int* b;int y=*b;(void)y;}\n");
+    const std::string request = std::string(
+        R"({"jsonrpc":"2.0","id":15,"method":"tools/call","params":{"name":"analyze","arguments":{"path":")") +
+        path + R"(","functions":"second","fatal_asserts":"my_fatal","allocator_pairs":"my_alloc=my_free"}}})";
+    const auto oldMask = std::cerr.exceptions();
+    const auto oldState = std::cerr.rdstate();
+    std::cerr.exceptions(std::ios::goodbit);
+    ThrowingWriteBuffer buffer;
+    auto* oldBuffer = std::cerr.rdbuf(&buffer);
+    std::cerr.exceptions(std::ios::badbit | std::ios::failbit);
+    std::string response;
+    bool escaped = false;
+    try { response = handleMcpMessage(request); } catch (...) { escaped = true; }
+    std::cerr.exceptions(std::ios::goodbit);
+    std::cerr.rdbuf(oldBuffer);
+    std::cerr.clear(oldState);
+    std::cerr.exceptions(oldMask);
+    EXPECT_FALSE(escaped);
+    if (!escaped) expectRpcError(response, -32603, "15");
+    EXPECT_TRUE(functionFilter().empty());
+    EXPECT_TRUE(fatalCallNames().empty());
+    EXPECT_TRUE(allocatorPairs().empty());
+    // The following real request must work without the failed call's filter.
+    const auto next = handleMcpMessage(std::string(
+        R"({"jsonrpc":"2.0","id":16,"method":"tools/call","params":{"name":"analyze","arguments":{"path":")") + path + R"("}}})");
+    EXPECT_NE(next.find("'a'"), std::string::npos);
+    EXPECT_NE(next.find("'b'"), std::string::npos);
+}
+
+#if GTEST_HAS_DEATH_TEST
+TEST(McpServerTest, LifecycleWorkerExceptionReachesCallerAndNextAnalysisWorks) {
+    const auto path = writeTempSource("mcp_worker_failure.cpp", "int f(){return 0;}\n");
+    for (bool warm : {false, true}) {
+        SCOPED_TRACE(warm);
+        // Catch the baseline's std::terminate in a child, not the whole runner.
+        EXPECT_EXIT({
+            SourceManager manager(::testing::TempDir(), nullptr, true);
+            manager.enableWarmCache(warm);
+            manager.addSourceFile(path);
+            if (warm && manager.processAll([](clang::ASTContext&) {}) != 0) std::_Exit(3);
+            bool caught = false;
+            try {
+                manager.processAll([](clang::ASTContext&) {
+                    throw std::runtime_error("injected worker exception");
+                });
+            } catch (const std::runtime_error&) { caught = true; }
+            unsigned visited = 0;
+            const int next = manager.processAll([&](clang::ASTContext&) { ++visited; });
+            std::_Exit(caught && next == 0 && visited == 1 ? 0 : 4);
+        }, ::testing::ExitedWithCode(0), "");
+    }
+}
+#endif
 
 TEST(McpServerTest, Initialize) {
     auto response = handleMcpMessage(
