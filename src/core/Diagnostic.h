@@ -33,6 +33,9 @@ enum class FindingKind {
     ResourceDoubleRelease,
     MemoryUseAfterRelease,
     ResourceUseAfterRelease,
+    MemoryLeak,
+    HandleLeak,
+    GenericResourceLeak,
 };
 
 // Dataflow trace step attached to a finding: the chain of events that

@@ -40,8 +40,18 @@ TEST(SarifReporterTest, MinimalStructure) {
     // Rules are listed uniquely under driver.rules
     auto parsed = llvm::json::parse(out);
     ASSERT_TRUE(static_cast<bool>(parsed));
-    const auto* descriptors = parsed->getAsObject()->getArray("runs")->front()
-        .getAsObject()->getObject("tool")->getObject("driver")->getArray("rules");
+    const auto* root = parsed->getAsObject();
+    ASSERT_NE(root, nullptr);
+    const auto* runs = root->getArray("runs");
+    ASSERT_NE(runs, nullptr);
+    ASSERT_EQ(runs->size(), 1u);
+    const auto* run = runs->front().getAsObject();
+    ASSERT_NE(run, nullptr);
+    const auto* tool = run->getObject("tool");
+    ASSERT_NE(tool, nullptr);
+    const auto* driver = tool->getObject("driver");
+    ASSERT_NE(driver, nullptr);
+    const auto* descriptors = driver->getArray("rules");
     ASSERT_NE(descriptors, nullptr);
     ASSERT_EQ(descriptors->size(), 2u);
     std::set<std::string> ids;

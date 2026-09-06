@@ -109,10 +109,10 @@ assumptions, contracts or project policy.
 |---|---|---|
 | `uninit-ptr` | CWE-824 | Dereference of an uninitialized pointer |
 | `uninit-scalar` | CWE-457 | Read of an uninitialized automatic scalar |
-| `memory-leak` | CWE-401 | Owned allocated memory is not released |
+| `memory-leak` | CWE-401, CWE-772, CWE-775 | Pointer-owned memory or resource is not released |
 | `double-free` | CWE-415, CWE-675 | Repeated release of memory or a resource |
 | `use-after-free` | CWE-416, CWE-672 | Use of memory or a resource after release |
-| `resource-leak` | CWE-775 | File stream, directory handle or descriptor left unclosed |
+| `resource-leak` | CWE-401, CWE-772, CWE-775 | Handle or other owned resource is not released |
 | `div-by-zero` | CWE-369 | Division or remainder with a zero divisor |
 | `null-deref` | CWE-476 | Dereference of a null pointer |
 | `bounds` | CWE-120, CWE-125, CWE-787, CWE-823 | Out-of-range memory access, pointer offset or unchecked copy |
@@ -140,6 +140,26 @@ that all operations occur in the same execution. A union containing an
 unclassified subtype is marked `partial`; known evidence is not discarded and
 the unknown part is not silently upgraded. Duplicate same-kind evidence is
 idempotent and command order does not choose the reported weakness.
+
+The stable `double-free`/`use-after-free` selectors also cover resource
+lifetimes. Ordinary memory with observed allocation and explicit free/delete
+evidence maps to CWE-415/CWE-416. File/directory handles map to CWE-675/CWE-672.
+Reporting conservatively uses these broader resource CWEs when evidence is
+mixed or incomplete (including custom functions, reassignment between kinds,
+smart-owner releases and realloc edge releases). This does not assert that
+every resource API use is detected. Metadata is collected separately from the
+existing solver; finding predicates, path/disjunct budgets and counts do not
+change. It is never inferred from translated messages or capped trace notes.
+
+Leak subtypes likewise use actual acquisitions, not the original variable
+initializer or legacy selector alone. Proven ordinary memory maps to CWE-401;
+FILE/DIR and native descriptor/pipe acquisitions map to CWE-775. Mixed or
+unknown ownership (including summary-only handles) maps to the broader
+[CWE-772 resource-release weakness](https://cwe.mitre.org/data/definitions/772.html).
+Both existing leak selectors are retained for compatibility; their potential
+CWE sets therefore overlap. Reusing a variable for both FILE and heap memory
+deliberately receives the broader subtype, without claiming generation-level
+provenance. Detection predicates, selector membership and messages are unchanged.
 
 The rule help URI points to the published capability overview; per-CWE links
 point directly to MITRE. This branch's new metadata documentation is not a

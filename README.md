@@ -244,10 +244,10 @@ assumptions, contracts or project policy.
 |---|---|---|
 | `uninit-ptr` | CWE-824 | Dereference of an uninitialized pointer |
 | `uninit-scalar` | CWE-457 | Read of an uninitialized automatic scalar |
-| `memory-leak` | CWE-401 | Owned allocated memory is not released |
+| `memory-leak` | CWE-401, CWE-772, CWE-775 | Pointer-owned memory or resource is not released |
 | `double-free` | CWE-415, CWE-675 | Repeated release of memory or a resource |
 | `use-after-free` | CWE-416, CWE-672 | Use of memory or a resource after release |
-| `resource-leak` | CWE-775 | File stream, directory handle or descriptor left unclosed |
+| `resource-leak` | CWE-401, CWE-772, CWE-775 | Handle or other owned resource is not released |
 | `div-by-zero` | CWE-369 | Division or remainder with a zero divisor |
 | `null-deref` | CWE-476 | Dereference of a null pointer |
 | `bounds` | CWE-120, CWE-125, CWE-787, CWE-823 | Out-of-range memory access, pointer offset or unchecked copy |

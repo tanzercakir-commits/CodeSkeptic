@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <functional>
 #include <iostream>
+#include <initializer_list>
 #include <map>
 #include <set>
 #include <vector>
@@ -322,6 +323,103 @@ const Expr* allocationExprFor(const Stmt* stmt, const VarDecl* var) {
             return assignment->getRHS();
     }
     return nullptr;
+}
+
+// Reporting provenance only. The analysis' broader ownership recognizers also
+// accept file handles, custom allocators and consumed summaries: those do not
+// establish that a released resource was ordinary memory. A namespace-local
+// lookalike or a user-defined body is not stdlib memory evidence either.
+bool ordinaryMemoryCallee(const FunctionDecl* callee) {
+    if (!callee || !callee->getIdentifier() || callee->hasBody()) return false;
+    const std::string name = callee->getNameAsString();
+    const std::string qualified = callee->getQualifiedNameAsString();
+    return qualified == name || qualified == "std::" + name;
+}
+
+bool hasMemorySignature(const FunctionDecl* callee, QualType result,
+                        std::initializer_list<QualType> parameters) {
+    if (!ordinaryMemoryCallee(callee) || callee->isVariadic() ||
+        callee->getNumParams() != parameters.size()) return false;
+    const ASTContext& ctx = callee->getASTContext();
+    if (!ctx.hasSameUnqualifiedType(callee->getReturnType(), result)) return false;
+    unsigned index = 0;
+    for (const QualType parameter : parameters)
+        if (!ctx.hasSameUnqualifiedType(callee->getParamDecl(index++)->getType(), parameter))
+            return false;
+    return true;
+}
+
+bool ordinaryMemoryAcquisition(const Expr* expression) {
+    if (!expression) return false;
+    if (isa<CXXNewExpr>(expression->IgnoreParenCasts())) return true;
+    const CallExpr* call = coreCall(expression);
+    const FunctionDecl* callee = call ? call->getDirectCallee() : nullptr;
+    if (!ordinaryMemoryCallee(callee)) return false;
+    const llvm::StringRef name = calleeName(callee);
+    ASTContext& ctx = callee->getASTContext();
+    if (name == "malloc")
+        return hasMemorySignature(callee, ctx.VoidPtrTy, {ctx.getSizeType()});
+    if (name == "calloc" || name == "aligned_alloc")
+        return hasMemorySignature(callee, ctx.VoidPtrTy, {ctx.getSizeType(), ctx.getSizeType()});
+    const QualType characters = ctx.getPointerType(ctx.CharTy);
+    const QualType string = ctx.getPointerType(ctx.CharTy.withConst());
+    if (name == "strdup") return hasMemorySignature(callee, characters, {string});
+    if (name == "strndup") return hasMemorySignature(callee, characters, {string, ctx.getSizeType()});
+    return false;
+}
+
+bool ordinaryMemoryRelease(const Stmt* statement) {
+    if (isa<CXXDeleteExpr>(statement)) return true;
+    const auto* call = dyn_cast<CallExpr>(statement);
+    const FunctionDecl* callee = call ? call->getDirectCallee() : nullptr;
+    return ordinaryMemoryCallee(callee) && calleeName(callee) == "free" &&
+           hasMemorySignature(callee, callee->getASTContext().VoidTy,
+                              {callee->getASTContext().VoidPtrTy});
+}
+
+bool namedHandlePointer(QualType type, llvm::StringRef name) {
+    if (!type->isPointerType()) return false;
+    QualType pointee = type->getPointeeType();
+    if (const auto* alias = pointee->getAs<TypedefType>())
+        if (alias->getDecl()->getName() == name) return true;
+    const auto* record = pointee->getAs<RecordType>();
+    return record && record->getDecl()->getName() == name;
+}
+
+bool ordinaryHandleAcquisition(const Expr* expression) {
+    const CallExpr* call = coreCall(expression);
+    const FunctionDecl* callee = call ? call->getDirectCallee() : nullptr;
+    if (!ordinaryMemoryCallee(callee)) return false;
+    ASTContext& ctx = callee->getASTContext();
+    const auto name = calleeName(callee);
+    const QualType result = callee->getReturnType();
+    const QualType string = ctx.getPointerType(ctx.CharTy.withConst());
+    if (namedHandlePointer(result, "FILE")) {
+        if (name == "fopen") return hasMemorySignature(callee, result, {string, string});
+        if (name == "freopen") return hasMemorySignature(callee, result, {string, string, result});
+        if (name == "fdopen") return hasMemorySignature(callee, result, {ctx.IntTy, string});
+        if (name == "tmpfile") return hasMemorySignature(callee, result, {});
+    } else if (namedHandlePointer(result, "DIR")) {
+        if (name == "opendir") return hasMemorySignature(callee, result, {string});
+        if (name == "fdopendir") return hasMemorySignature(callee, result, {ctx.IntTy});
+    }
+    return false;
+}
+
+enum AcquisitionMetadata : unsigned {
+    AcquiredMemory = 1, AcquiredHandle = 2, AcquiredUnknown = 4
+};
+
+unsigned acquisitionMetadata(const Expr* expression) {
+    if (ordinaryMemoryAcquisition(expression)) return AcquiredMemory;
+    if (ordinaryHandleAcquisition(expression)) return AcquiredHandle;
+    return AcquiredUnknown;
+}
+
+codeskeptic::FindingKind leakKindForAcquisition(unsigned evidence) {
+    if (evidence == AcquiredMemory) return codeskeptic::FindingKind::MemoryLeak;
+    if (evidence == AcquiredHandle) return codeskeptic::FindingKind::HandleLeak;
+    return codeskeptic::FindingKind::GenericResourceLeak;
 }
 
 AllocationFamily allocationFamilyOf(const Expr* expr) {
@@ -2015,6 +2113,24 @@ public:
     // use-after-free are produced here.
     void onStatement(const Stmt* stmt, const State& beforeDisjuncts,
                      const State& afterDisjuncts, ASTContext& ctx) {
+        observeLifetimeMetadata(beforeDisjuncts);
+        observeLifetimeMetadata(afterDisjuncts);
+        const StmtEffects effects = classifyStmtEffects(stmt, trackedSet_, ctx);
+        for (const auto& [var, effect] : effects) {
+            if (effect == StmtEffect::Allocates) {
+                // A fresh acquisition belongs to var, not its previous alias.
+                const unsigned kind = acquisitionMetadata(allocationExprFor(stmt, var));
+                acquisitionKinds_[var] |= kind;
+                lifetimeMetadata_[var] |= kind == AcquiredMemory
+                    ? MemoryAcquired : OtherLifetime;
+            } else if (effect == StmtEffect::Frees) {
+                for (const auto& disjunct : beforeDisjuncts) {
+                    if (const VarDecl* owner = resolveBinding(var, disjunct.vars))
+                        lifetimeMetadata_[owner] |= ordinaryMemoryRelease(stmt)
+                            ? MemoryReleased : OtherLifetime;
+                }
+            }
+        }
         // Reporting works on today's single-state view; the payoff of
         // path sensitivity is that disjuncts dropped by refineOnEdge
         // never enter this merge at all.
@@ -2059,8 +2175,7 @@ public:
             }
         }
 
-        for (const auto& [var, effect] :
-             classifyStmtEffects(stmt, trackedSet_, ctx)) {
+        for (const auto& [var, effect] : effects) {
             auto it = before.find(var);
             if (it == before.end()) continue;
 
@@ -2102,9 +2217,8 @@ public:
                     releaseAuthority(stmt, ownerState->second) !=
                         ReleaseAuthority::Match)
                     continue;
-                // Under its own identity, like UAF: so the CWE415 mapping
-                // and the --disable-rule taxonomy can tell the finding
-                // kinds apart
+                // Preserve the public selector; final reporting provenance
+                // distinguishes memory from other resource lifetimes.
                 report(stmt, var, ctx, codeskeptic::Severity::Error,
                        "double-free", codeskeptic::MsgId::DoubleFree,
                        owner);
@@ -2128,6 +2242,10 @@ public:
                       const State& beforeDisjuncts,
                       const State& afterDisjuncts,
                       ASTContext& ctx) {
+        // Observe even when no diagnostic trigger exists: the transfer may
+        // already have released the final smart owner at this CFG element.
+        observeLifetimeMetadata(beforeDisjuncts);
+        observeLifetimeMetadata(afterDisjuncts);
         auto destructor = element.getAs<CFGAutomaticObjDtor>();
         if (!destructor) return;
         const VarDecl* owner = destructor->getVarDecl();
@@ -2165,6 +2283,32 @@ public:
         return reported_;
     }
 
+    void finalizeLifetimeMetadata(bool converged) {
+        // Reporting visits blocks in CFG order, not lifetime order. Monotonic
+        // per-owner evidence is finalized only after the entire reporting pass.
+        // Reassignment and mixed paths never erase resource/unknown evidence.
+        for (const auto& [index, owner] : noteTargets_) {
+            auto& diagnostic = results_[index];
+            const auto found = lifetimeMetadata_.find(owner);
+            const bool memory = converged && found != lifetimeMetadata_.end() &&
+                found->second == (MemoryAcquired | MemoryReleased);
+            if (diagnostic.rule_id == "double-free")
+                diagnostic.kind = memory ? codeskeptic::FindingKind::MemoryDoubleRelease
+                                         : codeskeptic::FindingKind::ResourceDoubleRelease;
+            else if (diagnostic.rule_id == "use-after-free")
+                diagnostic.kind = memory ? codeskeptic::FindingKind::MemoryUseAfterRelease
+                                         : codeskeptic::FindingKind::ResourceUseAfterRelease;
+            else if (diagnostic.rule_id == "memory-leak" || diagnostic.rule_id == "resource-leak")
+                diagnostic.kind = leakKind(owner, converged);
+        }
+    }
+
+    codeskeptic::FindingKind leakKind(const VarDecl* owner, bool converged) const {
+        const auto found = acquisitionKinds_.find(owner);
+        return leakKindForAcquisition(converged && found != acquisitionKinds_.end()
+            ? found->second : AcquiredUnknown);
+    }
+
     // After the run finishes: attach the accumulated event notes to reports
     void attachTraces() {
         for (const auto& [index, var] : noteTargets_) {
@@ -2184,6 +2328,31 @@ public:
     }
 
 private:
+    enum LifetimeMetadata : unsigned {
+        MemoryAcquired = 1, MemoryReleased = 2, OtherLifetime = 4
+    };
+    // Not solver state: never participates in equality, transfer, merging,
+    // disjunct budgets or any decision to emit a diagnostic.
+    std::map<const VarDecl*, unsigned> lifetimeMetadata_;
+    // Leaks need acquisition provenance, independent of release/owner vetoes.
+    std::map<const VarDecl*, unsigned> acquisitionKinds_;
+
+    void observeLifetimeMetadata(const State& disjuncts) {
+        for (const auto& disjunct : disjuncts) {
+            for (const auto& [owner, lifetime] : disjunct.vars) {
+                if (!lifetime.smartOwners.empty() || !lifetime.smartOwnersKnown ||
+                    !lifetime.allocatorFamilyKnown || !lifetime.allocatorFamily.empty())
+                    lifetimeMetadata_[owner] |= OtherLifetime;
+                if (lifetime.reallocSource) {
+                    // Success-edge refinement can free the source without an
+                    // explicit free statement. Do not guess from later traces.
+                    lifetimeMetadata_[owner] |= OtherLifetime;
+                    lifetimeMetadata_[lifetime.reallocSource] |= OtherLifetime;
+                }
+            }
+        }
+    }
+
     std::map<const VarDecl*, std::vector<codeskeptic::TraceNote>> events_;
     std::vector<std::pair<size_t, const VarDecl*>> noteTargets_;
 
@@ -2272,6 +2441,7 @@ void reportDiscardedOwnedResults(const FunctionDecl* funcDecl,
             diag.line = sm.getSpellingLineNumber(loc);
             diag.column = sm.getSpellingColumnNumber(loc);
             diag.rule_id = resource ? "resource-leak" : "memory-leak";
+            diag.kind = leakKindForAcquisition(acquisitionMetadata(core));
             diag.function = func->getQualifiedNameAsString();
             diag.message = codeskeptic::msg(
                 codeskeptic::MsgId::OwnedResultDiscarded);
@@ -2334,6 +2504,7 @@ void analyzeFunction(const FunctionDecl* funcDecl,
         collectOwnerRawResultSites(funcDecl),
         results);
     auto dfResult = codeskeptic::runDataflow(funcDecl, ctx, analysis);
+    analysis.finalizeLifetimeMetadata(dfResult.converged);
     if (!dfResult.converged)
         codeskeptic::CoverageReport::instance().recordDataflowFailure(
             funcDecl->getQualifiedNameAsString(), dfResult.failure);
@@ -2380,8 +2551,9 @@ void analyzeFunction(const FunctionDecl* funcDecl,
                 diag.line = line;
                 diag.column = sm.getSpellingColumnNumber(endLoc);
                 // Classify by the ACQUIRING name (robust — a FILE*
-                // typedef's record name varies by libc). A resource
-                // handle left un-closed is CWE-404, not a heap leak.
+                // typedef's record name varies by libc). Preserve this legacy
+                // selector/message; typed CWE metadata instead uses actual
+                // acquisition evidence, including assignments and mixed reuse.
                 diag.rule_id = "memory-leak";
                 codeskeptic::MsgId leakMsg =
                     codeskeptic::MsgId::LeakEndOfFunction;
@@ -2396,6 +2568,7 @@ void analyzeFunction(const FunctionDecl* funcDecl,
                         }
                 }
                 diag.function = funcDecl->getQualifiedNameAsString();
+                diag.kind = analysis.leakKind(var, dfResult.converged);
                 diag.message =
                     codeskeptic::msg(leakMsg, var->getNameAsString());
                 results.push_back(diag);

@@ -38,6 +38,9 @@ const char* findingKindName(FindingKind kind) {
     case FindingKind::ResourceDoubleRelease: return "resource-double-release";
     case FindingKind::MemoryUseAfterRelease: return "memory-use-after-release";
     case FindingKind::ResourceUseAfterRelease: return "resource-use-after-release";
+    case FindingKind::MemoryLeak: return "memory-leak";
+    case FindingKind::HandleLeak: return "handle-leak";
+    case FindingKind::GenericResourceLeak: return "generic-resource-leak";
     }
     return "unclassified";
 }
@@ -215,6 +218,10 @@ std::vector<int> kindCweIds(std::string_view ruleId, FindingKind kind) {
     } else if (rule->id == "use-after-free") {
         if (kind == FindingKind::MemoryUseAfterRelease) ids = {416};
         else if (kind == FindingKind::ResourceUseAfterRelease) ids = {672};
+    } else if (rule->id == "memory-leak" || rule->id == "resource-leak") {
+        if (kind == FindingKind::MemoryLeak) ids = {401};
+        else if (kind == FindingKind::HandleLeak) ids = {775};
+        else if (kind == FindingKind::GenericResourceLeak) ids = {772};
     }
     // A mismatched producer subtype never imports another family's CWE.
     for (const int id : ids)

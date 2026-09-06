@@ -354,3 +354,212 @@ void f(){int a[1]={}; ACTION(a[2]);}
         assert surfaces[0] == surfaces[1], surfaces
     assert len(fingerprints) == 1, fingerprints
 print("CWE_VARIANT_METADATA_CLI_OK order-independent union, same-kind dedup, JSON/SARIF parity")
+
+# Memory and non-memory lifetimes share stable public rule IDs, not CWEs.
+# These are compile-only analyzer fixtures; no invalid operation is executed.
+with tempfile.TemporaryDirectory(prefix="codeskeptic-cwe-lifetimes-") as directory:
+    root = Path(directory)
+    (root / ".codeskeptic.conf").write_text(
+        "enable_rule=double-free\nenable_rule=use-after-free\n"
+        "allocator_pairs=pool_alloc=pool_free\n")
+    source = root / "lifetimes.cpp"
+    source.write_text('''
+struct FILE {int value;}; struct DIR {int value;};
+using Size = decltype(sizeof(0));
+extern "C" void* malloc(Size); extern "C" void free(void*);
+extern "C" void* realloc(void*,Size);
+struct Handle {int value;}; Handle* malloc(int,int); void free(Handle*,int);
+extern "C" FILE* fopen(const char*,const char*); extern "C" int fclose(FILE*);
+extern "C" DIR* opendir(const char*); extern "C" int closedir(DIR*);
+extern void* pool_alloc(unsigned long); extern void pool_free(void*);
+namespace handle_api {void* malloc(unsigned long); void free(void*);}
+namespace std {
+template<class T> class unique_ptr {
+public: explicit unique_ptr(T* p=nullptr); void reset(T* p=nullptr); ~unique_ptr();
+};
+}
+void heap_double(){int* p=(int*)malloc(8);free(p);free(p);}
+int heap_use(){int* p=(int*)malloc(8);free(p);return *p;}
+void new_double(){int* p=new int;delete p;delete p;}
+int new_use(){int* p=new int;delete p;return *p;}
+void alias_double(){int* p=(int*)malloc(8);int* q=p;free(q);free(p);}
+int alias_use(){int* p=(int*)malloc(8);int* q=p;free(p);return *q;}
+void file_double(){FILE* p=fopen("x","r");fclose(p);fclose(p);}
+int file_use(){FILE* p=fopen("x","r");fclose(p);return p->value;}
+void dir_double(){DIR* p=opendir("x");closedir(p);closedir(p);}
+int dir_use(){DIR* p=opendir("x");closedir(p);return p->value;}
+void file_alias_double(){FILE* p=fopen("x","r");FILE* q=p;fclose(q);fclose(p);}
+int dir_alias_use(){DIR* p=opendir("x");DIR* q=p;closedir(p);return q->value;}
+int file_to_heap(){FILE* p=fopen("x","r");fclose(p);p=(FILE*)malloc(8);free(p);return p->value;}
+int heap_to_file(){FILE* p=(FILE*)malloc(8);free(p);p=fopen("x","r");fclose(p);return p->value;}
+int mixed_branch(bool b){FILE* p;if(b){p=(FILE*)malloc(8);free(p);}else{p=fopen("x","r");fclose(p);}return p->value;}
+void mixed_release(){FILE* p=fopen("x","r");fclose(p);free(p);}
+void realloc_double(){int* p=(int*)malloc(8);int* q=(int*)realloc(p,16);if(q){free(p);free(q);}}
+int realloc_use(){int* p=(int*)malloc(8);int* q=(int*)realloc(p,16);if(q){int v=*p;free(q);return v;}free(p);return 0;}
+int realloc_alias_use(){int* p=(int*)malloc(8);int* a=p;int* q=(int*)realloc(a,16);if(q){int v=*p;free(q);return v;}free(p);return 0;}
+void custom_double(){int* p=(int*)pool_alloc(8);pool_free(p);pool_free(p);}
+int custom_use(){int* p=(int*)pool_alloc(8);pool_free(p);return *p;}
+void namespace_double(){void* p=handle_api::malloc(8);handle_api::free(p);handle_api::free(p);}
+int namespace_use(){int* p=(int*)handle_api::malloc(8);handle_api::free(p);return *p;}
+void overload_double(){Handle* p=malloc(1,2);free(p,3);free(p,4);}
+int overload_use(){Handle* p=malloc(1,2);free(p,3);return p->value;}
+void reset_double(){int* p=new int;std::unique_ptr<int> owner(p);delete p;owner.reset();}
+int reset_use(){int* p=new int;std::unique_ptr<int> owner(p);owner.reset();return *p;}
+int destructor_use(){int* p=new int;{std::unique_ptr<int> owner(p);}return *p;}
+void heap_safe(){int* p=(int*)malloc(8);free(p);}
+void file_safe(){FILE* p=fopen("x","r");fclose(p);}
+void dir_safe(){DIR* p=opendir("x");closedir(p);}
+''')
+    expected = {
+        "heap_double": ("double-free", 415), "heap_use": ("use-after-free", 416),
+        "new_double": ("double-free", 415), "new_use": ("use-after-free", 416),
+        "alias_double": ("double-free", 415), "alias_use": ("use-after-free", 416),
+        "file_double": ("double-free", 675), "file_use": ("use-after-free", 672),
+        "dir_double": ("double-free", 675), "dir_use": ("use-after-free", 672),
+        "file_alias_double": ("double-free", 675), "dir_alias_use": ("use-after-free", 672),
+        "file_to_heap": ("use-after-free", 672), "heap_to_file": ("use-after-free", 672),
+        "mixed_branch": ("use-after-free", 672), "mixed_release": ("double-free", 675),
+        "realloc_double": ("double-free", 675), "realloc_use": ("use-after-free", 672),
+        "realloc_alias_use": ("use-after-free", 672),
+        "custom_double": ("double-free", 675), "custom_use": ("use-after-free", 672),
+        "namespace_double": ("double-free", 675), "namespace_use": ("use-after-free", 672),
+        "overload_double": ("double-free", 675), "overload_use": ("use-after-free", 672),
+        "reset_double": ("double-free", 675), "reset_use": ("use-after-free", 672),
+        "destructor_use": ("use-after-free", 672),
+    }
+    registry = {rule["id"]: rule for rule in rules}
+    language_identities = []
+    for language in ("en", "tr"):
+        surfaces = []
+        for output_format in ("json", "sarif"):
+            output = root / (language + "." + output_format)
+            result = subprocess.run(
+                [str(binary), str(source),
+                 "--lang", language, "--" + output_format, str(output)],
+                cwd=root, capture_output=True, text=True, timeout=45)
+            assert result.returncode == 1, (output_format, result.stderr)
+            report = json.loads(output.read_text())
+            if output_format == "json":
+                assert report["complete"] is True, report
+                findings = report["diagnostics"]
+                assert len(findings) == len(expected), findings
+                assert {row["function"] for row in findings} == set(expected), findings
+                for row in findings:
+                    rule_id, cwe_id = expected[row["function"]]
+                    assert row["rule_id"] == rule_id, row
+                    metadata = row["rule_metadata"]
+                    assert metadata["cwe_mapping"] == "mapped", row
+                    assert [cwe["id"] for cwe in metadata["cwes"]] == [cwe_id], row
+                    advertised = registry[rule_id]
+                    assert metadata["description"] == advertised["description"], row
+                    assert metadata["help_uri"] == advertised["help_uri"], row
+                    assert metadata["cwes"][0] in advertised["potential_cwes"], row
+                    assert row["blocks_verdict"] is True, row
+                    assert row["capability_tier"] == "supported", row
+                surfaces.append({row["fingerprint"]: row["rule_metadata"] for row in findings})
+            else:
+                findings = report["runs"][0]["results"]
+                assert len(findings) == len(expected), findings
+                surfaces.append({row["partialFingerprints"]["codeskeptic/v1"]:
+                                 row["properties"]["codeskeptic/ruleMetadata"] for row in findings})
+        assert surfaces[0] == surfaces[1], surfaces
+        language_identities.append(surfaces[0])
+    assert language_identities[0] == language_identities[1], language_identities
+print("CWE_LIFETIME_METADATA_CLI_OK memory/resource/alias/reassignment/realloc, EN/TR, JSON/SARIF/registry parity")
+
+# Legacy leak selectors are intentionally preserved. Actual acquisitions, not
+# the declaration's initializer, determine the selected weakness subtype.
+with tempfile.TemporaryDirectory(prefix="codeskeptic-cwe-leaks-") as directory:
+    root = Path(directory)
+    (root / ".codeskeptic.conf").write_text(
+        "enable_rule=memory-leak\nenable_rule=resource-leak\n"
+        "allocator_pairs=pool_alloc=pool_free\n")
+    source = root / "leaks.cpp"
+    source.write_text('''
+struct FILE; struct DIR;
+using Size = decltype(sizeof(0));
+extern "C" void* malloc(Size); extern "C" void free(void*);
+extern "C" FILE* fopen(const char*,const char*); extern "C" int fclose(FILE*);
+extern "C" DIR* opendir(const char*); extern "C" int closedir(DIR*);
+extern "C" int open(const char*,int,...); extern "C" int pipe(int*);
+extern "C" int openat(int,const char*,int,...); extern "C" int socket(int,int,int);
+extern "C" int mkstemp(char*);
+extern void* pool_alloc(Size); extern void pool_free(void*);
+int open(double); int dup(int value){return value;}
+void heap_assigned(){void* p;p=malloc(8);(void)p;}
+void file_assigned(){FILE* p;p=fopen("x","r");(void)p;}
+void dir_assigned(){DIR* p;p=opendir("x");(void)p;}
+void file_overwrite(){FILE* p=fopen("x","r");
+p=fopen("x","r");fclose(p);}
+void heap_to_file_leak(){FILE* p=(FILE*)malloc(8);free(p);p=fopen("x","r");(void)p;}
+void file_to_heap_leak(){FILE* p=fopen("x","r");fclose(p);p=(FILE*)malloc(8);(void)p;}
+void direct_heap_leak(){void* p=malloc(8);(void)p;}
+void direct_file_leak(){FILE* p=fopen("x","r");(void)p;}
+void custom_leak(){void* p=pool_alloc(8);(void)p;}
+void discarded_heap(){malloc(8);}
+void discarded_file(){fopen("x","r");}
+void discarded_custom(){pool_alloc(8);}
+void native_fd_leak(){int fd=open("x",0);(void)fd;}
+void native_openat_leak(){int fd=openat(1,"x",0);(void)fd;}
+void native_socket_leak(){int fd=socket(1,1,0);(void)fd;}
+void native_mkstemp_leak(char* path){int fd=mkstemp(path);(void)fd;}
+void native_pipe_leak(){int fd[2];if(pipe(fd)<0)return;}
+int acquire_handle(){return open("x",0);}
+void summary_handle_leak(){int fd=acquire_handle();(void)fd;}
+void overload_fd_leak(){int fd=open(1.5);(void)fd;}
+void defined_body_fd_leak(){int fd=dup(1);(void)fd;}
+void safe_heap(){void* p=malloc(8);free(p);}
+void safe_file(){FILE* p=fopen("x","r");fclose(p);}
+''')
+    expected = {
+        "heap_assigned": ("memory-leak", 401), "file_assigned": ("memory-leak", 775),
+        "dir_assigned": ("memory-leak", 775), "file_overwrite": ("memory-leak", 775),
+        "heap_to_file_leak": ("memory-leak", 772), "file_to_heap_leak": ("resource-leak", 772),
+        "direct_heap_leak": ("memory-leak", 401), "direct_file_leak": ("resource-leak", 775),
+        "custom_leak": ("memory-leak", 772), "discarded_heap": ("memory-leak", 401),
+        "discarded_file": ("resource-leak", 775), "discarded_custom": ("memory-leak", 772),
+        "native_fd_leak": ("resource-leak", 775), "native_pipe_leak": ("resource-leak", 775),
+        "native_openat_leak": ("resource-leak", 775), "native_socket_leak": ("resource-leak", 775),
+        "native_mkstemp_leak": ("resource-leak", 775),
+        "summary_handle_leak": ("resource-leak", 772),
+        "overload_fd_leak": ("resource-leak", 772), "defined_body_fd_leak": ("resource-leak", 772),
+    }
+    counts = Counter({function: 1 for function in expected})
+    counts["native_pipe_leak"] = 2
+    registry = {rule["id"]: rule for rule in rules}
+    language_identities = []
+    for language in ("en", "tr"):
+        surfaces = []
+        for output_format in ("json", "sarif"):
+            output = root / (language + "." + output_format)
+            result = subprocess.run(
+                [str(binary), str(source), "--lang", language,
+                 "--" + output_format, str(output)],
+                cwd=root, capture_output=True, text=True, timeout=45)
+            assert result.returncode == 1, (output_format, result.stderr)
+            report = json.loads(output.read_text())
+            if output_format == "json":
+                assert report["complete"] is True, report
+                findings = report["diagnostics"]
+                assert Counter(row["function"] for row in findings) == counts, findings
+                for row in findings:
+                    rule_id, cwe_id = expected[row["function"]]
+                    assert row["rule_id"] == rule_id, row
+                    metadata = row["rule_metadata"]
+                    assert metadata["cwe_mapping"] == "mapped", row
+                    assert [cwe["id"] for cwe in metadata["cwes"]] == [cwe_id], row
+                    advertised = registry[rule_id]
+                    assert metadata["description"] == advertised["description"], row
+                    assert metadata["help_uri"] == advertised["help_uri"], row
+                    assert metadata["cwes"][0] in advertised["potential_cwes"], row
+                surfaces.append(Counter((row["fingerprint"], json.dumps(row["rule_metadata"], sort_keys=True))
+                                        for row in findings))
+            else:
+                findings = report["runs"][0]["results"]
+                assert len(findings) == sum(counts.values()), findings
+                surfaces.append(Counter((row["partialFingerprints"]["codeskeptic/v1"],
+                    json.dumps(row["properties"]["codeskeptic/ruleMetadata"], sort_keys=True)) for row in findings))
+        assert surfaces[0] == surfaces[1], surfaces
+        language_identities.append(surfaces[0])
+    assert language_identities[0] == language_identities[1], language_identities
+print("CWE_LEAK_METADATA_CLI_OK assignment/overwrite/mixed/custom/native, EN/TR, JSON/SARIF/registry parity")

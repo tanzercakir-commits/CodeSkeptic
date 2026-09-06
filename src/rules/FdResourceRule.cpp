@@ -18,6 +18,7 @@
 
 #include <map>
 #include <functional>
+#include <initializer_list>
 #include <limits>
 #include <optional>
 #include <set>
@@ -246,6 +247,36 @@ bool isPipeCall(const CallExpr* call) {
     const auto target = callee->getParamDecl(0)->getType();
     return target->isPointerType() && isInt(target->getPointeeType()) &&
         !target->getPointeeType().isConstQualified() && !target->getPointeeType().isVolatileQualified();
+}
+
+// Narrow reporting provenance, not an acquisition/transfer predicate. The
+// historical detector also models named/summary-owned integer resources; a
+// name alone does not prove that such a resource is a native descriptor.
+bool hasNativeDescriptorMetadata(const CallExpr* call) {
+    if (!call) return false;
+    if (isPipeCall(call)) return true;
+    const auto name = calleeName(call);
+    if (name == "accept" || name == "accept4")
+        return codeskeptic::isNativeFdAcquisition(call); // already signature-checked
+    const FunctionDecl* callee = call->getDirectCallee();
+    if (name.empty() || callee->hasBody() || !isInt(callee->getReturnType())) return false;
+    ASTContext& ctx = callee->getASTContext();
+    auto signature = [&](std::initializer_list<QualType> parameters, bool variadic = false) {
+        if (callee->isVariadic() != variadic || callee->getNumParams() != parameters.size())
+            return false;
+        unsigned index = 0;
+        for (const QualType type : parameters)
+            if (!ctx.hasSameUnqualifiedType(callee->getParamDecl(index++)->getType(), type))
+                return false;
+        return true;
+    };
+    const QualType string = ctx.getPointerType(ctx.CharTy.withConst());
+    if (name == "open") return signature({string, ctx.IntTy}, true);
+    if (name == "openat") return signature({ctx.IntTy, string, ctx.IntTy}, true);
+    if (name == "socket") return signature({ctx.IntTy, ctx.IntTy, ctx.IntTy});
+    if (name == "dup") return signature({ctx.IntTy});
+    if (name == "mkstemp") return signature({ctx.getPointerType(ctx.CharTy)});
+    return false;
 }
 
 bool isAcquisitionCall(const CallExpr* call) {
@@ -1076,6 +1107,9 @@ void reportLeaks(const FunctionDecl* function,
         diag.line = sm.getSpellingLineNumber(loc);
         diag.column = sm.getSpellingColumnNumber(loc);
         diag.rule_id = "resource-leak";
+        diag.kind = hasNativeDescriptorMetadata(origin.call)
+            ? codeskeptic::FindingKind::HandleLeak
+            : codeskeptic::FindingKind::GenericResourceLeak;
         diag.function = function->getQualifiedNameAsString();
         diag.message = discarded
             ? codeskeptic::msg(codeskeptic::MsgId::OwnedResultDiscarded)
