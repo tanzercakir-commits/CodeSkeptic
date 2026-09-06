@@ -1,6 +1,6 @@
 # CodeSkeptic — CWE Ürün Planı
 
-Sürüm: 37. Eski planın devamı değil; main tabanlı yeni program.
+Sürüm: 38. Eski planın devamı değil; main tabanlı yeni program.
 
 PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.
 
@@ -554,7 +554,7 @@ PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. G
 
 **Test bütçesi:** T2
 **Kontroller:** linux-suite, relevant-corpus, queue-check
-**Kapsam:** src/analyzer/*, tests/UnitEvidenceStoreTest.cpp
+**Kapsam:** src/analyzer/*, tests/UnitEvidenceStoreTest.cpp, src/config/Config.cpp, src/config/Config.h, tests/ConfigTest.cpp, tests/AnalysisCoordinatorTest.cpp, docs/usage.md
 **Bağımlılıklar:** CS3-CH04-S02-U001
 
 #### CS3-CH04-S02-U003 — Checkpoint yalnız aynı geçerli analizi sürdürsün

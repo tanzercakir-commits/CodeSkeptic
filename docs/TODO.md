@@ -16,7 +16,7 @@ Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter aç
 
 **Test bütçesi:** T2
 **Kontroller:** linux-suite, relevant-corpus, queue-check
-**Kapsam:** src/analyzer/*, tests/UnitEvidenceStoreTest.cpp
+**Kapsam:** src/analyzer/*, tests/UnitEvidenceStoreTest.cpp, src/config/Config.cpp, src/config/Config.h, tests/ConfigTest.cpp, tests/AnalysisCoordinatorTest.cpp, docs/usage.md
 **Bağımlılıklar:** CS3-CH04-S02-U001
 
 ### CS3-CH04-S02-U003 — Checkpoint yalnız aynı geçerli analizi sürdürsün
