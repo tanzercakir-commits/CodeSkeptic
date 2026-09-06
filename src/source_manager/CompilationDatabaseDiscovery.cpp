@@ -204,6 +204,15 @@ std::unique_ptr<clang::tooling::CompilationDatabase> loadExactJson(
 
 // Freeze known requested identities independently of database readiness. In
 // particular, an invalid later file-list member must not erase earlier ones.
+std::string unresolvedIdentity(const fs::path& path) {
+    // Reporting fallback only, never a path accepted for compilation. ELOOP
+    // and permission failures prevent canonicalization but not recording the
+    // exact requested location as failed evidence.
+    std::error_code error;
+    auto absolute = fs::absolute(path, error);
+    return (error ? path : absolute).lexically_normal().string();
+}
+
 bool collectRequestedSources(const Config& config, const fs::path& source,
                              const fs::path& database,
                              std::vector<std::string>& files,
@@ -212,9 +221,11 @@ bool collectRequestedSources(const Config& config, const fs::path& source,
     auto problem = [&](const std::string& text) {
         if (reason.empty()) reason = text;
     };
+    bool sourceIsDirectory = false;
     try {
         if (!source.empty()) {
-            if (fs::is_directory(source)) {
+            sourceIsDirectory = fs::is_directory(source);
+            if (sourceIsDirectory) {
                 for (auto it = fs::recursive_directory_iterator(normalized(source));
                      it != fs::recursive_directory_iterator(); ++it) {
                     if (it->is_directory() &&
@@ -235,11 +246,13 @@ bool collectRequestedSources(const Config& config, const fs::path& source,
             }
         }
     } catch (const fs::filesystem_error& error) {
+        if (!source.empty() && !sourceIsDirectory)
+            requested.insert(unresolvedIdentity(source));
         problem("cannot inspect requested scope: " + std::string(error.what()));
     }
     for (const auto& file : config.sourceFiles()) {
+        fs::path path(file);
         try {
-            fs::path path(file);
             // Preserve discovery's existing CWD-first/build-relative policy.
             if (!fs::exists(path) && path.is_relative() && !database.empty())
                 path = database.parent_path() / path;
@@ -247,6 +260,7 @@ bool collectRequestedSources(const Config& config, const fs::path& source,
             if (!fs::is_regular_file(path) || !supportedSource(path))
                 problem("listed source is missing or unsupported: " + file);
         } catch (const fs::filesystem_error& error) {
+            requested.insert(unresolvedIdentity(path));
             problem("cannot inspect listed source: " + std::string(error.what()));
         }
     }
@@ -363,6 +377,9 @@ CompilationDatabaseSelection discoverCompilationDatabase(const Config& config) {
     } catch (const fs::filesystem_error& error) {
         result.ready = false;
         result.reason = "cannot inspect compilation inputs: " + std::string(error.what());
+        std::string inputReason;
+        collectRequestedSources(config, config.sourcePath(), result.database,
+                                result.files, inputReason);
     }
     return result;
 }

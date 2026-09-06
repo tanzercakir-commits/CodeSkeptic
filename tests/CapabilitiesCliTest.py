@@ -164,8 +164,25 @@ void heap_safe(){void* p=malloc(8);free(p);}
                               input=requests, text=True, capture_output=True, timeout=45)
     def check_report(report, expected, finding_key="diagnostics", id_key="rule_id"):
         assert report["complete"] is True, report
-        assert report["coverage"] == {"attempted_tus": 1, "analyzed_tus": 1,
-                                       "broken_tus": 0, "incomplete_functions": 0}, report
+        coverage = report["coverage"]
+        expected_coverage = {"attempted_tus": 1, "analyzed_tus": 1,
+                             "broken_tus": 0, "incomplete_functions": 0,
+                             "skipped_tus": 0, "failed_tus": 0, "recovery_tus": 0,
+                             "attempted_commands": 1, "analyzed_commands": 1,
+                             "skipped_commands": 0, "failed_commands": 0}
+        assert all(type(coverage[key]) is int and coverage[key] == value
+                   for key, value in expected_coverage.items()), coverage
+        assert coverage["schema"] == "codeskeptic-source-coverage/v1", coverage
+        assert coverage["complete"] is True, coverage
+        assert coverage["accept_partial_coverage"] is False, coverage
+        assert coverage["analyze_broken_tus"] is False, coverage
+        assert len(coverage["sources"]) == 1, coverage
+        row = coverage["sources"][0]
+        assert row["file"] == str(source.resolve()), row
+        assert row["status"] == row["reason"] == "analyzed", row
+        assert row["commands"] == row["analyzed_commands"] == 1, row
+        assert row["skipped_commands"] == row["failed_commands"] == row["recovery_commands"] == 0, row
+        assert row["prepass"] == {"status": "not_requested", "reason": "", "recovery_commands": 0}, row
         findings = report[finding_key]
         assert Counter(d[id_key] for d in findings) == expected, findings
         assert all(not d.get("function", "").endswith("_safe") for d in findings), findings

@@ -355,6 +355,9 @@ classification, reason, command counts, recovery evidence and prepass status.
 Known requested identities remain in failure reports when discovery cannot
 produce a usable database. Unknown members of an unreadable directory cannot be
 enumerated; discovery fails closed instead of claiming complete scope.
+If filesystem errors prevent resolving an explicit source identity, its failed
+record retains the absolute lexical request path; it is not accepted as a
+resolved compilation target.
 
 The CLI emits this same coverage JSON on stderr after the `source coverage:`
 prefix. JSON reports store it under `coverage`; SARIF stores the identical object

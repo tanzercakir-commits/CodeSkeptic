@@ -401,7 +401,11 @@ TEST(ConfigTest, ChangedCompilationCommandsInvalidateWarmAstCache) {
     const auto multiple = analyze();
     EXPECT_EQ(multiple.exitCode(), 1);
     EXPECT_EQ(multiple.findings, 1u);
-    EXPECT_EQ(multiple.analyzed_tus, 2u);
+    EXPECT_EQ(multiple.attempted_tus, 1u);
+    EXPECT_EQ(multiple.analyzed_tus, 1u);
+    ASSERT_EQ(multiple.sources.size(), 1u);
+    EXPECT_EQ(multiple.sources[0].commands, 2u);
+    EXPECT_EQ(multiple.sources[0].analyzed_commands, 2u);
 }
 
 TEST(ConfigTest, DiagnosticSelectionPreservesSiblingProducerFamilies) {

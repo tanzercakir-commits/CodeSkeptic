@@ -102,6 +102,33 @@ class CompilationDatabaseCliTest(unittest.TestCase):
                          {str(self.source), str(build / "missing.cpp")})
         self.assertEqual(coverage["failed_tus"], 2, coverage)
 
+    def symlink_loop(self):
+        loop = self.root / "loop.cpp"
+        try:
+            loop.symlink_to(loop.name)
+        except OSError as error:
+            self.skipTest(f"host cannot create the symlink-loop fixture: {error}")
+        return loop
+
+    def test_looped_build_path_does_not_erase_valid_requested_source(self):
+        loop = self.symlink_loop()
+        _, payload = self.scan(self.source, "--build-path", loop, expected=2)
+        coverage = payload["coverage"]
+        self.assertEqual(coverage["attempted_tus"], 1, coverage)
+        self.assertEqual(coverage["failed_tus"], 1, coverage)
+        self.assertEqual([s["file"] for s in coverage["sources"]], [str(self.source)])
+
+    def test_looped_file_list_member_retains_every_known_identity(self):
+        loop = self.symlink_loop()
+        self.database(self.root / "build")
+        listing = self.root / "loop-list.txt"
+        listing.write_text(str(self.source) + "\n" + str(loop) + "\n", encoding="utf-8")
+        _, payload = self.scan("--files", listing, "--build-path", self.root / "build", expected=2)
+        coverage = payload["coverage"]
+        self.assertEqual(coverage["attempted_tus"], 2, coverage)
+        self.assertEqual(coverage["failed_tus"], 2, coverage)
+        self.assertEqual({s["file"] for s in coverage["sources"]}, {str(self.source), str(loop)})
+
     def test_malformed_json_cannot_use_compile_flags(self):
         build = self.root / "build"
         build.mkdir()
