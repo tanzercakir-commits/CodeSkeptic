@@ -1071,11 +1071,12 @@ TEST_F(AnalysisCoordinatorTest, CrashAtAnyPositionPreservesOtherFindingsAndFails
         EXPECT_FALSE(isolated.result.complete());
         EXPECT_EQ(isolated.result.failed_tus, 1u);
         EXPECT_EQ(isolated.result.analyzed_tus, 2u);
-        EXPECT_EQ(isolated.result.sources[crashed].file, sources[crashed].string());
+        const auto crashed_source = fs::canonical(sources[crashed]).string();
+        EXPECT_EQ(isolated.result.sources[crashed].file, crashed_source);
         EXPECT_EQ(isolated.result.sources[crashed].reason, "worker_crashed");
         EXPECT_EQ(isolated.diagnostics.size(), 2u);
         for (const auto& finding : isolated.diagnostics)
-            EXPECT_NE(finding.file, sources[crashed].string());
+            EXPECT_NE(finding.file, crashed_source);
     }
 }
 

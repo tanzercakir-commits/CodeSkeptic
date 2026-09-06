@@ -1,4 +1,5 @@
 #include "source_manager/SourceManager.h"
+#include "source_manager/InputIdentity.h"
 #include "analyzer/StaticAnalyzer.h"
 #include "rules/DivByZeroRule.h"
 #include "rules/NullDerefRule.h"
@@ -8,12 +9,74 @@
 #include <llvm/Support/JSON.h>
 #include <gtest/gtest.h>
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <stdexcept>
 
 namespace fs = std::filesystem;
 using codeskeptic::SourceManager;
+
+namespace {
+class ScopedIdentityEnvironment {
+public:
+    explicit ScopedIdentityEnvironment(const char* name) : name_(name) {
+        if (const auto* value = std::getenv(name_)) previous_ = value;
+    }
+    ~ScopedIdentityEnvironment() {
+        EXPECT_EQ(set(previous_ ? previous_->c_str() : nullptr), 0);
+    }
+    int set(const char* value) const {
+#ifdef _WIN32
+        return _putenv_s(name_, value ? value : "");
+#else
+        return value ? setenv(name_, value, 1) : unsetenv(name_);
+#endif
+    }
+private:
+    const char* name_;
+    std::optional<std::string> previous_;
+};
+} // namespace
+
+TEST(SourceInputIdentityTest, EnvironmentChangesAreCompleteStableAndRestored) {
+    const auto original = codeskeptic::inputEnvironmentIdentity();
+    ASSERT_FALSE(original.empty());
+    EXPECT_EQ(codeskeptic::inputEnvironmentIdentity(), original);
+    {
+        ScopedIdentityEnvironment first("CODESKEPTIC_TEST_IDENTITY_FIRST");
+        ScopedIdentityEnvironment second("CODESKEPTIC_TEST_IDENTITY_SECOND");
+        ASSERT_EQ(first.set(nullptr), 0);
+        ASSERT_EQ(second.set(nullptr), 0);
+        const auto absent = codeskeptic::inputEnvironmentIdentity();
+        ASSERT_FALSE(absent.empty());
+        ASSERT_EQ(first.set("first=value with spaces"), 0);
+        const auto added = codeskeptic::inputEnvironmentIdentity();
+        ASSERT_FALSE(added.empty());
+        EXPECT_NE(added, absent);
+        EXPECT_EQ(codeskeptic::inputEnvironmentIdentity(), added);
+        ASSERT_EQ(first.set("changed=value with spaces"), 0);
+        const auto changed = codeskeptic::inputEnvironmentIdentity();
+        ASSERT_FALSE(changed.empty());
+        EXPECT_NE(changed, added);
+        EXPECT_NE(changed, absent);
+        ASSERT_EQ(second.set("another=value"), 0);
+        const auto both = codeskeptic::inputEnvironmentIdentity();
+        ASSERT_FALSE(both.empty());
+        EXPECT_NE(both, changed);
+        ASSERT_EQ(first.set(nullptr), 0);
+        EXPECT_NE(codeskeptic::inputEnvironmentIdentity(), both);
+        ASSERT_EQ(second.set(nullptr), 0);
+        EXPECT_EQ(codeskeptic::inputEnvironmentIdentity(), absent);
+        // The same complete environment has one identity regardless of the
+        // order in which the two fixture variables entered the CRT table.
+        ASSERT_EQ(second.set("another=value"), 0);
+        ASSERT_EQ(first.set("changed=value with spaces"), 0);
+        EXPECT_EQ(codeskeptic::inputEnvironmentIdentity(), both);
+    }
+    EXPECT_EQ(codeskeptic::inputEnvironmentIdentity(), original);
+}
 
 class SourceManagerTargetTest : public ::testing::Test {
 protected:

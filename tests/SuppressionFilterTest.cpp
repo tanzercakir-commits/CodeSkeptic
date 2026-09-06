@@ -1,6 +1,7 @@
 #include "analyzer/SuppressionFilter.h"
 
 #include <fstream>
+#include <iterator>
 #include <gtest/gtest.h>
 
 using namespace codeskeptic;
@@ -11,8 +12,12 @@ namespace {
 std::string writeTempSource(const std::string& name,
                             const std::string& content) {
     std::string path = ::testing::TempDir() + name;
-    std::ofstream file(path);
+    std::ofstream file(path, std::ios::binary);
     file << content;
+    file.close();
+    EXPECT_FALSE(file.fail());
+    std::ifstream actual(path, std::ios::binary);
+    EXPECT_EQ(std::string(std::istreambuf_iterator<char>(actual), {}), content);
     return path;
 }
 

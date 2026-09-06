@@ -293,8 +293,12 @@ std::string inputDigest(const std::string& bytes) {
 }
 std::string inputEnvironmentIdentity() {
 #ifdef _WIN32
-    char** environment = nullptr;
-    if (_get_environ(&environment)) return {};
+    // Enumerate the same complete CRT table consumed by getenv. The secure
+    // per-name getters cannot discover unknown names; _get_environ is not an
+    // MSVC CRT API. main() initializes _environ; an unavailable table refuses
+    // reuse rather than being fingerprinted as an empty environment.
+    char** environment = _environ;
+    if (!environment) return {};
 #elif defined(__APPLE__)
     char** environment = *_NSGetEnviron();
 #else

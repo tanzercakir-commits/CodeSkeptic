@@ -1508,7 +1508,7 @@ TEST(BoundsRuleTest, MetadataDoesNotInventOnePastReadOrWrite) {
 TEST(BoundsRuleTest, CopySourceAndDestinationHaveIndependentMetadata) {
     BoundsRule rule;
     const auto results = runRule(rule, R"(
-        extern void* memcpy(void*,const void*,unsigned long);
+        extern void* memcpy(void*,const void*,__SIZE_TYPE__);
         void f(){char dst[2]={}; char src[1]={}; memcpy(dst,src,3);}
     )");
     ASSERT_EQ(results.size(), 2u);
