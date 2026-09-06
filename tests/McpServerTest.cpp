@@ -11,6 +11,8 @@
 #include "source_manager/SourceManager.h"
 #include <llvm/Support/JSON.h>
 #include <llvm/Support/FormatVariadic.h>
+#include <llvm/ADT/SmallString.h>
+#include <llvm/Support/FileSystem.h>
 #include <clang/Tooling/CompilationDatabase.h>
 #include <clang/Tooling/Tooling.h>
 
@@ -698,19 +700,42 @@ TEST(McpServerTest, WarmCache_SecondCallHits) {
     // cache must produce the SAME findings (the cache does not change
     // behavior, it only speeds things up).
     SourceManager::clearWarmCache();
-    auto path = writeTempSource("mcp_warm_hit.cpp", R"(
+    llvm::SmallString<256> private_name;
+    ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory("codeskeptic-mcp-warm", private_name));
+    struct Cleanup {
+        std::filesystem::path directory, sibling;
+        ~Cleanup() {
+            SourceManager::clearWarmCache();
+            std::error_code error;
+            std::filesystem::remove_all(directory, error);
+            if (!sibling.empty()) std::filesystem::remove_all(sibling, error);
+        }
+    } cleanup{std::filesystem::path(private_name.str().str()), {}};
+    const auto path = (cleanup.directory / "mcp_warm_hit.cpp").generic_string();
+    {
+        std::ofstream source(path, std::ios::binary);
+        source << R"(
         void f() {
             int* p = new int(1);
             delete p;
             int x = *p;
             (void)x;
         }
-    )");
+    )";
+        source.close();
+        ASSERT_FALSE(source.fail());
+    }
 
     auto first = handleMcpMessage(analyzeRequest(20, path));
     EXPECT_GE(SourceManager::warmCacheMisses(), 1u);
     EXPECT_EQ(SourceManager::warmCacheHits(), 0u);
 
+    // Other CTest processes may change the common temporary directory. The
+    // positive hit's source directory must remain stable; do not weaken input
+    // identity to pretend a changed observed directory is unchanged.
+    llvm::SmallString<256> sibling;
+    ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory(cleanup.directory.string() + "-sibling", sibling));
+    cleanup.sibling = std::filesystem::path(sibling.str().str());
     auto second = handleMcpMessage(analyzeRequest(21, path));
     EXPECT_GE(SourceManager::warmCacheHits(), 1u);
 
