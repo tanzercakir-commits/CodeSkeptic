@@ -114,9 +114,20 @@ bool validRow(const std::string& row, unsigned version) {
         const auto prefix = hex("csb-fn1:");
         return fields[4].size() > prefix.size() && fields[4].substr(0, prefix.size()) == prefix;
     }
-    if (fields.size() != 4 || fields[0].empty() || fields[1].empty()) return false;
-    return version == 1 ? positiveNumber(fields[2])
-                        : fields[2].size() == 16 && hexField(fields[2]);
+    // Legacy writers escaped neither paths nor messages. They may contain '|'
+    // or tabs. Validate that some legal old layout exists, then retain the
+    // exact whole row for its explicitly weak legacy matching algorithm.
+    const auto first = row.find('|');
+    if (first == std::string::npos || first == 0) return false;
+    for (auto left = row.find('|', first + 2); left != std::string::npos;
+         left = row.find('|', left + 1)) {
+        const auto right = row.find('|', left + 1);
+        if (right == std::string::npos) break;
+        const auto identity = std::string_view(row).substr(left + 1, right - left - 1);
+        if (version == 1 ? positiveNumber(identity) : identity.size() == 16 && hexField(identity))
+            return true;
+    }
+    return false;
 }
 
 std::string keyV3Cached(const Diagnostic& d, LineCache& cache) {
@@ -233,7 +244,7 @@ bool Baseline::load(const std::string& path) {
             seenHeader = true;
             continue;
         }
-        if (std::any_of(line.begin(), line.end(), [](unsigned char c) { return c < 32 || c == 127; }) ||
+        if ((version == 3 && std::any_of(line.begin(), line.end(), [](unsigned char c) { return c < 32 || c == 127; })) ||
             !validRow(line, version)) return false;
         seenRecord = true;
         if (version == 3 && line.rfind("unbound|", 0) == 0) ++unbound;

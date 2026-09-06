@@ -346,13 +346,12 @@ TEST(BaselineV3Test, MissingOrConflictingProofNeverFallsBackToPublicFingerprint)
     conflict.baseline_function = "csb-fn1:int (long)";
     findings = {bound, conflict};
     EXPECT_EQ(baseline.filter(findings), 0u);
-    for (auto unavailable : {bound, bound, bound}) {
-        unavailable.file = "/nonexistent/baseline_v3_source.cpp";
-        EXPECT_TRUE(Baseline::keyV3(unavailable).empty());
-        unavailable = bound;
-        unavailable.line = 1000;
-        EXPECT_TRUE(Baseline::keyV3(unavailable).empty());
-    }
+    auto unavailable = bound;
+    unavailable.file = "/nonexistent/baseline_v3_source.cpp";
+    EXPECT_TRUE(Baseline::keyV3(unavailable).empty());
+    unavailable = bound;
+    unavailable.line = 1000;
+    EXPECT_TRUE(Baseline::keyV3(unavailable).empty());
 }
 
 TEST(BaselineV3Test, ExactEncodingAndAtomicLoadRejectMixedOrMalformedFiles) {
@@ -381,6 +380,32 @@ TEST(BaselineV3Test, BufferedWriteFailureIsNotSuccess) {
     EXPECT_FALSE(Baseline::write("/dev/full", {}));
 }
 #endif
+
+TEST(BaselineV2Test, LiteralLegacyEncodingsRemainExplicitlyWeak) {
+#ifdef _WIN32
+    const auto source = writeSource("legacy_tab_message.cpp", "return 1/z;\n");
+#else
+    const auto source = writeSource("legacy|tab\t.cpp", "return 1/z;\n");
+#endif
+    auto diagnostic = makeDiag(source, 1, "div-by-zero", "message|with\ttab");
+    const auto path = ::testing::TempDir() + "literal_legacy_baseline.txt";
+    // Frozen old-writer hash for exact bytes "return 1/z;"; deliberately not
+    // computed by current keyV2(), so the legacy oracle is independent.
+    const auto row = "div-by-zero|" + source + "|b1382aa612fbd228|message|with\ttab\n";
+    { std::ofstream file(path, std::ios::binary); file << "# codeskeptic-baseline v2\n" << row; }
+    Baseline baseline;
+    ASSERT_TRUE(baseline.load(path));
+    EXPECT_TRUE(baseline.legacy());
+    EXPECT_EQ(baseline.version(), 2u);
+    DiagnosticList findings{diagnostic};
+    EXPECT_EQ(baseline.filter(findings), 1u);
+    { std::ofstream file(path, std::ios::binary); file << "div-by-zero|" << source << "|1|message|with\ttab\n"; }
+    ASSERT_TRUE(baseline.load(path));
+    EXPECT_TRUE(baseline.legacy());
+    EXPECT_EQ(baseline.version(), 1u);
+    findings = {diagnostic};
+    EXPECT_EQ(baseline.filter(findings), 1u);
+}
 
 // --- --files UX hardening (systemd lesson, 2026-07-12) ---
 

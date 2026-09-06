@@ -399,6 +399,52 @@ TEST(OutputParityReporterTest, SpecialTextWindowsPathsAndTypedCwesAgree) {
     EXPECT_NE(html.find("rel\\dir\\a.cpp:1:7</span>"), std::string::npos);
 }
 
+TEST(OutputParityReporterTest, SuppressionReasonsAndBaselineWeaknessSurviveEverySurface) {
+    AnalysisResult result;
+    result.attempted_tus = result.analyzed_tus = 1;
+    result.baseline_version = 2;
+    result.baseline_legacy_identity = true;
+    result.baseline_matched = 3;
+    SuppressionRecord record;
+    record.finding = {Severity::Error, "C:\\fixture<&>.cpp", 7, 8, "div-by-zero", "suppressed<&>"};
+    record.finding.function = "f";
+    record.finding.baseline_function = "csb-fn1:int (int)";
+    record.marker = "codeskeptic-disable-next-line";
+    record.marker_line = 6;
+    record.target_line = 7;
+    record.rules = {"div-by-zero"};
+    record.has_reason = true;
+    record.reason = "reviewed </pre><script>not-code</script>\n\t";
+    record.occurrences = 2;
+    result.suppressions.push_back(record);
+    record.has_reason = false;
+    record.reason.clear();
+    record.rules.clear();
+    result.suppressions.push_back(record);
+    checkSurfaceSnapshots({}, &result);
+    auto parsed = llvm::json::parse(readWhole(::testing::TempDir() + "surface_snapshot.json"));
+    ASSERT_TRUE(static_cast<bool>(parsed));
+    auto* object = parsed->getAsObject();
+    ASSERT_NE(object, nullptr);
+    auto* audit = object->getArray("suppressions");
+    ASSERT_NE(audit, nullptr);
+    ASSERT_EQ(audit->size(), 2u);
+    const auto* provided = (*audit)[0].getAsObject();
+    const auto* legacy = (*audit)[1].getAsObject();
+    ASSERT_NE(provided, nullptr);
+    ASSERT_NE(legacy, nullptr);
+    EXPECT_EQ(provided->getString("reason"), result.suppressions[0].reason);
+    EXPECT_EQ(provided->getString("reason_status"), "provided");
+    EXPECT_EQ(provided->getInteger("marker_line"), 6);
+    EXPECT_EQ(provided->getInteger("target_line"), 7);
+    EXPECT_EQ(provided->getInteger("occurrences"), 2);
+    EXPECT_EQ(legacy->getString("reason_status"), "legacy-unspecified");
+    ASSERT_NE(legacy->get("reason"), nullptr);
+    EXPECT_EQ(*legacy->get("reason"), llvm::json::Value(nullptr));
+    ASSERT_NE(object->getObject("baseline"), nullptr);
+    EXPECT_EQ(object->getObject("baseline")->getBoolean("legacy_weak_identity"), true);
+}
+
 TEST(OutputParityReporterTest, EveryVerdictEvidenceFlagAgreesWithoutInventingCoverage) {
     AnalysisResult base;
     SourceCoverage source{"safe.cpp", SourceStatus::Analyzed, "analyzed"};

@@ -140,18 +140,19 @@ run_zd() { # <files-list> <build-path> <json-out> <summary-out> <stderr-log>
         --summary-out "$4" --lang en \
         ${EXTRA[@]+"${EXTRA[@]}"} 2> "$5" || code=$?
     # 0/1 are valid configured verdicts; exit 2 is unavailable evidence.
-    if [ "$code" -gt 1 ] || [ ! -f "$3" ]; then
+    if [ "$code" -gt 1 ] || [ ! -f "$3" ] || [ ! -s "$4" ]; then
         echo "[review] FAIL: analyzer error (exit $code) — stderr tail:" >&2
         tail -n 20 "$5" >&2
         exit 2
     fi
 }
 
-HEAD_JSON=""; BASE_JSON=""; SUMDIFF=""
+HEAD_JSON=""; BASE_JSON=""; SUMDIFF=""; HEAD_STDERR=""
 if [ -s "$TMP/head-files.txt" ]; then
     run_zd "$TMP/head-files.txt" "$BUILD_PATH" "$TMP/head.json" \
         "$TMP/head.sum" "$TMP/head-stderr.log"
     HEAD_JSON="$TMP/head.json"
+    HEAD_STDERR="$TMP/head-stderr.log"
 fi
 
 if [ -s "$TMP/base-files.txt" ]; then
@@ -171,7 +172,11 @@ if [ -s "$TMP/base-files.txt" ]; then
 
     : > "$TMP/base-files-abs.txt"
     while IFS= read -r rel; do
-        [ -f "$BASE_WT/$rel" ] && echo "$BASE_WT/$rel" >> "$TMP/base-files-abs.txt"
+        if [ ! -f "$BASE_WT/$rel" ]; then
+            echo "[review] FAIL: expected base source is missing: $rel" >&2
+            exit 2
+        fi
+        echo "$BASE_WT/$rel" >> "$TMP/base-files-abs.txt"
     done < "$TMP/base-files.txt"
 
     if [ -s "$TMP/base-files-abs.txt" ]; then
@@ -211,8 +216,9 @@ python3 "$REPORT_PY" assemble \
     --diff "$TMP/diff.txt" \
     --name-status "$TMP/name-status.txt" \
     --head-files "$TMP/head-files.txt" \
+    --base-files "$TMP/base-files.txt" \
     ${SUMDIFF:+--summary-diff "$SUMDIFF"} \
-    --head-stderr "$TMP/head-stderr.log" \
+    ${HEAD_STDERR:+--head-stderr "$HEAD_STDERR"} \
     --gate "$GATE" \
     ${STRICT_ARG[@]+"${STRICT_ARG[@]}"} \
     ${EXCLUDE_ARGS[@]+"${EXCLUDE_ARGS[@]}"} \

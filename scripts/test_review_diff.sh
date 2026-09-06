@@ -25,11 +25,9 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 # Hermetic git: no user/system config, fixed identity, no GPG.
-export HOME="$TMP/home"
 export GIT_CONFIG_GLOBAL="$TMP/gitconfig"
 export GIT_CONFIG_SYSTEM=/dev/null
 export LC_ALL=C
-mkdir -p "$HOME"
 git config --file "$GIT_CONFIG_GLOBAL" user.email "zd@test.invalid"
 git config --file "$GIT_CONFIG_GLOBAL" user.name "zd-test"
 git config --file "$GIT_CONFIG_GLOBAL" init.defaultBranch main
@@ -269,3 +267,4 @@ bash "$SCRIPT_DIR/review_diff.sh" "$CS_BIN" "$ASSUME_SHA" --out review.md \
 assert_grep "vendor_deref" review.md
 
 echo "PASS: review-diff flow (delta + shift-immunity + self + rename + gate ladder + assumption delta + exclude)"
+bash "$SCRIPT_DIR/../tests/test_review_diff.sh" "$CS_BIN"

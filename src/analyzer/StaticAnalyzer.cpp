@@ -487,6 +487,9 @@ AnalysisResult StaticAnalyzer::run() {
     auto output = diagnostics_.begin();
     for (auto input = diagnostics_.begin(); input != diagnostics_.end(); ++input) {
         if (output != diagnostics_.begin() && *(output - 1) == *input) {
+            if ((output - 1)->baseline_function != input->baseline_function ||
+                (output - 1)->function != input->function)
+                (output - 1)->baseline_function.clear();
             mergeFindingMetadata(*(output - 1), *input);
         } else {
             if (output != input) *output = std::move(*input);

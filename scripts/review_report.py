@@ -16,11 +16,9 @@ Two subcommands, both invoked by scripts/review_diff.sh:
              coverage honesty data, render a markdown review, and exit
              with the gate verdict.
 
-Delta semantics — a faithful port of Baseline v2 (src/analyzer/
-Baseline.cpp), because that file's keying is the project's one tested
-definition of "the same finding":
+Delta semantics — Baseline v3's full identity (src/analyzer/Baseline.cpp):
 
-  key = rule_id | repo-relative path | fnv1a64(trimmed line content) | message
+  rule, path, function, AST signature, relative column, severity, source, message
 
 The one deliberate difference: the file component is the REPO-RELATIVE
 path (the C++ key uses the canonical absolute path, which can never
@@ -48,25 +46,14 @@ import sys
 from collections import Counter
 
 # ---------------------------------------------------------------------------
-# Baseline-v2 key parity (see src/analyzer/Baseline.cpp)
+# Baseline-v3 identity parity (see src/analyzer/Baseline.cpp)
 # ---------------------------------------------------------------------------
 
 TRIM_BYTES = b" \t\r\n"
 
 
-def fnv1a64_hex(data: bytes) -> str:
-    """FNV-1a 64 over raw bytes — the same constants and byte-wise walk
-    as Baseline.cpp's fnv1a64Hex (stable across platforms)."""
-    h = 0xCBF29CE484222325  # 1469598103934665603
-    for b in data:
-        h ^= b
-        h = (h * 0x100000001B3) & 0xFFFFFFFFFFFFFFFF  # 1099511628211
-    return "%016x" % h
-
-
 class LineCache:
-    """Per-file line table, split on '\\n' only (std::getline parity;
-    '\\r' survives into the line and is removed by trimming)."""
+    """Physical CR/LF/CRLF byte lines, matching compiler source coordinates."""
 
     def __init__(self):
         self._files = {}
@@ -74,21 +61,28 @@ class LineCache:
     def line(self, path: str, lineno: int) -> bytes:
         lines = self._files.get(path)
         if lines is None:
-            try:
-                with open(path, "rb") as f:
-                    lines = f.read().split(b"\n")
-            except OSError:
-                lines = []
+            with open(path, "rb") as f:
+                text = f.read()
+            lines = re.split(b"\r\n|\r|\n", text)
+            if not lines[-1]: lines.pop()
             self._files[path] = lines
         if lineno < 1 or lineno > len(lines):
-            return b""
+            raise ValueError(f"finding line is outside its source: {path}:{lineno}")
         return lines[lineno - 1]
 
 
-def finding_key(diag: dict, relpath: str, cache: LineCache) -> str:
-    content = cache.line(diag["file"], diag["line"]).strip(TRIM_BYTES)
-    return "%s|%s|%s|%s" % (
-        diag["rule_id"], relpath, fnv1a64_hex(content), diag["message"])
+def finding_key(diag: dict, relpath: str, cache: LineCache):
+    line = cache.line(diag["file"], diag["line"])
+    leading = len(line) - len(line.lstrip(TRIM_BYTES))
+    if not leading < diag["column"] <= len(line):
+        raise ValueError("finding column is outside its source content")
+    signature = diag["baseline_function"]
+    if not signature or not diag["function"]:
+        return None  # Explicitly unbound: never consume a baseline budget.
+    if not signature.startswith("csb-fn1:") or len(signature) <= 8:
+        raise ValueError("unsupported baseline function identity; refresh reports")
+    return (diag["rule_id"], relpath, diag["function"], signature,
+            diag["column"] - leading, diag["severity"], line.strip(TRIM_BYTES), diag["message"])
 
 
 # ---------------------------------------------------------------------------
@@ -96,12 +90,37 @@ def finding_key(diag: dict, relpath: str, cache: LineCache) -> str:
 # ---------------------------------------------------------------------------
 
 def load_diags(path):
-    """The analyzer's --json output; a missing/empty path is an empty run
-    (e.g. a PR that only adds files has no base side)."""
-    if not path or not os.path.exists(path):
+    """Omitted side is intentional; an explicit unreadable report is an error."""
+    if not path:
         return []
     with open(path, "r", encoding="utf-8") as f:
-        return json.load(f).get("diagnostics", [])
+        report = json.load(f)
+    if (not isinstance(report, dict) or report.get("schema") != "codeskeptic-report/v1" or
+            report.get("complete") is not True or type(report.get("exit_code")) is not int or
+            report["exit_code"] not in (0, 1) or not isinstance(report.get("diagnostics"), list) or
+            type(report.get("total")) is not int or report["total"] != len(report["diagnostics"])):
+        raise ValueError("missing, malformed or incomplete report contract; regenerate both sides")
+    for diag in report["diagnostics"]:
+        if not isinstance(diag, dict): raise ValueError("finding must be an object")
+        for field in ("rule_id", "file", "message", "function", "baseline_function"):
+            if not isinstance(diag.get(field), str):
+                raise ValueError(f"finding requires string {field}; refresh reports")
+        signature = diag["baseline_function"]
+        if signature and (not signature.startswith("csb-fn1:") or len(signature) <= 8):
+            raise ValueError("unsupported baseline function identity; refresh reports")
+        if (not diag["rule_id"] or not diag["file"] or diag.get("severity") not in ("info", "warning", "error") or
+                type(diag.get("blocks_verdict")) is not bool):
+            raise ValueError("invalid finding classification")
+        for field in ("line", "column"):
+            if type(diag.get(field)) is not int or not 0 < diag[field] <= 0xffffffff:
+                raise ValueError(f"invalid finding {field}")
+        if not isinstance(diag.get("notes"), list): raise ValueError("invalid finding notes")
+        for note in diag["notes"]:
+            if (not isinstance(note, dict) or not isinstance(note.get("file"), str) or
+                    not isinstance(note.get("message"), str) or type(note.get("line")) is not int or
+                    type(note.get("column")) is not int or note["line"] < 0 or note["column"] < 0):
+                raise ValueError("invalid finding trace")
+    return report["diagnostics"]
 
 
 def rel_to_root(abs_path: str, root: str) -> str:
@@ -123,13 +142,24 @@ def rel_to_root(abs_path: str, root: str) -> str:
 
 def load_renames(path):
     """old<TAB>new relative paths (git --find-renames R entries)."""
-    renames = {}
-    if path and os.path.exists(path):
+    renames, old_names, new_names = {}, set(), set()
+    if path:
         with open(path, "r", encoding="utf-8") as f:
             for line in f:
                 parts = line.rstrip("\n").split("\t")
-                if len(parts) == 2 and parts[0] and parts[1]:
-                    renames[parts[0]] = parts[1]
+                if len(parts) != 2:
+                    raise ValueError("rename map requires old<TAB>new paths")
+                for name in parts:
+                    if (not name or name.startswith(("/", "\\")) or "\\" in name or
+                            re.match(r"^[A-Za-z]:", name) or any(ord(c) < 32 for c in name) or
+                            any(part in ("", ".", "..") for part in name.split("/"))):
+                        raise ValueError("rename paths must be contained repository-relative paths")
+                old, new = parts
+                if os.path.normcase(old) in old_names or os.path.normcase(new) in new_names:
+                    raise ValueError("duplicate rename identity")
+                old_names.add(os.path.normcase(old))
+                new_names.add(os.path.normcase(new))
+                renames[old] = new
     return renames
 
 
@@ -223,21 +253,40 @@ HDR_EXT = (".h", ".hpp", ".hh", ".hxx", ".inl")
 # Delta — Baseline::filter's consume-budget algorithm over two runs
 # ---------------------------------------------------------------------------
 
+def logical_findings(diagnostics):
+    groups = {}
+    for diagnostic in diagnostics:
+        signature = diagnostic["baseline_function"]
+        if signature and (not signature.startswith("csb-fn1:") or len(signature) <= 8):
+            raise ValueError("unsupported baseline function identity; refresh reports")
+        key = tuple(diagnostic[field] for field in ("severity", "file", "line", "column", "rule_id", "message"))
+        if key not in groups:
+            groups[key] = dict(diagnostic)
+        else:
+            if groups[key]["blocks_verdict"] != diagnostic["blocks_verdict"]:
+                raise ValueError("equivalent finding rows disagree on verdict classification")
+            if any(groups[key][field] != diagnostic[field] for field in ("function", "baseline_function")):
+                groups[key]["baseline_function"] = ""
+    return list(groups.values())
+
+
 def compute_delta(base_diags, head_diags, base_root, head_root, renames):
+    base_diags, head_diags = logical_findings(base_diags), logical_findings(head_diags)
     cache = LineCache()
 
     base_keys = Counter()
     for d in base_diags:
         rel = rel_to_root(d["file"], base_root)
         rel = renames.get(rel, rel)  # align a renamed file with its head path
-        base_keys[finding_key(d, rel, cache)] += 1
+        key = finding_key(d, rel, cache)
+        if key is not None: base_keys[key] += 1
 
     budget = Counter(base_keys)
     new = []
     for d in head_diags:
         rel = rel_to_root(d["file"], head_root)
         k = finding_key(d, rel, cache)
-        if budget[k] > 0:
+        if k is not None and budget[k] > 0:
             budget[k] -= 1
         else:
             new.append((d, rel))
@@ -266,8 +315,23 @@ def render_finding(diag, rel, head_root, added_lines):
 
 
 def cmd_assemble(args):
-    base_diags = load_diags(args.base_json)
-    head_diags = load_diags(args.head_json)
+    if args.base_json and args.head_json and not args.summary_diff:
+        raise ValueError("two analyzed sides require a contract-diff artifact")
+    # Explicitly named artifacts must exist. Absence is only valid when the
+    # wrapper deliberately omitted that side/auxiliary result.
+    for field in ("renames", "diff", "name_status", "head_files", "base_files", "head_stderr", "summary_diff"):
+        path = getattr(args, field, None)
+        if path:
+            with open(path, "rb") as stream: stream.read(1)
+    for side in ("base", "head"):
+        manifest = getattr(args, side + "_files", None)
+        if manifest:
+            with open(manifest, encoding="utf-8") as stream:
+                expected = any(line.rstrip("\r\n") for line in stream)
+            if expected != bool(getattr(args, side + "_json")):
+                raise ValueError(f"{side} source manifest disagrees with report presence")
+    base_diags = logical_findings(load_diags(args.base_json))
+    head_diags = logical_findings(load_diags(args.head_json))
     renames = load_renames(args.renames)
     added_lines = parse_added_lines(args.diff)
     sum_changes, sum_available = parse_summary_diff(args.summary_diff)
@@ -284,6 +348,8 @@ def cmd_assemble(args):
 
     new, fixed = compute_delta(base_diags, head_diags, args.base_root,
                                args.head_root, renames)
+    unbound_base = sum(not d["baseline_function"] or not d["function"] for d in base_diags)
+    unbound_head = sum(not d["baseline_function"] or not d["function"] for d in head_diags)
     new_errors = [(d, r) for d, r in new if d["severity"] == "error"]
     new_warnings = [(d, r) for d, r in new if d["severity"] != "error"]
     blocking = [(d, r) for d, r in new
@@ -318,6 +384,10 @@ def cmd_assemble(args):
     md.append("# CodeSkeptic diff review")
     md.append("")
     md.append("Base `%s` -> head `%s`." % (args.base_label, args.head_label))
+    md.append("Finding identity: baseline v3 (AST-bound function signatures, logical occurrence budgets).")
+    if unbound_base or unbound_head:
+        md.append("Unbound identity: %d base / %d head findings. Head findings remain new; "
+                  "unbound base findings are not claimed fixed." % (unbound_base, unbound_head))
     if gate_fail:
         reasons = []
         if blocking_errors:
@@ -679,6 +749,7 @@ def main():
     p_asm.add_argument("--diff")
     p_asm.add_argument("--name-status")
     p_asm.add_argument("--head-files")
+    p_asm.add_argument("--base-files")
     p_asm.add_argument("--head-stderr")
     p_asm.add_argument("--summary-diff")
     p_asm.add_argument("--gate", choices=["error", "warn"], default="error")
@@ -698,7 +769,11 @@ def main():
         except (OSError, ValueError) as error:
             print(f"[review] invalid compilation inputs: {error}", file=sys.stderr)
             return 2
-    return cmd_assemble(args)
+    try:
+        return cmd_assemble(args)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        print(f"[review] invalid review evidence: {error}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

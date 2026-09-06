@@ -162,7 +162,7 @@ bool SarifReporter::report(const DiagnosticList& diagnostics,
              << (findingBlocksVerdict(diag.rule_id) ? "true" : "false")
              << ", \"codeskeptic/ruleMetadata\": ";
         writeFindingMetadataJson(file, diag);
-        file << " },\n";
+        file << ", \"codeskeptic/baselineFunction\": \"" << escapeJson(diag.baseline_function) << "\" },\n";
         file << "          \"partialFingerprints\": { "
              << "\"codeskeptic/v1\": \"" << escapeJson(fingerprint)
              << "\" },\n";

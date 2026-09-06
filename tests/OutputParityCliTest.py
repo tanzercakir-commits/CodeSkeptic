@@ -101,6 +101,7 @@ class OutputParityCliTest(unittest.TestCase):
                 "file": uri_path_identity(physical["artifactLocation"]["uri"]),
                 "line": physical["region"]["startLine"], "column": physical["region"]["startColumn"],
                 "function": location.get("logicalLocations", [{"name": ""}])[0]["name"],
+                "baseline_function": props["codeskeptic/baselineFunction"],
                 "message": native["message"]["text"], "notes": [],
             }
             for note in native.get("relatedLocations", []):

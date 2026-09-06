@@ -180,6 +180,9 @@ size_t SuppressionFilter::filter(DiagnosticList& diagnostics) {
         } else {
             auto& record = records_[entry->second];
             ++record.occurrences;
+            if (record.finding.baseline_function != finding.baseline_function ||
+                record.finding.function != finding.function)
+                record.finding.baseline_function.clear();
             mergeFindingMetadata(record.finding, finding);
         }
         return true;
