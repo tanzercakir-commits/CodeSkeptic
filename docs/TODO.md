@@ -2,23 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH02-S01-U003
-
-### CS3-CH02-S01-U003 — Çoklu producer kural seçimini diagnostic ID ile tutarlı uygula
-
-**Sonuç:** Kural kapatma işlemi yalnız sınıf adını değil yayımlanan diagnostic ID sözleşmesini bütün ilgili producer'larda uygular.
-
-**Kabul:**
-
-- S04-U001 CLI keşfi önce RED ile yeniden doğrulanır: --disable-rule resource-leak sonrasında FILE/DIR aynı ID ile hâlâ raporlanıyor; yalnız native FD producer'ının kaldırılması yeterli değildir.
-- Bilinen diagnostic ID kapatıldığında o ID'yi üreten bütün producer'ların bulguları tutarlı seçilir; farklı ID'lerin etkinliği, varsayılan kalite/tier ve kapsam sayaçları sessiz değişmez.
-- CLI ve MCP'nin mevcut yapılandırma yüzeyleri aynı seçim sözleşmesini uygular; kapalı/açık/kapalı ardışık kullanımda istekler arasında durum sızmaz, var olmayan seçenek çalıştı sayılmaz.
-- Native FD, FILE/DIR ve memory-leak pozitif/negatifleri gerçek CLI/MCP ve focused analyzer/config testleriyle sınanır; JSON/SARIF/verdict sayımları etkin bulgularla tutarlıdır.
-
-**Test bütçesi:** T1
-**Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/analyzer/StaticAnalyzer*, src/config/Config*, src/engine/RuleEngine*, src/core/Capabilities*, src/core/RuleCapabilities.def, src/server/McpServer*, src/main.cpp, tests/McpServerTest.cpp, tests/ConfigTest.cpp, tests/CapabilitiesTest.cpp, tests/CapabilitiesCliTest.py, tests/AnalysisResultTest.cpp, tests/MemoryLeakRuleExTest.cpp, tests/FdResourceRuleTest.cpp, tests/VerdictIntegrityTest.cpp
-**Bağımlılıklar:** CS3-CH01-S04-U001
+## FRONT — CS3-CH02-S02-U001
 
 ### CS3-CH02-S02-U001 — Fonksiyon özeti/model parser sınırlarını sağlamlaştır
 

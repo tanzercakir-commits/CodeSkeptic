@@ -2,6 +2,19 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH02-S01-U003 — Çoklu producer kural seçimini diagnostic ID ile tutarlı uygula
+
+- Commit: `e108ce50cb8c3e99576b82daf2dad9365e833b72`
+- Dal: `agent/cs3-ch02-s01-u003-diagnostic-selection`
+- Implementer: `root-cs3-ch02-s01-u003-20260906`
+- Bağımsız denetçi: `independent-cwe-ch02-s01-u003-e108ce5-20260906`
+- İnceleme SHA-256: `70265fd2b56cbdbce480966165e3f63bb7bdc28eae6b2ed88f58840cc74c6bff`
+- Tarih: 2026-09-05T23:59:53.454408+00:00
+- Sonuç: Kural kapatma işlemi yalnız sınıf adını değil yayımlanan diagnostic ID sözleşmesini bütün ilgili producer'larda uygular.
+- focused-tests: PASS; SHA-256 `7872bda9c9501d17a1214f94cf6fb0f7bdbae5b56c441d0058e0405c9eecbf4c`; `bash scripts/local_test.sh focused 'ConfigTest.*:McpServerTest.*:CapabilitiesTest.*:VerdictIntegrityTest.*:AnalysisResultTest.*:FdResourceRuleTest.*:MemoryLeakRuleExTest.*:SourceManagerTargetTest.*:ReportPathsTest.*:FunctionFilterTest.*:BrokenTuTest.*'`
+- cli-smoke: PASS; SHA-256 `3174c6a95817f9324e8f2882ee386559f8aa77385bb2f7e39db212e7a892adb4`; `Bounded rootless offline image 25640c190484acc04e0dab2c64f8683668ad33930a3670900ff407023efc7fc5 with read-only source/build and CS3-CH02-S01-U002 evidence mounted at /evidence: /workspace/build/src/codeskeptic --version; python3 -B tests/CapabilitiesCliTest.py /workspace/build/src/codeskeptic; python3 -B tests/CompilationDatabaseCliTest.py /workspace/build/src/codeskeptic; python3 -B /evidence/input_cli_smoke.py /workspace/build/src/codeskeptic (set -e, timeout 180s, 2 CPUs, 6 GiB); then bash scripts/local_test.sh smoke`
+- queue-check: PASS; SHA-256 `a6b32840649760bdff7723dbc21b0a620ab07f72db7bdd78ca4a35657ed61650`; `python3 -B scripts/project_queue.py check; python3 -B scripts/project_queue.py guard --base HEAD^; bash scripts/check_docs_sync.sh; git diff --check; git rev-parse HEAD; git status --short --branch; git rev-parse main (set -e)`
+
 ## CS3-CH02-S01-U002 — Config ve target-scope güncellemelerini işlemsel yap
 
 - Commit: `464546bd478245e14c80984c5011524a79025e13`
