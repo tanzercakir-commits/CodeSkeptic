@@ -1,4 +1,5 @@
 #include "reporter/HtmlReporter.h"
+#include "reporter/Coverage.h"
 
 #include "core/FindingFingerprint.h"
 #include "core/Messages.h"
@@ -200,7 +201,7 @@ bool HtmlReporter::report(const DiagnosticList& diagnostics,
         if (!result->sources.empty()) {
             file << "<details><summary>Source coverage</summary><ul>\n";
             for (const auto& source : result->sources)
-                file << "<li>" << escapeHtml(source.file) << ": "
+                file << "<li>" << escapeHtml(coveragePathIdentity(source.file)) << ": "
                      << source.statusName() << " (" << escapeHtml(source.reason)
                      << "); commands: " << source.analyzed_commands << "/"
                      << source.commands << " analyzed, " << source.skipped_commands

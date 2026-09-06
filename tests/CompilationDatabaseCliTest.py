@@ -2,6 +2,7 @@
 """Hermetic compilation-database discovery checks using the real CLI."""
 
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -179,6 +180,107 @@ class CompilationDatabaseCliTest(unittest.TestCase):
         self.assertEqual(len(coverage), 1, result.stderr)
         self.assertEqual(coverage[0]["analyzed_tus"], 1)
         self.assertFalse(coverage[0]["complete"], result.stderr)
+
+    @unittest.skipUnless(os.name == "posix", "non-UTF8 filesystem bytes require POSIX")
+    def test_non_utf8_source_identity_cannot_corrupt_coverage_json(self):
+        for name in (b"invalid-\xff.cpp", b"invalid-\xfe.cpp", b"parent-\xff/valid.cpp"):
+            source = self.root / os.fsdecode(name)
+            source.parent.mkdir(exist_ok=True)
+            source.write_text("int safe(){return 0;}\n", encoding="utf-8")
+            identity = "codeskeptic-bytes:" + os.fsencode(source).hex()
+            for flag in (None, "--accept-partial-coverage", "--analyze-broken-tus"):
+                with self.subTest(name=name, flag=flag):
+                    # Also decode all stdout/stderr strictly; doctor output must
+                    # not invalidate an otherwise valid JSON/CLI response.
+                    coverage = self.coverage_formats([source, *([flag] if flag else [])], 2)
+                    self.assertFalse(coverage["complete"])
+                    self.assertEqual(coverage["attempted_tus"], 1)
+                    self.assertEqual(coverage["failed_tus"], 1)
+                    self.assertEqual(coverage["attempted_commands"], 0)
+                    self.assertEqual(len(coverage["sources"]), 1)
+                    row = coverage["sources"][0]
+                    self.assertEqual(row["file"], identity)
+                    self.assertEqual(row["status"], "failed")
+                    self.assertEqual(row["reason"], "source_path_not_utf8")
+            output = self.root / "byte-path.html"
+            result = self.run_cli(source, "--html", output)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            html = output.read_text(encoding="utf-8")
+            self.assertIn(identity, html)
+            self.assertIn("Full coverage: no", html)
+            self.assertIn("source_path_not_utf8", html)
+            self.doctor(source, expected=2)
+
+    @unittest.skipUnless(os.name == "posix", "non-UTF8 filesystem bytes require POSIX")
+    def test_mixed_source_encodings_preserve_every_requested_identity(self):
+        invalid = self.root / os.fsdecode(b"invalid-\xff.cpp")
+        invalid.write_text("int safe(){return 0;}\n", encoding="utf-8")
+        coverage = self.coverage_formats([self.root, "--accept-partial-coverage"], 2)
+        self.assertEqual(coverage["attempted_tus"], 2)
+        self.assertEqual(coverage["failed_tus"], 2)
+        self.assertEqual(coverage["analyzed_tus"], 0)
+        identities = {row["file"]: row for row in coverage["sources"]}
+        encoded = "codeskeptic-bytes:" + os.fsencode(invalid).hex()
+        self.assertEqual(set(identities), {str(self.source), encoded})
+        self.assertEqual(identities[encoded]["reason"], "source_path_not_utf8")
+        self.assertEqual(identities[str(self.source)]["reason"], "compilation_input_unavailable")
+
+    @unittest.skipUnless(os.name == "posix", "non-UTF8 filesystem bytes require POSIX")
+    def test_non_utf8_canonical_symlink_target_is_reported_and_mcp_recovers(self):
+        source = self.root / os.fsdecode(b"target-\xff.cpp")
+        source.write_text("int safe(){return 0;}\n", encoding="utf-8")
+        alias = self.root / "alias.cpp"
+        alias.symlink_to(source)
+        build = self.root / "build"
+        self.database(build, [alias])
+        coverage = self.coverage_formats([alias, "--build-path", build], 2)
+        self.assertEqual(coverage["sources"][0]["file"],
+                         "codeskeptic-bytes:" + os.fsencode(source).hex())
+        self.assertEqual(coverage["sources"][0]["reason"], "source_path_not_utf8")
+        clean = self.root / "clean"
+        clean.mkdir()
+        safe = clean / "safe.cpp"
+        safe.write_text("int safe(){return 0;}\n", encoding="utf-8")
+        self.database(clean, [safe])
+        requests = [{"jsonrpc": "2.0", "id": index, "method": "tools/call",
+                     "params": {"name": "analyze", "arguments": {
+                         "path": str(path), "build_path": str(database)}}}
+                    for index, (path, database) in enumerate(((alias, build), (safe, clean)), 1)]
+        result = subprocess.run([BINARY, "--serve"], cwd=self.root, text=True,
+            input="".join(json.dumps(request) + "\n" for request in requests),
+            capture_output=True, timeout=45)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        replies = [json.loads(line) for line in result.stdout.splitlines()]
+        self.assertEqual(len(replies), 2, result.stdout)
+        payloads = [json.loads(reply["result"]["content"][0]["text"]) for reply in replies]
+        self.assertEqual(payloads[0]["coverage"], coverage)
+        self.assertEqual(payloads[0]["exit_code"], 2)
+        self.assertEqual(payloads[1]["exit_code"], 0)
+        self.assertTrue(payloads[1]["coverage"]["complete"])
+        self.assertEqual(payloads[1]["coverage"]["sources"][0]["file"], str(safe))
+
+    @unittest.skipUnless(os.name == "posix", "non-UTF8 filesystem bytes require POSIX")
+    def test_unrequested_database_symlink_with_non_utf8_target_fails_without_crash(self):
+        target = self.root / os.fsdecode(b"target-\xff.cpp")
+        target.write_text("int safe(){return 0;}\n", encoding="utf-8")
+        alias = self.root / "alias.cpp"
+        alias.symlink_to(target)
+        build = self.root / "build"
+        self.database(build, [self.source, alias])
+        # The selected source is UTF-8; database normalization itself must
+        # reject the other invalid canonical entry before constructing JSON.
+        coverage = self.coverage_formats([self.source, "--build-path", build], 2)
+        self.assertEqual(coverage["attempted_tus"], 1)
+        self.assertEqual(coverage["failed_tus"], 1)
+        self.assertEqual(coverage["sources"][0]["file"], str(self.source))
+        self.assertEqual(coverage["sources"][0]["reason"], "compilation_input_unavailable")
+
+    def test_valid_unicode_source_identity_round_trips_all_coverage_formats(self):
+        source = self.root / "çalışma-λ-�.cpp"
+        source.write_text("int safe(){return 0;}\n", encoding="utf-8")
+        coverage = self.coverage_formats([source], 0)
+        self.assertTrue(coverage["complete"])
+        self.assertEqual(coverage["sources"][0]["file"], str(source))
 
     def test_explicit_malformed_database_never_falls_back(self):
         build = self.root / "build"

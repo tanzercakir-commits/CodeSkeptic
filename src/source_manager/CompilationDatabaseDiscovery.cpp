@@ -179,9 +179,17 @@ std::unique_ptr<clang::tooling::CompilationDatabase> loadExactJson(
         working = normalized(working);
         fs::path input(file->str());
         if (input.is_relative()) input = working / input;
+        const auto canonicalInput = normalized(input).string();
+        const auto canonicalDirectory = working.string();
+        // Even UTF-8 database strings may resolve through a symlink to a raw
+        // byte pathname. Do not construct an invalid LLVM JSON string from it.
+        if (!llvm::json::isUTF8(canonicalInput) || !llvm::json::isUTF8(canonicalDirectory)) {
+            error = "resolved compilation input path is not UTF-8";
+            return nullptr;
+        }
         // Normalize the actual loaded commands, not just the doctor's labels.
-        (*object)["directory"] = working.string();
-        (*object)["file"] = normalized(input).string();
+        (*object)["directory"] = canonicalDirectory;
+        (*object)["file"] = canonicalInput;
     }
     auto database = clang::tooling::JSONCompilationDatabase::loadFromBuffer(
         llvm::formatv("{0}", *parsed).str(), error,
@@ -265,6 +273,10 @@ bool collectRequestedSources(const Config& config, const fs::path& source,
         }
     }
     files.assign(requested.begin(), requested.end());
+    for (const auto& file : files) {
+        if (!llvm::json::isUTF8(file))
+            problem("requested source path is not UTF-8");
+    }
     return reason.empty();
 }
 
@@ -340,6 +352,10 @@ CompilationDatabaseSelection discoverCompilationDatabase(const Config& config) {
                 result.ready = true;
                 result.files.push_back(normalized(source).string());
                 result.selection = "direct-single-file";
+                if (!llvm::json::isUTF8(result.files.front())) {
+                    result.ready = false;
+                    result.reason = "requested source path is not UTF-8";
+                }
                 return result;
             }
             return fail("no compile_commands.json found; project/file-list analysis requires a database");
@@ -385,13 +401,18 @@ CompilationDatabaseSelection discoverCompilationDatabase(const Config& config) {
 }
 
 void writeCompilationDoctor(const CompilationDatabaseSelection& result, std::ostream& output) {
+    // Human-readable labels must not corrupt a UTF-8 stderr/stdout stream.
+    // The analysis coverage separately retains each failed path byte-for-byte.
+    auto display = [](const std::string& text) {
+        return llvm::json::isUTF8(text) ? text : llvm::json::fixUTF8(text);
+    };
     output << "[CodeSkeptic] compilation doctor\n"
            << "status: " << (result.ready ? "ready" : "unavailable") << "\n"
-           << "source: " << result.source << "\n";
+           << "source: " << display(result.source) << "\n";
     if (result.ready) {
         output << "mode: " << (result.synthetic ? "synthetic-single-file" : "compilation-database") << "\n"
                << "selection: " << result.selection << "\n"
-               << "database: " << (result.synthetic ? "none" : result.database) << "\n"
+               << "database: " << (result.synthetic ? "none" : display(result.database)) << "\n"
                << "entries: " << result.entries << "\n"
                << "matching-entries: " << result.matching_entries << "\n"
                << "source-files: " << result.files.size() << "\n";
@@ -399,10 +420,10 @@ void writeCompilationDoctor(const CompilationDatabaseSelection& result, std::ost
             output << "standard: " << (fs::path(result.files.front()).extension() == ".c" ? "gnu11" : "c++17") << "\n";
         output << "next: run analysis with the same source and build-path options; doctor does not compile or prove correctness\n";
     } else {
-        output << "reason: " << result.reason << "\n";
-        if (!result.database.empty()) output << "database: " << result.database << "\n";
+        output << "reason: " << display(result.reason) << "\n";
+        if (!result.database.empty()) output << "database: " << display(result.database) << "\n";
         for (std::size_t i = 0; i < result.candidates.size(); ++i)
-            output << "candidate[" << i << "]: " << result.candidates[i] << "\n";
+            output << "candidate[" << i << "]: " << display(result.candidates[i]) << "\n";
         output << "next: generate a valid compile_commands.json for this project and select its directory with --build-path; for CMake enable CMAKE_EXPORT_COMPILE_COMMANDS\n";
     }
 }

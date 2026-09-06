@@ -2,14 +2,34 @@
 #define CODESKEPTIC_REPORTER_COVERAGE_H
 
 #include "core/AnalysisResult.h"
+#include <llvm/Support/JSON.h>
 #include <ostream>
 
 namespace codeskeptic {
 
+// A failed POSIX path can contain arbitrary bytes. Preserve its identity
+// losslessly without placing invalid UTF-8 in JSON or conflating it with a
+// replacement-character pathname. Canonical absolute UTF-8 paths are unchanged.
+inline std::string coveragePathIdentity(const std::string& path) {
+    static constexpr char prefix[] = "codeskeptic-bytes:";
+    if (llvm::json::isUTF8(path) && path.compare(0, sizeof(prefix) - 1, prefix) != 0)
+        return path;
+    static constexpr char hex[] = "0123456789abcdef";
+    std::string identity = prefix;
+    for (unsigned char byte : path) {
+        identity += hex[byte >> 4];
+        identity += hex[byte & 15];
+    }
+    return identity;
+}
+
 inline void writeCoverageString(std::ostream& out, const std::string& value) {
     static constexpr char hex[] = "0123456789abcdef";
+    // Free-form explanatory text is display-only; file identities use the
+    // lossless representation above instead of replacement characters.
+    const std::string text = llvm::json::isUTF8(value) ? value : llvm::json::fixUTF8(value);
     out << '"';
-    for (unsigned char c : value) {
+    for (unsigned char c : text) {
         if (c == '"' || c == '\\') out << '\\' << static_cast<char>(c);
         else if (c < 0x20) out << "\\u00" << hex[c >> 4] << hex[c & 15];
         else out << static_cast<char>(c);
@@ -50,7 +70,7 @@ inline void writeCoverageJson(std::ostream& out, const AnalysisResult& result) {
         if (!first) out << ", ";
         first = false;
         out << "{ \"file\": ";
-        writeCoverageString(out, source.file);
+        writeCoverageString(out, coveragePathIdentity(source.file));
         out << ", \"status\": \"" << source.statusName() << "\", \"reason\": ";
         writeCoverageString(out, source.reason);
         out << ", \"commands\": " << source.commands

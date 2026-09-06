@@ -358,6 +358,14 @@ enumerated; discovery fails closed instead of claiming complete scope.
 If filesystem errors prevent resolving an explicit source identity, its failed
 record retains the absolute lexical request path; it is not accepted as a
 resolved compilation target.
+Source paths must be UTF-8. Unsupported filesystem byte encodings fail closed
+with exit `2` and source reason `source_path_not_utf8`, even with either coverage
+opt-in. Such a failed `sources[].file` is `codeskeptic-bytes:` followed by the
+lowercase hexadecimal encoding of the entire original path byte sequence; it
+is an identity, not a filesystem path to open. This lossless representation is
+shared by JSON, SARIF, CLI, MCP and HTML. Valid UTF-8 canonical paths are unchanged.
+The compilation doctor's human-readable labels may use replacement characters;
+use the coverage identity for exact failed-path reconciliation.
 
 The CLI emits this same coverage JSON on stderr after the `source coverage:`
 prefix. JSON reports store it under `coverage`; SARIF stores the identical object

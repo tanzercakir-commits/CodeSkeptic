@@ -112,13 +112,16 @@ StaticAnalyzer::StaticAnalyzer(Config config)
         SourceCoverage source{file};
         source.reason = selection.ready ? "not_processed"
                                         : "compilation_input_unavailable";
-        if (!selection.ready) {
+        if (!llvm::json::isUTF8(file)) {
+            source.reason = "source_path_not_utf8";
+            compilation_input_ready_ = false;
+        } else if (!selection.ready) {
             std::error_code error;
             if (!std::filesystem::is_regular_file(file, error))
                 source.reason = error ? "source_identity_unavailable" : "source_unavailable";
         }
         requested_sources_.push_back(std::move(source));
-        if (selection.ready && !source_mgr_->addSourceFile(file)) {
+        if (selection.ready && llvm::json::isUTF8(file) && !source_mgr_->addSourceFile(file)) {
             requested_sources_.back().reason = "source_unavailable";
             compilation_input_ready_ = false;
         }

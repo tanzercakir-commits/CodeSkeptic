@@ -1,4 +1,5 @@
 #include "reporter/JsonReporter.h"
+#include "reporter/Coverage.h"
 
 #include <fstream>
 #include <gtest/gtest.h>
@@ -103,4 +104,31 @@ TEST(JsonReporterTest, SourceIdentitiesAndReasonsRoundTripEveryControlByte) {
     EXPECT_EQ(row->getString("reason"), identity);
     ASSERT_NE(row->getObject("prepass"), nullptr);
     EXPECT_EQ(row->getObject("prepass")->getString("reason"), identity);
+}
+
+TEST(JsonReporterTest, BytePathIdentitiesAreLosslessDistinctAndValidUtf8) {
+    const std::vector<std::string> invalid{
+        std::string("/\xff.cpp"), std::string("/\xfe.cpp"),
+        std::string("/\xc0\xaf.cpp"), std::string("/\xe2\x82"),
+        std::string("/\xed\xa0\x80.cpp"), std::string("/\xf4\x90\x80\x80.cpp")};
+    const std::vector<std::string> expected{
+        "codeskeptic-bytes:2fff2e637070", "codeskeptic-bytes:2ffe2e637070",
+        "codeskeptic-bytes:2fc0af2e637070", "codeskeptic-bytes:2fe282",
+        "codeskeptic-bytes:2feda0802e637070", "codeskeptic-bytes:2ff49080802e637070"};
+    AnalysisResult result;
+    for (const auto& path : invalid)
+        result.sources.push_back(SourceCoverage{path, SourceStatus::Failed, "source_path_not_utf8"});
+    result.reconcileSources();
+    const auto text = readJsonReport(result);
+    ASSERT_TRUE(llvm::json::isUTF8(text));
+    auto parsed = llvm::json::parse(text);
+    ASSERT_TRUE(static_cast<bool>(parsed));
+    const auto* rows = parsed->getAsObject()->getObject("coverage")->getArray("sources");
+    ASSERT_EQ(rows->size(), expected.size());
+    for (std::size_t i = 0; i < expected.size(); ++i)
+        EXPECT_EQ((*rows)[i].getAsObject()->getString("file"), expected[i]);
+    // A caller's literal marker text must not alias the encoded identity.
+    EXPECT_NE(coveragePathIdentity(expected.front()), expected.front());
+    const std::string unicode = "/\xc3\xa7-\xce\xbb-\xef\xbf\xbd.cpp";
+    EXPECT_EQ(coveragePathIdentity(unicode), unicode);
 }
