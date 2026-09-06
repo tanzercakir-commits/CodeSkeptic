@@ -213,7 +213,7 @@ std::vector<SourceCoverage> StaticAnalyzer::processIsolated(bool prepass) {
             continue;
         }
         auto execution = executeAnalysisWorker(worker_executable_, request, config_.workerLimits(),
-                                               config_.resourceCancellation());
+                                               config_.resourceCancellation(), disk_cache_.get());
         if (!execution.detail.empty()) std::cerr << execution.detail << '\n';
         if (!execution.valid) {
             failed.reason = execution.reason;
@@ -244,6 +244,25 @@ std::vector<SourceCoverage> StaticAnalyzer::processIsolated(bool prepass) {
 }
 
 AnalysisResult StaticAnalyzer::run() {
+    disk_cache_.reset();
+    if (config_.analysisCache() && !config_.analysisCacheDirectory().empty())
+        disk_cache_ = std::make_unique<DiskEvidenceStore>(config_.analysisCacheDirectory(),
+            config_.analysisCacheBytes(), config_.analysisCacheEntries());
+    // Parent-only advisory on every return/exception. Never writes worker
+    // stdout or execution.detail and never changes report/exit semantics.
+    struct StorageSummary {
+        DiskEvidenceStore* store;
+        ~StorageSummary() {
+            if (!store) return;
+            const auto s = store->status();
+            std::cerr << "[CodeSkeptic] disk-cache: state=" << s.state
+                      << " candidates=" << s.candidates << " hits=" << s.hits
+                      << " writes=" << s.writes << " evictions=" << s.evictions
+                      << " recovered=" << s.recovered << " rejected=" << s.rejected
+                      << " errors=" << s.errors << " capacity=" << s.capacity
+                      << " busy=" << s.busy << " bytes=" << s.bytes << " entries=" << s.entries << '\n';
+        }
+    } storage_summary{disk_cache_.get()};
     diagnostics_.clear();
     AnalysisResult result;
     result.sources = requested_sources_;

@@ -224,7 +224,7 @@ bool importWorkerSummaries(const std::string& bytes, std::string& error) {
 }
 
 WorkerExecution executeAnalysisWorker(const std::string& executable, const WorkerRequest& request,
-    const WorkerLimits& limits, const ResourceCancellation* cancellation) {
+    const WorkerLimits& limits, const ResourceCancellation* cancellation, DiskEvidenceStore* disk_cache) {
     WorkerExecution execution;
     execution.reason = "worker_transport_failed";
     try {
@@ -245,7 +245,8 @@ WorkerExecution executeAnalysisWorker(const std::string& executable, const Worke
         std::optional<std::string> candidate;
         if (!key.empty()) {
             try {
-                candidate = processUnitEvidenceStore().candidate(key, digest, cancelled);
+                candidate = disk_cache ? disk_cache->candidate(key, digest, cancelled) :
+                    processUnitEvidenceStore().candidate(key, digest, cancelled);
             } catch (...) { /* Optional cache failure falls through to ordinary execution. */ }
         }
         if (cancelled()) { execution.reason = "worker_cancelled"; return execution; }
@@ -309,14 +310,18 @@ WorkerExecution executeAnalysisWorker(const std::string& executable, const Worke
         if (!key.empty() && execution.detail.empty() && !cancelled()) {
             try {
                 if (tool_identity == cacheToolIdentity(executable, cancelled) && environment == inputEnvironmentIdentity() &&
-                    cacheableResponse(request, execution.response))
-                    processUnitEvidenceStore().rememberCandidate(key, digest, response_packet, execution.response.input_witness, cancelled);
+                    cacheableResponse(request, execution.response)) {
+                    if (disk_cache && !execution.response.cache_hit)
+                        disk_cache->rememberCandidate(key, digest, response_packet, execution.response.input_witness, cancelled);
+                    else if (!disk_cache) processUnitEvidenceStore().rememberCandidate(key, digest, response_packet, execution.response.input_witness, cancelled);
+                }
             } catch (...) { /* No cache entry is preferable to losing successful analysis. */ }
         }
         if (cancelled()) { execution.valid = false; execution.reason = "worker_cancelled"; }
         if (execution.valid && execution.response.cache_hit) {
             execution.cache_hit = true;
             processUnitEvidenceStore().confirmHit();
+            if (disk_cache) disk_cache->confirmHit();
         }
         return execution;
     } catch (const std::exception& failure) {

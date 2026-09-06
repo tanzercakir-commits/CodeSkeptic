@@ -1,6 +1,44 @@
 #ifdef CODESKEPTIC_RUNTIME_TEST_MODULE
 #include <cstdio>
 #include <cstdlib>
+#include <cerrno>
+#include <cstring>
+#include <sys/syscall.h>
+#include <unistd.h>
+
+// Fault injection belongs only to this separately built private fixture DSO.
+// No production environment flag or storage hook is introduced. The control
+// file changes without changing the child's environment/runtime identity.
+static bool diskFault(int fd, char mode, bool pending) {
+    const auto* directory = std::getenv("CS_DISK_FAULT_DIR");
+    const auto* control = std::getenv("CS_DISK_FAULT_CONTROL");
+    if (!directory || !control) return false;
+    auto* file = std::fopen(control, "rb");
+    if (!file) return false;
+    const int selected = std::fgetc(file);
+    std::fclose(file);
+    if (selected != mode) return false;
+    char proc[64], path[8192];
+    std::snprintf(proc, sizeof(proc), "/proc/self/fd/%d", fd);
+    const auto size = ::readlink(proc, path, sizeof(path) - 1);
+    if (size < 0) return false;
+    path[size] = '\0';
+    const auto length = std::strlen(directory);
+    return std::strncmp(path, directory, length) == 0 &&
+        std::strcmp(path + length, pending ? "/.pending" : "") == 0;
+}
+extern "C" int fsync(int fd) {
+    if (diskFault(fd, 'f', true) || diskFault(fd, 'd', false)) { errno = EIO; return -1; }
+    return static_cast<int>(::syscall(SYS_fsync, fd));
+}
+extern "C" int renameat(int old_fd, const char* old_name, int new_fd, const char* new_name) noexcept {
+    if (std::strcmp(old_name, ".pending") == 0 && diskFault(old_fd, 'r', false)) { errno = EIO; return -1; }
+#ifdef SYS_renameat
+    return static_cast<int>(::syscall(SYS_renameat, old_fd, old_name, new_fd, new_name));
+#else
+    return static_cast<int>(::syscall(SYS_renameat2, old_fd, old_name, new_fd, new_name, 0));
+#endif
+}
 
 // Private Linux loader fixture; no hooks or fault flags in the production tool.
 __attribute__((constructor)) static void markRuntimeLoaded() {
@@ -42,6 +80,15 @@ int main(int argc, char** argv) {
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <thread>
+#ifdef __linux__
+#include <fcntl.h>
+#include <signal.h>
+#include <sys/file.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
 #ifndef _WIN32
 #include <sys/resource.h>
 #endif
@@ -75,6 +122,274 @@ protected:
         return result;
     }
 };
+
+#ifdef __linux__
+class DiskEvidenceStoreTest : public InputIdentityTest {
+protected:
+    std::string proof, digest = inputDigest("request"), key = inputDigest("key");
+    fs::path directory;
+    void SetUp() override {
+        InputIdentityTest::SetUp();
+        write("int f(){return 42;}\n");
+        proof = encodeInputIdentity(witness());
+        ASSERT_FALSE(proof.empty());
+        directory = root / "disk";
+    }
+    fs::path entry() const { return directory / (key + ".entry"); }
+    std::string read(const fs::path& path) {
+        std::ifstream input(path, std::ios::binary);
+        return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+    }
+    void replace(const fs::path& path, const std::string& bytes) {
+        std::ofstream file(path, std::ios::binary | std::ios::trunc);
+        file << bytes;
+        ASSERT_TRUE(file.good());
+    }
+};
+
+TEST_F(DiskEvidenceStoreTest, SeparateStoresRoundtripOnlyBoundedValidatedEnvelopes) {
+    DiskEvidenceStore writer(directory.string(), 1024 * 1024, 8);
+    EXPECT_EQ(writer.rememberCandidate(key, digest, "original", proof), DiskWriteResult::Committed);
+    const auto envelope = read(entry());
+    ASSERT_FALSE(envelope.empty());
+    DiskEvidenceStore reader(directory.string(), 1024 * 1024, 8);
+    EXPECT_EQ(reader.candidate(key, digest), "original");
+    EXPECT_EQ(reader.status().hits, 0u); // Only the actual child can confirm reuse.
+    EXPECT_FALSE(reader.candidate(key, inputDigest("wrong-request")));
+    EXPECT_EQ(reader.status().rejected, 1u);
+    for (std::size_t length : {0u, 7u, 151u, static_cast<unsigned>(envelope.size() - 1)}) {
+        replace(entry(), envelope.substr(0, length));
+        EXPECT_FALSE(reader.candidate(key, digest));
+    }
+    auto tampered = envelope;
+    tampered[152] ^= 1;
+    replace(entry(), tampered);
+    EXPECT_FALSE(reader.candidate(key, digest));
+    replace(entry(), envelope + "trailing");
+    EXPECT_FALSE(reader.candidate(key, digest));
+    replace(entry(), envelope);
+    EXPECT_EQ(reader.candidate(key, digest), "original");
+}
+
+TEST_F(DiskEvidenceStoreTest, ExactByteCeilingIncludesOldAndPendingAndPreservesFailedReplacement) {
+    DiskEvidenceStore writer(directory.string(), 1024 * 1024, 8);
+    ASSERT_EQ(writer.rememberCandidate(key, digest, "original", proof), DiskWriteResult::Committed);
+    const auto old = read(entry());
+    DiskEvidenceStore tight(directory.string(), old.size() * 2 - 1, 8);
+    EXPECT_EQ(tight.rememberCandidate(key, digest, "replaced", proof), DiskWriteResult::NotStored);
+    EXPECT_EQ(tight.status().capacity, 1u);
+    EXPECT_EQ(read(entry()), old);
+    EXPECT_FALSE(fs::exists(directory / ".pending"));
+    DiskEvidenceStore exact(directory.string(), old.size() * 2, 8);
+    EXPECT_EQ(exact.rememberCandidate(key, digest, "replaced", proof), DiskWriteResult::Committed);
+    EXPECT_EQ(exact.status().bytes, old.size());
+    EXPECT_EQ(exact.candidate(key, digest), "replaced");
+    DiskEvidenceStore one(directory.string(), 1024 * 1024, 1);
+    EXPECT_EQ(one.rememberCandidate(key, digest, "original", proof), DiskWriteResult::NotStored);
+    EXPECT_EQ(one.status().capacity, 1u);
+    EXPECT_EQ(one.candidate(key, digest), "replaced");
+}
+
+TEST_F(DiskEvidenceStoreTest, CancellationDuringPartialWritePreservesOldAndRemovesTemporary) {
+    DiskEvidenceStore store(directory.string(), 1024 * 1024, 8);
+    ASSERT_EQ(store.rememberCandidate(key, digest, "original", proof), DiskWriteResult::Committed);
+    const auto old = read(entry());
+    bool observed_partial = false;
+    const auto cancel = [&] {
+        std::error_code error;
+        const auto size = fs::file_size(directory / ".pending", error);
+        if (!error && size > 0) observed_partial = true;
+        return observed_partial;
+    };
+    EXPECT_EQ(store.rememberCandidate(key, digest, std::string(180000, 'x'), proof, cancel), DiskWriteResult::NotStored);
+    EXPECT_TRUE(observed_partial);
+    EXPECT_EQ(store.status().state, "cancelled");
+    EXPECT_EQ(read(entry()), old);
+    EXPECT_FALSE(fs::exists(directory / ".pending"));
+    EXPECT_EQ(store.candidate(key, digest), "original");
+}
+
+TEST_F(DiskEvidenceStoreTest, CrashLeftTemporaryIsNeverACandidateAndRetentionStaysFinite) {
+    DiskEvidenceStore store(directory.string(), 1024 * 1024, 3);
+    ASSERT_EQ(store.rememberCandidate(key, digest, "original", proof), DiskWriteResult::Committed);
+    replace(directory / ".pending", "interrupted write");
+    ASSERT_EQ(::chmod((directory / ".pending").c_str(), 0600), 0);
+    EXPECT_EQ(store.candidate(key, digest), "original");
+    EXPECT_EQ(store.status().recovered, 1u);
+    EXPECT_FALSE(fs::exists(directory / ".pending"));
+    for (int i = 0; i < 8; ++i)
+        EXPECT_EQ(store.rememberCandidate(inputDigest(std::to_string(i)), digest, "other", proof), DiskWriteResult::Committed);
+    EXPECT_LE(store.status().entries, 3u);
+    EXPECT_GT(store.status().evictions, 0u);
+    std::uint64_t actual = 0;
+    std::size_t count = 0;
+    for (const auto& file : fs::directory_iterator(directory)) { actual += file.file_size(); ++count; }
+    EXPECT_EQ(actual, store.status().bytes);
+    EXPECT_EQ(count, store.status().entries);
+    DiskEvidenceStore tiny(directory.string(), 1, 1);
+    EXPECT_FALSE(tiny.candidate(key, digest));
+    EXPECT_TRUE(fs::is_empty(directory));
+    EXPECT_EQ(tiny.rememberCandidate(key, digest, "new", proof), DiskWriteResult::NotStored);
+    EXPECT_EQ(tiny.status().capacity, 1u);
+}
+
+TEST_F(DiskEvidenceStoreTest, ActualProcessExitMidWriteLeavesOnlyRecoverableTemporaryAndOldTarget) {
+    DiskEvidenceStore store(directory.string(), 1024 * 1024, 8);
+    ASSERT_EQ(store.rememberCandidate(key, digest, "original", proof), DiskWriteResult::Committed);
+    const auto old = read(entry());
+    const auto child = ::fork();
+    ASSERT_GE(child, 0);
+    if (child == 0) {
+        DiskEvidenceStore writer(directory.string(), 1024 * 1024, 8);
+        writer.rememberCandidate(key, digest, std::string(180000, 'x'), proof, [&] {
+            std::error_code error;
+            const auto size = fs::file_size(directory / ".pending", error);
+            if (!error && size > 0) ::_exit(73); // no C++ destructor/cleanup
+            return false;
+        });
+        ::_exit(4);
+    }
+    int status = 0;
+    ASSERT_EQ(::waitpid(child, &status, 0), child);
+    ASSERT_TRUE(WIFEXITED(status)); ASSERT_EQ(WEXITSTATUS(status), 73);
+    ASSERT_TRUE(fs::exists(directory / ".pending"));
+    EXPECT_EQ(read(entry()), old);
+    EXPECT_EQ(store.candidate(key, digest), "original");
+    EXPECT_EQ(store.status().recovered, 1u);
+    EXPECT_FALSE(fs::exists(directory / ".pending"));
+}
+
+TEST_F(DiskEvidenceStoreTest, SymlinksHardlinksAndUnrelatedNamesAreNotFollowedOrDeleted) {
+    DiskEvidenceStore store(directory.string(), 1024 * 1024, 8);
+    ASSERT_EQ(store.rememberCandidate(key, digest, "original", proof), DiskWriteResult::Committed);
+    const auto external = root / "external";
+    fs::rename(entry(), external);
+    fs::create_symlink(external, entry());
+    const auto original = read(external);
+    EXPECT_FALSE(store.candidate(key, digest));
+    EXPECT_EQ(store.rememberCandidate(key, digest, "replacement", proof), DiskWriteResult::NotStored);
+    EXPECT_EQ(read(external), original);
+    EXPECT_TRUE(fs::is_symlink(entry()));
+    fs::remove(entry());
+    fs::create_hard_link(external, entry());
+    EXPECT_FALSE(store.candidate(key, digest));
+    EXPECT_EQ(store.rememberCandidate(key, digest, "replacement", proof), DiskWriteResult::NotStored);
+    EXPECT_EQ(read(external), original);
+    fs::remove(entry());
+    fs::rename(external, entry());
+    replace(directory / "user-file", "do not delete");
+    EXPECT_FALSE(store.candidate(key, digest));
+    EXPECT_EQ(store.rememberCandidate(key, digest, "replacement", proof), DiskWriteResult::NotStored);
+    EXPECT_EQ(read(directory / "user-file"), "do not delete");
+    fs::remove(directory / "user-file");
+    fs::create_symlink(entry(), directory / ".pending");
+    EXPECT_FALSE(store.candidate(key, digest));
+    EXPECT_TRUE(fs::is_symlink(directory / ".pending"));
+    EXPECT_EQ(read(entry()), original);
+}
+
+TEST_F(DiskEvidenceStoreTest, DirectoryPermissionsAndAncestorSymlinksRefuseStorage) {
+    ASSERT_TRUE(fs::create_directory(directory));
+    ASSERT_EQ(::chmod(directory.c_str(), 0755), 0);
+    DiskEvidenceStore store(directory.string(), 1024 * 1024, 8);
+    EXPECT_EQ(store.rememberCandidate(key, digest, "original", proof), DiskWriteResult::NotStored);
+    EXPECT_TRUE(fs::is_empty(directory));
+    ASSERT_EQ(::chmod(directory.c_str(), 0700), 0);
+    const auto alias = root / "alias";
+    fs::create_directory_symlink(directory, alias);
+    DiskEvidenceStore linked(alias.string(), 1024 * 1024, 8);
+    EXPECT_EQ(linked.rememberCandidate(key, digest, "original", proof), DiskWriteResult::NotStored);
+    DiskEvidenceStore ancestor((alias / "nested").string(), 1024 * 1024, 8);
+    EXPECT_EQ(ancestor.rememberCandidate(key, digest, "original", proof), DiskWriteResult::NotStored);
+    EXPECT_TRUE(fs::is_empty(directory));
+}
+
+TEST_F(DiskEvidenceStoreTest, ConcurrentWritersAndReadersPublishOnlyWholePacketsWithinCaps) {
+    DiskEvidenceStore store(directory.string(), 1024 * 1024, 8);
+    ASSERT_EQ(store.rememberCandidate(key, digest, "original", proof), DiskWriteResult::Committed);
+    const auto child = ::fork();
+    ASSERT_GE(child, 0);
+    if (child == 0) {
+        DiskEvidenceStore writer(directory.string(), 1024 * 1024, 8);
+        unsigned committed = 0;
+        for (int i = 0; i < 120; ++i) {
+            const auto result = writer.rememberCandidate(key, digest, std::string(70000, i % 2 ? 'a' : 'b'), proof);
+            if (result == DiskWriteResult::NotStored && writer.status().state != "busy") ::_exit(3);
+            if (result == DiskWriteResult::Committed) ++committed;
+            ::usleep(1000);
+        }
+        ::_exit(committed ? 0 : 5);
+    }
+    unsigned same_commits = 0, other_commits = 0;
+    for (int i = 0; i < 120; ++i) {
+        const bool same = i % 2 == 0;
+        const auto result = store.rememberCandidate(same ? key : inputDigest(std::to_string(i)), digest,
+                                                    std::string(70000, 'c'), proof);
+        if (result == DiskWriteResult::Committed) { if (same) ++same_commits; else ++other_commits; }
+        else EXPECT_EQ(store.status().state, "busy");
+        const auto packet = store.candidate(key, digest);
+        if (packet) EXPECT_TRUE(*packet == "original" || *packet == std::string(70000, 'a') ||
+                              *packet == std::string(70000, 'b') || *packet == std::string(70000, 'c'));
+        else EXPECT_TRUE(store.status().state == "busy" || store.status().state == "miss");
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    int status = 0;
+    ASSERT_EQ(::waitpid(child, &status, 0), child);
+    ASSERT_TRUE(WIFEXITED(status)); EXPECT_EQ(WEXITSTATUS(status), 0);
+    EXPECT_GT(same_commits, 0u); EXPECT_GT(other_commits, 0u);
+    EXPECT_GT(store.status().evictions, 0u);
+    EXPECT_FALSE(fs::exists(directory / ".pending"));
+    store.candidate(key, digest);
+    EXPECT_LE(store.status().bytes, 1024 * 1024u);
+    EXPECT_LE(store.status().entries, 8u);
+}
+
+TEST_F(DiskEvidenceStoreTest, HeldDirectoryLockReturnsBusyWithoutWaitingOrWriting) {
+    DiskEvidenceStore store(directory.string(), 1024 * 1024, 8);
+    ASSERT_EQ(store.rememberCandidate(key, digest, "original", proof), DiskWriteResult::Committed);
+    const int fd = ::open(directory.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    ASSERT_GE(fd, 0);
+    ASSERT_EQ(::flock(fd, LOCK_EX | LOCK_NB), 0);
+    EXPECT_FALSE(store.candidate(key, digest));
+    EXPECT_EQ(store.status().state, "busy");
+    EXPECT_EQ(store.rememberCandidate(key, digest, "replacement", proof), DiskWriteResult::NotStored);
+    EXPECT_EQ(store.status().state, "busy");
+    ::close(fd);
+    EXPECT_EQ(store.candidate(key, digest), "original");
+}
+
+TEST_F(DiskEvidenceStoreTest, InvalidLimitsNamesAndCancellationNeverCreateStorage) {
+    for (const auto& limits : std::vector<std::pair<std::uint64_t, std::size_t>>{
+             {0, 1}, {1, 0}, {1073741825ULL, 8}, {1024, 4097}}) {
+        DiskEvidenceStore store(directory.string(), limits.first, limits.second);
+        EXPECT_FALSE(store.candidate(key, digest));
+        EXPECT_EQ(store.rememberCandidate(key, digest, "original", proof), DiskWriteResult::NotStored);
+        EXPECT_EQ(store.status().state, "invalid_limits");
+        EXPECT_FALSE(fs::exists(directory));
+    }
+    DiskEvidenceStore store(directory.string(), 1024 * 1024, 8);
+    EXPECT_FALSE(store.candidate("../outside", digest));
+    EXPECT_EQ(store.rememberCandidate("../outside", digest, "original", proof), DiskWriteResult::NotStored);
+    EXPECT_EQ(store.status().state, "rejected");
+    EXPECT_FALSE(fs::exists(directory));
+    EXPECT_FALSE(store.candidate(key, digest, [] { return true; }));
+    EXPECT_EQ(store.rememberCandidate(key, digest, "original", proof, [] { return true; }), DiskWriteResult::NotStored);
+    EXPECT_EQ(store.status().state, "cancelled");
+    EXPECT_FALSE(fs::exists(directory));
+}
+#else
+TEST(DiskEvidenceStoreTest, UnsupportedPlatformNeverTouchesDisk) {
+    const auto directory = fs::path(::testing::TempDir()) / ("codeskeptic-unsupported-disk-" +
+        std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    DiskEvidenceStore store(directory.string(), 1024, 8);
+    EXPECT_EQ(store.status().state, "unsupported");
+    EXPECT_FALSE(store.candidate(inputDigest("key"), inputDigest("request")));
+    EXPECT_EQ(store.rememberCandidate(inputDigest("key"), inputDigest("request"), "packet", "proof"),
+              DiskWriteResult::NotStored);
+    EXPECT_EQ(store.status().state, "unsupported");
+    EXPECT_FALSE(fs::exists(directory));
+}
+#endif
 
 TEST_F(InputIdentityTest, RefusedRecordingNeverSubstitutesAnEarlierRead) {
     write("AAAA");

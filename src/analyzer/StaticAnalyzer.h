@@ -7,6 +7,7 @@
 #include "engine/RuleEngine.h"
 #include "reporter/Reporter.h"
 #include "source_manager/SourceManager.h"
+#include "analyzer/UnitEvidenceStore.h"
 
 #include <memory>
 #include <utility>
@@ -37,10 +38,12 @@ public:
 
     const DiagnosticList& diagnostics() const { return diagnostics_; }
     const Config& config() const { return config_; }
+    DiskCacheStatus diskCacheStatus() const { return disk_cache_ ? disk_cache_->status() : DiskCacheStatus{"disabled"}; }
 
 private:
     std::vector<SourceCoverage> processIsolated(bool prepass);
     Config config_;
+    std::unique_ptr<DiskEvidenceStore> disk_cache_;
     std::string worker_executable_;
     std::vector<WorkerRequest> worker_requests_;
     bool compilation_input_ready_ = false;

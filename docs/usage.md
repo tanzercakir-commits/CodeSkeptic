@@ -20,6 +20,11 @@ codeskeptic <source_path> [options]
                          (default 2048; platform semantics below)
   --analysis-cache      Opt in to bounded process-local worker-result reuse
   --no-analysis-cache   Disable result reuse (the default)
+  --analysis-cache-dir <path> Explicit absolute private disk-cache directory
+  --analysis-cache-bytes <N> Disk bytes including temporary files, 1..1073741824
+                         (default 268435456)
+  --analysis-cache-entries <N> Disk entries including temporary files, 1..4096
+                         (default 128)
   --json <file>          JSON output file
   --sarif <file>         SARIF 2.1.0 output file (GitHub code scanning)
   --html <file>          Self-contained HTML report: summary cards double
@@ -211,10 +216,13 @@ must not independently reap them. No sudo is required for these worker controls.
 
 `--analysis-cache` (configuration `analysis_cache=true`) enables a process-local
 worker-result cache; `--no-analysis-cache` disables it. It is off by default.
-The current cache has no disk persistence, cross-invocation resume or daemon.
-It can reuse work across requests in a long-lived `--serve` process. Each MCP
-request inherits the launch preference without adding client-side RPC fields.
-A separate one-shot CLI invocation starts empty; this is not a promised speedup.
+Without a directory it can reuse work across requests in a long-lived `--serve`
+process; a separate CLI invocation starts empty. To opt into persistence, also
+set `--analysis-cache-dir /absolute/private/cache`. The final directory can be
+created, but its parents must already exist. Neither directory nor limit options
+enable caching by themselves; `--no-analysis-cache` performs no cache storage I/O.
+Each MCP request inherits the complete launch preference without adding
+client-controlled RPC write paths. There is no checkpoint/resume or daemon.
 
 The key binds the exact worker request, tool bytes, environment, working
 directory and resource settings. Evidence records the frontend's actual source
@@ -247,12 +255,53 @@ with a five-second checked budget. Input evidence is limited to 4 MiB/16,384
 observations, 16 MiB per consumed buffer and 64 MiB of buffers per recording.
 Reaching evidence limits declines caching; it does not truncate ordinary analysis.
 
-The store holds at most 128 entries and 64 MiB of accounted key/packet/witness
+The memory-only store holds at most 128 entries and 64 MiB of accounted key/packet/witness
 payload, excluding container/allocator overhead. Deterministic eviction affects
 reuse only. Hashing and validation have costs; no benchmarked speedup is claimed.
 The programmatic in-process warm AST cache is separate, limited to 16 entries,
 and revalidates actual inputs. It retains the existing broken-TU policy and does
 not cache ASTs dependent on vanished-assert records owned by another parse.
+
+### Persistent storage safety and limits
+
+Disk persistence currently supports Linux, matching the qualified runtime-cache
+profile above. Other systems explicitly report `unsupported` and analyze fresh.
+The directory must be dedicated to CodeSkeptic, owned by the current user with
+mode `0700`; symlinks in any path component are refused, not resolved. Records
+must be regular, owner-only `0600`, single-link files. Unexpected names, symlinks,
+hardlinks, malformed/truncated records and checksum mismatches refuse reuse.
+Do not put unrelated files in this directory or move/remove it during scans.
+Storage assumes a coherent local filesystem and a trusted account; checksums
+detect corruption, not deliberate same-owner forgery or privileged interference.
+
+Cooperating processes serialize with a nonblocking directory lock; a busy cache
+falls back to ordinary analysis. Pending bytes are synchronized before an atomic
+temp-to-final rename. Failed **pre-commit** writes preserve the previous target.
+The rename is the visibility commit: if its subsequent directory sync fails,
+status is explicitly `committed_durability_uncertain`, not a claim that the old
+entry survived or that the replacement is crash-durable. Interrupted `.pending`
+files are never candidates and are recovered under the same lock.
+
+`--analysis-cache-bytes` and `--analysis-cache-entries` bound the total logical
+regular-file bytes (including record envelopes) and count, **including pending
+writes**. Defaults are 256 MiB and 128 entries; hard maxima are 1 GiB and 4096.
+These are not filesystem metadata/allocation quotas or limits on unrelated
+writers. Deterministic retention only changes work saved. Replacing an existing
+entry needs space for both old and pending records; the previous target is not
+evicted to make that replacement fit. A one-entry cap therefore cannot replace
+an occupied target in place. Lowering limits may evict old entries on next access.
+More than 4096 existing entries refuses storage without an unbounded directory
+scan. Persistent mode bypasses the memory-only map completely, so changing
+directory/caps cannot resurrect a hidden in-memory candidate.
+
+One parent stderr `disk-cache` summary reports state, candidates, confirmed hits,
+writes, evictions, recovered temporaries, rejections, errors, capacity refusals,
+busy accesses and observed bytes/entries. No advisory is written into worker
+stdout, MCP frames, report schemas or the analysis exit verdict. `ready` means
+no storage access was needed; it does not prove a reusable entry exists. A read
+candidate counts as a hit only after the supervised worker confirms it. Storage
+failure never substitutes missing analysis evidence; the ordinary fresh worker
+still has to succeed. No benchmarked cross-invocation speedup is claimed.
 
 ## Configuration file
 
@@ -267,6 +316,8 @@ fail with exit `2`):
 have the same finite integer ranges/defaults as their CLI options; signed,
 fractional, overflowing and out-of-range values are rejected transactionally.
 `analysis_cache` accepts `true`/`false` or `1`/`0` and defaults to false.
+`analysis_cache_dir`, `analysis_cache_bytes`, and `analysis_cache_entries` have
+the same explicit path requirements and finite ranges as the CLI options.
 An allocator may appear in multiple `allocator_pairs`
 entries to admit multiple exact deallocators.
 

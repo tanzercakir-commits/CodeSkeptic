@@ -49,6 +49,15 @@ bool parseResourceNumber(const std::string& value, unsigned minimum, unsigned ma
     return true;
 }
 
+bool cacheDirectory(const std::string& value) {
+    if (value.empty() || value.size() > 4096 || value.find('\0') != std::string::npos) return false;
+    const std::filesystem::path path(value);
+    if (!path.is_absolute() || path == path.root_path()) return false;
+    for (const auto& component : path.relative_path())
+        if (component.empty() || component == "." || component == "..") return false;
+    return true;
+}
+
 const std::set<std::string>& singleValueOptions() {
     static const std::set<std::string> options = {
         "--source", "--build-path", "--json", "--sarif", "--html",
@@ -59,7 +68,7 @@ const std::set<std::string>& singleValueOptions() {
         "--owning-pointers", "--report-paths", "--policy", "--gate",
         "--lines", "--summary-in", "--summary-out", "--model-file",
         "--files", "--worker-timeout-ms", "--worker-memory-mb",
-        "--write-baseline"
+        "--write-baseline", "--analysis-cache-dir", "--analysis-cache-bytes", "--analysis-cache-entries"
     };
     return options;
 }
@@ -255,6 +264,17 @@ bool Config::loadFromFileInPlace(const std::string& path, InputError* error) {
             if (!parseBool(value, analysis_cache_))
                 return rejectInput(error, "invalid_value", key, "analysis_cache expects true/false/1/0");
         }
+        else if (key == "analysis_cache_dir") {
+            if (!cacheDirectory(value))
+                return rejectInput(error, "invalid_path", key, "Cache directory requires an absolute non-root path without dot components");
+            analysis_cache_directory_ = value;
+        }
+        else if (key == "analysis_cache_bytes" || key == "analysis_cache_entries") {
+            const bool bytes = key == "analysis_cache_bytes";
+            auto& target = bytes ? analysis_cache_bytes_ : analysis_cache_entries_;
+            if (!parseResourceNumber(value, 1, bytes ? 1073741824 : 4096, target))
+                return rejectInput(error, "invalid_value", key, "Cache storage limit is outside its integer range");
+        }
         else if (key == "worker_timeout_ms" || key == "worker_memory_mb") {
             const bool timeout = key == "worker_timeout_ms";
             unsigned& target = timeout ? worker_limits_.timeout_ms : worker_limits_.memory_mb;
@@ -332,6 +352,16 @@ bool Config::parseArgsInPlace(int argc, char* argv[], InputError* error) {
             analysis_cache_ = true;
         } else if (arg == "--no-analysis-cache") {
             analysis_cache_ = false;
+        } else if (arg == "--analysis-cache-dir") {
+            const std::string value(argv[++i]);
+            if (!cacheDirectory(value))
+                return rejectInput(error, "invalid_path", arg, "Cache directory requires an absolute non-root path without dot components");
+            analysis_cache_directory_ = value;
+        } else if (arg == "--analysis-cache-bytes" || arg == "--analysis-cache-entries") {
+            const bool bytes = arg == "--analysis-cache-bytes";
+            auto& target = bytes ? analysis_cache_bytes_ : analysis_cache_entries_;
+            if (!parseResourceNumber(argv[++i], 1, bytes ? 1073741824 : 4096, target))
+                return rejectInput(error, "invalid_value", arg, "Cache storage limit is outside its integer range");
         } else if (arg == "--worker-timeout-ms" || arg == "--worker-memory-mb") {
             const bool timeout = arg == "--worker-timeout-ms";
             unsigned& target = timeout ? worker_limits_.timeout_ms : worker_limits_.memory_mb;
@@ -465,6 +495,10 @@ bool Config::parseArgsInPlace(int argc, char* argv[], InputError* error) {
                       << "                         does not build or run analysis\n"
                       << "  --analysis-cache       Opt in to bounded process-local worker reuse\n"
                       << "  --no-analysis-cache    Disable worker reuse (default)\n"
+                      << "  --analysis-cache-dir <path> Explicit absolute private disk directory\n"
+                      << "  --analysis-cache-bytes <N> Disk byte cap including temp files, 1..1073741824\n"
+                      << "                         (default 268435456; requires cache enablement and directory)\n"
+                      << "  --analysis-cache-entries <N> Disk entry cap including temp files, 1..4096 (default 128)\n"
                       << "  --worker-timeout-ms <N> Per-worker deadline, 1..3600000 ms\n"
                       << "                         (default 120000); includes startup\n"
                       << "  --worker-memory-mb <N> Per-worker native memory cap, 16..65536\n"

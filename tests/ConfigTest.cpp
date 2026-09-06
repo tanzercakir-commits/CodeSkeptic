@@ -70,12 +70,78 @@ std::string snapshot(const Config& c) {
         {"whole", c.wholeProgram()}, {"broken", c.analyzeBrokenTUs()},
         {"partial", c.acceptPartialCoverage()}, {"assumptions", c.assumptions()},
         {"recovery", c.assertRecovery()}, {"cache", c.warmCache()},
+        {"analysis_cache", c.analysisCache()}, {"cache_dir", c.analysisCacheDirectory()},
+        {"cache_bytes", c.analysisCacheBytes()}, {"cache_entries", c.analysisCacheEntries()},
         {"help", c.helpRequested()}, {"off_rule", c.isRuleEnabled("memory-leak")},
         {"on_rule", c.isRuleEnabled("resource-leak")}, {"selection", std::move(selection)}};
     return llvm::formatv("{0}", llvm::json::Value(std::move(state))).str();
 }
 
 } // anonymous namespace
+
+TEST(ConfigTest, DiskCachePreferencesAreExplicitFiniteAndInheritedTogether) {
+    Config config;
+    EXPECT_FALSE(config.analysisCache());
+    EXPECT_TRUE(config.analysisCacheDirectory().empty());
+    EXPECT_EQ(config.analysisCacheBytes(), 268435456u);
+    EXPECT_EQ(config.analysisCacheEntries(), 128u);
+    const auto directory = (std::filesystem::absolute(::testing::TempDir()) / "explicit-cache").string();
+    ASSERT_TRUE(parse(config, {"codeskeptic", "--analysis-cache-dir", directory.c_str(),
+        "--analysis-cache-bytes", "1073741824", "--analysis-cache-entries", "4096"}));
+    EXPECT_FALSE(config.analysisCache()); // directory does not silently enable I/O
+    ASSERT_TRUE(parse(config, {"codeskeptic", "--analysis-cache"}));
+    Config request;
+    request.setWarmCache(true);
+    request.inheritAnalysisCache(config);
+    EXPECT_TRUE(request.analysisCache());
+    EXPECT_TRUE(request.warmCache());
+    EXPECT_EQ(request.analysisCacheDirectory(), directory);
+    EXPECT_EQ(request.analysisCacheBytes(), 1073741824u);
+    EXPECT_EQ(request.analysisCacheEntries(), 4096u);
+    ASSERT_TRUE(parse(config, {"codeskeptic", "--analysis-cache-bytes", "1", "--analysis-cache-entries", "1",
+                              "--no-analysis-cache"}));
+    request.inheritAnalysisCache(config);
+    EXPECT_FALSE(request.analysisCache());
+    EXPECT_EQ(request.analysisCacheBytes(), 1u);
+    EXPECT_EQ(request.analysisCacheEntries(), 1u);
+}
+
+TEST(ConfigTest, DiskCacheMalformedPreferencesLeaveTheWholeConfigUnchanged) {
+    Config config;
+    ASSERT_TRUE(parse(config, {"codeskeptic", "--analysis-cache"}));
+    const auto before = snapshot(config);
+    for (const auto option : {"--analysis-cache-bytes", "--analysis-cache-entries"}) {
+        for (const auto value : {"", "0", "-1", "+1", "1.5", "1e3", " 1", "999999999999999999999"}) {
+            EXPECT_FALSE(parse(config, {"codeskeptic", "--no-analysis-cache", option, value}));
+            EXPECT_EQ(snapshot(config), before);
+        }
+        EXPECT_FALSE(parse(config, {"codeskeptic", option}));
+        EXPECT_FALSE(parse(config, {"codeskeptic", option, "--serve"}));
+        EXPECT_EQ(snapshot(config), before);
+    }
+    EXPECT_FALSE(parse(config, {"codeskeptic", "--analysis-cache-bytes", "1073741825"}));
+    EXPECT_FALSE(parse(config, {"codeskeptic", "--analysis-cache-entries", "4097"}));
+    for (const auto value : {"", "relative/cache", "/", "/tmp/../cache", "/tmp/./cache", "/tmp/cache/"}) {
+        EXPECT_FALSE(parse(config, {"codeskeptic", "--no-analysis-cache", "--analysis-cache-dir", value}));
+        EXPECT_EQ(snapshot(config), before);
+    }
+    const auto directory = (std::filesystem::absolute(::testing::TempDir()) / "cache-config-test").string();
+    const auto content = "analysis_cache=true\nanalysis_cache_dir=" + directory +
+                         "\nanalysis_cache_bytes=4096\nanalysis_cache_entries=2\n";
+    const auto path = writeConfig("codeskeptic-disk-cache-config.conf", content.c_str());
+    ASSERT_TRUE(config.loadFromFile(path));
+    EXPECT_EQ(config.analysisCacheDirectory(), directory);
+    EXPECT_EQ(config.analysisCacheBytes(), 4096u);
+    EXPECT_EQ(config.analysisCacheEntries(), 2u);
+    const auto configured = snapshot(config);
+    for (const auto line : {"analysis_cache_bytes=0", "analysis_cache_entries=4097", "analysis_cache_dir=relative"}) {
+        const auto invalid = std::string("analysis_cache=false\n") + line + "\n";
+        writeConfig("codeskeptic-disk-cache-config.conf", invalid.c_str());
+        EXPECT_FALSE(config.loadFromFile(path));
+        EXPECT_EQ(snapshot(config), configured);
+    }
+    std::filesystem::remove(path);
+}
 
 TEST(ConfigTest, RejectsUnknownOptionAndMissingValue) {
     Config unknown;

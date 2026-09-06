@@ -34,6 +34,7 @@ struct Scan {
     AnalysisResult result;
     DiagnosticList diagnostics;
     std::string report;
+    DiskCacheStatus disk_cache;
 };
 
 class AnalysisCoordinatorTest : public ::testing::Test {
@@ -107,6 +108,7 @@ protected:
         scan.result = analyzer.run();
         scan.diagnostics = analyzer.diagnostics();
         scan.report = readText(root / "report.json");
+        scan.disk_cache = analyzer.diskCacheStatus();
         return scan;
     }
 };
@@ -118,6 +120,120 @@ protected:
 };
 
 #ifdef __linux__
+TEST_F(AnalysisCacheTest, DiskPreferencesCannotReuseHiddenMemoryOrAnotherDirectory) {
+    file("persistent.cpp", "int finding(){ int* p=nullptr; return *p; }\n");
+    database();
+    const auto fresh = scan(CODESKEPTIC_BINARY_PATH);
+    ASSERT_TRUE(fresh.result.complete());
+    const auto memory = scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"});
+    EXPECT_EQ(memory.report, fresh.report);
+    const auto directory = (root / "disk").string();
+    const std::vector<std::string> settings{"--analysis-cache", "--analysis-cache-dir", directory};
+    const auto first = scan(CODESKEPTIC_BINARY_PATH, settings);
+    EXPECT_EQ(first.report, fresh.report);
+    EXPECT_EQ(first.disk_cache.hits, 0u);
+    ASSERT_EQ(first.disk_cache.writes, 1u);
+    const auto second = scan(CODESKEPTIC_BINARY_PATH, settings);
+    EXPECT_EQ(second.report, fresh.report);
+    EXPECT_EQ(second.disk_cache.hits, 1u);
+    EXPECT_EQ(second.disk_cache.writes, 0u);
+    const auto elsewhere = scan(CODESKEPTIC_BINARY_PATH,
+        {"--analysis-cache", "--analysis-cache-dir", (root / "other").string()});
+    EXPECT_EQ(elsewhere.report, fresh.report);
+    EXPECT_EQ(elsewhere.disk_cache.hits, 0u);
+    EXPECT_EQ(elsewhere.disk_cache.writes, 1u);
+    const auto tight = scan(CODESKEPTIC_BINARY_PATH,
+        {"--analysis-cache", "--analysis-cache-dir", directory, "--analysis-cache-bytes", "1"});
+    EXPECT_EQ(tight.report, fresh.report);
+    EXPECT_EQ(tight.disk_cache.hits, 0u);
+    EXPECT_GT(tight.disk_cache.capacity, 0u);
+    EXPECT_TRUE(fs::is_empty(directory));
+    const auto disabled = scan(CODESKEPTIC_BINARY_PATH,
+        {"--analysis-cache-dir", (root / "never-created").string(), "--no-analysis-cache"});
+    EXPECT_EQ(disabled.report, fresh.report);
+    EXPECT_FALSE(fs::exists(root / "never-created"));
+}
+
+TEST_F(AnalysisCacheTest, SeparateCliProcessesPersistAndCorruptionFallsBackToFreshAnalysis) {
+    file("cli-cache.cpp", "int finding(){ int* p=nullptr; return *p; }\n");
+    database();
+    const auto report = (root / "cli-report.json").string();
+    const auto output = (root / "cli-out.log").string();
+    const auto errors = (root / "cli-errors.log").string();
+    const auto directory = (root / "disk-cli").string();
+    auto cli = [&](const std::vector<std::string>& options) {
+        std::vector<std::string> args{CODESKEPTIC_BINARY_PATH, "--source", sources.front().string(),
+            "--build-path", (root / "build").string(), "--json", report};
+        args.insert(args.end(), options.begin(), options.end());
+        std::vector<llvm::StringRef> refs(args.begin(), args.end());
+        const std::array<std::optional<llvm::StringRef>, 3> redirects{{llvm::StringRef(""), output, errors}};
+        std::string error;
+        EXPECT_EQ(llvm::sys::ExecuteAndWait(CODESKEPTIC_BINARY_PATH, refs, std::nullopt, redirects, 30, 0, &error), 1)
+            << error << readText(errors);
+        return readText(report);
+    };
+    const auto fresh = cli({});
+    ASSERT_FALSE(fresh.empty());
+    const std::vector<std::string> settings{"--analysis-cache", "--analysis-cache-dir", directory};
+    EXPECT_EQ(cli(settings), fresh);
+    EXPECT_NE(readText(errors).find("writes=1"), std::string::npos) << readText(errors);
+    EXPECT_EQ(cli(settings), fresh);
+    EXPECT_NE(readText(errors).find("hits=1"), std::string::npos) << readText(errors);
+    std::size_t entries = 0;
+    for (const auto& entry : fs::directory_iterator(directory)) {
+        ASSERT_EQ(entry.path().extension(), ".entry");
+        std::ofstream(entry.path(), std::ios::binary | std::ios::trunc) << "corrupt";
+        ++entries;
+    }
+    ASSERT_EQ(entries, 1u);
+    EXPECT_EQ(cli(settings), fresh);
+    EXPECT_NE(readText(errors).find("rejected=1"), std::string::npos) << readText(errors);
+    EXPECT_NE(readText(errors).find("hits=0"), std::string::npos) << readText(errors);
+    EXPECT_EQ(cli(settings), fresh);
+    EXPECT_NE(readText(errors).find("hits=1"), std::string::npos) << readText(errors);
+}
+
+TEST_F(AnalysisCacheTest, SeparateMcpProcessesInheritDiskSettingsWithoutChangingRpcFrames) {
+    const auto source = file("mcp-cache.cpp", "int finding(){ int* p=nullptr; return *p; }\n");
+    database();
+    const auto input = (root / "disk-mcp-input.jsonl").string();
+    const auto output = (root / "disk-mcp-output.jsonl").string();
+    const auto errors = (root / "disk-mcp-errors.log").string();
+    std::string frames;
+    llvm::raw_string_ostream stream(frames);
+    stream << llvm::json::Value(llvm::json::Object{{"jsonrpc", "2.0"}, {"id", 1},
+        {"method", "tools/call"}, {"params", llvm::json::Object{{"name", "analyze"},
+            {"arguments", llvm::json::Object{{"path", source.string()}, {"build_path", (root / "build").string()}}}}}}) << '\n';
+    stream << "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"ping\"}\n";
+    { std::ofstream file(input, std::ios::binary); file << frames; }
+    auto mcp = [&](bool enabled) {
+        std::vector<std::string> args{CODESKEPTIC_BINARY_PATH, "--serve"};
+        if (enabled) args.insert(args.end(), {"--analysis-cache", "--analysis-cache-dir", (root / "disk-mcp").string()});
+        std::vector<llvm::StringRef> refs(args.begin(), args.end());
+        const std::array<std::optional<llvm::StringRef>, 3> redirects{{input, output, errors}};
+        std::string error;
+        EXPECT_EQ(llvm::sys::ExecuteAndWait(CODESKEPTIC_BINARY_PATH, refs, std::nullopt, redirects, 30, 0, &error), 0)
+            << error << readText(errors);
+        return readText(output);
+    };
+    const auto fresh = mcp(false);
+    ASSERT_FALSE(fresh.empty());
+    EXPECT_EQ(mcp(true), fresh);
+    EXPECT_NE(readText(errors).find("writes=1"), std::string::npos) << readText(errors);
+    EXPECT_EQ(mcp(true), fresh);
+    EXPECT_NE(readText(errors).find("hits=1"), std::string::npos) << readText(errors);
+    std::istringstream lines(fresh);
+    std::string line;
+    for (int id : {1, 2}) {
+        ASSERT_TRUE(static_cast<bool>(std::getline(lines, line)));
+        auto parsed = llvm::json::parse(line);
+        ASSERT_TRUE(static_cast<bool>(parsed));
+        ASSERT_NE(parsed->getAsObject(), nullptr);
+        EXPECT_EQ(parsed->getAsObject()->getInteger("id"), id);
+    }
+    EXPECT_FALSE(static_cast<bool>(std::getline(lines, line)));
+}
+
 TEST_F(AnalysisCacheTest, RealHeaderBearingHitsPreserveReportAndInvalidateRestoredMetadata) {
     file("input.cpp", "#include \"value.h\"\nint result(){\n#if VALUE == 3\nint *p=nullptr; return *p;\n#else\nreturn 42;\n#endif\n}\n");
     const auto header = root / "src/value.h";
@@ -208,6 +324,61 @@ public:
         else ::unsetenv(name_.c_str());
     }
 };
+
+TEST_F(AnalysisCacheTest, RealSyscallFailuresPreservePrecommitTargetAndExposePostcommitUncertainty) {
+    const auto source = file("disk-fault.cpp", "int finding(){ int* p=nullptr; return *p; }\n");
+    database();
+    const auto directory = (root / "disk-fault").string();
+    const auto control = root / "fault-control";
+    const auto report = (root / "fault-report.json").string();
+    const auto output = (root / "fault-out.log").string();
+    const auto errors = (root / "fault-errors.log").string();
+    const auto module = root / "disk-fault-runtime.so";
+    ASSERT_TRUE(fs::copy_file(CODESKEPTIC_RUNTIME_FIXTURE_ONE, module));
+    // Like the existing loader fixtures: /tmp's coherent native identity and
+    // an aged module are prerequisites, not a relaxation of runtime validation.
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    ScopedCacheEnvironment preload("LD_PRELOAD", module.string());
+    ScopedCacheEnvironment target("CS_DISK_FAULT_DIR", directory);
+    ScopedCacheEnvironment mode("CS_DISK_FAULT_CONTROL", control.string());
+    auto invoke = [&](char fault, bool caching = true) {
+        { std::ofstream file(control, std::ios::binary); file << fault; }
+        std::vector<std::string> args{CODESKEPTIC_BINARY_PATH, "--source", source.string(),
+            "--build-path", (root / "build").string(), "--json", report};
+        if (caching) args.insert(args.end(), {"--analysis-cache", "--analysis-cache-dir", directory});
+        std::vector<llvm::StringRef> refs(args.begin(), args.end());
+        const std::array<std::optional<llvm::StringRef>, 3> redirects{{llvm::StringRef(""), output, errors}};
+        std::string error;
+        EXPECT_EQ(llvm::sys::ExecuteAndWait(CODESKEPTIC_BINARY_PATH, refs, std::nullopt, redirects, 30, 0, &error), 1)
+            << error << readText(errors);
+        return readText(report);
+    };
+    const auto initial = invoke('0');
+    ASSERT_NE(readText(errors).find("writes=1"), std::string::npos) << readText(errors);
+    const auto first = fs::directory_iterator(directory);
+    ASSERT_NE(first, fs::directory_iterator{});
+    const auto entry = first->path();
+    const auto old = readText(entry);
+    // Source content changes, not the request/key/environment. An old candidate
+    // must be rejected by the child, so this genuinely attempts replacement.
+    { std::ofstream file(source, std::ios::binary | std::ios::app); file << "// changed\n"; }
+    const auto changed_fresh = invoke('0', false);
+    ASSERT_FALSE(changed_fresh.empty());
+    for (char fault : {'f', 'r'}) {
+        EXPECT_EQ(invoke(fault), changed_fresh);
+        EXPECT_NE(readText(errors).find("state=write_failed"), std::string::npos) << readText(errors);
+        EXPECT_NE(readText(errors).find("writes=0"), std::string::npos) << readText(errors);
+        EXPECT_EQ(readText(entry), old);
+        EXPECT_FALSE(fs::exists(fs::path(directory) / ".pending"));
+    }
+    EXPECT_EQ(invoke('d'), changed_fresh);
+    EXPECT_NE(readText(errors).find("state=committed_durability_uncertain"), std::string::npos) << readText(errors);
+    EXPECT_NE(readText(errors).find("writes=1"), std::string::npos) << readText(errors);
+    EXPECT_NE(readText(entry), old); // committed; do not claim the old bytes survived
+    EXPECT_FALSE(fs::exists(fs::path(directory) / ".pending"));
+    EXPECT_EQ(invoke('0'), changed_fresh);
+    EXPECT_NE(readText(errors).find("hits=1"), std::string::npos) << readText(errors);
+}
 
 TEST_F(AnalysisCacheTest, ActualLoadedLibraryReplacementAndEarlierCandidateInvalidateReuse) {
     const auto source = file("input.cpp", "int result(){int *p=nullptr;return *p;}\n");

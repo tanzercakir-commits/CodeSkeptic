@@ -109,7 +109,15 @@ public:
     bool warmCache() const { return warm_cache_; }
     void setAnalysisCache(bool enabled) { analysis_cache_ = enabled; }
     bool analysisCache() const { return analysis_cache_; }
-    void inheritAnalysisCache(const Config& defaults) { analysis_cache_ = defaults.analysis_cache_; }
+    const std::string& analysisCacheDirectory() const { return analysis_cache_directory_; }
+    unsigned analysisCacheBytes() const { return analysis_cache_bytes_; }
+    unsigned analysisCacheEntries() const { return analysis_cache_entries_; }
+    void inheritAnalysisCache(const Config& defaults) {
+        analysis_cache_directory_ = defaults.analysis_cache_directory_;
+        analysis_cache_bytes_ = defaults.analysis_cache_bytes_;
+        analysis_cache_entries_ = defaults.analysis_cache_entries_;
+        analysis_cache_ = defaults.analysis_cache_;
+    }
 
     // Programmatic scope settings (the MCP server uses these directly)
     bool addFunctions(const std::string& list, InputError* error = nullptr);
@@ -231,6 +239,9 @@ private:
     bool assumptions_ = false;
     bool warm_cache_ = false;
     bool analysis_cache_ = false;
+    std::string analysis_cache_directory_;
+    unsigned analysis_cache_bytes_ = 256 * 1024 * 1024;
+    unsigned analysis_cache_entries_ = 128;
     bool help_requested_ = false;
     bool build_path_specified_ = false;
     bool file_list_specified_ = false;

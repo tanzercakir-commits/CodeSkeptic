@@ -6,6 +6,8 @@
 
 namespace codeskeptic {
 
+class DiskEvidenceStore;
+
 // Production main resolves its own executable and opts in once (including
 // --serve). Library embedders retain an explicit in-process backend when this
 // path is empty; arbitrary custom rule objects cannot be serialized as IDs.
@@ -23,7 +25,8 @@ struct WorkerExecution {
 
 std::vector<std::string> workerAnalysisArguments(const Config& config);
 WorkerExecution executeAnalysisWorker(const std::string& executable, const WorkerRequest& request,
-    const WorkerLimits& limits = {}, const ResourceCancellation* cancellation = nullptr);
+    const WorkerLimits& limits = {}, const ResourceCancellation* cancellation = nullptr,
+    DiskEvidenceStore* disk_cache = nullptr);
 // Private main dispatch; no normal argument scanning or config-file load.
 int runAnalysisWorker(const std::string& request_path, const std::string& response_path);
 
