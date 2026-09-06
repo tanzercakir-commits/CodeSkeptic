@@ -1,6 +1,6 @@
 # CodeSkeptic — CWE Ürün Planı
 
-Sürüm: 32. Eski planın devamı değil; main tabanlı yeni program.
+Sürüm: 33. Eski planın devamı değil; main tabanlı yeni program.
 
 PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.
 
@@ -473,7 +473,7 @@ PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. G
 
 **Test bütçesi:** T1
 **Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/analyzer/Baseline*, src/analyzer/SuppressionFilter*, src/core/FindingFingerprint*, scripts/review_diff.sh, scripts/review_report.py, tests/BaselineTest.cpp, tests/SuppressionFilterTest.cpp, tests/test_review_diff.sh, src/core/AnalysisResult.h, src/analyzer/StaticAnalyzer.cpp, src/reporter/ReportContract.h, tests/HtmlReporterTest.cpp, scripts/test_review_diff.sh, src/core/Diagnostic.h
+**Kapsam:** src/analyzer/Baseline*, src/analyzer/SuppressionFilter*, src/core/FindingFingerprint*, scripts/review_diff.sh, scripts/review_report.py, tests/BaselineTest.cpp, tests/SuppressionFilterTest.cpp, tests/test_review_diff.sh, src/core/AnalysisResult.h, src/analyzer/StaticAnalyzer.cpp, src/reporter/ReportContract.h, tests/HtmlReporterTest.cpp, scripts/test_review_diff.sh, src/core/Diagnostic.h, src/reporter/SarifReporter.cpp, tests/OutputParityCliTest.py
 **Bağımlılıklar:** Yok
 
 #### CS3-CH03-S02-U002 — Minimal ilk tarama ve CI kullanımını doğrula
