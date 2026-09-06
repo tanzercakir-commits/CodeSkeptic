@@ -1,6 +1,6 @@
 # CodeSkeptic — CWE Ürün Planı
 
-Sürüm: 19. Eski planın devamı değil; main tabanlı yeni program.
+Sürüm: 20. Eski planın devamı değil; main tabanlı yeni program.
 
 PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.
 
@@ -371,7 +371,7 @@ PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. G
 
 **Test bütçesi:** T1
 **Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/server/McpServer*, src/config/Config*, tests/McpServerTest.cpp
+**Kapsam:** src/server/McpServer*, src/config/Config*, tests/McpServerTest.cpp, src/source_manager/SourceManager.cpp, src/analyzer/StaticAnalyzer.cpp
 **Bağımlılıklar:** Yok
 
 ### CH02-S03 — Eksik analizden sahte temiz sonuç üretmeme

@@ -16,7 +16,7 @@ Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter aç
 
 **Test bütçesi:** T1
 **Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/server/McpServer*, src/config/Config*, tests/McpServerTest.cpp
+**Kapsam:** src/server/McpServer*, src/config/Config*, tests/McpServerTest.cpp, src/source_manager/SourceManager.cpp, src/analyzer/StaticAnalyzer.cpp
 **Bağımlılıklar:** Yok
 
 ### CS3-CH02-S03-U001 — İstenen/analiz edilen/atlanan/başarısız dosyaları uzlaştır
