@@ -586,11 +586,25 @@ TEST_F(DiskEvidenceStoreTest, ConcurrentWritersAndReadersPublishOnlyWholePackets
     ASSERT_EQ(::waitpid(child, &status, 0), child);
     ASSERT_TRUE(WIFEXITED(status)); EXPECT_EQ(WEXITSTATUS(status), 0);
     EXPECT_GT(same_commits, 0u); EXPECT_GT(other_commits, 0u);
-    EXPECT_GT(store.status().evictions, 0u);
     EXPECT_FALSE(fs::exists(directory / ".pending"));
     store.candidate(key, digest);
     EXPECT_LE(store.status().bytes, 1024 * 1024u);
     EXPECT_LE(store.status().entries, 8u);
+
+    // The race above proves concurrent safety, not which process evicts:
+    // contention may admit too few distinct keys, or only the child may trim.
+    // After joining, force retention pressure through this parent's own store.
+    const auto evictions_before = store.status().evictions;
+    for (int i = 0; i < 9; ++i) {
+        const auto retained_key = inputDigest("parent-retention-phase-" + std::to_string(i));
+        ASSERT_EQ(store.rememberCandidate(retained_key, digest, std::string(70000, 'd'), proof),
+                  DiskWriteResult::Committed);
+        EXPECT_FALSE(fs::exists(directory / ".pending"));
+        EXPECT_LE(store.status().bytes, 1024 * 1024u);
+        EXPECT_LE(store.status().entries, 8u);
+    }
+    EXPECT_GT(store.status().evictions, evictions_before);
+    EXPECT_GT(store.status().evictions, 0u);
 }
 
 TEST_F(DiskEvidenceStoreTest, HeldDirectoryLockReturnsBusyWithoutWaitingOrWriting) {
