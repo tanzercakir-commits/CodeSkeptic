@@ -128,6 +128,10 @@ if(NOT WIN32)
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/CapabilitiesCliTest.py
                      $<TARGET_FILE:codeskeptic>)
+    add_test(NAME OutputParityCliContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/OutputParityCliTest.py
+                     $<TARGET_FILE:codeskeptic>)
     add_test(NAME MeasurementLabContract
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/MeasurementLabTest.py)

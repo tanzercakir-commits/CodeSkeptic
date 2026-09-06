@@ -131,6 +131,40 @@ TEST(JsonReporterTest, SourceIdentitiesAndReasonsRoundTripEveryControlByte) {
     EXPECT_EQ(row->getObject("prepass")->getString("reason"), identity);
 }
 
+TEST(JsonReporterTest, FindingAndOrderedTraceRoundTripEveryControlByte) {
+    std::string text = "quote\"-backslash\\-";
+    for (int byte = 0; byte < 32; ++byte) text += static_cast<char>(byte);
+    AnalysisResult result;
+    result.attempted_tus = result.analyzed_tus = 1;
+    result.findings = 1;
+    Diagnostic finding{Severity::Error, "dir/" + text, 4, 7, "null-deref", text};
+    finding.function = text;
+    finding.notes = {{"first/" + text, 2, 3, text}, {"second/" + text, 9, 11, text}};
+    auto parsed = llvm::json::parse(readJsonReport(result, {finding}));
+    ASSERT_TRUE(static_cast<bool>(parsed));
+    const auto* root = parsed->getAsObject();
+    ASSERT_NE(root, nullptr);
+    const auto* rows = root->getArray("diagnostics");
+    ASSERT_NE(rows, nullptr);
+    ASSERT_EQ(rows->size(), 1u);
+    const auto* row = rows->front().getAsObject();
+    ASSERT_NE(row, nullptr);
+    EXPECT_EQ(row->getString("file"), finding.file);
+    EXPECT_EQ(row->getString("message"), text);
+    EXPECT_EQ(row->getString("function"), text);
+    const auto* notes = row->getArray("notes");
+    ASSERT_NE(notes, nullptr);
+    ASSERT_EQ(notes->size(), finding.notes.size());
+    for (size_t index = 0; index < notes->size(); ++index) {
+        const auto* note = (*notes)[index].getAsObject();
+        ASSERT_NE(note, nullptr);
+        EXPECT_EQ(note->getString("file"), finding.notes[index].file);
+        EXPECT_EQ(note->getString("message"), text);
+        EXPECT_EQ(note->getInteger("line"), finding.notes[index].line);
+        EXPECT_EQ(note->getInteger("column"), finding.notes[index].column);
+    }
+}
+
 TEST(JsonReporterTest, BytePathIdentitiesAreLosslessDistinctAndValidUtf8) {
     const std::vector<std::string> invalid{
         std::string("/\xff.cpp"), std::string("/\xfe.cpp"),
