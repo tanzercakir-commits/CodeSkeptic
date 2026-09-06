@@ -2,6 +2,24 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH03-S01-U001 — Kural ve CWE eşlemesini tek sözleşmede yayınla
+
+- Commit: `160d8d8d5f0c1e0614c216f8a065d05c7c09cf79`
+- Dal: `agent/cs3-ch03-s01-u001-rule-cwe-contract`
+- Implementer: `root-cwe-ch03-s01-u001-20260906`
+- Bağımsız denetçi: `independent-cwe-ch03-s01-u001-product-160d8d8-20260906`
+- İnceleme SHA-256: `76e39369de3fb824bdcecdf577c63bdfddf16a810fcea5d94d32f1b5b9aeffd3`
+- Tarih: 2026-09-06T12:48:33.951400+00:00
+- Sonuç: Bulguların stable rule ID, doğru CWE ve açıklama bağlantısı vardır.
+- focused-tests: PASS; SHA-256 `fda99d15e9b10e7b9a91f01c0b5e05c84d9be1cf29ebe76329cf75c1d14898b7`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S01-U001/run_offline.sh /workspace/build/tests/codeskeptic_tests '--gtest_filter=BoundsRuleTest.*:IntOverflowRuleTest.*:SignConversionRuleTest.*:CapabilitiesTest.*:JsonReporterTest.*:SarifReporterTest.*:BaselineTest.*:MemoryLeakRuleExTest.*:PathSensitivityTest.*:AllocFunctionsTest.*:AllocatorPairTest.*:AliasLifetimeV2Test.*:ReallocLifetimeV2Test.*:SmartOwnerLifetimeV2Test.*:AbseilFpTest.*:AddrOfMemberTest.*:AliasEscapeTest.*:CallGuardTest.*:CarbonFpTest.*:CleanupAttrTest.*:DocumentedLimitTest.*:ExceptionalOwnerLifetimeV2Test.*:ExceptionalTransferBoundaryTest.*:FprimeFpTest.*:OwningPointerTest.*:ShadPS4FpTest.*:SystemdIdiomTest.*:FdResource*.*'`
+- cli-smoke: PASS; SHA-256 `1488359e5f37c9b789b7af30a5972f01156d7cfb54c359f583852e853c8a3213`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S01-U001/run_offline.sh python3 -B tests/CapabilitiesCliTest.py /workspace/build/src/codeskeptic`
+- queue-check: PASS; SHA-256 `6fe9a27f63f5d034fe4afbe18ae33b6eb37fafbf4d02de52eb7ae341ea0e7d1b`; `python3 -B scripts/project_queue.py check; python3 -B scripts/project_queue.py guard --base HEAD^; bash scripts/check_docs_sync.sh; python3 -B scripts/check_capabilities_sync.py; python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S01-U001/check_metadata_registry_negatives.py /home/tanzer/Projects/CodeSkeptic; git diff --check`
+- exact-version: PASS; SHA-256 `2f07019e1b9b71744683c3b3e22e5fb2ac701f6c4672d47dcaeeab3e393ff48a`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S01-U001/run_offline.sh /workspace/build/src/codeskeptic --version`
+- arithmetic-cli: PASS; SHA-256 `aeef16a1eff41b53773d10dc722330f59fd5a400e831e5458991f766f99431c8`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S01-U001/run_offline.sh python3 -B /evidence/arithmetic_cli.py /workspace/build/src/codeskeptic /evidence/160d8d8d5f0c1e0614c216f8a065d05c7c09cf79/arithmetic`
+- variant-metadata: PASS; SHA-256 `b0faa0a29d8cfa39f99be7a61f501b823cdae9ad4dfe8495bf5b61c36b5885d5`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S01-U001/run_offline.sh python3 -B /evidence/variant_metadata_probe.py /workspace/build/src/codeskeptic /evidence/160d8d8d5f0c1e0614c216f8a065d05c7c09cf79/variants`
+- lifetime-metadata-parity: PASS; SHA-256 `32eb8041bb5d5af7a23ebdf9ce838bb33b65e19b5190d8775d039bff9f8d9206`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S01-U001/check_lifetime_metadata.py /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S01-U001/160d8d8d5f0c1e0614c216f8a065d05c7c09cf79/lifetime/result.json /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S01-U001/lifetime-red/result.json`
+- leak-metadata: PASS; SHA-256 `e09178f7f46bf6c29f8da995058af724b6d50bc318878895e68b9ddb6fc65817`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S01-U001/check_leak_metadata.py /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S01-U001/160d8d8d5f0c1e0614c216f8a065d05c7c09cf79/leaks/result.json`
+
 ## CS3-CH02-S04-U001 — Compilation discovery için native LLVM/MSVC uyumluluğunu doğrula
 
 - Commit: `94cb335ffc7a73509c64a98ee029f5f44c7322f0`

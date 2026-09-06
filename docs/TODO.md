@@ -2,23 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH03-S01-U001
-
-### CS3-CH03-S01-U001 — Kural ve CWE eşlemesini tek sözleşmede yayınla
-
-**Sonuç:** Bulguların stable rule ID, doğru CWE ve açıklama bağlantısı vardır.
-
-**Kabul:**
-
-- CWE-125 okuma ile CWE-787 yazma farklı açıklanır; her bounds bulgusu aynı CWE'ye yanlış eşlenmez.
-- Existing supported/experimental durumu ölçümsüz yükseltilmez.
-- JSON/SARIF metadata ve CLI capability listesi registry ile tutarlıdır.
-- Aritmetik pozitif taşma ile negatif sınır taşması doğru mesajla ayrılır; 64-bit çıkarmada upward overflow underflow diye sunulmaz.
-
-**Test bütçesi:** T1
-**Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/core/RuleCapabilities.def, src/core/Capabilities*, src/core/Diagnostic.h, src/core/AnalysisResult.h, src/reporter/*, src/rules/*, tests/SarifReporterTest.cpp, tests/CapabilitiesTest.cpp, docs/capabilities.md, src/core/Messages.*, tests/IntOverflowRuleTest.cpp, tests/JsonReporterTest.cpp, tests/CapabilitiesCliTest.py, README.md, scripts/check_capabilities_sync.py, tests/BoundsRuleTest.cpp, src/analyzer/StaticAnalyzer.cpp
-**Bağımlılıklar:** Yok
+## FRONT — CS3-CH03-S01-U002
 
 ### CS3-CH03-S01-U002 — CLI/JSON/SARIF/HTML bulgu ve verdict tutarlılığını sabitle
 
