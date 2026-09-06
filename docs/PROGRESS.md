@@ -2,6 +2,21 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH04-S01-U002 — Timeout/bellek/iptal bütçesini uygula
+
+- Commit: `81f1d505854e57e4b222860d7a469db494326200`
+- Dal: `agent/cs3-ch04-s01-u002-resource-budgets`
+- Implementer: `root-cwe-ch04-s01-u002-20260906`
+- Bağımsız denetçi: `independent-cwe-ch04-s01-u002-product-81f1d505-20260906`
+- İnceleme SHA-256: `468487aee0dd24bc7f3f73dc9beda19c5e7c304b692f16cfec916112436ce2d9`
+- Tarih: 2026-09-06T17:12:35.558702+00:00
+- Sonuç: Kaynak bütçesi aşan worker sonlandırılır; süreç ve descriptor sızıntısı bırakılmaz.
+- linux-suite: PASS; SHA-256 `3c9480bbf2b94ae0af3680e106322d84d1617af4672ca0b73ccfde1a6fc3d603`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S01-U002/qualify.sh 81f1d505854e57e4b222860d7a469db494326200`
+- relevant-corpus: PASS; SHA-256 `2dcf072a96332c1e88df525c0df62d9e08482c71263df96e56a0aa37d70b1887`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S01-U002/qualify.sh 81f1d505854e57e4b222860d7a469db494326200`
+- queue-check: PASS; SHA-256 `4f2efecadc7397deed831d0817c79ed7f33e05cc715632ec78de64853168d9cf`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S01-U002/qualify.sh 81f1d505854e57e4b222860d7a469db494326200`
+- resource-lifecycle-focused: PASS; SHA-256 `a3daf005965ee9c58f3099e640a066093ea64f5119e807b1d2601bd7d7b1f558`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S01-U002/qualify.sh 81f1d505854e57e4b222860d7a469db494326200`
+- cli-smoke: PASS; SHA-256 `801bf938848126844f74b4dbcadb2a935c0f5823d5b6d0d25c07f0e88a6ead23`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S01-U002/qualify.sh 81f1d505854e57e4b222860d7a469db494326200`
+
 ## CS3-CH04-S01-U001 — Dosya başına taşınabilir worker protokolü kur
 
 - Commit: `3e0627ecd3fa5740875456619e702403f377b4b5`

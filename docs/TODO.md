@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH04-S01-U002
-
-### CS3-CH04-S01-U002 — Timeout/bellek/iptal bütçesini uygula
-
-**Sonuç:** Kaynak bütçesi aşan worker sonlandırılır; süreç ve descriptor sızıntısı bırakılmaz.
-
-**Kabul:**
-
-- Timeout, memory limit ve cancellation negatifleri gerçek subprocess ile sınanır.
-- Partial failure sonuç ve kapsamda görünür; diğer sonuçlar deterministik toplanır.
-- Host-wide/root authority yoktur; yalnız başlatılan çocuk süreçler yönetilir.
-
-**Test bütçesi:** T2
-**Kontroller:** linux-suite, relevant-corpus, queue-check
-**Kapsam:** src/analyzer/*, src/core/Resource*, src/config/Config*, src/main.cpp, src/CMakeLists.txt, tests/ResourceBudgetTest.cpp, tests/AnalysisCoordinatorTest.cpp, tests/CMakeLists.txt, docs/usage.md, src/server/McpServer.cpp
-**Bağımlılıklar:** CS3-CH04-S01-U001
+## FRONT — CS3-CH04-S02-U001
 
 ### CS3-CH04-S02-U001 — Cache kimliğini gerçek girdilere bağla
 
