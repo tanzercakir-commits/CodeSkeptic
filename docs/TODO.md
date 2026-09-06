@@ -16,7 +16,7 @@ Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter aç
 
 **Test bütçesi:** T1
 **Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/analyzer/*, src/source_manager/*, src/config/Config*, tests/UnitEvidenceStoreTest.cpp, tests/AnalysisCoordinatorTest.cpp
+**Kapsam:** src/analyzer/*, src/source_manager/*, src/config/Config*, tests/UnitEvidenceStoreTest.cpp, tests/AnalysisCoordinatorTest.cpp, src/CMakeLists.txt, tests/CMakeLists.txt, tests/SourceManagerTest.cpp, src/contracts/Sidecar.cpp, src/server/McpServer.cpp, docs/usage.md
 **Bağımlılıklar:** Yok
 
 ### CS3-CH04-S02-U002 — Cache yazımı ve saklama sınırını güvenli yap
