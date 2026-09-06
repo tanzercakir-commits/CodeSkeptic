@@ -72,6 +72,9 @@ struct Diagnostic {
     // different proven subtypes. Retain their union without changing the
     // existing finding key, count or source fingerprint.
     std::vector<FindingKind> additional_kinds;
+    // Baseline-only, AST-proven function signature (csb-fn1). Empty means
+    // ownership could not be bound safely, NOT a wildcard. Not a finding key.
+    std::string baseline_function;
 
     std::string severityToString() const {
         switch (severity) {

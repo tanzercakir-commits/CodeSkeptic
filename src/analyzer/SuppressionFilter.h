@@ -2,10 +2,12 @@
 #define CODESKEPTIC_SUPPRESSION_FILTER_H
 
 #include "core/Diagnostic.h"
+#include "core/AnalysisResult.h"
 
 #include <map>
 #include <string>
 #include <vector>
+#include <utility>
 
 namespace codeskeptic {
 
@@ -14,6 +16,8 @@ namespace codeskeptic {
 //   // codeskeptic-disable-line rule1,rule2  -> only these rules on that line
 //   // codeskeptic-disable-next-line [...]   -> same, for the next line
 // The rule list may be separated by spaces or commas.
+// A supplied rationale follows `-- reason` or the legacy `(reason)` syntax.
+// Only actual comment tokens are directives; quoted text is never executable.
 class SuppressionFilter {
 public:
     // Removes suppressed findings from the list, returns the number removed.
@@ -22,10 +26,14 @@ public:
     // Tells whether a single finding is suppressed (testable).
     bool isSuppressed(const Diagnostic& diag);
 
-private:
-    const std::vector<std::string>* linesFor(const std::string& path);
+    const std::vector<SuppressionRecord>& records() const { return records_; }
+    std::vector<SuppressionRecord> takeRecords() { return std::move(records_); }
 
-    std::map<std::string, std::vector<std::string>> file_cache_;
+private:
+    const SuppressionRecord* directiveFor(const Diagnostic& diag);
+
+    std::map<std::string, std::vector<SuppressionRecord>> file_cache_;
+    std::vector<SuppressionRecord> records_;
 };
 
 // Does the comment text suppress the given rule? (if no rule list follows

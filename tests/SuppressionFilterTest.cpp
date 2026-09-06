@@ -146,3 +146,74 @@ TEST(SuppressionFilterTest, LineBeyondFileEnd_NothingSuppressed) {
 
     EXPECT_EQ(removed, 0u);
 }
+
+TEST(SuppressionFilterTest, PhysicalNewlinesCannotMoveAMarkerOntoAnotherFinding) {
+    for (const std::string newline : {"\n", "\r\n", "\r"}) {
+        const auto path = writeTempSource("supp_newlines.cpp",
+            "int f(){int z=0;return 1/z;}" + newline +
+            "// codeskeptic-disable-line div-by-zero" + newline);
+        SuppressionFilter filter;
+        DiagnosticList findings{makeDiag(path, 1, "div-by-zero")};
+        EXPECT_EQ(filter.filter(findings), 0u);
+        EXPECT_TRUE(filter.records().empty());
+    }
+    const auto path = writeTempSource("supp_mixed_newlines.cpp",
+        "/* decoration\r\n * codeskeptic-disable-next-line div-by-zero -- reviewed fixture\r"
+        " */ int f(){return 1/0;}\nint g(){return 1/0;}\r\n");
+    SuppressionFilter filter;
+    DiagnosticList findings{makeDiag(path, 3, "div-by-zero"), makeDiag(path, 4, "div-by-zero")};
+    EXPECT_EQ(filter.filter(findings), 1u);
+    ASSERT_EQ(filter.records().size(), 1u);
+    EXPECT_EQ(filter.records()[0].marker_line, 2u);
+    EXPECT_EQ(filter.records()[0].target_line, 3u);
+    EXPECT_EQ(findings.front().line, 4u);
+}
+
+TEST(SuppressionFilterTest, RawStringsDigitSeparatorsAndEscapesCannotForgeComments) {
+    for (const std::string content : {
+        "auto n=1'000; const char* s=\"// codeskeptic-disable-line\";\n",
+        "const char* s=R\"tag(\n// codeskeptic-disable-line\n)tag\";\n",
+        "const char* s=\"escaped \\\" // codeskeptic-disable-line\";\n",
+        "const char* s=\"continued \\\n// codeskeptic-disable-line\";\n"}) {
+        const auto path = writeTempSource("supp_lexical.cpp", content);
+        SuppressionFilter filter;
+        DiagnosticList findings{makeDiag(path, 1, "div-by-zero"), makeDiag(path, 2, "div-by-zero")};
+        EXPECT_EQ(filter.filter(findings), 0u) << content;
+        EXPECT_TRUE(filter.records().empty());
+    }
+}
+
+TEST(SuppressionMarkerTest, EmptyReasonsAndMalformedSelectorsNeverApply) {
+    for (const std::string suffix : {" --", " --   ", " ()", " div-by-zero,", " ,div-by-zero",
+                                    " div-by-zero,,memory-leak", " div-by-zero!", " div-by-zero (broken"}) {
+        EXPECT_FALSE(markerSuppressesRule("// codeskeptic-disable-line" + suffix,
+            "codeskeptic-disable-line", "div-by-zero")) << suffix;
+    }
+}
+
+TEST(SuppressionFilterTest, RetainsReasonScopeFingerprintAndLogicalAuditCopies) {
+    const auto path = writeTempSource("supp_audit.cpp",
+        "// codeskeptic-disable-next-line div-by-zero -- bounded fixture rationale\n"
+        "int f(){return 1/0;}\nint g(){return 1/0;} // codeskeptic-disable-line\n");
+    auto finding = makeDiag(path, 2, "div-by-zero");
+    auto unaffected = makeDiag(path, 2, "memory-leak");
+    SuppressionFilter filter;
+    DiagnosticList findings{finding, finding, unaffected, makeDiag(path, 3, "div-by-zero")};
+    EXPECT_EQ(filter.filter(findings), 3u);
+    ASSERT_EQ(findings.size(), 1u);
+    EXPECT_EQ(findings.front().rule_id, "memory-leak");
+    auto records = filter.takeRecords();
+    ASSERT_EQ(records.size(), 2u);
+    EXPECT_EQ(records[0].occurrences, 2u);
+    EXPECT_EQ(records[0].reason, "bounded fixture rationale");
+    EXPECT_TRUE(records[0].has_reason);
+    EXPECT_EQ(records[0].rules, std::vector<std::string>{"div-by-zero"});
+    EXPECT_FALSE(records[0].finding.fingerprint.empty());
+    EXPECT_FALSE(records[1].has_reason);
+    EXPECT_TRUE(records[1].reason.empty());
+    EXPECT_TRUE(records[1].rules.empty());
+    writeTempSource("supp_audit.cpp", "int f(){return 1/0;}\nint g(){return 1/0;}\n");
+    findings = {finding};
+    EXPECT_EQ(filter.filter(findings), 0u);
+    EXPECT_TRUE(filter.records().empty());
+}

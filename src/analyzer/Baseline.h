@@ -12,30 +12,21 @@ namespace codeskeptic {
 // report ONLY NEW findings. The standard path for gradual adoption on
 // legacy code.
 //
-// The v2 key is LINE-INDEPENDENT: instead of the line number it uses a
-// hash of the trimmed TEXT content of the finding's line (FNV-1a 64 —
-// stable across platforms; std::hash gives no such guarantee). When
-// code is added above and the finding shifts, the key does not change;
-// if the line ITSELF changes, the finding reappears — that is a
-// feature (a changed line should be re-reviewed).
-//
-// Multiple findings with the same key are tracked by COUNT (multiset
-// semantics): baselining one of two identical `delete p;` lines in two
-// different functions does not hide the other.
-//
-// Format: "# codeskeptic-baseline v2" header + one key per line
-// (rule_id|file|line-hash|message; duplicates preserved). Headerless
-// old v1 files (rule_id|file|line|message) are recognized on load and
-// keep matching with their old meaning — refreshing the baseline
-// migrates to v2.
+// v3 binds rule, full path, function name and AST-proven signature, severity,
+// indentation-relative column, trimmed source line and message. Hex fields
+// preserve delimiters/control bytes without hashing away identity. Line shifts
+// remain stable. Equivalent TU callbacks consume ONE logical finding budget.
+// Unbound findings are explicitly recorded but can never suppress a finding.
+// Valid v1/v2 files keep their original weak matching semantics, disclosed by
+// version()/legacy(); no mixed-format or malformed file is partially accepted.
 class Baseline {
 public:
-    // Writes findings to the baseline file (v2 format). Returns success.
+    // Writes v3. Optional count exposes findings without sufficient identity.
     static bool write(const std::string& path,
-                      const DiagnosticList& diagnostics);
+                      const DiagnosticList& diagnostics,
+                      std::size_t* unbound = nullptr);
 
-    // Loads the baseline file. A missing file means an empty baseline
-    // (not an error).
+    // Missing, malformed or unreadable files fail; failed load clears state.
     bool load(const std::string& path);
 
     // Removes findings recorded in the baseline from the list, returns
@@ -47,9 +38,16 @@ public:
     static std::string keyV1(const Diagnostic& diag);
     // v2: line-content-hash key (diag.file is read from disk)
     static std::string keyV2(const Diagnostic& diag);
+    // Empty means unbound, never a wildcard. Public csf1 remains unchanged.
+    static std::string keyV3(const Diagnostic& diag);
+    unsigned version() const { return version_; }
+    bool legacy() const { return version_ == 1 || version_ == 2; }
+    std::size_t unboundRecords() const { return unbound_; }
 
 private:
-    std::map<std::string, int> counts_;
+    std::map<std::string, std::size_t> counts_;
+    unsigned version_ = 0;
+    std::size_t unbound_ = 0;
 };
 
 } // namespace codeskeptic

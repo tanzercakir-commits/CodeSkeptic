@@ -10,6 +10,32 @@ namespace codeskeptic {
 
 // Independent of the native SARIF 2.1.0 and source-coverage/v1 envelopes.
 inline constexpr const char* reportSchema = "codeskeptic-report/v1";
+inline void writeReportFindingJson(std::ostream& out, const Diagnostic& diag);
+
+inline void writeSuppressionAuditJson(std::ostream& out, const AnalysisResult& result) {
+    out << "[";
+    for (std::size_t index = 0; index < result.suppressions.size(); ++index) {
+        const auto& record = result.suppressions[index];
+        if (index) out << ", ";
+        out << "{ \"marker\": \"" << escapeJson(record.marker)
+            << "\", \"file\": \"" << escapeJson(coveragePathIdentity(record.finding.file))
+            << "\", \"marker_line\": " << record.marker_line
+            << ", \"target_line\": " << record.target_line << ", \"rules\": [";
+        for (std::size_t rule = 0; rule < record.rules.size(); ++rule) {
+            if (rule) out << ", ";
+            out << '"' << escapeJson(record.rules[rule]) << '"';
+        }
+        out << "], \"all_rules\": " << (record.rules.empty() ? "true" : "false")
+            << ", \"reason_status\": \"" << (record.has_reason ? "provided" : "legacy-unspecified")
+            << "\", \"reason\": ";
+        if (record.has_reason) out << '"' << escapeJson(record.reason) << '"';
+        else out << "null";
+        out << ", \"occurrences\": " << record.occurrences << ", \"finding\": ";
+        writeReportFindingJson(out, record.finding);
+        out << " }";
+    }
+    out << "]";
+}
 
 inline void writeReportEvidenceJson(std::ostream& out, const AnalysisResult& result) {
     out << "{ \"no_inputs\": " << (result.no_inputs ? "true" : "false")
@@ -46,6 +72,16 @@ inline void writeReportRunFields(std::ostream& out, std::size_t total,
             << ", \"report_only\": " << result->report_only_findings << " }";
     } else out << "null";
     out << ", \"total\": " << total;
+    out << ", \"suppressions\": ";
+    if (result) writeSuppressionAuditJson(out, *result);
+    else out << "null";
+    out << ", \"baseline\": ";
+    if (result && result->baseline_version) {
+        out << "{ \"version\": " << result->baseline_version
+            << ", \"legacy_weak_identity\": " << (result->baseline_legacy_identity ? "true" : "false")
+            << ", \"matched_callbacks\": " << result->baseline_matched
+            << ", \"unbound_records\": " << result->baseline_unbound << " }";
+    } else out << "null";
     if (includeCoverage) {
         out << ", \"coverage\": ";
         if (result) writeCoverageJson(out, *result);
@@ -73,6 +109,7 @@ inline void writeReportFindingJson(std::ostream& out, const Diagnostic& diag) {
         << "\", \"file\": \"" << escapeJson(coveragePathIdentity(diag.file))
         << "\", \"line\": " << diag.line << ", \"column\": " << diag.column
         << ", \"function\": \"" << escapeJson(diag.function)
+        << "\", \"baseline_function\": \"" << escapeJson(diag.baseline_function)
         << "\", \"message\": \"" << escapeJson(diag.message) << "\", \"notes\": [";
     for (std::size_t index = 0; index < diag.notes.size(); ++index) {
         const auto& note = diag.notes[index];

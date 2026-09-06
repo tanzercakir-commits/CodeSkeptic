@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+namespace clang { class ASTContext; }
+
 namespace codeskeptic {
 
 // Stable semantic finding identity (schema csf1). The checkout root and source
@@ -25,6 +27,8 @@ private:
 
 std::string findingFingerprint(const Diagnostic &diagnostic);
 void assignFindingFingerprints(DiagnosticList &diagnostics);
+// Capture while the TU is alive. No AST pointers escape into diagnostics.
+void bindBaselineFunctions(clang::ASTContext &context, DiagnosticList &diagnostics);
 
 } // namespace codeskeptic
 

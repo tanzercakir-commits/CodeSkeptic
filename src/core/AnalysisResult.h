@@ -1,6 +1,7 @@
 #ifndef CODESKEPTIC_ANALYSIS_RESULT_H
 #define CODESKEPTIC_ANALYSIS_RESULT_H
 
+#include "core/Diagnostic.h"
 #include <algorithm>
 #include <cstddef>
 #include <string>
@@ -23,6 +24,19 @@ enum class AnalysisStatus {
 };
 
 enum class SourceStatus { Analyzed, Skipped, Failed };
+
+// An applied decision, retained after the finding leaves the visible list.
+// Legacy comments have no supplied rationale: never invent one for the owner.
+struct SuppressionRecord {
+    Diagnostic finding{};
+    unsigned marker_line = 0;
+    unsigned target_line = 0;
+    std::string marker;
+    std::vector<std::string> rules;
+    std::string reason;
+    bool has_reason = false;
+    std::size_t occurrences = 1;
+};
 
 // One canonical requested source, irrespective of the number of compile
 // variants or AST callbacks. A failed/skipped variant dominates success.
@@ -50,6 +64,11 @@ struct SourceCoverage {
 };
 
 struct AnalysisResult {
+    std::vector<SuppressionRecord> suppressions;
+    unsigned baseline_version = 0;
+    bool baseline_legacy_identity = false;
+    std::size_t baseline_matched = 0;
+    std::size_t baseline_unbound = 0;
     std::size_t attempted_tus = 0;
     std::size_t analyzed_tus = 0;
     std::size_t broken_tus = 0;

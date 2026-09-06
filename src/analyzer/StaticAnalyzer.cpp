@@ -23,6 +23,7 @@
 #include "reporter/JsonReporter.h"
 #include "reporter/SarifReporter.h"
 #include "reporter/Coverage.h"
+#include "reporter/ReportContract.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -298,6 +299,7 @@ AnalysisResult StaticAnalyzer::run() {
 
     source_mgr_->processAll([this](clang::ASTContext& ctx) {
         auto findings = engine_.runAll(ctx);
+        bindBaselineFunctions(ctx, findings);
         diagnostics_.insert(diagnostics_.end(), findings.begin(), findings.end());
     });
     result.sources = source_mgr_->coverage();
@@ -411,6 +413,7 @@ AnalysisResult StaticAnalyzer::run() {
 
     SuppressionFilter suppression;
     size_t suppressed = suppression.filter(diagnostics_);
+    result.suppressions = suppression.takeRecords();
     if (suppressed > 0) {
         std::cerr << msg(MsgId::SuppressedCount, std::to_string(suppressed))
                   << "\n";
@@ -423,7 +426,14 @@ AnalysisResult StaticAnalyzer::run() {
     // Record mode: findings are written to the baseline, no reporting,
     // exit clean (for producing a baseline in CI)
     if (!config_.writeBaselinePath().empty()) {
-        if (Baseline::write(config_.writeBaselinePath(), diagnostics_)) {
+        result.baseline_version = 3;
+        const auto written = Baseline::write(config_.writeBaselinePath(), diagnostics_, &result.baseline_unbound);
+        // Record-only mode intentionally has no normal report file. Preserve
+        // the suppression decision trail in its machine-readable stderr record.
+        std::cerr << "[CodeSkeptic] suppressions: ";
+        writeSuppressionAuditJson(std::cerr, result);
+        std::cerr << "\n[CodeSkeptic] baseline: version=3 unbound_records=" << result.baseline_unbound << "\n";
+        if (written) {
             std::cerr << msg(MsgId::BaselineWritten,
                              std::to_string(diagnostics_.size()),
                              config_.writeBaselinePath()) << "\n";
@@ -448,6 +458,13 @@ AnalysisResult StaticAnalyzer::run() {
                              config_.baselinePath()) << "\n";
         }
         size_t matched = baseline.filter(diagnostics_);
+        result.baseline_version = baseline.version();
+        result.baseline_legacy_identity = baseline.legacy();
+        result.baseline_unbound = baseline.unboundRecords();
+        result.baseline_matched = matched;
+        if (baseline.legacy())
+            std::cerr << "[CodeSkeptic] baseline: legacy-weak-identity v" << baseline.version()
+                      << "; refresh to v3 for function/signature/severity identity\n";
         if (matched > 0) {
             std::cerr << msg(MsgId::BaselineFiltered,
                              std::to_string(matched)) << "\n";
