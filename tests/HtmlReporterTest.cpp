@@ -10,8 +10,12 @@
 #include "reporter/SarifReporter.h"
 
 #include <fstream>
+#include <filesystem>
 #include <sstream>
+#include <stdexcept>
 #include <gtest/gtest.h>
+#include <llvm/ADT/SmallString.h>
+#include <llvm/Support/FileSystem.h>
 #include <llvm/Support/JSON.h>
 
 using namespace codeskeptic;
@@ -247,6 +251,28 @@ TEST(HtmlReporterTest, AcceptedPartialAndRecoveryEscapeSourceEvidenceWithoutClea
 
 namespace {
 
+class SurfaceSnapshot {
+public:
+    SurfaceSnapshot() {
+        llvm::SmallString<256> directory;
+        const auto error = llvm::sys::fs::createUniqueDirectory("codeskeptic-report-test", directory);
+        if (error) throw std::runtime_error(error.message());
+        directory_ = directory.str().str();
+    }
+    ~SurfaceSnapshot() {
+        std::error_code error;
+        // Only this fixture's newly created directory; CTest processes cannot
+        // overwrite or clean each other's report artifacts.
+        std::filesystem::remove_all(directory_, error);
+        EXPECT_FALSE(error) << error.message();
+    }
+    std::string prefix() const { return (directory_ / "surface_snapshot").string(); }
+    SurfaceSnapshot(const SurfaceSnapshot&) = delete;
+    SurfaceSnapshot& operator=(const SurfaceSnapshot&) = delete;
+private:
+    std::filesystem::path directory_;
+};
+
 std::string decodeReportHtml(std::string text) {
     // Decode exactly one layer. Ampersand last prevents entity-looking source
     // text from being interpreted a second time by the test normalizer.
@@ -261,8 +287,8 @@ std::string decodeReportHtml(std::string text) {
     return text;
 }
 
-void checkSurfaceSnapshots(const DiagnosticList& findings, const AnalysisResult* result) {
-    const std::string prefix = ::testing::TempDir() + "surface_snapshot";
+void checkSurfaceSnapshots(const std::string& prefix, const DiagnosticList& findings,
+                           const AnalysisResult* result) {
     ASSERT_TRUE(JsonReporter(prefix + ".json").report(findings, result));
     ASSERT_TRUE(HtmlReporter(prefix + ".html").report(findings, result));
     ASSERT_TRUE(SarifReporter(prefix + ".sarif").report(findings, result));
@@ -375,6 +401,7 @@ void checkSurfaceSnapshots(const DiagnosticList& findings, const AnalysisResult*
 } // namespace
 
 TEST(OutputParityReporterTest, SpecialTextWindowsPathsAndTypedCwesAgree) {
+    const SurfaceSnapshot snapshot;
     std::string text = "</pre><script>untrusted-marker</script> &quot; ' \\\"";
     for (int byte = 0; byte < 32; ++byte) text += static_cast<char>(byte);
     Diagnostic read{Severity::Warning, "C:\\first dir\\a.cpp", 12, 8, "bounds", text};
@@ -389,9 +416,9 @@ TEST(OutputParityReporterTest, SpecialTextWindowsPathsAndTypedCwesAgree) {
     result.attempted_tus = result.analyzed_tus = 1;
     result.findings = 3;
     result.report_only_findings = 1;
-    checkSurfaceSnapshots({read, info, error}, &result);
-    checkSurfaceSnapshots({read}, nullptr);
-    const auto html = readWhole(::testing::TempDir() + "surface_snapshot.html");
+    ASSERT_NO_FATAL_FAILURE(checkSurfaceSnapshots(snapshot.prefix(), {read, info, error}, &result));
+    ASSERT_NO_FATAL_FAILURE(checkSurfaceSnapshots(snapshot.prefix(), {read}, nullptr));
+    const auto html = readWhole(snapshot.prefix() + ".html");
     EXPECT_EQ(html.find("<script>untrusted-marker"), std::string::npos);
     EXPECT_NE(html.find("CWE-125</a>"), std::string::npos);
     EXPECT_NE(html.find("CWE-787</a>"), std::string::npos);
@@ -400,6 +427,7 @@ TEST(OutputParityReporterTest, SpecialTextWindowsPathsAndTypedCwesAgree) {
 }
 
 TEST(OutputParityReporterTest, SuppressionReasonsAndBaselineWeaknessSurviveEverySurface) {
+    const SurfaceSnapshot snapshot;
     AnalysisResult result;
     result.attempted_tus = result.analyzed_tus = 1;
     result.baseline_version = 2;
@@ -421,8 +449,8 @@ TEST(OutputParityReporterTest, SuppressionReasonsAndBaselineWeaknessSurviveEvery
     record.reason.clear();
     record.rules.clear();
     result.suppressions.push_back(record);
-    checkSurfaceSnapshots({}, &result);
-    auto parsed = llvm::json::parse(readWhole(::testing::TempDir() + "surface_snapshot.json"));
+    ASSERT_NO_FATAL_FAILURE(checkSurfaceSnapshots(snapshot.prefix(), {}, &result));
+    auto parsed = llvm::json::parse(readWhole(snapshot.prefix() + ".json"));
     ASSERT_TRUE(static_cast<bool>(parsed));
     auto* object = parsed->getAsObject();
     ASSERT_NE(object, nullptr);
@@ -446,6 +474,7 @@ TEST(OutputParityReporterTest, SuppressionReasonsAndBaselineWeaknessSurviveEvery
 }
 
 TEST(OutputParityReporterTest, EveryVerdictEvidenceFlagAgreesWithoutInventingCoverage) {
+    const SurfaceSnapshot snapshot;
     AnalysisResult base;
     SourceCoverage source{"safe.cpp", SourceStatus::Analyzed, "analyzed"};
     source.commands = source.analyzed_commands = 1;
@@ -453,7 +482,7 @@ TEST(OutputParityReporterTest, EveryVerdictEvidenceFlagAgreesWithoutInventingCov
     source.prepass_reason = "full prepass";
     base.sources = {source};
     base.reconcileSources();
-    checkSurfaceSnapshots({}, &base);
+    ASSERT_NO_FATAL_FAILURE(checkSurfaceSnapshots(snapshot.prefix(), {}, &base));
     for (auto flag : {&AnalysisResult::no_inputs, &AnalysisResult::no_rules,
                        &AnalysisResult::tool_failed, &AnalysisResult::summary_load_failed,
                        &AnalysisResult::summary_stale, &AnalysisResult::summary_save_failed,
@@ -461,7 +490,7 @@ TEST(OutputParityReporterTest, EveryVerdictEvidenceFlagAgreesWithoutInventingCov
                        &AnalysisResult::baseline_recorded, &AnalysisResult::report_write_failed}) {
         auto result = base;
         result.*flag = true;
-        checkSurfaceSnapshots({}, &result);
+        ASSERT_NO_FATAL_FAILURE(checkSurfaceSnapshots(snapshot.prefix(), {}, &result));
     }
     auto recovery = base;
     recovery.sources.front().recovery_commands = 1;
@@ -470,11 +499,12 @@ TEST(OutputParityReporterTest, EveryVerdictEvidenceFlagAgreesWithoutInventingCov
     recovery.reconcileSources();
     ASSERT_TRUE(recovery.complete());
     ASSERT_FALSE(recovery.coverageComplete());
-    checkSurfaceSnapshots({}, &recovery);
-    checkSurfaceSnapshots({}, nullptr);
+    ASSERT_NO_FATAL_FAILURE(checkSurfaceSnapshots(snapshot.prefix(), {}, &recovery));
+    ASSERT_NO_FATAL_FAILURE(checkSurfaceSnapshots(snapshot.prefix(), {}, nullptr));
 }
 
 TEST(OutputParityReporterTest, InvalidUtf8AndReservedIdentityPrefixDoNotAliasPaths) {
+    const SurfaceSnapshot snapshot;
     Diagnostic bytes{Severity::Error, std::string("/src/") + char(0xff) + ".cpp",
                      1, 1, "null-deref", "message"};
     Diagnostic literal = bytes;
@@ -483,17 +513,45 @@ TEST(OutputParityReporterTest, InvalidUtf8AndReservedIdentityPrefixDoNotAliasPat
     AnalysisResult result;
     result.attempted_tus = result.analyzed_tus = 1;
     result.findings = 2;
-    checkSurfaceSnapshots({bytes, literal}, &result);
-    auto parsed = llvm::json::parse(readWhole(::testing::TempDir() + "surface_snapshot.json"));
+    ASSERT_NO_FATAL_FAILURE(checkSurfaceSnapshots(snapshot.prefix(), {bytes, literal}, &result));
+    auto parsed = llvm::json::parse(readWhole(snapshot.prefix() + ".json"));
     ASSERT_TRUE(static_cast<bool>(parsed));
+    ASSERT_NE(parsed->getAsObject(), nullptr);
     const auto* rows = parsed->getAsObject()->getArray("diagnostics");
     ASSERT_NE(rows, nullptr);
+    ASSERT_EQ(rows->size(), 2u);
+    ASSERT_NE((*rows)[0].getAsObject(), nullptr);
+    ASSERT_NE((*rows)[1].getAsObject(), nullptr);
     EXPECT_EQ((*rows)[0].getAsObject()->getString("file"), "codeskeptic-bytes:2f7372632fff2e637070");
     EXPECT_EQ((*rows)[1].getAsObject()->getString("file"),
               "codeskeptic-bytes:636f6465736b65707469632d62797465733a3266");
-    const auto sarif = readWhole(::testing::TempDir() + "surface_snapshot.sarif");
+    const auto sarif = readWhole(snapshot.prefix() + ".sarif");
     EXPECT_NE(sarif.find("\"uri\": \"file:///src/%FF.cpp\""), std::string::npos);
     EXPECT_NE(sarif.find("\"uri\": \"codeskeptic-bytes%3A2f\""), std::string::npos);
-    const auto html = readWhole(::testing::TempDir() + "surface_snapshot.html");
+    const auto html = readWhole(snapshot.prefix() + ".html");
     EXPECT_NE(html.find("codeskeptic-bytes:2f7372632fff2e637070:1:1</span>"), std::string::npos);
+}
+
+TEST(OutputParityReporterTest, SnapshotFixturesRemainIsolatedWhenInterleaved) {
+    const SurfaceSnapshot first;
+    const auto prefix = first.prefix();
+    const Diagnostic finding{Severity::Error, "first.cpp", 1, 1, "null-deref", "first snapshot"};
+    ASSERT_NO_FATAL_FAILURE(checkSurfaceSnapshots(prefix, {finding}, nullptr));
+    const auto json = readWhole(prefix + ".json");
+    const auto html = readWhole(prefix + ".html");
+    const auto sarif = readWhole(prefix + ".sarif");
+    std::string second_prefix;
+    {
+        const SurfaceSnapshot second;
+        second_prefix = second.prefix();
+        ASSERT_NE(prefix, second_prefix);
+        ASSERT_NO_FATAL_FAILURE(checkSurfaceSnapshots(second_prefix, {}, nullptr));
+        EXPECT_EQ(readWhole(prefix + ".json"), json);
+        EXPECT_EQ(readWhole(prefix + ".html"), html);
+        EXPECT_EQ(readWhole(prefix + ".sarif"), sarif);
+    }
+    EXPECT_FALSE(std::filesystem::exists(std::filesystem::path(second_prefix).parent_path()));
+    EXPECT_EQ(readWhole(prefix + ".json"), json);
+    EXPECT_EQ(readWhole(prefix + ".html"), html);
+    EXPECT_EQ(readWhole(prefix + ".sarif"), sarif);
 }
