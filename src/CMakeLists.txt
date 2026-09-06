@@ -50,6 +50,15 @@ add_library(codeskeptic_core STATIC
     contracts/Sidecar.cpp
 )
 
+# LLVM's generated driver option IDs forward variadic macro arguments. Native
+# MSVC's traditional preprocessor collapses these IDs into repeated OPT_ names.
+# Keep the official parser and limit the conformance switch to its consuming TU;
+# do not change flags for unrelated sources or for GCC/Clang (including clang-cl).
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    set_property(SOURCE source_manager/CompilationDatabaseDiscovery.cpp
+                 APPEND PROPERTY COMPILE_OPTIONS /Zc:preprocessor)
+endif()
+
 add_executable(codeskeptic main.cpp)
 target_link_libraries(codeskeptic PRIVATE codeskeptic_core)
 

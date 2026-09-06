@@ -580,6 +580,44 @@ class CompilationDatabaseCliTest(unittest.TestCase):
         self.doctor(self.source)
         self.scan(self.source)
 
+    def test_cl_mode_keeps_option_operands_and_rejects_wrong_actual_input(self):
+        include = self.root / "included.cpp"
+        include.write_text("#define INCLUDED_VALUE 33\n", encoding="utf-8")
+        self.source.write_text("int safe() { return INCLUDED_VALUE + REQUIRED; }\n", encoding="utf-8")
+        other = self.root / "other.cpp"
+        other.write_text("int other() { return 42; }\n", encoding="utf-8")
+        path = self.database(self.root / "build")
+        for driver in (["clang-cl"], ["cl.exe"], ["clang++", "--driver-mode=cl"]):
+            with self.subTest(driver=driver):
+                entry = {"directory": str(self.root), "file": str(self.source),
+                         "arguments": [*driver, "/DREQUIRED=9", "/FI", "included.cpp", "/c", "input.cpp"]}
+                path.write_text(json.dumps([entry]), encoding="utf-8")
+                self.doctor(self.source)
+                self.scan(self.source)
+                entry["arguments"][-1] = "other.cpp"
+                path.write_text(json.dumps([entry]), encoding="utf-8")
+                self.doctor(self.source, expected=2)
+                self.scan(self.source, expected=2)
+
+    def test_cl_mode_response_flags_and_wrong_or_missing_input(self):
+        self.source.write_text("int safe() { return REQUIRED; }\n", encoding="utf-8")
+        other = self.root / "other.cpp"
+        other.write_text("int other() { return 42; }\n", encoding="utf-8")
+        path = self.database(self.root / "build")
+        response = self.root / "cl-arguments.rsp"
+        entry = {"directory": str(self.root), "file": str(self.source),
+                 "arguments": ["clang-cl", "@" + response.as_posix()]}
+        path.write_text(json.dumps([entry]), encoding="utf-8")
+        response.write_text('/DREQUIRED=42 /c "input.cpp"\n', encoding="utf-8")
+        self.doctor(self.source)
+        self.scan(self.source)
+        response.write_text('/DREQUIRED=42 /c "other.cpp"\n', encoding="utf-8")
+        self.doctor(self.source, expected=2)
+        self.scan(self.source, expected=2)
+        response.unlink()
+        self.doctor(self.source, expected=2)
+        self.scan(self.source, expected=2)
+
     def test_shell_command_database_and_paths_with_spaces(self):
         source = self.root / "source space.cpp"
         source.write_text("int safe() { return 42; }\n", encoding="utf-8")
