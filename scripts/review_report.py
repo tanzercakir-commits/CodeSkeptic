@@ -89,7 +89,7 @@ def finding_key(diag: dict, relpath: str, cache: LineCache):
 # Inputs
 # ---------------------------------------------------------------------------
 
-def load_diags(path):
+def load_diags(path, suppression_audit=None):
     """Omitted side is intentional; an explicit unreadable report is an error."""
     if not path:
         return []
@@ -100,7 +100,37 @@ def load_diags(path):
             report["exit_code"] not in (0, 1) or not isinstance(report.get("diagnostics"), list) or
             type(report.get("total")) is not int or report["total"] != len(report["diagnostics"])):
         raise ValueError("missing, malformed or incomplete report contract; regenerate both sides")
-    for diag in report["diagnostics"]:
+    baseline = report.get("baseline")
+    if baseline is not None:
+        if (not isinstance(baseline, dict) or type(baseline.get("matched_callbacks")) is not int or
+                baseline["matched_callbacks"] != 0):
+            raise ValueError("baseline-filtered evidence cannot establish a full diff; rerun without --baseline")
+    audit = report.get("suppressions")
+    if not isinstance(audit, list): raise ValueError("report requires a suppression audit array")
+    for record in audit:
+        if not isinstance(record, dict) or not isinstance(record.get("finding"), dict):
+            raise ValueError("invalid suppression audit finding")
+        for field in ("marker_line", "target_line", "occurrences"):
+            if type(record.get(field)) is not int or record[field] <= 0:
+                raise ValueError("invalid suppression audit coordinates/count")
+        marker = record.get("marker")
+        if marker not in ("codeskeptic-disable-line", "codeskeptic-disable-next-line"):
+            raise ValueError("invalid suppression marker")
+        if (record["target_line"] != record["marker_line"] + (marker == "codeskeptic-disable-next-line") or
+                record["target_line"] != record["finding"].get("line") or
+                record.get("file") != record["finding"].get("file")):
+            raise ValueError("suppression audit scope disagrees with its finding")
+        rules = record.get("rules")
+        if (not isinstance(rules, list) or any(not isinstance(rule, str) or not rule for rule in rules) or
+                type(record.get("all_rules")) is not bool or record["all_rules"] != (not rules) or
+                (rules and record["finding"].get("rule_id") not in rules)):
+            raise ValueError("invalid suppression rule scope")
+        if record.get("reason_status") == "provided":
+            if not isinstance(record.get("reason"), str) or not record["reason"].strip():
+                raise ValueError("suppression reason is missing")
+        elif record.get("reason_status") != "legacy-unspecified" or record.get("reason", "") is not None:
+            raise ValueError("invalid legacy suppression reason state")
+    for diag in report["diagnostics"] + [record["finding"] for record in audit]:
         if not isinstance(diag, dict): raise ValueError("finding must be an object")
         for field in ("rule_id", "file", "message", "function", "baseline_function"):
             if not isinstance(diag.get(field), str):
@@ -120,6 +150,7 @@ def load_diags(path):
                     not isinstance(note.get("message"), str) or type(note.get("line")) is not int or
                     type(note.get("column")) is not int or note["line"] < 0 or note["column"] < 0):
                 raise ValueError("invalid finding trace")
+    if suppression_audit is not None: suppression_audit.extend(audit)
     return report["diagnostics"]
 
 
@@ -195,15 +226,30 @@ def parse_added_lines(diff_path):
 def parse_summary_diff(path):
     """SUMMARY_DIFF <KIND> <key> <detail...> lines from the captured
     --summary-diff output. Returns (list of (kind, rest), available)."""
-    if not path or not os.path.exists(path):
+    if not path:
         return [], False
-    changes = []
-    with open(path, "r", encoding="utf-8", errors="replace") as f:
-        for line in f:
-            if line.startswith("SUMMARY_DIFF "):
-                parts = line.rstrip("\n").split(" ", 2)
-                if len(parts) >= 2:
-                    changes.append((parts[1], parts[2] if len(parts) > 2 else ""))
+    with open(path, "r", encoding="utf-8") as stream:
+        lines = stream.read().splitlines()
+    if not lines or not re.fullmatch(r"\[CodeSkeptic\] summary diff: .+ -> .+ \(\d+ functions\)", lines[0]):
+        raise ValueError("missing or malformed contract-diff header")
+    changes, index = [], 1
+    kinds = ("WEAKENED", "STRENGTHENED", "CHANGED", "ADDED", "REMOVED")
+    while index < len(lines) and lines[index].startswith("SUMMARY_DIFF "):
+        fields = lines[index].split(" ", 2)
+        if len(fields) != 3 or fields[1] not in kinds or not fields[2].strip():
+            raise ValueError("invalid contract-diff change record")
+        changes.append((fields[1], fields[2]))
+        index += 1
+    trailer = re.fullmatch(r"\[CodeSkeptic\] (\d+) weakened, (\d+) strengthened, (\d+) changed, (\d+) added, (\d+) removed",
+                           lines[index] if index < len(lines) else "")
+    if trailer is None: raise ValueError("missing or malformed contract-diff count trailer")
+    counts = Counter(kind for kind, _ in changes)
+    if tuple(map(int, trailer.groups())) != tuple(counts[kind] for kind in kinds):
+        raise ValueError("contract-diff counts disagree with change records")
+    expected_tail = (["[CodeSkeptic] weakened contracts: callers relying on them must be re-checked"]
+                     if counts["WEAKENED"] else [])
+    if lines[index + 1:] != expected_tail:
+        raise ValueError("unexpected or truncated contract-diff ending")
     return changes, True
 
 
@@ -270,7 +316,7 @@ def logical_findings(diagnostics):
     return list(groups.values())
 
 
-def compute_delta(base_diags, head_diags, base_root, head_root, renames):
+def compute_delta(base_diags, head_diags, base_root, head_root, renames, head_suppressed=()):
     base_diags, head_diags = logical_findings(base_diags), logical_findings(head_diags)
     cache = LineCache()
 
@@ -290,7 +336,18 @@ def compute_delta(base_diags, head_diags, base_root, head_root, renames):
             budget[k] -= 1
         else:
             new.append((d, rel))
-    fixed = sum(budget.values())  # base findings nothing at head consumed
+    # A suppression can add text on the finding line itself. Do NOT weaken v3
+    # matching to call it the same finding. Conservatively withhold fix claims
+    # in that owner instead; new visible findings still use the full identity.
+    suppressed_owners, unbound_suppressed_files = set(), set()
+    for diagnostic in head_suppressed:
+        rel = rel_to_root(diagnostic["file"], head_root)
+        if diagnostic["function"] and diagnostic["baseline_function"]:
+            suppressed_owners.add((diagnostic["rule_id"], rel, diagnostic["function"], diagnostic["baseline_function"]))
+        else:
+            unbound_suppressed_files.add((diagnostic["rule_id"], rel))
+    fixed = sum(count for key, count in budget.items()
+                if key[:4] not in suppressed_owners and key[:2] not in unbound_suppressed_files)
     return new, fixed
 
 
@@ -330,13 +387,19 @@ def cmd_assemble(args):
                 expected = any(line.rstrip("\r\n") for line in stream)
             if expected != bool(getattr(args, side + "_json")):
                 raise ValueError(f"{side} source manifest disagrees with report presence")
-    base_diags = logical_findings(load_diags(args.base_json))
-    head_diags = logical_findings(load_diags(args.head_json))
+    base_audit, head_audit = [], []
+    base_diags = logical_findings(load_diags(args.base_json, base_audit))
+    head_diags = logical_findings(load_diags(args.head_json, head_audit))
     renames = load_renames(args.renames)
     added_lines = parse_added_lines(args.diff)
     sum_changes, sum_available = parse_summary_diff(args.summary_diff)
     processed, capped = parse_head_stderr(args.head_stderr)
     name_status = parse_name_status(args.name_status)
+    audit_sources = LineCache()
+    for root, audit in ((args.base_root, base_audit), (args.head_root, head_audit)):
+        for record in audit:
+            diagnostic = record["finding"]
+            finding_key(diagnostic, rel_to_root(diagnostic["file"], root), audit_sources)
 
     analyzed_rel = set()
     if args.head_files and os.path.exists(args.head_files):
@@ -347,7 +410,7 @@ def cmd_assemble(args):
                     analyzed_rel.add(rel_to_root(p, args.head_root))
 
     new, fixed = compute_delta(base_diags, head_diags, args.base_root,
-                               args.head_root, renames)
+                               args.head_root, renames, [record["finding"] for record in head_audit])
     unbound_base = sum(not d["baseline_function"] or not d["function"] for d in base_diags)
     unbound_head = sum(not d["baseline_function"] or not d["function"] for d in head_diags)
     new_errors = [(d, r) for d, r in new if d["severity"] == "error"]
@@ -415,6 +478,15 @@ def cmd_assemble(args):
     md.append("## Fixed findings")
     md.append("%d finding(s) present at base are gone at head." % fixed
               if fixed else "None.")
+    if base_audit or head_audit:
+        md.extend(["", "## Applied suppressions", "",
+                   "Suppression is a policy decision, not evidence of a fix. Fix claims for the same rule/function "
+                   "are withheld where head findings are suppressed (same rule/file if ownership is unbound)."])
+        for side, audit in (("Base", base_audit), ("Head", head_audit)):
+            md.extend(["", "### %s (%d applied finding records)" % (side, len(audit)), ""])
+            # Indented JSON retains exact reason/scope/finding evidence without
+            # treating untrusted comment text as executable HTML or Markdown.
+            md.extend("    " + json.dumps(record, ensure_ascii=False, sort_keys=True) for record in audit)
 
     md.append("")
     md.append("## Contract changes")

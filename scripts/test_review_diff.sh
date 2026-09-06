@@ -40,9 +40,9 @@ git init -q
 
 fail() {
     echo "FAIL: $1" >&2
-    echo "--- stdout ---" >&2;    cat "$TMP/stdout.txt" 2>/dev/null >&2 || true
-    echo "--- stderr ---" >&2;    cat "$TMP/stderr.txt" 2>/dev/null >&2 || true
-    echo "--- review.md ---" >&2; cat review.md 2>/dev/null >&2 || true
+    echo "--- stdout ---" >&2;    cat "$TMP/stdout.txt" >&2 2>/dev/null || true
+    echo "--- stderr ---" >&2;    cat "$TMP/stderr.txt" >&2 2>/dev/null || true
+    echo "--- review.md ---" >&2; cat review.md >&2 2>/dev/null || true
     exit 1
 }
 assert_grep()     { grep -qF -- "$1" "$2" || fail "expected '$1' in $2"; }
@@ -266,5 +266,38 @@ bash "$SCRIPT_DIR/review_diff.sh" "$CS_BIN" "$ASSUME_SHA" --out review.md \
 [ "$code" -eq 0 ] || fail "exclude-control review: expected exit 0, got $code"
 assert_grep "vendor_deref" review.md
 
-echo "PASS: review-diff flow (delta + shift-immunity + self + rename + gate ladder + assumption delta + exclude)"
+# A policy decision is not a demonstrated fix. Retain the real suppression
+# audit when temporary base/head JSON reports disappear after the wrapper exits.
+cat > policy.c <<'EOF'
+int policy_finding(void) {
+    int zero = 0;
+    return 1 / zero;
+}
+EOF
+write_db core.c vendor/extra.c policy.c
+git add -A
+git commit -qm suppression-base
+POLICY_BASE="$(git rev-parse HEAD)"
+for mode in next-line inline; do
+    python3 - "$mode" <<'PY'
+from pathlib import Path
+import sys
+if sys.argv[1] == "next-line":
+    text = "int policy_finding(void) {\n    int zero = 0;\n    // codeskeptic-disable-next-line div-by-zero -- reviewed quotient fixture\n    return 1 / zero;\n}\n"
+else:
+    text = "int policy_finding(void) {\n    int zero = 0;\n    return 1 / zero; // codeskeptic-disable-line div-by-zero -- reviewed quotient fixture\n}\n"
+Path("policy.c").write_text(text)
+PY
+    code=0
+    bash "$SCRIPT_DIR/review_diff.sh" "$CS_BIN" "$POLICY_BASE" --out review.md \
+        > "$TMP/stdout.txt" 2> "$TMP/stderr.txt" || code=$?
+    [ "$code" -eq 0 ] || fail "suppression-only review: expected exit 0, got $code"
+    assert_grep "new_errors=0 new_warnings=0 fixed=0 weakened=0 gate=pass" "$TMP/stdout.txt"
+    assert_grep "Applied suppressions" review.md
+    assert_grep "reviewed quotient fixture" review.md
+    assert_grep "policy.c" review.md
+    assert_grep "not evidence of a fix" review.md
+done
+
+echo "PASS: review-diff flow (delta + shift-immunity + self + rename + gate ladder + assumption delta + exclude + suppression audit)"
 bash "$SCRIPT_DIR/../tests/test_review_diff.sh" "$CS_BIN"

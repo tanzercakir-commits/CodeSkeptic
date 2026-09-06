@@ -57,6 +57,15 @@ with tempfile.TemporaryDirectory(prefix="codeskeptic-baseline-contract-") as dir
             assert report["diagnostics"][0]["fingerprint"] == diagnostic["fingerprint"]
             assert report["diagnostics"][0]["baseline_function"] != diagnostic["baseline_function"]
 
+    volume = "".join("int old_%d(){int z=0;return 1/z;}\n" % index for index in range(128))
+    process, report = scan(volume, "--write-baseline", baseline)
+    assert process.returncode == 0 and "unbound_records=0" in process.stderr
+    process, report = scan(volume + "int fresh_critical(){int z=0;return 1/z;}\n", "--baseline", baseline)
+    assert process.returncode == 1 and report["total"] == 1
+    assert report["diagnostics"][0]["function"] == "fresh_critical"
+    assert report["diagnostics"][0]["severity"] == "error" and report["diagnostics"][0]["blocks_verdict"]
+    assert report["baseline"]["matched_callbacks"] == 128
+
     for newline in ("\n", "\r", "\r\n"):
         process, report = scan("int f(){int z=0;return 1/z;}" + newline +
                                "// codeskeptic-disable-line div-by-zero" + newline)
@@ -209,5 +218,33 @@ with tempfile.TemporaryDirectory(prefix="codeskeptic-baseline-contract-") as dir
         process = subprocess.run([sys.executable, "-B", str(module_path), "assemble", "--head-json", str(report_path),
             "--head-root", str(root), "--base-root", str(root), "--gate", "warn"], capture_output=True, text=True)
         assert process.returncode == 2 and "Verdict: PASS" not in process.stdout
+    summary = root / "summary-diff.txt"
+    header = "[CodeSkeptic] summary diff: base.sum -> head.sum (1 functions)\n"
+    zero = "[CodeSkeptic] 0 weakened, 0 strengthened, 0 changed, 0 added, 0 removed\n"
+    for contents in ["", "garbage\n", header, zero, header + "SUMMARY_DIFF UNKNOWN f\n" + zero,
+                     header + "SUMMARY_DIFF WEAKENED f detail\n" + zero]:
+        summary.write_text(contents)
+        try:
+            review.parse_summary_diff(str(summary))
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("malformed contract diff accepted: " + repr(contents))
+    summary.write_text(header + zero)
+    assert review.parse_summary_diff(str(summary)) == ([], True)
+    # Parsing failure remains infrastructure exit 2 even with --gate warn.
+    report_path.write_text(json.dumps(valid))
+    summary.write_text("")
+    process = subprocess.run([sys.executable, "-B", str(module_path), "assemble", "--head-json", str(report_path),
+        "--base-json", str(report_path), "--head-root", str(root), "--base-root", str(root),
+        "--summary-diff", str(summary), "--gate", "warn"], capture_output=True, text=True)
+    assert process.returncode == 2 and "Verdict: PASS" not in process.stdout
+    report_path.write_text(json.dumps(dict(valid, baseline={"matched_callbacks": 1})))
+    try:
+        review.load_diags(str(report_path))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("filtered baseline input must not masquerade as a full diff")
     print("PASS: baseline v3 / lexical suppression / AST variants / review identity and input integrity")
 PY
