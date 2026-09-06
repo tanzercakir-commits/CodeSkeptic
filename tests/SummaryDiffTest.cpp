@@ -262,13 +262,13 @@ TEST(SummaryDiffTest, IdenticalHarvests_NoChanges) {
 TEST(SummaryDiffTest, ReportEndToEnd_ExitCodes) {
     auto oldPath = writeFile("sd_old.txt",
         "codeskeptic-summaries v2\n"
-        "find/1\tN\t-\tU\n");
+        "find/1\tN\tO\tU\n");
     auto newPathWeak = writeFile("sd_new_weak.txt",
         "codeskeptic-summaries v2\n"
-        "find/1\tM\t-\tU\n");
+        "find/1\tM\tO\tU\n");
     auto newPathSame = writeFile("sd_new_same.txt",
         "codeskeptic-summaries v2\n"
-        "find/1\tN\t-\tU\n");
+        "find/1\tN\tO\tU\n");
 
     std::ostringstream out;
     EXPECT_EQ(reportSummaryDiff(oldPath, newPathWeak, out), 1);
@@ -288,10 +288,10 @@ TEST(SummaryDiffTest, GateWarn_ReportsButExitsZero) {
     // still fully visible in the output, only the exit code relaxes.
     auto oldPath = writeFile("sd_gate_old.txt",
         "codeskeptic-summaries v2\n"
-        "find/1\tN\t-\tU\n");
+        "find/1\tN\tO\tU\n");
     auto newPathWeak = writeFile("sd_gate_new.txt",
         "codeskeptic-summaries v2\n"
-        "find/1\tM\t-\tU\n");
+        "find/1\tM\tO\tU\n");
 
     std::ostringstream out;
     EXPECT_EQ(reportSummaryDiff(oldPath, newPathWeak, out,
@@ -304,6 +304,20 @@ TEST(SummaryDiffTest, GateWarn_ReportsButExitsZero) {
     std::ostringstream out2;
     EXPECT_EQ(reportSummaryDiff("/no/such.txt", newPathWeak, out2,
                                 /*gateWeakened=*/false), 2);
+}
+
+TEST(SummaryDiffTest, MalformedModelRemainsExitTwoInBothGateModes) {
+    const auto valid = writeFile("sd_valid_arity.txt",
+        "codeskeptic-summaries v2\nfind/1\tN\tO\tU\n");
+    const auto invalid = writeFile("sd_invalid_arity.txt",
+        "codeskeptic-summaries v2\nfind/1\tM\tO\tU\nbad/1\tN\t-\tU\n");
+    for (bool gate : {false, true}) {
+        std::ostringstream oldBad, newBad;
+        EXPECT_EQ(reportSummaryDiff(invalid, valid, oldBad, gate), 2);
+        EXPECT_EQ(reportSummaryDiff(valid, invalid, newBad, gate), 2);
+        EXPECT_EQ(oldBad.str().find("SUMMARY_DIFF WEAKENED"), std::string::npos);
+        EXPECT_EQ(newBad.str().find("SUMMARY_DIFF WEAKENED"), std::string::npos);
+    }
 }
 
 TEST(SummaryDiffTest, AddedPossibleFieldWriteIsWeakened) {
