@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH04-S02-U002
-
-### CS3-CH04-S02-U002 — Cache yazımı ve saklama sınırını güvenli yap
-
-**Sonuç:** Kısmi/bozuk/symlink kayıt kullanılmaz; disk kullanımı tanımlı tavanda kalır.
-
-**Kabul:**
-
-- Atomic temp-to-final, concurrent writers, truncated entry ve tamper fixture'ları vardır.
-- Failed write önceki geçerli entry'yi bozmaz; retention sonucu analiz doğruluğu değişmez.
-- Saklama tavanı aşılırsa açık durum verir; sınırsız cache oluşturulmaz.
-
-**Test bütçesi:** T2
-**Kontroller:** linux-suite, relevant-corpus, queue-check
-**Kapsam:** src/analyzer/*, tests/UnitEvidenceStoreTest.cpp, src/config/Config.cpp, src/config/Config.h, tests/ConfigTest.cpp, tests/AnalysisCoordinatorTest.cpp, docs/usage.md
-**Bağımlılıklar:** CS3-CH04-S02-U001
+## FRONT — CS3-CH04-S02-U003
 
 ### CS3-CH04-S02-U003 — Checkpoint yalnız aynı geçerli analizi sürdürsün
 

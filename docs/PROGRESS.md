@@ -2,6 +2,19 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH04-S02-U002 — Cache yazımı ve saklama sınırını güvenli yap
+
+- Commit: `481c19f079d3007df64151ce0e2254285dafedb1`
+- Dal: `agent/cs3-ch04-s02-u002-cache-storage`
+- Implementer: `root-cwe-ch04-s02-u002-20260906`
+- Bağımsız denetçi: `independent-cwe-ch04-s02-u002-product-481c19f-cache-exact-verifier-20260906`
+- İnceleme SHA-256: `6da2cdb626ec8360806944f8a74f9fcd9c1fee05441d168d463e28c8c330fa45`
+- Tarih: 2026-09-06T20:34:33.804747+00:00
+- Sonuç: Kısmi/bozuk/symlink kayıt kullanılmaz; disk kullanımı tanımlı tavanda kalır.
+- linux-suite: PASS; SHA-256 `2dc9f47e063881c3a829d6877a16a3938f905db5fe7ff937d4d3de46d96dfbea`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S02-U002/qualify.sh 481c19f079d3007df64151ce0e2254285dafedb1`
+- relevant-corpus: PASS; SHA-256 `f2f04e56ddfe600263fbfe8661d7c4e828826e1e6eeb49766cb41294febbe5b0`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S02-U002/qualify.sh 481c19f079d3007df64151ce0e2254285dafedb1`
+- queue-check: PASS; SHA-256 `091f21ee8878ec1890b4c93b5f22648672b96aeb14bae03b98b78d971a11d3f9`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S02-U002/qualify.sh 481c19f079d3007df64151ce0e2254285dafedb1`
+
 ## CS3-CH04-S02-U001 — Cache kimliğini gerçek girdilere bağla
 
 - Commit: `490205087393f5a3c9215e9efda4ea48d0bcdad5`
