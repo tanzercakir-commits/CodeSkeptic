@@ -1,4 +1,5 @@
 #include "TestHelper.h"
+#include "core/Messages.h"
 #include "engine/AllocFunctions.h"
 #include "rules/IntOverflowRule.h"
 
@@ -754,4 +755,140 @@ TEST(IntOverflowRuleTest, Signed64SubtractionFiniteCornersClean) {
         }
     )");
     EXPECT_TRUE(results.empty());
+}
+
+// Direction is a property of the proven range, not of the operator. In
+// particular subtraction may cross MAX and addition/multiplication may
+// cross MIN. Keep the stable public rule ID in every case.
+TEST(IntOverflowRuleTest, ArithmeticMessagesFollowProvenDirection) {
+    struct Case {
+        const char* type;
+        const char* lhs;
+        const char* op;
+        const char* rhs;
+        bool lower;
+    };
+    const Case cases[] = {
+        {"long long", "9223372036854775807LL", "-", "-1", false},
+        {"long long", "0", "-", "(-9223372036854775807LL - 1)", false},
+        {"long long", "(-9223372036854775807LL - 1)", "-", "1", true},
+        {"long long", "9223372036854775807LL", "+", "1", false},
+        {"long long", "(-9223372036854775807LL - 1)", "+", "-1", true},
+        {"long long", "9223372036854775807LL", "*", "2", false},
+        {"long long", "(-9223372036854775807LL - 1)", "*", "2", true},
+        {"long long", "(-9223372036854775807LL - 1)", "*", "-1", false},
+        {"long long", "9223372036854775807LL", "*", "-2", true},
+        {"long long", "-2", "*", "9223372036854775807LL", true},
+        {"int", "2147483647", "-", "-1", false},
+        {"int", "(-2147483647 - 1)", "-", "1", true},
+        {"int", "2147483647", "+", "1", false},
+        {"int", "(-2147483647 - 1)", "+", "-1", true},
+        {"int", "100000", "*", "100000", false},
+        {"int", "-100000", "*", "100000", true},
+    };
+    struct RestoreLang {
+        Lang previous = currentLang();
+        ~RestoreLang() { setLang(previous); }
+    } restore;
+    for (const auto lang : {Lang::EN, Lang::TR}) {
+        setLang(lang);
+        for (const auto& c : cases) {
+            const std::string code = std::string(c.type) + " f(){ " +
+                c.type + " a=" + c.lhs + "; " + c.type + " b=" + c.rhs +
+                "; return a " + c.op + " b; }";
+            SCOPED_TRACE(code);
+            SCOPED_TRACE(lang == Lang::EN ? "EN" : "TR");
+            IntOverflowRule rule;
+            const auto findings = runRule(rule, code);
+            ASSERT_EQ(findings.size(), 1u);
+            EXPECT_EQ(findings[0].rule_id, "int-overflow");
+            EXPECT_EQ(findings[0].kind, c.lower ? FindingKind::ArithmeticLower
+                                              : FindingKind::ArithmeticUpper);
+            EXPECT_EQ(findings[0].message.find("underflow") != std::string::npos,
+                      c.lower) << findings[0].message;
+            if (lang == Lang::EN && !c.lower)
+                EXPECT_NE(findings[0].message.find("overflow"), std::string::npos);
+        }
+    }
+}
+
+TEST(IntOverflowRuleTest, ArithmeticMessagesDescribeBothProvenLimits) {
+    const auto previous = currentLang();
+    setLang(Lang::EN);
+    // Both extreme corners escape in opposite directions. Reporting only
+    // the first corner loses half of the actual evidence.
+    for (const auto* code : {
+        "long long f(long long a, long long b) { "
+        "if(a < -9223372036854775807LL || a > 9223372036854775807LL) return 0; "
+        "if(b < -2 || b > 2) return 0; return a - b; }",
+        "long long f(long long a, long long b) { "
+        "if(a < -9223372036854775807LL || a > 9223372036854775807LL) return 0; "
+        "if(b < -2 || b > 2) return 0; return a + b; }",
+        "long long f(long long a, long long b) { "
+        "if(a < -9223372036854775807LL || a > 9223372036854775807LL) return 0; "
+        "if(b < -2 || b > 2) return 0; return a * b; }",
+        "int f(int a, int b) { if(a < -2000000000 || a > 2000000000) return 0; "
+        "if(b < -2 || b > 2) return 0; return a * b; }"}) {
+        SCOPED_TRACE(code);
+        IntOverflowRule rule;
+        const auto findings = runRule(rule, code);
+        EXPECT_EQ(findings.size(), 1u);
+        if (!findings.empty()) {
+            EXPECT_EQ(findings[0].kind, FindingKind::ArithmeticBoth);
+            EXPECT_NE(findings[0].message.find("overflow"), std::string::npos);
+            EXPECT_NE(findings[0].message.find("underflow"), std::string::npos);
+        }
+    }
+    setLang(previous);
+}
+
+TEST(IntOverflowRuleTest, NarrowingBothLimitsIsNotAnArithmeticTypeEscape) {
+    const auto previous = currentLang();
+    for (const auto lang : {Lang::EN, Lang::TR}) {
+        setLang(lang);
+        IntOverflowRule rule;
+        const auto findings = runRule(rule, R"(
+            signed char f(int a) {
+                if (a < -100 || a > 100) return 0;
+                return a * 2;
+            }
+        )");
+        EXPECT_EQ(findings.size(), 1u);
+        if (!findings.empty()) {
+            EXPECT_EQ(findings[0].kind, FindingKind::NarrowingBoth);
+            EXPECT_NE(findings[0].message.find("signed char"), std::string::npos);
+            EXPECT_NE(findings[0].message.find("underflow"), std::string::npos);
+            EXPECT_NE(findings[0].message.find("overflow"), std::string::npos);
+        }
+    }
+    setLang(previous);
+}
+
+TEST(IntOverflowRuleTest, SignedMinimumMultiplicationExactFitsStaySilent) {
+    for (const auto* value : {"0", "1"}) {
+        IntOverflowRule rule;
+        EXPECT_TRUE(runRule(rule, std::string(
+            "long long f(){ long long a=(-9223372036854775807LL-1); "
+            "long long b=") + value + "; return a*b; }").empty());
+    }
+}
+
+TEST(IntOverflowRuleTest, NarrowingMessagesFollowDestinationLimits) {
+    const auto previous = currentLang();
+    setLang(Lang::EN);
+    for (const auto* value : {"100", "-100"}) {
+        SCOPED_TRACE(value);
+        IntOverflowRule rule;
+        const auto findings = runRule(rule, std::string(
+            "signed char f(){ int a=") + value + "; int b=2; return a*b; }");
+        EXPECT_EQ(findings.size(), 1u);
+        if (!findings.empty()) {
+            EXPECT_EQ(findings[0].kind, value[0] == '-' ? FindingKind::NarrowingLower
+                                                     : FindingKind::NarrowingUpper);
+            EXPECT_EQ(findings[0].message.find("underflow") != std::string::npos,
+                      value[0] == '-');
+            EXPECT_NE(findings[0].message.find("signed char"), std::string::npos);
+        }
+    }
+    setLang(previous);
 }

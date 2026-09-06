@@ -102,6 +102,12 @@ enum class MsgId {
     SignConversionUntrusted,    // {0} = signed source type, {1} = unsigned target type
     AllocSizeOverflow,          // {0} = the unsigned result type name
     VerdictUnavailable,        // analysis evidence/output could not produce a verdict
+    IntOverflowSub,            // {0} = arithmetic type; result above MAX
+    IntUnderflowAdd,           // {0} = arithmetic type; result below MIN
+    IntUnderflowMul,           // {0} = arithmetic type; result below MIN
+    IntUnderflowNarrow,        // {0} = narrower target type; result below MIN
+    IntRangeBoth,              // {0} = arithmetic type; witnesses at both limits
+    IntNarrowRangeBoth,        // {0} = narrower target type; both limits
 
 };
 

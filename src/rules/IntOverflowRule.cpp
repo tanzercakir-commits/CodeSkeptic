@@ -91,12 +91,8 @@ bool isSelfSquare(const BinaryOperator* op) {
     return l && l == r;
 }
 
-// An arithmetic operator this rule reasons about. `*` and `+` grow a
-// value past the type's MAX (CWE-190); `-` drops it below the type's
-// MIN (CWE-191 underflow). Both are undefined behaviour for signed
-// integers, and the interval escape check already tests BOTH bounds —
-// the only thing that kept subtraction out was this predicate
-// (2026-07-30: CWE-191 folded in, same machinery, no new engine).
+// Each supported operator can cross either signed limit. Direction follows
+// the operand/range evidence, never the spelling of the operator.
 bool isArithOp(const BinaryOperator* op) {
     const auto k = op->getOpcode();
     return k == BO_Mul || k == BO_Add || k == BO_Sub;
@@ -157,19 +153,26 @@ std::vector<ArithSite> collectArithSites(const FunctionDecl* fn,
 // previous __int128 hull check: the hull's max exceeds INT64_MAX iff
 // some corner overflows upward, and symmetrically for the min.
 // Any infinite bound -> not proven -> silent (precision-first).
-bool evalEscapes64(const BinaryOperator* op,
+struct RangeEscape {
+    bool lower = false;
+    bool upper = false;
+    bool any() const { return lower || upper; }
+};
+
+RangeEscape evalEscapes64(const BinaryOperator* op,
                    const codeskeptic::IntervalMap& st, ASTContext& ctx) {
     codeskeptic::Interval l = codeskeptic::evalInterval(op->getLHS(), st, &ctx);
     codeskeptic::Interval r = codeskeptic::evalInterval(op->getRHS(), st, &ctx);
-    if (l.isEmpty() || r.isEmpty()) return false;
+    if (l.isEmpty() || r.isEmpty()) return {};
     if (l.loIsInf() || l.hiIsInf() || r.loIsInf() || r.hiIsInf())
-        return false;
+        return {};
     const auto opcode = op->getOpcode();
     const int64_t lhs[4] = {l.lo(), l.lo(), l.hi(), l.hi()};
     const int64_t rhs[4] = {r.lo(), r.hi(), r.lo(), r.hi()};
     // Same evidence bar as the sub-64 path: the proven range REACHES
     // beyond the type ("possible overflow", warning) — not necessarily
     // entirely outside it.
+    RangeEscape escape;
     for (int i = 0; i < 4; ++i) {
         int64_t out;
         const bool fits = opcode == BO_Mul
@@ -177,22 +180,29 @@ bool evalEscapes64(const BinaryOperator* op,
             : opcode == BO_Sub
             ? codeskeptic::checkedSub64(lhs[i], rhs[i], &out)
             : codeskeptic::checkedAdd64(lhs[i], rhs[i], &out);
-        if (!fits) return true;
+        if (fits) continue;
+        // A failed checked operation has no usable result. Its direction
+        // follows the operand signs without evaluating overflowing math or
+        // negating INT64_MIN. Inspect every corner: both directions can occur.
+        const bool lower = opcode == BO_Mul
+            ? (lhs[i] < 0) != (rhs[i] < 0)
+            : opcode == BO_Sub ? rhs[i] > 0 : rhs[i] < 0;
+        if (lower) escape.lower = true;
+        else escape.upper = true;
     }
-    return false;
+    return escape;
 }
 
 // The sub-64 escape query, with the FINITE-witness bar: an infinite
 // endpoint is over-approximation, not evidence. Interval::add keeps
 // half-open ranges where mul collapses them to top() — without this
 // bar every `if (x > 0) x + k` would be a false positive.
-bool escapesSignedFinite(const codeskeptic::Interval& r, unsigned bits) {
-    if (r.isEmpty() || r.isTop()) return false;
+RangeEscape escapesSignedFinite(const codeskeptic::Interval& r, unsigned bits) {
+    if (r.isEmpty() || r.isTop()) return {};
     const int64_t maxv = ((int64_t)1 << (bits - 1)) - 1;
     const int64_t minv = -maxv - 1;
-    if (!r.hiIsInf() && r.hi() > maxv) return true;
-    if (!r.loIsInf() && r.lo() < minv) return true;
-    return false;
+    return {!r.loIsInf() && r.lo() < minv,
+            !r.hiIsInf() && r.hi() > maxv};
 }
 
 void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
@@ -226,7 +236,7 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         const codeskeptic::IntervalMap* st = analysis.stateAt(site.op);
         if (!st) continue;  // unreached / not recorded — nothing proven
 
-        bool escapes = false;
+        RangeEscape escapes;
         if (site.bits >= 64) {
             // The int64-based Interval collapses an overflowing 64-bit
             // result to top() — prove from the operand corners instead.
@@ -239,7 +249,7 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
             escapes = escapesSignedFinite(
                 codeskeptic::evalInterval(site.op, *st, &ctx), site.bits);
         }
-        if (!escapes) continue;
+        if (!escapes.any()) continue;
 
         SourceLocation loc = sm.getExpansionLoc(site.op->getOperatorLoc());
         unsigned line = sm.getSpellingLineNumber(loc);
@@ -252,18 +262,30 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         diag.rule_id = "int-overflow";
         diag.function = fn->getQualifiedNameAsString();
         diag.severity = codeskeptic::Severity::Warning;
+        const bool both = escapes.lower && escapes.upper;
+        using Kind = codeskeptic::FindingKind;
         if (site.narrowing) {
             // The narrowed DESTINATION carries the claim, not the
             // (wider) arithmetic type.
-            diag.message = codeskeptic::msg(
-                codeskeptic::MsgId::IntOverflowNarrow, site.narrowType);
+            diag.kind = both ? Kind::NarrowingBoth : escapes.lower
+                ? Kind::NarrowingLower : Kind::NarrowingUpper;
+            diag.message = codeskeptic::msg(both
+                ? codeskeptic::MsgId::IntNarrowRangeBoth : escapes.lower
+                ? codeskeptic::MsgId::IntUnderflowNarrow
+                : codeskeptic::MsgId::IntOverflowNarrow, site.narrowType);
         } else {
+            diag.kind = both ? Kind::ArithmeticBoth : escapes.lower
+                ? Kind::ArithmeticLower : Kind::ArithmeticUpper;
             codeskeptic::MsgId mid;
             switch (site.op->getOpcode()) {
-                case BO_Add: mid = codeskeptic::MsgId::IntOverflowAdd; break;
-                case BO_Sub: mid = codeskeptic::MsgId::IntUnderflowSub; break;
-                default:     mid = codeskeptic::MsgId::IntOverflowMul; break;
+                case BO_Add: mid = escapes.lower ? codeskeptic::MsgId::IntUnderflowAdd
+                                                 : codeskeptic::MsgId::IntOverflowAdd; break;
+                case BO_Sub: mid = escapes.lower ? codeskeptic::MsgId::IntUnderflowSub
+                                                 : codeskeptic::MsgId::IntOverflowSub; break;
+                default:     mid = escapes.lower ? codeskeptic::MsgId::IntUnderflowMul
+                                                 : codeskeptic::MsgId::IntOverflowMul; break;
             }
+            if (both) mid = codeskeptic::MsgId::IntRangeBoth;
             diag.message =
                 codeskeptic::msg(mid, site.op->getType().getAsString());
         }

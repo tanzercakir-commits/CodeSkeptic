@@ -12,6 +12,18 @@ enum class Severity {
     Error
 };
 
+// Producer-owned semantics, independent of translated message text. Reporting
+// metadata does not participate in finding identity or deduplication.
+enum class FindingKind {
+    Unspecified,
+    ArithmeticUpper,
+    ArithmeticLower,
+    ArithmeticBoth,
+    NarrowingUpper,
+    NarrowingLower,
+    NarrowingBoth,
+};
+
 // Dataflow trace step attached to a finding: the chain of events that
 // leads to the error (e.g. "p allocated here", "p freed here"). The
 // answer to "why?" for both human and LLM consumers.
@@ -41,6 +53,7 @@ struct Diagnostic {
     // reporting. Excluded from ordering/equality so presentation metadata
     // cannot change finding deduplication.
     std::string fingerprint;
+    FindingKind kind = FindingKind::Unspecified;
 
     std::string severityToString() const {
         switch (severity) {

@@ -94,6 +94,23 @@ Verdict tiers are decided from each emitted finding ID.
 `contract-syntax` and `contract-unsupported` are internal diagnostics, not
 separate selectable rules; both inherit the experimental `contract` tier.
 
+### Arithmetic direction and baseline compatibility
+
+The stable `int-overflow` family distinguishes a result above the arithmetic
+type's maximum from one below its minimum; addition, subtraction and
+multiplication can each cross either limit. When bounded interval witnesses
+reach both limits, the message describes both possibilities. Implicit signed
+narrowing instead names the narrower destination and describes conversion
+range loss, not overflow of the wider arithmetic type. Unknown ranges do not
+gain a new detection merely from this metadata distinction.
+
+Corrected direction messages can make old baseline entries stop matching:
+the existing baseline formats include diagnostic message text in their keys.
+Review resurfacing findings before refreshing a baseline; do not treat this
+presentation correction as evidence of a newly introduced source defect.
+The public rule ID, source-comment suppression and `csf1` source fingerprints
+are unchanged. This is not a claim of message-independent baseline matching.
+
 ## Explicit non-goals
 
 The v1 scope excludes injection/taint analysis, race detection, automatic

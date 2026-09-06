@@ -226,15 +226,15 @@ const MsgEntry kMessages[] = {
     {"possible integer overflow: this addition can exceed '{0}'",
      "olasi tamsayi tasmasi: bu toplama '{0}' sinirini asabilir"},
     // IntOverflowNarrow
-    {"possible integer overflow: arithmetic result provably exceeds the "
-     "narrower target type '{0}'",
-     "olasi tamsayi tasmasi: aritmetik sonuc, daraltilan hedef tip '{0}' "
-     "sinirini kanitlanabilir bicimde asiyor"},
+    {"possible integer conversion overflow: arithmetic result exceeds the "
+     "maximum of the narrower target type '{0}'",
+     "olasi tamsayi donusum tasmasi: aritmetik sonuc, daraltilan hedef tip '{0}' "
+     "ust sinirini asiyor"},
     // IntUnderflowSub
-    {"possible integer underflow: this subtraction can leave the "
-     "representable range of '{0}'",
+    {"possible integer underflow: this subtraction can fall below the "
+     "minimum of '{0}'",
      "olasi tamsayi eksilmesi (underflow): bu cikarma '{0}' tipinin "
-     "gosterilebilir araligindan cikabilir"},
+     "alt sinirinin altina dusebilir"},
     // BoundsArrayDefinite
     {"out-of-bounds array access: proven index range {0} lies outside the "
      "array bound [0, {1})",
@@ -317,6 +317,24 @@ const MsgEntry kMessages[] = {
      "incomplete or an artifact could not be written (exit 2).",
      "[CodeSkeptic] KARAR URETILEMEDI: istenen analiz kaniti eksik kaldi "
      "veya bir cikti yazilamadi (cikis 2)."},
+    // IntOverflowSub
+    {"possible integer overflow: this subtraction can exceed the maximum of '{0}'",
+     "olasi tamsayi tasmasi: bu cikarma '{0}' tipinin ust sinirini asabilir"},
+    // IntUnderflowAdd
+    {"possible integer underflow: this addition can fall below the minimum of '{0}'",
+     "olasi tamsayi eksilmesi (underflow): bu toplama '{0}' tipinin alt sinirinin altina dusebilir"},
+    // IntUnderflowMul
+    {"possible integer underflow: this multiplication can fall below the minimum of '{0}'",
+     "olasi tamsayi eksilmesi (underflow): bu carpma '{0}' tipinin alt sinirinin altina dusebilir"},
+    // IntUnderflowNarrow
+    {"possible integer conversion underflow: arithmetic result can fall below the minimum of the narrower target type '{0}'",
+     "olasi tamsayi donusum eksilmesi (underflow): aritmetik sonuc daraltilan hedef tip '{0}' alt sinirinin altina dusebilir"},
+    // IntRangeBoth
+    {"possible integer overflow or underflow: arithmetic result can exceed the maximum or fall below the minimum of '{0}'",
+     "olasi tamsayi tasmasi veya eksilmesi (overflow/underflow): aritmetik sonuc '{0}' tipinin ust sinirini asabilir veya alt sinirinin altina dusebilir"},
+    // IntNarrowRangeBoth
+    {"possible integer conversion overflow or underflow: arithmetic result can cross either limit of the narrower target type '{0}'",
+     "olasi tamsayi donusum tasmasi veya eksilmesi (overflow/underflow): aritmetik sonuc daraltilan hedef tip '{0}' icin her iki sinirin disina cikabilir"},
 };
 
 void substitute(std::string& text, const std::string& placeholder,
