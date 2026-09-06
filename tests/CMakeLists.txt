@@ -87,6 +87,20 @@ add_test(NAME StatusAutomationContract
 add_test(NAME RealworldCampaignContract
          COMMAND ${Python3_EXECUTABLE}
                  ${CMAKE_CURRENT_SOURCE_DIR}/RealworldCampaignTest.py)
+add_test(NAME StressMatrixContract
+         COMMAND ${Python3_EXECUTABLE} -B
+                 ${CMAKE_CURRENT_SOURCE_DIR}/StressMatrixTest.py)
+add_test(NAME StressMatrixCorpus
+         COMMAND ${Python3_EXECUTABLE} -B
+                 ${CMAKE_SOURCE_DIR}/scripts/run_stress_matrix.py
+                 $<TARGET_FILE:codeskeptic>)
+set_tests_properties(StressMatrixContract PROPERTIES TIMEOUT 60)
+set_tests_properties(StressMatrixCorpus PROPERTIES TIMEOUT 120 LABELS "stress")
+add_test(NAME ReviewInputContract
+         COMMAND ${Python3_EXECUTABLE} -B
+                 ${CMAKE_CURRENT_SOURCE_DIR}/ReviewInputTest.py
+                 $<TARGET_FILE:codeskeptic>)
+set_tests_properties(ReviewInputContract PROPERTIES TIMEOUT 180)
 
 # End-to-end diff-review flow (scripts/review_diff.sh + review_report.py):
 # hermetic git-repo fixture driven with the real binary. Pins the delta

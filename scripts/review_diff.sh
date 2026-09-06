@@ -139,8 +139,7 @@ run_zd() { # <files-list> <build-path> <json-out> <summary-out> <stderr-log>
     "$CS_BIN" --files "$1" --build-path "$2" --json "$3" \
         --summary-out "$4" --lang en \
         ${EXTRA[@]+"${EXTRA[@]}"} 2> "$5" || code=$?
-    # 0/1 = clean/findings. The binary maps internal "no files" (2) onto
-    # exit 1 as well, so the JSON's existence is the real success signal.
+    # 0/1 are valid configured verdicts; exit 2 is unavailable evidence.
     if [ "$code" -gt 1 ] || [ ! -f "$3" ]; then
         echo "[review] FAIL: analyzer error (exit $code) — stderr tail:" >&2
         tail -n 20 "$5" >&2
@@ -158,15 +157,15 @@ fi
 if [ -s "$TMP/base-files.txt" ]; then
     git worktree add --detach "$BASE_WT" "$BASE_SHA" >/dev/null 2>&1
 
-    # Base compile DB: head commands remapped onto the worktree. Without
-    # a head compile DB both sides run in the same fallback parse mode —
-    # still a fair delta.
+    # Base compile DB: already validated HEAD commands remapped onto the
+    # worktree. Project/file-list analysis never invents fallback commands.
     BASE_DB="$BASE_WT"
     if [ -f "$BUILD_PATH/compile_commands.json" ]; then
         BASE_DB="$TMP/basedb"
         python3 "$REPORT_PY" remap-db --src "$BUILD_PATH/compile_commands.json" \
             --from-root "$HEAD_ROOT" --to-root "$BASE_WT" \
             --protect "$BUILD_PATH" \
+            --renames "$TMP/renames.txt" \
             --out "$BASE_DB/compile_commands.json"
     fi
 

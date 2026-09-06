@@ -43,6 +43,7 @@ import fnmatch
 import json
 import os
 import re
+import shlex
 import sys
 from collections import Counter
 
@@ -487,6 +488,64 @@ def _rewrite_compile_path(value, src_root, dst_root, protect=None):
     return value
 
 
+def _compile_renames(path, src_root, dst_root):
+    """Strict HEAD-new -> BASE-old source identities, never basename edits."""
+    if not path:
+        return {}
+    result, seen_old = {}, set()
+    with open(path, encoding="utf-8") as stream:
+        for line in stream:
+            fields = line.rstrip("\n").split("\t")
+            if len(fields) != 2:
+                raise ValueError("rename map requires old<TAB>new paths")
+            for name in fields:
+                if (not name or name.startswith(("/", "\\")) or "\x00" in name or
+                        "\\" in name or ":" in name.split("/")[0] or
+                        any(part in ("", ".", "..") for part in name.split("/"))):
+                    raise ValueError("rename paths must be contained repository-relative paths")
+            old, new = fields
+            if old in seen_old or new in result:
+                raise ValueError("duplicate rename identity")
+            seen_old.add(old)
+            result[new] = os.path.normpath(os.path.join(dst_root, old))
+    return {os.path.normpath(os.path.join(src_root, new)): old for new, old in result.items()}
+
+
+def _compile_identity(path, working):
+    return os.path.normpath(path if os.path.isabs(path) else os.path.join(working, path))
+
+
+def _remap_compile_arguments(arguments, source, working, target, renamed, rw):
+    """Preserve argument values; move only an exact standalone source operand.
+
+    This is not a driver parser. The real HEAD analyzer must validate the
+    original command first. Ambiguous rename forms fail rather than inventing
+    a valid BASE command from invalid or differently interpreted HEAD input.
+    """
+    if renamed and (os.path.basename(arguments[0]).lower() in ("cl", "cl.exe", "clang-cl", "clang-cl.exe") or
+                    any(arg.startswith(("@", "-working-directory", "--working-directory", "/Tc", "/Tp")) or
+                        arg == "--driver-mode=cl" for arg in arguments)):
+        raise ValueError("rename requires standalone source arguments without response files or directory overrides")
+    if any(arg in (";", "&&", "||", "|", "<", ">") for arg in arguments):
+        raise ValueError("shell command chains are not compilation arguments")
+    matching = [index for index, value in enumerate(arguments) if index and
+                not value.startswith(("-", "@")) and _compile_identity(value, working) == source]
+    if renamed and len(matching) != 1:
+        raise ValueError("rename requires exactly one original declared source operand")
+    if renamed:
+        for index, value in enumerate(arguments):
+            if index == 0 or index in matching or value.startswith(("-", "@")):
+                continue
+            if os.path.normpath(rw(_compile_identity(value, working))) == target:
+                raise ValueError("rename would conflate another original argument with the BASE source")
+    remapped = [rw(value) for value in arguments]
+    # Absolute source operands remain correct when a protected build working
+    # directory stays in HEAD, including originally relative source arguments.
+    for index in matching:
+        remapped[index] = target
+    return remapped
+
+
 def cmd_remap_db(args):
     src_root = os.path.realpath(args.from_root).rstrip(os.sep)
     dst_root = os.path.realpath(args.to_root).rstrip(os.sep)
@@ -507,7 +566,8 @@ def cmd_remap_db(args):
             common = os.path.commonpath((src_root, protect))
         except ValueError:
             common = ""
-        if os.path.normcase(common) != os.path.normcase(src_root):
+        if (os.path.normcase(common) != os.path.normcase(src_root) or
+                os.path.normcase(protect) == os.path.normcase(src_root)):
             protect = None  # outside the root: the rewrite can't touch it
 
     def rw(s):
@@ -515,13 +575,41 @@ def cmd_remap_db(args):
 
     with open(args.src, "r", encoding="utf-8") as f:
         entries = json.load(f)
+    if not isinstance(entries, list):
+        raise ValueError("compilation database must be an array")
+    renames = _compile_renames(getattr(args, "renames", None), src_root, dst_root)
     for e in entries:
-        for field in ("directory", "file", "command", "output"):
-            if field in e and isinstance(e[field], str):
-                e[field] = rw(e[field])
-        if isinstance(e.get("arguments"), list):
-            e["arguments"] = [rw(a) if isinstance(a, str) else a
-                              for a in e["arguments"]]
+        if not isinstance(e, dict) or any(not isinstance(e.get(field), str) or
+                not e[field] or "\x00" in e[field] for field in ("directory", "file")):
+            raise ValueError("database entries require nonempty directory and file strings")
+        if "arguments" in e and (not isinstance(e["arguments"], list) or not e["arguments"] or
+                any(not isinstance(a, str) or "\x00" in a for a in e["arguments"]) or not e["arguments"][0]):
+            raise ValueError("arguments must be a nonempty string array with a compiler")
+        if "command" in e and (not isinstance(e["command"], str) or not e["command"] or "\x00" in e["command"]):
+            raise ValueError("command must be a nonempty string")
+        if "arguments" not in e and "command" not in e:
+            raise ValueError("database entry requires arguments or command")
+        if "output" in e and (not isinstance(e["output"], str) or "\x00" in e["output"]):
+            raise ValueError("output must be a string")
+        working = _compile_identity(e["directory"], os.path.dirname(os.path.abspath(args.src)))
+        source = _compile_identity(e["file"], working)
+        target = renames.get(source, rw(source))
+        renamed = source in renames
+        if "arguments" in e:
+            e["arguments"] = _remap_compile_arguments(e["arguments"], source, working, target, renamed, rw)
+        if "command" in e:
+            if os.name == "nt":
+                if renamed:
+                    raise ValueError("rename command-string remapping requires POSIX tokenization")
+                e["command"] = rw(e["command"])
+            else:
+                arguments = shlex.split(e["command"])
+                if not arguments:
+                    raise ValueError("command has no compiler")
+                e["command"] = shlex.join(_remap_compile_arguments(arguments, source, working, target, renamed, rw))
+        e["directory"], e["file"] = rw(working), target
+        if "output" in e:
+            e["output"] = rw(e["output"])
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(entries, f, indent=1)
@@ -541,6 +629,7 @@ def main():
     p_remap.add_argument("--protect", help="path prefix to keep un-remapped "
                          "(the head build dir — absent from a worktree)")
     p_remap.add_argument("--out", required=True)
+    p_remap.add_argument("--renames", help="old<TAB>new repository-relative source names")
 
     p_asm = sub.add_parser("assemble")
     p_asm.add_argument("--base-json")
@@ -565,7 +654,11 @@ def main():
 
     args = parser.parse_args()
     if args.cmd == "remap-db":
-        return cmd_remap_db(args)
+        try:
+            return cmd_remap_db(args)
+        except (OSError, ValueError) as error:
+            print(f"[review] invalid compilation inputs: {error}", file=sys.stderr)
+            return 2
     return cmd_assemble(args)
 
 
