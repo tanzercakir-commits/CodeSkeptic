@@ -2,6 +2,20 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH02-S03-U002 — Frontend ve CFG düşmanca geçerli girdilerde sonlansın
+
+- Commit: `5cfa9022f9aafc8d07c22a6f3f2fb06232e8c423`
+- Dal: `agent/cs3-ch02-s03-u002-frontend-cfg`
+- Implementer: `root-cs3-ch02-s03-u002-20260906`
+- Bağımsız denetçi: `independent-cwe-ch02-s03-u002-product-5cfa902-20260906`
+- İnceleme SHA-256: `1d12e3c3ea52ba885fc29c5c7ac8c7649486a7990ff6a89ff914bd944013f8cb`
+- Tarih: 2026-09-06T08:48:47.830059+00:00
+- Sonuç: Template/macro/CFG köşeleri crash/hang yerine sınırları belirli sonuç verir.
+- build: PASS; SHA-256 `709da6b9723d1a0fef59f7f98e930d75f34457d4af1344c0abfa2bb0da52e01c`; `bash scripts/local_test.sh build`
+- linux-suite: PASS; SHA-256 `7fad23b66aa00e940fba839d5cba73dac89f72bd9350ec4109c4c22d6d904fa7`; `bash scripts/local_test.sh full`
+- relevant-corpus: PASS; SHA-256 `76c8e66d1b9bb853878750c4fb8a78a9ada2db326f3388773289853509d0d601`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S03-U002/verify_frontend_candidate.sh 5cfa9022f9aafc8d07c22a6f3f2fb06232e8c423`
+- queue-check: PASS; SHA-256 `19a4d39a89069f131373c867cfe37d2863a77f4a74ecabf92bbbdbe9dc22a433`; `python3 -B scripts/project_queue.py check && python3 -B scripts/project_queue.py guard --base HEAD^ && bash scripts/check_docs_sync.sh && git diff --check`
+
 ## CS3-CH02-S03-U001 — İstenen/analiz edilen/atlanan/başarısız dosyaları uzlaştır
 
 - Commit: `36b332cf7f5fa0bcc37429fcca92278e112dcbfc`
