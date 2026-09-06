@@ -1,6 +1,6 @@
 # CodeSkeptic — CWE Ürün Planı
 
-Sürüm: 30. Eski planın devamı değil; main tabanlı yeni program.
+Sürüm: 31. Eski planın devamı değil; main tabanlı yeni program.
 
 PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.
 
@@ -456,7 +456,7 @@ PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. G
 
 **Test bütçesi:** T1
 **Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/reporter/*, src/core/Capabilities*, src/core/Messages*, src/main.cpp, src/config/Config*, tests/*ReporterTest.cpp, tests/CapabilitiesTest.cpp, tests/ConfigTest.cpp
+**Kapsam:** src/reporter/*, src/core/Capabilities*, src/core/Messages*, src/main.cpp, src/config/Config*, tests/*ReporterTest.cpp, tests/CapabilitiesTest.cpp, tests/ConfigTest.cpp, src/analyzer/StaticAnalyzer.cpp, tests/OutputParityCliTest.py, tests/CMakeLists.txt
 **Bağımlılıklar:** Yok
 
 ### CH03-S02 — Günlük geliştirme kullanımı

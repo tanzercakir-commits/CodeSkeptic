@@ -16,7 +16,7 @@ Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter aç
 
 **Test bütçesi:** T1
 **Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/reporter/*, src/core/Capabilities*, src/core/Messages*, src/main.cpp, src/config/Config*, tests/*ReporterTest.cpp, tests/CapabilitiesTest.cpp, tests/ConfigTest.cpp
+**Kapsam:** src/reporter/*, src/core/Capabilities*, src/core/Messages*, src/main.cpp, src/config/Config*, tests/*ReporterTest.cpp, tests/CapabilitiesTest.cpp, tests/ConfigTest.cpp, src/analyzer/StaticAnalyzer.cpp, tests/OutputParityCliTest.py, tests/CMakeLists.txt
 **Bağımlılıklar:** Yok
 
 ### CS3-CH03-S02-U001 — Baseline/suppression ile yalnız yeni bulguyu ayır
