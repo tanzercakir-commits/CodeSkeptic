@@ -2,6 +2,20 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH03-S02-U001 — Baseline/suppression ile yalnız yeni bulguyu ayır
+
+- Commit: `3a222ffee8343d567318530c49ce27ba02b1ee98`
+- Dal: `agent/cs3-ch03-s02-u001-baseline-suppression`
+- Implementer: `root-cwe-ch03-s02-u001-20260906`
+- Bağımsız denetçi: `independent-cwe-ch03-s02-u001-product-3a222ff-20260906`
+- İnceleme SHA-256: `efc7ebfdf8fc030f5ad06604e5ab3b2298e0e3af453f066baacc0e4ace2cccba`
+- Tarih: 2026-09-06T14:56:02.794058+00:00
+- Sonuç: Yeni kod kontrolü legacy bulguları gizlice yeni veya yok sayılmış göstermeden çalışır.
+- focused-tests: PASS; SHA-256 `8bbe39a3b2ea7ebcb01c6bebc636bc3de310ce8c60f890a7bcec363fe9ffc72a`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S02-U001/qualify_final.sh`
+- cli-smoke: PASS; SHA-256 `1e8049ba4e403ddfdb3f88c0c4cf7ac043b809da35065be84cfda3ae637829d3`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S02-U001/qualify_final.sh`
+- queue-check: PASS; SHA-256 `a85956e2226b895f34366d5d725f0ad226ee251fb2f67ec9c15f5072f0238a2c`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S02-U001/qualify_final.sh`
+- exact-version: PASS; SHA-256 `0bd23d5fbbbd062a63192cb74893adf6fcd4d77e155649b6f79f4d6fa250166d`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S02-U001/run_offline.sh /workspace/build/src/codeskeptic --version`
+
 ## CS3-CH03-S01-U002 — CLI/JSON/SARIF/HTML bulgu ve verdict tutarlılığını sabitle
 
 - Commit: `184a30cdef4c33f4b70394d15fa771f823fd8c13`

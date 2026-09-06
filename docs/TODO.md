@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH03-S02-U001
-
-### CS3-CH03-S02-U001 — Baseline/suppression ile yalnız yeni bulguyu ayır
-
-**Sonuç:** Yeni kod kontrolü legacy bulguları gizlice yeni veya yok sayılmış göstermeden çalışır.
-
-**Kabul:**
-
-- Stable fingerprint, moved lines, changed function ve malformed baseline/suppression kapsanır.
-- Bastırma kaydı gerekçe/kapsam içerir; suppression analiz kapsamını değiştirmez.
-- Eski bulgu yükü yeni yüksek güvenli bulguyu engellemez veya saklamaz.
-
-**Test bütçesi:** T1
-**Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/analyzer/Baseline*, src/analyzer/SuppressionFilter*, src/core/FindingFingerprint*, scripts/review_diff.sh, scripts/review_report.py, tests/BaselineTest.cpp, tests/SuppressionFilterTest.cpp, tests/test_review_diff.sh, src/core/AnalysisResult.h, src/analyzer/StaticAnalyzer.cpp, src/reporter/ReportContract.h, tests/HtmlReporterTest.cpp, scripts/test_review_diff.sh, src/core/Diagnostic.h, src/reporter/SarifReporter.cpp, tests/OutputParityCliTest.py
-**Bağımlılıklar:** Yok
+## FRONT — CS3-CH03-S02-U002
 
 ### CS3-CH03-S02-U002 — Minimal ilk tarama ve CI kullanımını doğrula
 
