@@ -377,16 +377,25 @@ AnalysisResult StaticAnalyzer::run() {
     // same way; a prefix that fails to canonicalize (not on disk) is
     // used as written.
     if (!config_.reportPaths().empty()) {
-        std::vector<std::string> prefixes;
+        std::vector<std::filesystem::path> prefixes;
         for (const auto& p : config_.reportPaths()) {
             std::error_code ec;
             auto canonical = std::filesystem::weakly_canonical(p, ec);
-            prefixes.push_back(ec ? p : canonical.string());
+            auto prefix = (ec ? std::filesystem::path(p) : canonical).lexically_normal();
+            // A trailing separator is not a filename component. Keep roots.
+            if (prefix.has_relative_path() && prefix.filename().empty())
+                prefix = prefix.parent_path();
+            prefixes.push_back(std::move(prefix));
         }
         auto outside = [&](const Diagnostic& d) {
-            for (const auto& prefix : prefixes)
-                if (d.file.compare(0, prefix.size(), prefix) == 0)
+            const std::filesystem::path path(d.file);
+            for (const auto& prefix : prefixes) {
+                if (prefix.empty()) continue;
+                const auto mismatch = std::mismatch(prefix.begin(), prefix.end(),
+                                                    path.begin(), path.end());
+                if (mismatch.first == prefix.end())
                     return false;
+            }
             return true;
         };
         size_t before = diagnostics_.size();

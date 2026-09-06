@@ -201,3 +201,48 @@ TEST(SarifReporterTest, WindowsAbsolutePathsGetFileUris) {
     // A relative Windows-style path stays relative (verbatim, escaped).
     EXPECT_NE(out.find("\"uri\": \"rel\\\\dir\\\\d.cpp\""), std::string::npos);
 }
+
+TEST(SarifReporterTest, ReservedUriBytesAndOrderedTraceRemainDistinct) {
+    std::string text = "quote\"-backslash\\-";
+    for (int byte = 0; byte < 32; ++byte) text += static_cast<char>(byte);
+    Diagnostic finding{Severity::Error, "/src/a #.cpp", 4, 7, "null-deref", text};
+    finding.function = text;
+    finding.notes = {{"C:\\src\\a %23.cpp", 2, 3, text},
+                     {"\\\\srv\\share\\a #.cpp", 9, 11, text}};
+    auto parsed = llvm::json::parse(reportToString({finding}));
+    ASSERT_TRUE(static_cast<bool>(parsed));
+    const auto* root = parsed->getAsObject();
+    ASSERT_NE(root, nullptr);
+    const auto* runs = root->getArray("runs");
+    ASSERT_NE(runs, nullptr);
+    const auto* run = runs->front().getAsObject();
+    ASSERT_NE(run, nullptr);
+    const auto* rows = run->getArray("results");
+    ASSERT_NE(rows, nullptr);
+    ASSERT_EQ(rows->size(), 1u);
+    const auto* row = rows->front().getAsObject();
+    ASSERT_NE(row, nullptr);
+    ASSERT_NE(row->getObject("message"), nullptr);
+    EXPECT_EQ(row->getObject("message")->getString("text"), text);
+    const auto* locations = row->getArray("locations");
+    ASSERT_NE(locations, nullptr);
+    const auto* location = locations->front().getAsObject();
+    ASSERT_NE(location, nullptr);
+    EXPECT_EQ(location->getObject("physicalLocation")->getObject("artifactLocation")->getString("uri"),
+              "file:///src/a%20%23.cpp");
+    EXPECT_EQ(location->getArray("logicalLocations")->front().getAsObject()->getString("name"), text);
+    const auto* notes = row->getArray("relatedLocations");
+    ASSERT_NE(notes, nullptr);
+    ASSERT_EQ(notes->size(), 2u);
+    const char* uris[] = {"file:///C:/src/a%20%2523.cpp", "file://srv/share/a%20%23.cpp"};
+    for (size_t index = 0; index < notes->size(); ++index) {
+        const auto* note = (*notes)[index].getAsObject();
+        ASSERT_NE(note, nullptr);
+        const auto* physical = note->getObject("physicalLocation");
+        ASSERT_NE(physical, nullptr);
+        EXPECT_EQ(physical->getObject("artifactLocation")->getString("uri"), uris[index]);
+        EXPECT_EQ(physical->getObject("region")->getInteger("startLine"), finding.notes[index].line);
+        EXPECT_EQ(physical->getObject("region")->getInteger("startColumn"), finding.notes[index].column);
+        EXPECT_EQ(note->getObject("message")->getString("text"), text);
+    }
+}

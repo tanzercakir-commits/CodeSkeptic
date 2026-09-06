@@ -4,29 +4,10 @@
 #include "core/FindingFingerprint.h"
 #include "core/Messages.h"
 #include "reporter/Coverage.h"
+#include "reporter/ReportEncoding.h"
 
 #include <fstream>
 #include <iostream>
-
-namespace {
-
-std::string escapeJson(const std::string& s) {
-    std::string out;
-    out.reserve(s.size());
-    for (char c : s) {
-        switch (c) {
-            case '"':  out += "\\\""; break;
-            case '\\': out += "\\\\"; break;
-            case '\n': out += "\\n";  break;
-            case '\r': out += "\\r";  break;
-            case '\t': out += "\\t";  break;
-            default:   out += c;      break;
-        }
-    }
-    return out;
-}
-
-} // anonymous namespace
 
 namespace codeskeptic {
 
@@ -103,7 +84,7 @@ bool JsonReporter::report(const DiagnosticList& diagnostics,
              << ",\n";
         file << "      \"fingerprint\": \""
              << escapeJson(fingerprint) << "\",\n";
-        file << "      \"file\": \"" << escapeJson(diag.file) << "\",\n";
+        file << "      \"file\": \"" << escapeJson(coveragePathIdentity(diag.file)) << "\",\n";
         file << "      \"line\": " << diag.line << ",\n";
         file << "      \"column\": " << diag.column << ",\n";
         file << "      \"function\": \"" << escapeJson(diag.function)
@@ -113,7 +94,7 @@ bool JsonReporter::report(const DiagnosticList& diagnostics,
         for (size_t n = 0; n < diag.notes.size(); ++n) {
             const auto& note = diag.notes[n];
             if (n > 0) file << ",";
-            file << "\n        { \"file\": \"" << escapeJson(note.file)
+            file << "\n        { \"file\": \"" << escapeJson(coveragePathIdentity(note.file))
                  << "\", \"line\": " << note.line
                  << ", \"column\": " << note.column
                  << ", \"message\": \"" << escapeJson(note.message)

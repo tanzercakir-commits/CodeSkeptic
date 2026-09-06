@@ -66,13 +66,16 @@ class OutputParityCliTest(unittest.TestCase):
         for label, selection, expected in (
                 ("all", None, set(paths)),
                 ("directory", project / "src", set(paths) - {"src2/neighbor.cpp"}),
-                ("file", project / "src/keep.cpp", {"src/keep.cpp"})):
+                ("trailing-separator", str(project / "src") + "/", set(paths) - {"src2/neighbor.cpp"}),
+                ("project-root", project, set(paths)),
+                ("file", project / "src/keep.cpp", {"src/keep.cpp"}),
+                ("no-match", project / "missing", set())):
             with self.subTest(label=label):
                 output = self.root / (label + ".json")
                 arguments = [project, "--build-path", project, "--json", output]
                 if selection is not None: arguments += ["--report-paths", selection]
                 result = self.run_cli(*arguments)
-                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertEqual(result.returncode, 1 if expected else 0, result.stderr)
                 self.assertEqual(result.stdout, "")
                 report = json.loads(output.read_text())
                 self.assertTrue(report["complete"])
@@ -94,6 +97,25 @@ class OutputParityCliTest(unittest.TestCase):
         self.assertTrue(report["complete"])
         self.assertEqual(len(report["diagnostics"]), 1)
         self.assertEqual(report["diagnostics"][0]["file"], str(source))
+
+    def test_sarif_preserves_reserved_bytes_in_real_path(self):
+        # URI delimiters are filename bytes here, not a fragment or query.
+        names = ["space # percent%.cpp"]
+        if sys.platform != "win32":
+            names.append("control\x01.cpp")
+        for name in names:
+            with self.subTest(name=name):
+                source = self.root / name
+                source.write_text("int f(){int zero=0;return 1/zero;}\n")
+                output = self.root / "report.sarif"
+                result = self.run_cli(source, "--sarif", output)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertEqual(result.stdout, "")
+                report = json.loads(output.read_text())
+                rows = report["runs"][0]["results"]
+                self.assertEqual(len(rows), 1)
+                uri = rows[0]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+                self.assertEqual(uri, source.as_uri())
 
 
 if __name__ == "__main__":

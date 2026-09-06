@@ -5,28 +5,13 @@
 
 #include "core/Messages.h"
 #include "reporter/Coverage.h"
+#include "reporter/ReportEncoding.h"
 
 #include <fstream>
 #include <iostream>
 #include <set>
 
 namespace {
-
-std::string escapeJson(const std::string& s) {
-    std::string out;
-    out.reserve(s.size());
-    for (char c : s) {
-        switch (c) {
-            case '"':  out += "\\\""; break;
-            case '\\': out += "\\\\"; break;
-            case '\n': out += "\\n";  break;
-            case '\r': out += "\\r";  break;
-            case '\t': out += "\\t";  break;
-            default:   out += c;      break;
-        }
-    }
-    return out;
-}
 
 const char* sarifLevel(codeskeptic::Severity severity) {
     switch (severity) {
@@ -52,17 +37,35 @@ bool isWindowsAbsolute(const std::string& path) {
 }
 
 std::string toUri(const std::string& path) {
-    if (!path.empty() && path[0] == '/')
-        return "file://" + path;
-    if (isWindowsAbsolute(path)) {
-        std::string p = path;
-        for (char& c : p)
-            if (c == '\\') c = '/';
-        if (p[0] == '/')           // UNC //server/share/...
-            return "file:" + p;    // -> file://server/share/...
-        return "file:///" + p;     // -> file:///C:/...
+    const bool windows = isWindowsAbsolute(path);
+    static constexpr char hex[] = "0123456789ABCDEF";
+    std::string encoded;
+    for (std::size_t i = 0; i < path.size(); ++i) {
+        unsigned char c = path[i];
+        if (windows && c == '\\') c = '/';
+        const bool unreserved = (c >= 'a' && c <= 'z') ||
+            (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+            c == '-' || c == '.' || c == '_' || c == '~';
+        // Relative backslash paths retain the established Windows fixture
+        // representation. This legacy exception is not general URI normalization.
+        const bool legacyBackslash = !windows && !path.empty() &&
+                                     path[0] != '/' && c == '\\';
+        if (unreserved || c == '/' || (windows && i == 1 && c == ':') ||
+            legacyBackslash) encoded += static_cast<char>(c);
+        else {
+            encoded += '%';
+            encoded += hex[c >> 4];
+            encoded += hex[c & 15];
+        }
     }
-    return path;
+    if (!path.empty() && path[0] == '/')
+        return "file://" + encoded;
+    if (windows) {
+        if (encoded[0] == '/')         // UNC //server/share/...
+            return "file:" + encoded; // -> file://server/share/...
+        return "file:///" + encoded;  // -> file:///C:/...
+    }
+    return encoded;
 }
 
 } // anonymous namespace
