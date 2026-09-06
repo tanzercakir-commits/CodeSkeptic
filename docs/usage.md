@@ -336,3 +336,27 @@ harness may pass `--accept-partial-coverage` to restore a findings-based exit
 over the analyzed subset; attempted/analyzed/broken counts and warnings remain
 visible. This is different from `--analyze-broken-tus`, which runs rules over
 Clang's error-recovery AST and accepts that additional reliability risk.
+
+These opt-ins retain their findings-based exit policy, but use the explicit
+`partial-accepted` or `recovery-accepted` status, never `clean`. The top-level
+`complete` field describes whether the configured verdict policy was satisfied;
+`coverage.complete` is false when sources were skipped or recovery ASTs were
+used. Missing commands, absent ASTs and frontend failures cannot be accepted by
+either flag. A source with any failed compile variant remains failed, even when
+its other variants produced findings successfully.
+
+Coverage schema `codeskeptic-source-coverage/v1` counts canonical requested
+sources exactly once: `attempted_tus = analyzed_tus + skipped_tus + failed_tus`.
+`broken_tus` is the legacy alias for `skipped_tus`. Separate `attempted_commands`,
+`analyzed_commands`, `skipped_commands` and `failed_commands` retain the compile
+variant execution counts; neither variants nor whole-program prepasses inflate
+source counts. `sources` records each canonical file, its analyzed/skipped/failed
+classification, reason, command counts, recovery evidence and prepass status.
+Known requested identities remain in failure reports when discovery cannot
+produce a usable database. Unknown members of an unreadable directory cannot be
+enumerated; discovery fails closed instead of claiming complete scope.
+
+The CLI emits this same coverage JSON on stderr after the `source coverage:`
+prefix. JSON reports store it under `coverage`; SARIF stores the identical object
+in `runs[0].invocations[0].properties["codeskeptic/coverage"]` while retaining
+the existing scalar properties. HTML displays the corresponding source summary.

@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include "core/Messages.h"
+#include "core/AnalysisResult.h"
 
 namespace clang {
 class ASTContext;
@@ -72,6 +73,7 @@ public:
 
     size_t fileCount() const;
     const std::vector<std::string>& files() const;
+    const std::vector<SourceCoverage>& coverage() const { return coverage_; }
 
 private:
     // The body of processAll, run on a large-stack worker thread (deep
@@ -81,6 +83,7 @@ private:
 
     std::string build_path_;
     std::vector<std::string> source_files_;
+    std::vector<SourceCoverage> coverage_;
     std::unique_ptr<clang::tooling::CompilationDatabase> comp_db_;
     bool warm_cache_ = false;
 };

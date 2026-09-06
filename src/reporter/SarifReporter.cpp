@@ -4,6 +4,7 @@
 #include "core/FindingFingerprint.h"
 
 #include "core/Messages.h"
+#include "reporter/Coverage.h"
 
 #include <fstream>
 #include <iostream>
@@ -121,7 +122,9 @@ bool SarifReporter::report(const DiagnosticList& diagnostics,
              << ", \"codeskeptic/blockingFindings\": "
              << result->blockingFindings()
              << ", \"codeskeptic/reportOnlyFindings\": "
-             << result->report_only_findings << " } } ],\n";
+             << result->report_only_findings << ", \"codeskeptic/coverage\": ";
+        writeCoverageJson(file, *result);
+        file << " } } ],\n";
     }
     file << "      \"results\": [";
 

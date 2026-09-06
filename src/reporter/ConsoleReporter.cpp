@@ -13,8 +13,12 @@ bool ConsoleReporter::report(const DiagnosticList& diagnostics,
         // Suppressed when NOTHING was actually analyzed (every TU
         // broken): printing "Clean!" a line above the exit-2 failure
         // message would be a contradiction (v0.4.5 fail-loud policy).
-        if (!result || result->complete())
+        if (!result || (result->complete() && result->broken_tus == 0 &&
+                        result->recovery_tus == 0))
             std::cerr << msg(MsgId::CleanNoIssues) << "\n";
+        else if (result->complete())
+            std::cerr << "[CodeSkeptic] " << result->statusName()
+                      << ": no findings in accepted evidence; not a full clean analysis.\n";
         return true;
     }
 

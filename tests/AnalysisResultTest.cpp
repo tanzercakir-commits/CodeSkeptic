@@ -53,8 +53,50 @@ TEST(AnalysisResultTest, PartialCoverageRequiresExplicitAcceptance) {
     result.broken_tus = 1;
     result.accept_partial_coverage = true;
     EXPECT_TRUE(result.complete());
-    EXPECT_EQ(result.status(), AnalysisStatus::Clean);
+    EXPECT_FALSE(result.coverageComplete());
+    EXPECT_EQ(result.status(), AnalysisStatus::PartialAccepted);
     EXPECT_EQ(result.exitCode(), 0);
+}
+
+TEST(AnalysisResultTest, ImpossibleAggregateCountsCannotConcealMissingEvidence) {
+    AnalysisResult result;
+    result.attempted_tus = 1;
+    result.analyzed_tus = 2;
+    EXPECT_EQ(result.exitCode(), 2);
+    result.analyzed_tus = 1;
+    result.broken_tus = 1;
+    result.accept_partial_coverage = true;
+    EXPECT_EQ(result.exitCode(), 2);
+}
+
+TEST(AnalysisResultTest, FailedSourceCannotBeAcceptedByPartialOrRecoveryFlags) {
+    AnalysisResult result;
+    result.sources = {{"a.cpp", codeskeptic::SourceStatus::Analyzed, "analyzed"},
+                      {"b.cpp", codeskeptic::SourceStatus::Failed, "frontend_failed"}};
+    result.reconcileSources();
+    result.accept_partial_coverage = true;
+    result.analyze_broken_tus = true;
+    EXPECT_EQ(result.attempted_tus, 2u);
+    EXPECT_EQ(result.analyzed_tus, 1u);
+    EXPECT_EQ(result.failed_tus, 1u);
+    EXPECT_FALSE(result.coverageComplete());
+    EXPECT_EQ(result.exitCode(), 2);
+}
+
+TEST(AnalysisResultTest, RecoveryEvidenceIsNeverLabeledFullClean) {
+    AnalysisResult result;
+    codeskeptic::SourceCoverage source{"a.cpp", codeskeptic::SourceStatus::Analyzed,
+                                        "error_recovery_ast"};
+    source.commands = source.analyzed_commands = source.recovery_commands = 1;
+    result.sources = {source};
+    result.reconcileSources();
+    result.analyze_broken_tus = true;
+    EXPECT_TRUE(result.complete());
+    EXPECT_FALSE(result.coverageComplete());
+    EXPECT_EQ(result.status(), AnalysisStatus::RecoveryAccepted);
+    EXPECT_EQ(result.exitCode(), 0);
+    result.findings = 1;
+    EXPECT_EQ(result.exitCode(), 1);
 }
 
 TEST(AnalysisResultTest, EvidenceAndArtifactFailuresAreLoud) {

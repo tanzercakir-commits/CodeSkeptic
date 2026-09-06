@@ -191,8 +191,22 @@ bool HtmlReporter::report(const DiagnosticList& diagnostics,
         file << "<p class=\"sub\">TUs: " << result->analyzed_tus << " / "
              << result->attempted_tus << " analyzed &middot; "
              << result->broken_tus << " broken &middot; "
+             << result->failed_tus << " failed &middot; "
+             << result->recovery_tus << " recovery &middot; "
              << result->incomplete_functions
              << " incomplete function(s)</p>\n";
+        file << "<p class=\"sub\">Full coverage: "
+             << (result->coverageComplete() ? "yes" : "no") << "</p>\n";
+        if (!result->sources.empty()) {
+            file << "<details><summary>Source coverage</summary><ul>\n";
+            for (const auto& source : result->sources)
+                file << "<li>" << escapeHtml(source.file) << ": "
+                     << source.statusName() << " (" << escapeHtml(source.reason)
+                     << "); commands: " << source.analyzed_commands << "/"
+                     << source.commands << " analyzed, " << source.skipped_commands
+                     << " skipped, " << source.failed_commands << " failed</li>\n";
+            file << "</ul></details>\n";
+        }
         file << "<p class=\"sub\">Blocking findings: "
              << result->blockingFindings() << " &middot; report-only: "
              << result->report_only_findings << "</p>\n";
@@ -226,8 +240,12 @@ bool HtmlReporter::report(const DiagnosticList& diagnostics,
             "file, function or message&hellip;\">\n<main>\n";
 
     if (diagnostics.empty()) {
-        if (result && result->complete()) {
+        if (result && result->complete() && result->broken_tus == 0 &&
+            result->recovery_tus == 0) {
             file << "<p class=\"empty\">Clean! No issues found.</p>\n";
+        } else if (result && result->complete()) {
+            file << "<p class=\"empty\">No findings in explicitly accepted evidence; "
+                    "not a full clean analysis.</p>\n";
         } else {
             file << "<p class=\"empty\">Verdict unavailable &mdash; no "
                     "clean result was produced.</p>\n";

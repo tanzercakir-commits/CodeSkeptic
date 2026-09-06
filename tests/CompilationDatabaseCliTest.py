@@ -75,6 +75,33 @@ class CompilationDatabaseCliTest(unittest.TestCase):
         if report.exists():
             self.assertFalse(json.loads(report.read_text(encoding="utf-8"))["complete"])
 
+    def test_unavailable_database_retains_requested_source_identities(self):
+        other = self.root / "other.cpp"
+        other.write_text("int other(){return 0;}\n", encoding="utf-8")
+        build = self.root / "build"
+        build.mkdir()
+        (build / "compile_commands.json").write_text("[{broken", encoding="utf-8")
+        _, payload = self.scan(self.root, "--build-path", build, expected=2)
+        coverage = payload["coverage"]
+        self.assertEqual(coverage["attempted_tus"], 2, coverage)
+        self.assertEqual(coverage["failed_tus"], 2, coverage)
+        self.assertEqual({s["file"] for s in coverage["sources"]},
+                         {str(self.source), str(other)})
+        self.assertTrue(all(s["status"] == "failed" and s["reason"]
+                            for s in coverage["sources"]))
+
+    def test_missing_file_list_member_has_its_own_failed_record(self):
+        build = self.root / "build"
+        self.database(build)
+        listing = self.root / "partial.txt"
+        listing.write_text(str(self.source) + "\nmissing.cpp\n", encoding="utf-8")
+        _, payload = self.scan("--files", listing, "--build-path", build, expected=2)
+        coverage = payload["coverage"]
+        self.assertEqual(coverage["attempted_tus"], 2, coverage)
+        self.assertEqual({s["file"] for s in coverage["sources"]},
+                         {str(self.source), str(build / "missing.cpp")})
+        self.assertEqual(coverage["failed_tus"], 2, coverage)
+
     def test_malformed_json_cannot_use_compile_flags(self):
         build = self.root / "build"
         build.mkdir()

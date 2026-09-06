@@ -22,6 +22,7 @@
 #include "reporter/HtmlReporter.h"
 #include "reporter/JsonReporter.h"
 #include "reporter/SarifReporter.h"
+#include "reporter/Coverage.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -108,7 +109,14 @@ StaticAnalyzer::StaticAnalyzer(Config config)
         buildDirectory, std::move(selection.commands), selection.synthetic);
     if (config_.warmCache()) source_mgr_->enableWarmCache(true);
     for (const auto& file : selection.files) {
-        source_mgr_->addSourceFile(file);
+        SourceCoverage source{file};
+        source.reason = selection.ready ? "not_processed"
+                                        : "compilation_input_unavailable";
+        requested_sources_.push_back(std::move(source));
+        if (selection.ready && !source_mgr_->addSourceFile(file)) {
+            requested_sources_.back().reason = "source_unavailable";
+            compilation_input_ready_ = false;
+        }
     }
 
     if (config_.outputFormat() == "json") {
@@ -139,14 +147,23 @@ StaticAnalyzer::~StaticAnalyzer() {
 AnalysisResult StaticAnalyzer::run() {
     diagnostics_.clear();
     AnalysisResult result;
-    result.attempted_tus = source_mgr_->fileCount();
+    result.sources = requested_sources_;
+    result.reconcileSources();
     result.analyze_broken_tus = config_.analyzeBrokenTUs();
     result.accept_partial_coverage = config_.acceptPartialCoverage();
+    CoverageReport::instance().clear();
+    SourceManager::setAnalyzeBrokenTUs(config_.analyzeBrokenTUs());
+    SourceManager::clearBrokenTUs();
+    SourceManager::setAttemptedTUCount(result.attempted_tus);
+    auto finishReport = [&] {
+        writeCoverageConsole(std::cerr, result);
+        if (!reporter_->report(diagnostics_, &result)) result.report_write_failed = true;
+        return result;
+    };
 
     if (!compilation_input_ready_) {
         result.tool_failed = true;
-        if (!reporter_->report(diagnostics_, &result)) result.report_write_failed = true;
-        return result;
+        return finishReport();
     }
 
     if (source_mgr_->fileCount() == 0) {
@@ -155,13 +172,14 @@ AnalysisResult StaticAnalyzer::run() {
         // "Clean!" with exit 0.
         std::cerr << msg(MsgId::NoFilesToAnalyze) << "\n";
         result.no_inputs = true;
-        return result;
+        return finishReport();
     }
 
     if (engine_.ruleCount() == 0) {
         std::cerr << msg(MsgId::NoRulesRegistered) << "\n";
         result.no_rules = true;
-        return result;
+        for (auto& source : result.sources) source.reason = "no_rules";
+        return finishReport();
     }
 
     engine_.setDiagnosticSelector([this](const std::string& id) {
@@ -177,7 +195,8 @@ AnalysisResult StaticAnalyzer::run() {
     if (engine_.enabledRuleCount() == 0) {
         std::cerr << msg(MsgId::NoRulesRegistered) << "\n";
         result.no_rules = true;
-        return result;
+        for (auto& source : result.sources) source.reason = "no_rules";
+        return finishReport();
     }
 
     std::cerr << msg(MsgId::AnalysisStarting,
@@ -247,6 +266,7 @@ AnalysisResult StaticAnalyzer::run() {
     // externally-linked functions from all TUs; rules in pass 2 see the
     // real summary instead of Opaque at cross-file calls. The cost is a
     // second parse — deliberate, enabled by flag.
+    std::vector<SourceCoverage> prepassCoverage;
     if (config_.wholeProgram()) {
         std::cerr << msg(MsgId::WholeProgramPass,
                          std::to_string(source_mgr_->fileCount())) << "\n";
@@ -257,6 +277,7 @@ AnalysisResult StaticAnalyzer::run() {
             registry.clear();
             CfgCache::instance().clear();
         });
+        prepassCoverage = source_mgr_->coverage();
     }
 
     // --summary-out: harvest from the per-TU local table runAll builds —
@@ -265,16 +286,31 @@ AnalysisResult StaticAnalyzer::run() {
     // equivalent values, harmless)
     if (!config_.summaryOut().empty()) engine_.enableGlobalHarvest(true);
 
-    SourceManager::setAnalyzeBrokenTUs(config_.analyzeBrokenTUs());
     SourceManager::clearBrokenTUs();
-    SourceManager::setAttemptedTUCount(source_mgr_->fileCount());
 
-    const int analysis_result = source_mgr_->processAll(
-        [this, &result](clang::ASTContext& ctx) {
-        ++result.analyzed_tus;
+    source_mgr_->processAll([this](clang::ASTContext& ctx) {
         auto findings = engine_.runAll(ctx);
         diagnostics_.insert(diagnostics_.end(), findings.begin(), findings.end());
     });
+    result.sources = source_mgr_->coverage();
+    // Both passes use the same frozen source ordering. A later successful
+    // parse cannot erase missing summary evidence from the required prepass.
+    for (std::size_t i = 0; i < prepassCoverage.size(); ++i) {
+        result.sources[i].prepass_status = prepassCoverage[i].statusName();
+        result.sources[i].prepass_reason = prepassCoverage[i].reason;
+        result.sources[i].prepass_recovery_commands = prepassCoverage[i].recovery_commands;
+        if (prepassCoverage[i].status == SourceStatus::Failed &&
+            result.sources[i].status != SourceStatus::Failed) {
+            result.sources[i].status = SourceStatus::Failed;
+            result.sources[i].reason = "summary_prepass_failed";
+        } else if (prepassCoverage[i].status == SourceStatus::Skipped &&
+                   result.sources[i].status == SourceStatus::Analyzed) {
+            result.sources[i].status = SourceStatus::Skipped;
+            result.sources[i].reason = "summary_prepass_skipped";
+        }
+    }
+    result.reconcileSources();
+    result.tool_failed = result.failed_tus > 0;
 
     // Broken-TU guard (#86): honest coverage note for every skipped TU.
     if (!SourceManager::brokenTUs().empty()) {
@@ -284,13 +320,6 @@ AnalysisResult StaticAnalyzer::run() {
         for (const auto& file : SourceManager::brokenTUs())
             std::cerr << "  - " << file << "\n";
     }
-    result.broken_tus = SourceManager::brokenTUs().size();
-    // ClangTool returns non-zero for ordinary compile diagnostics as well as
-    // driver failures. Broken TUs are already accounted explicitly; only an
-    // unaccounted failure is a separate hard tool failure.
-    if (analysis_result != 0 &&
-        result.analyzed_tus + result.broken_tus < result.attempted_tus)
-        result.tool_failed = true;
 
     // Coverage: surface concrete functions whose CFG could not be built or
     // whose dataflow could not reach a fixpoint. "No warning" in these is
@@ -383,12 +412,14 @@ AnalysisResult StaticAnalyzer::run() {
                              config_.writeBaselinePath()) << "\n";
             setFindingCounts(result, diagnostics_);
             result.baseline_recorded = true;
+            writeCoverageConsole(std::cerr, result);
             return result;
         }
         setFindingCounts(result, diagnostics_);
         result.baseline_write_failed = true;
         std::cerr << msg(MsgId::OutputFileOpenError,
                          config_.writeBaselinePath()) << "\n";
+        writeCoverageConsole(std::cerr, result);
         return result;
     }
 
@@ -422,10 +453,7 @@ AnalysisResult StaticAnalyzer::run() {
         diagnostics_.end());
 
     setFindingCounts(result, diagnostics_);
-    if (!reporter_->report(diagnostics_, &result))
-        result.report_write_failed = true;
-
-    return result;
+    return finishReport();
 }
 
 } // namespace codeskeptic

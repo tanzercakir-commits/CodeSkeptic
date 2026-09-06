@@ -37,24 +37,14 @@ bool tuIsBroken(clang::ASTContext& ctx) {
     return ctx.getDiagnostics().hasUncompilableErrorOccurred();
 }
 
-std::string mainFileOf(clang::ASTContext& ctx) {
-    const clang::SourceManager& sm = ctx.getSourceManager();
-    if (auto ref = sm.getFileEntryRefForID(sm.getMainFileID()))
-        return ref->getName().str();
-    return "<unknown>";
-}
-
 class CodeSkepticASTConsumer : public clang::ASTConsumer {
 public:
     explicit CodeSkepticASTConsumer(codeskeptic::ASTCallback callback)
         : callback_(std::move(callback)) {}
 
     void HandleTranslationUnit(clang::ASTContext& ctx) override {
-        if (!codeskeptic::SourceManager::analyzeBrokenTUs() &&
-            tuIsBroken(ctx)) {
-            codeskeptic::SourceManager::recordBrokenTU(mainFileOf(ctx));
-            return;
-        }
+        // SourceManager wraps this callback with the requested source and
+        // compile-variant identity, including the broken-AST guard.
         callback_(ctx);
     }
 
@@ -204,7 +194,9 @@ bool SourceManager::addSourceFile(const std::string& path, InputError* error) {
         const auto ext = abs.extension().string();
         if (ext != ".c" && ext != ".cpp" && ext != ".cc" && ext != ".cxx")
             return fail("invalid_target", "Unsupported source extension");
-        source_files_.push_back(abs.string());
+        const auto identity = fs::weakly_canonical(abs).string();
+        if (std::find(source_files_.begin(), source_files_.end(), identity) ==
+            source_files_.end()) source_files_.push_back(identity);
     } catch (const fs::filesystem_error&) {
         return fail("read_error", "Cannot inspect source target");
     }
@@ -230,7 +222,9 @@ bool SourceManager::scanDirectory(const std::string& dir_path, InputError* error
 
             auto ext = entry.path().extension().string();
             if (ext == ".c" || ext == ".cpp" || ext == ".cc" || ext == ".cxx") {
-                staged.push_back(fs::absolute(entry.path()).string());
+                const auto identity = fs::weakly_canonical(entry.path()).string();
+                if (std::find(staged.begin(), staged.end(), identity) == staged.end())
+                    staged.push_back(identity);
             }
         }
     } catch (const fs::filesystem_error&) {
@@ -272,6 +266,19 @@ void applyPlatformAdjusters(clang::tooling::ClangTool& tool) {
 struct CachedAst {
     std::string fingerprint;
     std::unique_ptr<clang::ASTUnit> unit;
+    int frontend_result = 0;
+};
+
+// ClangTool's aggregate result cannot identify which of a source's compile
+// variants failed before producing an AST. Execute each frozen recipe once.
+class SingleCommandDatabase : public clang::tooling::CompilationDatabase {
+public:
+    explicit SingleCommandDatabase(clang::tooling::CompileCommand command)
+        : command_(std::move(command)) {}
+    std::vector<clang::tooling::CompileCommand>
+    getCompileCommands(llvm::StringRef) const override { return {command_}; }
+private:
+    clang::tooling::CompileCommand command_;
 };
 
 std::map<std::string, CachedAst>& astCache() {
@@ -341,84 +348,108 @@ int SourceManager::processAll(ASTCallback callback) {
 }
 
 int SourceManager::processAllOnWorker(ASTCallback callback) {
-    if (source_files_.empty()) return 0;
-    if (!comp_db_) return 1;
-
-    if (warm_cache_) {
-        bool anyFailed = false;
-        for (const auto& file : source_files_) {
-            const auto commands = comp_db_->getCompileCommands(file);
-            if (commands.size() != 1) {
-                // One cached AST cannot represent multiple compile variants.
-                // Execute every variant through the normal path; retain caching
-                // for its supported one-command case without dropping evidence.
-                clang::tooling::ClangTool tool(*comp_db_, {file});
-                applyPlatformAdjusters(tool);
-                CodeSkepticActionFactory factory(callback);
-                if (tool.run(&factory) != 0) anyFailed = true;
-                continue;
-            }
-            // Length-prefix fields: separators inside paths/arguments cannot
-            // collide. Source freshness is still the existing mtime/size model;
-            // this specifically prevents changed database flags reusing an AST.
-            std::string key;
-            auto bind = [&](const std::string& field) {
-                key += std::to_string(field.size()) + ":" + field;
+    coverage_.clear();
+    for (const auto& file : source_files_) coverage_.push_back(SourceCoverage{file});
+    bool anyFailed = false;
+    for (auto& source : coverage_) {
+        const auto& file = source.file;
+        if (!comp_db_) {
+            source.reason = "compilation_database_unavailable";
+            anyFailed = true;
+            continue;
+        }
+        const auto commands = comp_db_->getCompileCommands(file);
+        source.commands = commands.size();
+        if (commands.empty()) {
+            source.reason = "missing_compile_command";
+            anyFailed = true;
+            continue;
+        }
+        for (const auto& command : commands) {
+            bool visited = false, completed = false, broken = false;
+            auto guardedCall = [&](clang::ASTContext& ctx) {
+                visited = true;
+                broken = broken || tuIsBroken(ctx);
+                if (tuIsBroken(ctx) && !analyzeBrokenTUs()) {
+                    recordBrokenTU(file);
+                    return;
+                }
+                callback(ctx);
+                completed = true;
             };
-            bind(file);
-            bind(build_path_);
-            bind(std::to_string(commands.size()));
-            for (const auto& command : commands) {
+            int frontendResult = 0;
+            SingleCommandDatabase database(command);
+            // Retain the existing one-command warm-cache boundary. Multiple
+            // variants always execute normally; none is silently discarded.
+            if (warm_cache_ && commands.size() == 1) {
+                // Length-prefix fields prevent delimiter collisions. Retain
+                // the existing source mtime/size cache freshness model.
+                std::string key;
+                auto bind = [&](const std::string& field) {
+                    key += std::to_string(field.size()) + ":" + field;
+                };
+                bind(file);
+                bind(build_path_);
+                bind(std::to_string(commands.size()));
                 bind(command.Directory);
                 bind(command.Filename);
                 bind(command.Output);
                 bind(std::to_string(command.CommandLine.size()));
                 for (const auto& argument : command.CommandLine) bind(argument);
-            }
-            for (const auto& argument : platformExtraArgs()) bind(argument);
-            const std::string fp = fingerprintOf(file);
-
-            // The broken-TU guard applies to both cache paths — a
-            // cached AST keeps its DiagnosticsEngine, so the check is
-            // identical (see CodeSkepticASTConsumer).
-            auto guardedCall = [&](clang::ASTContext& ctx) {
-                if (!analyzeBrokenTUs() && tuIsBroken(ctx)) {
-                    recordBrokenTU(mainFileOf(ctx));
-                    return;
+                for (const auto& argument : platformExtraArgs()) bind(argument);
+                const std::string fp = fingerprintOf(file);
+                auto it = astCache().find(key);
+                if (!fp.empty() && it != astCache().end() &&
+                    it->second.fingerprint == fp && it->second.unit) {
+                    ++g_warmHits;
+                    frontendResult = it->second.frontend_result;
+                    guardedCall(it->second.unit->getASTContext());
+                } else {
+                    ++g_warmMisses;
+                    clang::tooling::ClangTool tool(database, {file});
+                    applyPlatformAdjusters(tool);
+                    std::vector<std::unique_ptr<clang::ASTUnit>> units;
+                    frontendResult = tool.buildASTs(units);
+                    if (!units.empty() && units[0]) {
+                        guardedCall(units[0]->getASTContext());
+                        if (astCache().size() >= kMaxCachedAsts) astCache().clear();
+                        astCache()[key] = {fp, std::move(units[0]), frontendResult};
+                    }
                 }
-                callback(ctx);
-            };
-
-            auto it = astCache().find(key);
-            if (!fp.empty() && it != astCache().end() &&
-                it->second.fingerprint == fp && it->second.unit) {
-                ++g_warmHits;
-                guardedCall(it->second.unit->getASTContext());
-                continue;
+            } else {
+                clang::tooling::ClangTool tool(database, {file});
+                applyPlatformAdjusters(tool);
+                CodeSkepticActionFactory factory(guardedCall);
+                frontendResult = tool.run(&factory);
             }
-
-            ++g_warmMisses;
-            clang::tooling::ClangTool tool(*comp_db_, {file});
-            applyPlatformAdjusters(tool);
-            std::vector<std::unique_ptr<clang::ASTUnit>> units;
-            tool.buildASTs(units);
-            if (units.empty() || !units[0]) {
-                anyFailed = true;
-                continue;
+            if (!visited || (!broken && frontendResult != 0)) {
+                ++source.failed_commands;
+                source.reason = frontendResult != 0 ? "frontend_failed"
+                                                     : "ast_not_produced";
+            } else if (broken && !analyzeBrokenTUs()) {
+                ++source.skipped_commands;
+            } else if (completed) {
+                ++source.analyzed_commands;
+                if (broken) ++source.recovery_commands;
+            } else {
+                ++source.failed_commands;
+                source.reason = "analysis_not_completed";
             }
-            guardedCall(units[0]->getASTContext());
-
-            if (astCache().size() >= kMaxCachedAsts) astCache().clear();
-            astCache()[key] = {fp, std::move(units[0])};
         }
-        return anyFailed ? 1 : 0;
+        if (source.failed_commands > 0) {
+            source.status = SourceStatus::Failed;
+            anyFailed = true;
+        } else if (source.skipped_commands > 0) {
+            source.status = SourceStatus::Skipped;
+            source.reason = "broken_translation_unit";
+            anyFailed = true;
+        } else {
+            source.status = SourceStatus::Analyzed;
+            source.reason = source.recovery_commands > 0 ? "error_recovery_ast"
+                                                        : "analyzed";
+        }
     }
-
-    clang::tooling::ClangTool tool(*comp_db_, source_files_);
-    applyPlatformAdjusters(tool);
-
-    CodeSkepticActionFactory factory(callback);
-    return tool.run(&factory);
+    return anyFailed ? 1 : 0;
 }
 
 namespace {

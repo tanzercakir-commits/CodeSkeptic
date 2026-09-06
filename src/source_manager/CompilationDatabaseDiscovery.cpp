@@ -202,6 +202,58 @@ std::unique_ptr<clang::tooling::CompilationDatabase> loadExactJson(
     return std::make_unique<ResolvedCompilationDatabase>(std::move(commands));
 }
 
+// Freeze known requested identities independently of database readiness. In
+// particular, an invalid later file-list member must not erase earlier ones.
+bool collectRequestedSources(const Config& config, const fs::path& source,
+                             const fs::path& database,
+                             std::vector<std::string>& files,
+                             std::string& reason) {
+    std::set<std::string> requested;
+    auto problem = [&](const std::string& text) {
+        if (reason.empty()) reason = text;
+    };
+    try {
+        if (!source.empty()) {
+            if (fs::is_directory(source)) {
+                for (auto it = fs::recursive_directory_iterator(normalized(source));
+                     it != fs::recursive_directory_iterator(); ++it) {
+                    if (it->is_directory() &&
+                        (it->path().filename() == ".git" ||
+                         (!database.empty() && it->path().filename() == "CMakeFiles" &&
+                          normalized(it->path().parent_path()) == database.parent_path() &&
+                          fs::is_regular_file(database.parent_path() / "CMakeCache.txt")))) {
+                        it.disable_recursion_pending();
+                        continue;
+                    }
+                    if (it->is_regular_file() && supportedSource(it->path()))
+                        requested.insert(normalized(it->path()).string());
+                }
+            } else {
+                requested.insert(normalized(source).string());
+                if (!fs::is_regular_file(source) || !supportedSource(source))
+                    problem("source is not a supported C/C++ file or directory");
+            }
+        }
+    } catch (const fs::filesystem_error& error) {
+        problem("cannot inspect requested scope: " + std::string(error.what()));
+    }
+    for (const auto& file : config.sourceFiles()) {
+        try {
+            fs::path path(file);
+            // Preserve discovery's existing CWD-first/build-relative policy.
+            if (!fs::exists(path) && path.is_relative() && !database.empty())
+                path = database.parent_path() / path;
+            requested.insert(normalized(path).string());
+            if (!fs::is_regular_file(path) || !supportedSource(path))
+                problem("listed source is missing or unsupported: " + file);
+        } catch (const fs::filesystem_error& error) {
+            problem("cannot inspect listed source: " + std::string(error.what()));
+        }
+    }
+    files.assign(requested.begin(), requested.end());
+    return reason.empty();
+}
+
 } // namespace
 
 CompilationDatabaseSelection discoverCompilationDatabase(const Config& config) {
@@ -211,21 +263,25 @@ CompilationDatabaseSelection discoverCompilationDatabase(const Config& config) {
         if (source.empty() && config.sourceFiles().empty() &&
             !config.fileListSpecified() && config.doctor()) source = ".";
         result.source = source.empty() ? "file-list" : normalized(source).string();
+        auto fail = [&](std::string reason) {
+            std::string inputReason;
+            collectRequestedSources(config, source, result.database,
+                                    result.files, inputReason);
+            result.reason = std::move(reason);
+            return std::move(result);
+        };
         if (config.fileListSpecified() && config.sourceFiles().empty()) {
-            result.reason = "explicit file list is empty";
-            return result;
+            return fail("explicit file list is empty");
         }
         if ((!source.empty() && !fs::exists(source)) ||
             (source.empty() && config.sourceFiles().empty())) {
-            result.reason = "no existing source input was requested";
-            return result;
+            return fail("no existing source input was requested");
         }
         std::set<fs::path> candidates;
         if (config.buildPathSpecified()) {
             result.selection = "explicit";
             if (config.buildPath().empty()) {
-                result.reason = "explicit build path is empty";
-                return result;
+                return fail("explicit build path is empty");
             }
             const fs::path specified = normalized(config.buildPath());
             const fs::path database = specified.filename() == "compile_commands.json" ?
@@ -241,14 +297,12 @@ CompilationDatabaseSelection discoverCompilationDatabase(const Config& config) {
             }
             for (const auto& file : config.sourceFiles()) {
                 if (!fs::is_regular_file(file)) {
-                    result.reason = "listed source does not exist: " + file;
-                    return result;
+                    return fail("listed source does not exist: " + file);
                 }
                 addSearchRoots(normalized(file).parent_path(), roots);
             }
             if (roots.size() > 128) {
-                result.reason = "automatic discovery exceeds 128 source roots; select --build-path";
-                return result;
+                return fail("automatic discovery exceeds 128 source roots; select --build-path");
             }
             for (const auto& root : roots) {
                 for (const char* location : {"", "build", "Build", "build-debug", "build-release",
@@ -263,8 +317,7 @@ CompilationDatabaseSelection discoverCompilationDatabase(const Config& config) {
         }
         for (const auto& path : candidates) result.candidates.push_back(path.string());
         if (candidates.size() > 1) {
-            result.reason = "ambiguous compilation databases; select --build-path explicitly";
-            return result;
+            return fail("ambiguous compilation databases; select --build-path explicitly");
         }
         if (candidates.empty()) {
             if (!source.empty() && fs::is_regular_file(source) && supportedSource(source) &&
@@ -275,53 +328,17 @@ CompilationDatabaseSelection discoverCompilationDatabase(const Config& config) {
                 result.selection = "direct-single-file";
                 return result;
             }
-            result.reason = "no compile_commands.json found; project/file-list analysis requires a database";
-            return result;
+            return fail("no compile_commands.json found; project/file-list analysis requires a database");
         }
         const fs::path database = *candidates.begin();
         result.database = database.string();
+        if (!collectRequestedSources(config, source, database, result.files, result.reason))
+            return result;
         result.commands = loadExactJson(database, result.reason);
         if (!result.commands) return result;
         const auto allCommands = result.commands->getAllCompileCommands();
         result.entries = allCommands.size();
-        std::set<std::string> requested;
-        if (!source.empty()) {
-            if (fs::is_directory(source)) {
-                const fs::path sourceRoot = normalized(source);
-                for (auto it = fs::recursive_directory_iterator(sourceRoot);
-                     it != fs::recursive_directory_iterator(); ++it) {
-                    // Only CMake's generated internal probes are metadata. The
-                    // database may live in src/: never prune its whole parent.
-                    if (it->is_directory() &&
-                        (it->path().filename() == ".git" ||
-                         (it->path().filename() == "CMakeFiles" &&
-                          normalized(it->path().parent_path()) == database.parent_path() &&
-                          fs::is_regular_file(database.parent_path() / "CMakeCache.txt")))) {
-                        it.disable_recursion_pending();
-                        continue;
-                    }
-                    if (it->is_regular_file() && supportedSource(it->path()))
-                        requested.insert(normalized(it->path()).string());
-                }
-            } else if (fs::is_regular_file(source) && supportedSource(source)) {
-                requested.insert(normalized(source).string());
-            } else {
-                result.reason = "source is not a supported C/C++ file or directory";
-                return result;
-            }
-        }
-        for (const auto& file : config.sourceFiles()) {
-            fs::path path(file);
-            // An existing CWD-relative input wins. Never choose a same-named
-            // build-directory twin just because it appears in the database.
-            if (!fs::exists(path) && path.is_relative()) path = database.parent_path() / path;
-            if (!fs::is_regular_file(path) || !supportedSource(path)) {
-                result.reason = "listed source is missing or unsupported: " + file;
-                return result;
-            }
-            requested.insert(normalized(path).string());
-        }
-        result.files.assign(requested.begin(), requested.end());
+        const std::set<std::string> requested(result.files.begin(), result.files.end());
         if (requested.empty()) {
             result.reason = "no supported source files in requested scope";
             return result;

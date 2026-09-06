@@ -3,6 +3,7 @@
 #include "core/Capabilities.h"
 #include "core/FindingFingerprint.h"
 #include "core/Messages.h"
+#include "reporter/Coverage.h"
 
 #include <fstream>
 #include <iostream>
@@ -47,11 +48,9 @@ bool JsonReporter::report(const DiagnosticList& diagnostics,
         file << "  \"complete\": " << (result->complete() ? "true" : "false")
              << ",\n";
         file << "  \"exit_code\": " << result->exitCode() << ",\n";
-        file << "  \"coverage\": { \"attempted_tus\": "
-             << result->attempted_tus << ", \"analyzed_tus\": "
-             << result->analyzed_tus << ", \"broken_tus\": "
-             << result->broken_tus << ", \"incomplete_functions\": "
-             << result->incomplete_functions << " },\n";
+        file << "  \"coverage\": ";
+        writeCoverageJson(file, *result);
+        file << ",\n";
         file << "  \"evidence\": { \"no_inputs\": "
              << (result->no_inputs ? "true" : "false")
              << ", \"no_rules\": "
