@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH02-S02-U001
-
-### CS3-CH02-S02-U001 — Fonksiyon özeti/model parser sınırlarını sağlamlaştır
-
-**Sonuç:** Bozuk, sürümü uyumsuz veya aşırı büyük özet/model dosyası güvenli reddedilir.
-
-**Kabul:**
-
-- Arity/index, CRLF, embedded NUL, count/size ve version fixture'ları vardır.
-- Hata kısmi model/state yayımlamaz; normal geçerli dosyalar korunur.
-- Dar donor fikirleri yeni baseline üzerinde yeniden test edilir.
-
-**Test bütçesi:** T1
-**Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/engine/FunctionSummary*, src/contracts/*, tests/InterproceduralTest.cpp, tests/ContractRuleTest.cpp, tests/PolicyRuleTest.cpp, tests/ContractTest.cpp, tests/SummaryDiffTest.cpp
-**Bağımlılıklar:** Yok
+## FRONT — CS3-CH02-S02-U002
 
 ### CS3-CH02-S02-U002 — MCP istek zarfını ve yaşam döngüsünü sınırla
 

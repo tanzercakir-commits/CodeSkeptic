@@ -2,6 +2,19 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH02-S02-U001 — Fonksiyon özeti/model parser sınırlarını sağlamlaştır
+
+- Commit: `574fa3158093782407118e93b36caa252c1be09e`
+- Dal: `agent/cs3-ch02-s02-u001-summary-model-parser`
+- Implementer: `root-cs3-ch02-s02-u001-20260906`
+- Bağımsız denetçi: `independent-cwe-ch02-s02-u001-574fa31-20260906`
+- İnceleme SHA-256: `97f30d8eca4131882b3e9fcc959536e6c4afb8af7a021ad6ba6978c4c1d90dc8`
+- Tarih: 2026-09-06T05:35:27.745596+00:00
+- Sonuç: Bozuk, sürümü uyumsuz veya aşırı büyük özet/model dosyası güvenli reddedilir.
+- focused-tests: PASS; SHA-256 `19f1f181bf9c2053b4c01956a63ea177b53455d984a50f0826528e85171358ee`; `bash scripts/local_test.sh focused '*Summary*:*Interproc*:*CrossTU*:*Contract*:*Sidecar*:*Policy*:*ConditionedNull*'; bounded rootless offline image 25640c190484acc04e0dab2c64f8683668ad33930a3670900ff407023efc7fc5: /usr/bin/ctest --test-dir /workspace/build -R '^SummaryPersistTest[.]Parser' --repeat until-fail:3 --parallel 2 --output-on-failure --no-tests=error; bash scripts/local_test.sh focused 'LibraryModelFileTest.*' (all terminal zero, same clean exact head)`
+- cli-smoke: PASS; SHA-256 `0a873af0a492a1516c00cf639875d453e1166beb7b9b5d39e9be141ec520e149`; `Bounded rootless offline image 25640c190484acc04e0dab2c64f8683668ad33930a3670900ff407023efc7fc5, 2 CPUs, 6 GiB, timeout 180s: python3 -B /evidence/parser_cli_smoke.py /workspace/build/src/codeskeptic; bash scripts/local_test.sh smoke (set -e; exact-head version, 45 JSON analyses, 2 SARIF checks and 4 same-process MCP requests)`
+- queue-check: PASS; SHA-256 `53ef652b90ce8bfd4f138dbac0d5cbaf1a021075e167f04d00afe82138d5bf23`; `python3 -B scripts/project_queue.py check; python3 -B scripts/project_queue.py guard --base HEAD^; bash scripts/check_docs_sync.sh; git diff --check; git rev-parse HEAD main; git status --short --branch; assert clean HEAD 574fa3158093782407118e93b36caa252c1be09e and unchanged main 7dfd37596414c9512316093ff4fb6b039673f55f (set -e)`
+
 ## CS3-CH02-S01-U003 — Çoklu producer kural seçimini diagnostic ID ile tutarlı uygula
 
 - Commit: `e108ce50cb8c3e99576b82daf2dad9365e833b72`
