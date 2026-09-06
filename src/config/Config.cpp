@@ -251,6 +251,10 @@ bool Config::loadFromFileInPlace(const std::string& path, InputError* error) {
                 ok = false;
             }
         }
+        else if (key == "analysis_cache") {
+            if (!parseBool(value, analysis_cache_))
+                return rejectInput(error, "invalid_value", key, "analysis_cache expects true/false/1/0");
+        }
         else if (key == "worker_timeout_ms" || key == "worker_memory_mb") {
             const bool timeout = key == "worker_timeout_ms";
             unsigned& target = timeout ? worker_limits_.timeout_ms : worker_limits_.memory_mb;
@@ -324,6 +328,10 @@ bool Config::parseArgsInPlace(int argc, char* argv[], InputError* error) {
             setBuildPath(argv[++i]);
         } else if (arg == "--doctor") {
             doctor_ = true;
+        } else if (arg == "--analysis-cache") {
+            analysis_cache_ = true;
+        } else if (arg == "--no-analysis-cache") {
+            analysis_cache_ = false;
         } else if (arg == "--worker-timeout-ms" || arg == "--worker-memory-mb") {
             const bool timeout = arg == "--worker-timeout-ms";
             unsigned& target = timeout ? worker_limits_.timeout_ms : worker_limits_.memory_mb;
@@ -455,6 +463,8 @@ bool Config::parseArgsInPlace(int argc, char* argv[], InputError* error) {
                       << "  --build-path <path>    compile_commands.json directory\n"
                       << "  --doctor              Explain compilation-database selection;\n"
                       << "                         does not build or run analysis\n"
+                      << "  --analysis-cache       Opt in to bounded process-local worker reuse\n"
+                      << "  --no-analysis-cache    Disable worker reuse (default)\n"
                       << "  --worker-timeout-ms <N> Per-worker deadline, 1..3600000 ms\n"
                       << "                         (default 120000); includes startup\n"
                       << "  --worker-memory-mb <N> Per-worker native memory cap, 16..65536\n"

@@ -334,6 +334,7 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args,
     codeskeptic::Config config;
     config.inheritRuleSelection(defaults);
     config.inheritWorkerLimits(defaults);
+    config.inheritAnalysisCache(defaults);
     codeskeptic::InputError inputError;
     if (auto disabled = args->getString("disable_rules")) {
         if (!config.addDisabledRules(disabled->str(), &inputError))

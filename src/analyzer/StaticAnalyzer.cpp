@@ -200,6 +200,7 @@ std::vector<SourceCoverage> StaticAnalyzer::processIsolated(bool prepass) {
         request.phase = prepass ? WorkerPhase::Harvest : WorkerPhase::Analyze;
         request.harvest = !config_.summaryOut().empty();
         request.producers = engine_.ruleIds();
+        request.record_inputs = config_.analysisCache();
         SourceCoverage failed{request.source};
         failed.commands = failed.failed_commands = request.commands.size();
         failed.reason = "worker_summary_export_failed";

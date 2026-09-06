@@ -5,6 +5,7 @@ add_library(codeskeptic_core STATIC
     core/FindingFingerprint.cpp
     core/FunctionFilter.cpp
     source_manager/SourceManager.cpp
+    source_manager/InputIdentity.cpp
     source_manager/CompilationDatabaseDiscovery.cpp
     source_manager/ResourceDir.cpp
     engine/AllocFunctions.cpp
@@ -29,6 +30,8 @@ add_library(codeskeptic_core STATIC
     config/Config.cpp
     analyzer/StaticAnalyzer.cpp
     analyzer/AnalysisCoordinator.cpp
+    analyzer/UnitEvidenceStore.cpp
+    analyzer/RuntimeIdentity.cpp
     analyzer/WorkerProtocol.cpp
     analyzer/SuppressionFilter.cpp
     analyzer/Baseline.cpp

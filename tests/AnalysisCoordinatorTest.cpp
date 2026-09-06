@@ -2,6 +2,8 @@
 #include "analyzer/AnalysisState.h"
 #include "analyzer/BuiltinRules.h"
 #include "analyzer/StaticAnalyzer.h"
+#include "analyzer/UnitEvidenceStore.h"
+#include "source_manager/InputIdentity.h"
 #include <gtest/gtest.h>
 #include <llvm/ADT/SmallString.h>
 #include <llvm/Support/FileSystem.h>
@@ -17,6 +19,7 @@
 #include <future>
 #include <thread>
 #include <chrono>
+#include <cstdlib>
 
 namespace {
 using namespace codeskeptic;
@@ -64,7 +67,7 @@ protected:
         sources.push_back(path);
         return path;
     }
-    void database(bool variants = false) {
+    void database(bool variants = false, const std::vector<std::string>& flags = {}) {
         llvm::json::Array entries;
         for (const auto& source : sources) {
             const int count = variants ? 2 : 1;
@@ -73,6 +76,7 @@ protected:
                 arguments.push_back(source.extension() == ".c" ? "clang" : "clang++");
                 arguments.push_back(source.extension() == ".c" ? "-std=gnu11" : "-std=c++17");
                 arguments.push_back("-DVARIANT=" + std::to_string(variant));
+                for (const auto& flag : flags) arguments.push_back(flag);
                 arguments.push_back("-c");
                 arguments.push_back(source.string());
                 entries.push_back(llvm::json::Object{{"directory", root.string()},
@@ -106,6 +110,334 @@ protected:
         return scan;
     }
 };
+
+class AnalysisCacheTest : public AnalysisCoordinatorTest {
+protected:
+    void SetUp() override { AnalysisCoordinatorTest::SetUp(); processUnitEvidenceStore().clear(); }
+    void TearDown() override { processUnitEvidenceStore().clear(); AnalysisCoordinatorTest::TearDown(); }
+};
+
+#ifdef __linux__
+TEST_F(AnalysisCacheTest, RealHeaderBearingHitsPreserveReportAndInvalidateRestoredMetadata) {
+    file("input.cpp", "#include \"value.h\"\nint result(){\n#if VALUE == 3\nint *p=nullptr; return *p;\n#else\nreturn 42;\n#endif\n}\n");
+    const auto header = root / "src/value.h";
+    { std::ofstream output(header, std::ios::binary); output << "#define VALUE 3\n"; }
+    database();
+    const auto fresh = scan(CODESKEPTIC_BINARY_PATH);
+    ASSERT_EQ(fresh.result.exitCode(), 1);
+    const auto inserted = scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"});
+    EXPECT_EQ(inserted.report, fresh.report);
+    ASSERT_GT(processUnitEvidenceStore().entries(), 0u);
+    EXPECT_EQ(processUnitEvidenceStore().hits(), 0u);
+    const auto hit = scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"});
+    EXPECT_EQ(hit.report, fresh.report);
+    ASSERT_EQ(processUnitEvidenceStore().hits(), 1u);
+    const auto modified = fs::last_write_time(header);
+    { std::ofstream output(header, std::ios::binary); output << "#define VALUE 1\n"; }
+    fs::last_write_time(header, modified);
+    const auto changed = scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"});
+    EXPECT_EQ(changed.result.exitCode(), 0);
+    EXPECT_EQ(changed.report, scan(CODESKEPTIC_BINARY_PATH).report);
+    EXPECT_EQ(processUnitEvidenceStore().hits(), 1u);
+}
+#endif
+
+TEST_F(AnalysisCacheTest, VolatileInputsRemainFreshWithIdenticalResults) {
+    file("input.cpp", "#define VOLATILE_TIME __TIME__\nconst char *time_value=VOLATILE_TIME;\nint result(){return 42;}\n");
+    database();
+    const auto fresh = scan(CODESKEPTIC_BINARY_PATH);
+    ASSERT_EQ(fresh.result.exitCode(), 0);
+    EXPECT_EQ(scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"}).report, fresh.report);
+    EXPECT_EQ(scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"}).report, fresh.report);
+    EXPECT_EQ(processUnitEvidenceStore().entries(), 0u);
+    EXPECT_EQ(processUnitEvidenceStore().hits(), 0u);
+}
+
+TEST_F(AnalysisCacheTest, UnsupportedOptionsKeepFreshAnalysisAndReportParity) {
+    file("input.cpp", "int result(){int *p=nullptr;return *p;}\n");
+    const auto header = root / "forced.h";
+    { std::ofstream output(header); output << "#define FORCED 1\n"; }
+    for (const auto& flags : std::vector<std::vector<std::string>>{{"-fno-builtin"}, {"-include", header.string()}}) {
+        database(false, flags);
+        const auto fresh = scan(CODESKEPTIC_BINARY_PATH);
+        ASSERT_EQ(fresh.result.exitCode(), 1);
+        EXPECT_EQ(scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"}).report, fresh.report);
+        EXPECT_EQ(scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"}).report, fresh.report);
+        EXPECT_EQ(processUnitEvidenceStore().entries(), 0u);
+        EXPECT_EQ(processUnitEvidenceStore().hits(), 0u);
+    }
+}
+
+#ifndef __linux__
+TEST_F(AnalysisCacheTest, UnqualifiedRuntimePlatformKeepsOrdinaryFreshResults) {
+    file("input.cpp", "int result(){int *p=nullptr;return *p;}\n");
+    database();
+    const auto fresh = scan(CODESKEPTIC_BINARY_PATH);
+    ASSERT_EQ(fresh.result.exitCode(), 1);
+    EXPECT_EQ(scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"}).report, fresh.report);
+    EXPECT_EQ(scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"}).report, fresh.report);
+    EXPECT_EQ(processUnitEvidenceStore().entries(), 0u);
+    EXPECT_EQ(processUnitEvidenceStore().hits(), 0u);
+}
+#endif
+
+TEST_F(AnalysisCacheTest, UnsolicitedReuseClaimIsNeverPublishedOrAdmitted) {
+    file("input.cpp", "int result(){int *p=nullptr;return *p;}\n");
+    database();
+    const auto result = scan(CODESKEPTIC_CACHE_FIXTURE_PATH, {"--analysis-cache"});
+    EXPECT_FALSE(result.result.complete());
+    EXPECT_EQ(result.result.exitCode(), 2);
+    ASSERT_EQ(result.result.sources.size(), 1u);
+    EXPECT_EQ(result.result.sources.front().reason, "worker_result_invalid");
+    EXPECT_TRUE(result.diagnostics.empty());
+    EXPECT_EQ(processUnitEvidenceStore().entries(), 0u);
+    EXPECT_EQ(processUnitEvidenceStore().hits(), 0u);
+}
+
+#ifdef __linux__
+class ScopedCacheEnvironment {
+    std::string name_;
+    std::optional<std::string> previous_;
+public:
+    ScopedCacheEnvironment(std::string name, const std::string& value) : name_(std::move(name)) {
+        if (const auto* old = std::getenv(name_.c_str())) previous_ = old;
+        EXPECT_EQ(::setenv(name_.c_str(), value.c_str(), 1), 0);
+    }
+    ~ScopedCacheEnvironment() {
+        if (previous_) ::setenv(name_.c_str(), previous_->c_str(), 1);
+        else ::unsetenv(name_.c_str());
+    }
+};
+
+TEST_F(AnalysisCacheTest, ActualLoadedLibraryReplacementAndEarlierCandidateInvalidateReuse) {
+    const auto source = file("input.cpp", "int result(){int *p=nullptr;return *p;}\n");
+    const auto early = root / "runtime-early", late = root / "runtime-late";
+    ASSERT_TRUE(fs::create_directory(early));
+    ASSERT_TRUE(fs::create_directory(late));
+    const auto first_module = root / "runtime-one.so", second_module = root / "runtime-two.so";
+    ASSERT_TRUE(fs::copy_file(CODESKEPTIC_RUNTIME_FIXTURE_ONE, first_module));
+    ASSERT_TRUE(fs::copy_file(CODESKEPTIC_RUNTIME_FIXTURE_TWO, second_module));
+    // Recent module ctime deliberately refuses reuse. Age these owned copies
+    // before starting a worker; never backdate timestamps or wait inside it.
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    const auto marker = root / "loaded-module";
+    { std::ofstream output(marker); output << "0"; }
+    const auto name = "libcodeskeptic_runtime_fixture.so";
+    auto library_path = early.string() + ":" + late.string();
+    if (const auto* prior = std::getenv("LD_LIBRARY_PATH")) library_path += ":" + std::string(prior);
+    ScopedCacheEnvironment search("LD_LIBRARY_PATH", library_path);
+    ScopedCacheEnvironment preload("LD_PRELOAD", name);
+    ScopedCacheEnvironment marker_path("CS_CACHE_FIXTURE_MARKER", marker.string());
+    WorkerRequest request;
+    request.source = source.string(); request.build_directory = root.string();
+    request.commands.emplace_back(root.string(), source.string(),
+        std::vector<std::string>{"clang++", "-std=c++17", "-c", source.string()}, "");
+    request.producers = {"null-deref"}; request.selected_families = {"null-deref"}; request.record_inputs = true;
+    std::string summary_error;
+    ASSERT_TRUE(exportWorkerSummaries(request.global_summaries, summary_error)) << summary_error;
+    for (const bool earlier : {false, true}) {
+        processUnitEvidenceStore().clear();
+        std::error_code error;
+        fs::remove(early / name, error); fs::remove(late / name, error);
+        fs::create_symlink(first_module, late / name);
+        const auto execute = [&] { return executeAnalysisWorker(CODESKEPTIC_BINARY_PATH, request); };
+        const auto first = execute();
+        ASSERT_TRUE(first.valid) << first.reason << first.detail;
+        ASSERT_FALSE(first.response.runtime_digest.empty());
+        EXPECT_FALSE(first.cache_hit); EXPECT_EQ(readText(marker), "1");
+        const auto repeat = execute();
+        ASSERT_TRUE(repeat.valid) << repeat.reason << repeat.detail;
+        ASSERT_TRUE(repeat.cache_hit);
+        ASSERT_EQ(processUnitEvidenceStore().hits(), 1u);
+        ASSERT_EQ(repeat.response.runtime_digest, first.response.runtime_digest);
+        const auto alias = earlier ? early / name : late / name;
+        fs::create_symlink(second_module, late / "next-module-link");
+        fs::rename(late / "next-module-link", alias);
+        InputIdentity input;
+        ASSERT_TRUE(decodeInputIdentity(first.response.input_witness, input));
+        ASSERT_TRUE(input.matchesCurrent()) << "loader change must not be masked by frontend invalidation";
+        const auto changed = execute();
+        ASSERT_TRUE(changed.valid) << changed.reason << changed.detail;
+        EXPECT_EQ(readText(marker), "2");
+        ASSERT_FALSE(changed.response.runtime_digest.empty());
+        EXPECT_NE(changed.response.runtime_digest, first.response.runtime_digest);
+        EXPECT_FALSE(changed.cache_hit); EXPECT_EQ(processUnitEvidenceStore().hits(), 1u);
+        auto normalized = changed.response;
+        normalized.runtime_digest = first.response.runtime_digest;
+        EXPECT_EQ(encodeWorkerResponse(normalized), encodeWorkerResponse(first.response));
+        const auto repeat_changed = execute();
+        ASSERT_TRUE(repeat_changed.valid) << repeat_changed.reason << repeat_changed.detail;
+        EXPECT_TRUE(repeat_changed.cache_hit);
+        EXPECT_EQ(repeat_changed.response.runtime_digest, changed.response.runtime_digest);
+        EXPECT_EQ(processUnitEvidenceStore().hits(), 2u);
+    }
+}
+#endif
+
+#ifdef __linux__
+TEST_F(AnalysisCacheTest, NewlySelectedRelocatableResourceDirectoryRejectsOldWorkerEntry) {
+    file("input.cpp", "#include <stddef.h>\nint result(){\n#ifdef CS_ALTERNATE_RESOURCE\nint *p=nullptr;return *p;\n#else\nreturn 42;\n#endif\n}\n");
+    database();
+    ASSERT_TRUE(fs::create_directory(root / "bin"));
+    const auto binary = root / "bin" / fs::path(CODESKEPTIC_BINARY_PATH).filename();
+    ASSERT_TRUE(fs::copy_file(CODESKEPTIC_BINARY_PATH, binary));
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    ScopedCacheEnvironment no_override("CODESKEPTIC_RESOURCE_DIR", "");
+    const auto first = scan(binary.string(), {"--analysis-cache"});
+    ASSERT_EQ(first.result.exitCode(), 0);
+    EXPECT_EQ(scan(binary.string(), {"--analysis-cache"}).report, first.report);
+    ASSERT_EQ(processUnitEvidenceStore().hits(), 1u);
+    const auto resource = root / "lib/clang/999/include";
+    ASSERT_TRUE(fs::create_directories(resource));
+    { std::ofstream output(resource / "stddef.h"); output << "#define CS_ALTERNATE_RESOURCE 1\n"; }
+    const auto changed = scan(binary.string(), {"--analysis-cache"});
+    EXPECT_EQ(changed.result.exitCode(), 1);
+    EXPECT_EQ(changed.report, scan(binary.string()).report);
+    EXPECT_EQ(processUnitEvidenceStore().hits(), 1u);
+}
+
+TEST_F(AnalysisCacheTest, ChangedCompilerFlagsAndAnalysisProfileRejectPreviousEvidence) {
+    file("input.cpp", "int result(){\n#if FLAG\nint *p=nullptr;return *p;\n#else\nreturn 42;\n#endif\n}\n");
+    database(false, {"-DFLAG=0"});
+    const auto first = scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"});
+    ASSERT_EQ(first.result.exitCode(), 0);
+    EXPECT_EQ(scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"}).report, first.report);
+    ASSERT_EQ(processUnitEvidenceStore().hits(), 1u);
+    database(false, {"-DFLAG=1"});
+    const auto changed = scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"});
+    ASSERT_EQ(changed.result.exitCode(), 1);
+    EXPECT_EQ(changed.report, scan(CODESKEPTIC_BINARY_PATH).report);
+    EXPECT_EQ(processUnitEvidenceStore().hits(), 1u);
+    EXPECT_EQ(scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache", "--no-assert-recovery"}).report,
+              scan(CODESKEPTIC_BINARY_PATH, {"--no-assert-recovery"}).report);
+    EXPECT_EQ(processUnitEvidenceStore().hits(), 1u);
+    EXPECT_EQ(scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache", "--no-assert-recovery"}).report, changed.report);
+    EXPECT_EQ(processUnitEvidenceStore().hits(), 2u);
+}
+
+TEST_F(AnalysisCacheTest, EarlierIncludeCandidateAndChangedEnvironmentCannotUseOldHeader) {
+    file("input.cpp", "#include <value.h>\nint result(){\n#if VALUE\nint *p=nullptr;return *p;\n#else\nreturn 42;\n#endif\n}\n");
+    const auto early = root / "include-early", late = root / "include-late";
+    ASSERT_TRUE(fs::create_directory(early)); ASSERT_TRUE(fs::create_directory(late));
+    { std::ofstream output(late / "value.h"); output << "#define VALUE 0\n"; }
+    database(false, {"-I", early.string(), "-I", late.string()});
+    const auto first = scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"});
+    ASSERT_EQ(first.result.exitCode(), 0);
+    EXPECT_EQ(scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"}).report, first.report);
+    ASSERT_EQ(processUnitEvidenceStore().hits(), 1u);
+    { std::ofstream output(early / "value.h"); output << "#define VALUE 1\n"; }
+    const auto changed = scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"});
+    ASSERT_EQ(changed.result.exitCode(), 1);
+    EXPECT_EQ(changed.report, scan(CODESKEPTIC_BINARY_PATH).report);
+    EXPECT_EQ(processUnitEvidenceStore().hits(), 1u);
+
+    processUnitEvidenceStore().clear();
+    database();
+    ScopedCacheEnvironment base("CPATH", late.string());
+    const auto environmental = scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"});
+    ASSERT_EQ(environmental.result.exitCode(), 0);
+    EXPECT_EQ(scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"}).report, environmental.report);
+    ASSERT_EQ(processUnitEvidenceStore().hits(), 1u);
+    ScopedCacheEnvironment changed_search("CPATH", early.string() + ":" + late.string());
+    const auto environment_changed = scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"});
+    ASSERT_EQ(environment_changed.result.exitCode(), 1);
+    EXPECT_EQ(environment_changed.report, scan(CODESKEPTIC_BINARY_PATH).report);
+    EXPECT_EQ(processUnitEvidenceStore().hits(), 1u);
+}
+
+TEST_F(AnalysisCacheTest, CachedWorkNeverOverridesCancellationOrChangedLimits) {
+    file("input.cpp", "int result(){int *p=nullptr;return *p;}\n");
+    database();
+    const auto first = scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"});
+    ASSERT_TRUE(first.result.complete());
+    ASSERT_GT(processUnitEvidenceStore().entries(), 0u);
+    EXPECT_EQ(scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache", "--worker-timeout-ms", "60000"}).report, first.report);
+    EXPECT_EQ(processUnitEvidenceStore().hits(), 0u);
+    auto token = std::make_shared<ResourceCancellation>();
+    token->request();
+    const auto cancelled = scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"}, false, token);
+    ASSERT_FALSE(cancelled.result.complete());
+    EXPECT_EQ(cancelled.result.exitCode(), 2);
+    ASSERT_EQ(cancelled.result.sources.size(), 1u);
+    EXPECT_EQ(cancelled.result.sources[0].reason, "worker_cancelled");
+    EXPECT_EQ(processUnitEvidenceStore().hits(), 0u);
+}
+
+TEST_F(AnalysisCacheTest, RuleSelectionAndVariantsKeepTheExactWorkerIdentity) {
+    file("input.cpp", "int result(){int *p=nullptr;return *p;}\n");
+    database(true);
+    const auto fresh = scan(CODESKEPTIC_BINARY_PATH);
+    EXPECT_EQ(scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"}).report, fresh.report);
+    EXPECT_EQ(scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache"}).report, fresh.report);
+    EXPECT_EQ(processUnitEvidenceStore().hits(), 1u);
+    const auto filtered = scan(CODESKEPTIC_BINARY_PATH, {"--analysis-cache", "--disable-rule", "null-deref"});
+    EXPECT_EQ(filtered.report, scan(CODESKEPTIC_BINARY_PATH, {"--disable-rule", "null-deref"}).report);
+    EXPECT_EQ(processUnitEvidenceStore().hits(), 1u);
+}
+
+TEST_F(AnalysisCacheTest, ReplacedToolBytesCannotReuseTheOldWorkerEntry) {
+    file("input.cpp", "int result(){int *p=nullptr;return *p;}\n");
+    database();
+    const auto copy = root / fs::path(CODESKEPTIC_BINARY_PATH).filename();
+    ASSERT_TRUE(fs::copy_file(CODESKEPTIC_BINARY_PATH, copy));
+    std::this_thread::sleep_for(std::chrono::seconds(3)); // qualify newly installed executable before child startup
+    const auto first = scan(copy.string(), {"--analysis-cache"});
+    ASSERT_TRUE(first.result.complete());
+    ASSERT_GT(processUnitEvidenceStore().entries(), 0u);
+    EXPECT_EQ(scan(copy.string(), {"--analysis-cache"}).report, first.report);
+    ASSERT_EQ(processUnitEvidenceStore().hits(), 1u);
+    // A trailing non-loadable byte preserves this native executable's behavior
+    // while changing its content identity. No repository binary is modified.
+    { std::ofstream output(copy, std::ios::binary | std::ios::app); output.put('\0'); }
+    EXPECT_EQ(scan(copy.string(), {"--analysis-cache"}).report, first.report);
+    EXPECT_EQ(processUnitEvidenceStore().hits(), 1u);
+}
+
+TEST_F(AnalysisCacheTest, NonExecutableWorkerCannotBeRescuedByCachedEvidence) {
+    file("input.cpp", "int result(){int *p=nullptr;return *p;}\n");
+    database();
+    const auto copy = root / fs::path(CODESKEPTIC_BINARY_PATH).filename();
+    ASSERT_TRUE(fs::copy_file(CODESKEPTIC_BINARY_PATH, copy));
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    ASSERT_TRUE(scan(copy.string(), {"--analysis-cache"}).result.complete());
+    ASSERT_TRUE(scan(copy.string(), {"--analysis-cache"}).result.complete());
+    ASSERT_EQ(processUnitEvidenceStore().hits(), 1u);
+    const auto permissions = fs::status(copy).permissions();
+    fs::permissions(copy, fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
+                    fs::perm_options::remove);
+    const auto fresh = scan(copy.string());
+    ASSERT_FALSE(fresh.result.complete());
+    const auto cached = scan(copy.string(), {"--analysis-cache"});
+    EXPECT_FALSE(cached.result.complete());
+    EXPECT_EQ(cached.result.exitCode(), 2);
+    EXPECT_EQ(cached.result.sources.front().reason, fresh.result.sources.front().reason);
+    fs::permissions(copy, permissions);
+    EXPECT_TRUE(scan(copy.string(), {"--analysis-cache"}).result.complete());
+}
+#endif
+
+TEST_F(AnalysisCacheTest, OptInConfigurationIsExplicitValidatedAndInheritedSeparately) {
+    Config defaults;
+    EXPECT_FALSE(defaults.analysisCache());
+    const auto path = root / "cache.conf";
+    { std::ofstream output(path, std::ios::binary); output << "analysis_cache=true\n"; }
+    ASSERT_TRUE(defaults.loadFromFile(path.string()));
+    EXPECT_TRUE(defaults.analysisCache());
+    EXPECT_FALSE(defaults.warmCache());
+    Config request;
+    request.setWarmCache(true);
+    request.inheritAnalysisCache(defaults);
+    EXPECT_TRUE(request.analysisCache());
+    EXPECT_TRUE(request.warmCache());
+    { std::ofstream output(path, std::ios::binary); output << "analysis_cache=perhaps\n"; }
+    EXPECT_FALSE(defaults.loadFromFile(path.string()));
+    EXPECT_TRUE(defaults.analysisCache()); // failed load remains transactional
+    std::vector<std::string> args{"codeskeptic", "--no-analysis-cache"};
+    std::vector<char*> raw;
+    for (auto& arg : args) raw.push_back(arg.data());
+    ASSERT_TRUE(defaults.parseArgs(raw.size(), raw.data()));
+    EXPECT_FALSE(defaults.analysisCache());
+}
 
 TEST_F(AnalysisCoordinatorTest, ProductionWorkerMatchesInProcessForCAndCpp) {
     file("safe.c", "#include <stddef.h>\nint safe(void) { return (int)sizeof(size_t); }\n");

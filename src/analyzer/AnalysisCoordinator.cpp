@@ -1,6 +1,8 @@
 #include "analyzer/AnalysisCoordinator.h"
 #include "analyzer/AnalysisState.h"
 #include "analyzer/BuiltinRules.h"
+#include "analyzer/UnitEvidenceStore.h"
+#include "analyzer/RuntimeIdentity.h"
 #include "core/Capabilities.h"
 #include "core/FindingFingerprint.h"
 #include "engine/CfgCache.h"
@@ -10,8 +12,11 @@
 #include <llvm/ADT/SmallString.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/Program.h>
+#include <llvm/Support/SHA256.h>
 #include <array>
+#include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <set>
@@ -65,6 +70,62 @@ private:
 
 void check(bool value, const std::string& message) {
     if (!value) throw std::runtime_error(message);
+}
+
+std::string cacheToolIdentity(const std::string& executable, const std::function<bool()>& cancelled) {
+    try {
+        namespace fs = std::filesystem;
+        if ((cancelled && cancelled()) || !fs::path(executable).is_absolute() ||
+            !fs::is_regular_file(fs::symlink_status(executable)) || !llvm::sys::fs::can_execute(executable)) return {};
+        const auto size = fs::file_size(executable);
+        const auto modified = fs::last_write_time(executable);
+        if (size > 512 * 1024 * 1024) return {};
+        std::ifstream input(executable, std::ios::binary);
+        if (!input) return {};
+        llvm::SHA256 hash;
+        std::array<char, 65536> chunk;
+        std::uintmax_t consumed = 0;
+        const auto started = std::chrono::steady_clock::now();
+        while (input) {
+            if ((cancelled && cancelled()) || std::chrono::steady_clock::now() - started > std::chrono::seconds(5)) return {};
+            input.read(chunk.data(), chunk.size());
+            const auto count = input.gcount();
+            consumed += static_cast<std::uintmax_t>(count);
+            if (consumed > size) return {};
+            hash.update(llvm::StringRef(chunk.data(), static_cast<std::size_t>(count)));
+        }
+        if (input.bad() || consumed != size || size != fs::file_size(executable) ||
+            modified != fs::last_write_time(executable) || !llvm::sys::fs::can_execute(executable)) return {};
+        auto digest = hash.final();
+        return inputDigest(executable + std::string(reinterpret_cast<const char*>(digest.data()), digest.size()));
+    } catch (...) { return {}; }
+}
+
+bool cacheableResponse(const WorkerRequest& request, const WorkerResponse& response) {
+    if (!request.record_inputs || response.runtime_digest.size() != 64 ||
+        response.runtime_digest.find_first_not_of("0123456789abcdef") != std::string::npos) return false;
+    const auto& coverage = response.coverage;
+    if (coverage.status != SourceStatus::Analyzed || coverage.commands != request.commands.size() ||
+        coverage.analyzed_commands != request.commands.size() || coverage.failed_commands ||
+        coverage.skipped_commands || coverage.recovery_commands || !response.gaps.empty()) return false;
+    InputIdentity identity;
+    if (!decodeInputIdentity(response.input_witness, identity) ||
+        identity.context != response.request_digest || !identity.hasBuffer(request.source)) return false;
+    std::set<std::string> produced;
+    for (const auto& producer : request.producers)
+        for (const auto& family : producerFindingFamilies(producer)) produced.insert(std::string(family));
+    for (const auto& diagnostic : response.diagnostics) {
+        const auto* family = findRuleCapability(diagnostic.rule_id);
+        if (!family || !produced.count(std::string(family->id)) ||
+            std::find(request.selected_families.begin(), request.selected_families.end(),
+                      std::string(family->id)) == request.selected_families.end()) return false;
+    }
+    TemporaryDirectory directory;
+    const auto path = directory.file("cache-summaries.txt");
+    std::string error;
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    return writeWorkerPacket(path, response.global_summaries, error) &&
+           SummaryRegistry::parseSummaryFile(path, parsed);
 }
 
 Config decodeAnalysisArguments(const WorkerRequest& request) {
@@ -172,12 +233,34 @@ WorkerExecution executeAnalysisWorker(const std::string& executable, const Worke
               "worker launch/request resource limit mismatch");
         const auto packet = encodeWorkerRequest(request);
         const auto digest = workerRequestDigest(packet);
+        auto cancelled = [&] {
+            return workerSignalCancellationRequested() || (cancellation && cancellation->requested());
+        };
+        if (cancelled()) { execution.reason = "worker_cancelled"; return execution; }
+        const auto tool_identity = request.record_inputs ? cacheToolIdentity(executable, cancelled) : std::string{};
+        const auto environment = request.record_inputs ? inputEnvironmentIdentity() : std::string{};
+        const auto key = tool_identity.empty() || environment.empty() ? std::string{} :
+            inputDigest(digest + tool_identity + environment + ":" + std::to_string(limits.timeout_ms) +
+                        ":" + std::filesystem::current_path().string());
+        std::optional<std::string> candidate;
+        if (!key.empty()) {
+            try {
+                candidate = processUnitEvidenceStore().candidate(key, digest, cancelled);
+            } catch (...) { /* Optional cache failure falls through to ordinary execution. */ }
+        }
+        if (cancelled()) { execution.reason = "worker_cancelled"; return execution; }
         TemporaryDirectory directory;
         const auto input = directory.file("request.bin");
         const auto output = directory.file("response.bin");
         const auto stdout_path = directory.file("stdout.txt");
         const auto stderr_path = directory.file("stderr.txt");
         check(writeWorkerPacket(input, packet, execution.detail), execution.detail);
+        if (candidate) {
+            std::string ignored;
+            // This sibling is owned by the same unique transport directory and
+            // does not alter the frozen semantic request or its digest.
+            writeWorkerPacket(input + ".candidate", *candidate, ignored);
+        }
         const std::vector<std::string> arguments{executable, "--codeskeptic-worker-v1", input, output};
         const std::array<std::string, 3> redirects{{"", stdout_path, stderr_path}};
         const auto process = runResourceWorker(executable, arguments, redirects, limits, cancellation);
@@ -213,10 +296,33 @@ WorkerExecution executeAnalysisWorker(const std::string& executable, const Worke
         check(stdout_text.empty(), "unexpected worker stdout");
         check(readWorkerPacket(output, response_packet, read_error), read_error);
         check(decodeWorkerResponse(response_packet, request, digest, execution.response, read_error), read_error);
+        if (execution.response.cache_hit) {
+            check(candidate.has_value(), "worker claimed reuse without a supplied candidate");
+            WorkerResponse supplied;
+            check(decodeWorkerResponse(*candidate, request, digest, supplied, read_error), read_error);
+            supplied.cache_hit = true;
+            check(execution.detail.empty() && cacheableResponse(request, execution.response) &&
+                  encodeWorkerResponse(supplied) == response_packet, "worker reuse did not match its supplied candidate");
+        }
         execution.valid = true;
         execution.reason.clear();
+        if (!key.empty() && execution.detail.empty() && !cancelled()) {
+            try {
+                if (tool_identity == cacheToolIdentity(executable, cancelled) && environment == inputEnvironmentIdentity() &&
+                    cacheableResponse(request, execution.response))
+                    processUnitEvidenceStore().rememberCandidate(key, digest, response_packet, execution.response.input_witness, cancelled);
+            } catch (...) { /* No cache entry is preferable to losing successful analysis. */ }
+        }
+        if (cancelled()) { execution.valid = false; execution.reason = "worker_cancelled"; }
+        if (execution.valid && execution.response.cache_hit) {
+            execution.cache_hit = true;
+            processUnitEvidenceStore().confirmHit();
+        }
         return execution;
     } catch (const std::exception& failure) {
+        execution.valid = false;
+        execution.cache_hit = false;
+        if (execution.reason.empty()) execution.reason = "worker_result_invalid";
         execution.detail += failure.what();
         return execution;
     }
@@ -272,6 +378,24 @@ int runAnalysisWorker(const std::string& request_path, const std::string& respon
         response.request_digest = workerRequestDigest(packet);
         response.ordinal = request.ordinal;
         response.phase = request.phase;
+        const auto runtime_before = request.record_inputs ? observeRuntimeIdentity() : RuntimeIdentity{};
+        if (request.record_inputs && runtime_before) {
+            std::string cached_packet, ignored;
+            WorkerResponse cached;
+            InputIdentity identity;
+            if (readWorkerPacket(request_path + ".candidate", cached_packet, ignored) &&
+                decodeWorkerResponse(cached_packet, request, response.request_digest, cached, ignored) &&
+                cached.runtime_digest == runtime_before.digest && cacheableResponse(request, cached) &&
+                decodeInputIdentity(cached.input_witness, identity) && identity.matchesCurrent()) {
+                const auto runtime_after = observeRuntimeIdentity();
+                if (runtime_after && runtime_after.digest == runtime_before.digest) {
+                    cached.cache_hit = true;
+                    check(writeWorkerPacket(response_path, encodeWorkerResponse(cached), error), error);
+                    return 0; // Supervision/ACK/transport gates still apply in parent.
+                }
+            }
+        }
+        if (request.record_inputs) source.recordInputs(response.request_digest);
         source.processAll([&](clang::ASTContext& context) {
             if (request.phase == WorkerPhase::Harvest) {
                 auto& registry = SummaryRegistry::instance();
@@ -289,6 +413,13 @@ int runAnalysisWorker(const std::string& request_path, const std::string& respon
         response.coverage = source.coverage().front();
         response.gaps = CoverageReport::instance().entries();
         check(exportWorkerSummaries(response.global_summaries, error), error);
+        if (request.record_inputs && runtime_before && source.inputIdentity().matchesCurrent()) {
+            const auto runtime_after = observeRuntimeIdentity();
+            if (runtime_after && runtime_after.digest == runtime_before.digest) {
+                response.input_witness = encodeInputIdentity(source.inputIdentity());
+                response.runtime_digest = runtime_before.digest;
+            }
+        }
         check(writeWorkerPacket(response_path, encodeWorkerResponse(response), error), error);
         return 0; // Transport succeeded; source coverage may still describe failure.
     } catch (const std::bad_alloc&) {

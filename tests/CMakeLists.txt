@@ -15,6 +15,7 @@ add_executable(codeskeptic_tests
     AnalysisResultTest.cpp
     WorkerProtocolTest.cpp
     AnalysisCoordinatorTest.cpp
+    UnitEvidenceStoreTest.cpp
     ResourceBudgetTest.cpp
     CapabilitiesTest.cpp
     FindingFingerprintTest.cpp
@@ -73,16 +74,34 @@ target_link_libraries(codeskeptic_worker_fixture PRIVATE codeskeptic_core)
 add_executable(codeskeptic_resource_fixture ResourceBudgetTest.cpp)
 target_compile_definitions(codeskeptic_resource_fixture PRIVATE CODESKEPTIC_RESOURCE_TEST_CHILD=1)
 target_link_libraries(codeskeptic_resource_fixture PRIVATE codeskeptic_core)
+add_executable(codeskeptic_cache_fixture UnitEvidenceStoreTest.cpp)
+target_compile_definitions(codeskeptic_cache_fixture PRIVATE CODESKEPTIC_CACHE_TEST_CHILD=1)
+target_link_libraries(codeskeptic_cache_fixture PRIVATE codeskeptic_core)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    foreach(version IN ITEMS 1 2)
+        add_library(codeskeptic_runtime_fixture_${version} SHARED UnitEvidenceStoreTest.cpp)
+        target_compile_definitions(codeskeptic_runtime_fixture_${version} PRIVATE CODESKEPTIC_RUNTIME_TEST_MODULE=${version})
+        set_target_properties(codeskeptic_runtime_fixture_${version} PROPERTIES
+            OUTPUT_NAME codeskeptic_runtime_fixture
+            LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/runtime-fixture-${version}")
+    endforeach()
+    target_compile_definitions(codeskeptic_tests PRIVATE
+        CODESKEPTIC_RUNTIME_FIXTURE_ONE="$<TARGET_FILE:codeskeptic_runtime_fixture_1>"
+        CODESKEPTIC_RUNTIME_FIXTURE_TWO="$<TARGET_FILE:codeskeptic_runtime_fixture_2>")
+    add_dependencies(codeskeptic_tests codeskeptic_runtime_fixture_1 codeskeptic_runtime_fixture_2)
+endif()
 target_compile_definitions(codeskeptic_tests PRIVATE
     CODESKEPTIC_BINARY_PATH="$<TARGET_FILE:codeskeptic>"
     CODESKEPTIC_WORKER_FIXTURE_PATH="$<TARGET_FILE:codeskeptic_worker_fixture>"
-    CODESKEPTIC_RESOURCE_FIXTURE_PATH="$<TARGET_FILE:codeskeptic_resource_fixture>")
+    CODESKEPTIC_RESOURCE_FIXTURE_PATH="$<TARGET_FILE:codeskeptic_resource_fixture>"
+    CODESKEPTIC_CACHE_FIXTURE_PATH="$<TARGET_FILE:codeskeptic_cache_fixture>")
 if(MSVC)
     target_sources(codeskeptic_tests PRIVATE ../src/windows_utf8.manifest)
     target_sources(codeskeptic_worker_fixture PRIVATE ../src/windows_utf8.manifest)
     target_sources(codeskeptic_resource_fixture PRIVATE ../src/windows_utf8.manifest)
+    target_sources(codeskeptic_cache_fixture PRIVATE ../src/windows_utf8.manifest)
 endif()
-add_dependencies(codeskeptic_tests codeskeptic_corpus_inputs codeskeptic codeskeptic_worker_fixture codeskeptic_resource_fixture)
+add_dependencies(codeskeptic_tests codeskeptic_corpus_inputs codeskeptic codeskeptic_worker_fixture codeskeptic_resource_fixture codeskeptic_cache_fixture)
 
 include(GoogleTest)
 gtest_discover_tests(codeskeptic_tests)

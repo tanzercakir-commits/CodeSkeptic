@@ -107,6 +107,9 @@ public:
     // memory-wise.
     void setWarmCache(bool enabled) { warm_cache_ = enabled; }
     bool warmCache() const { return warm_cache_; }
+    void setAnalysisCache(bool enabled) { analysis_cache_ = enabled; }
+    bool analysisCache() const { return analysis_cache_; }
+    void inheritAnalysisCache(const Config& defaults) { analysis_cache_ = defaults.analysis_cache_; }
 
     // Programmatic scope settings (the MCP server uses these directly)
     bool addFunctions(const std::string& list, InputError* error = nullptr);
@@ -227,6 +230,7 @@ private:
     bool assert_recovery_ = true;
     bool assumptions_ = false;
     bool warm_cache_ = false;
+    bool analysis_cache_ = false;
     bool help_requested_ = false;
     bool build_path_specified_ = false;
     bool file_list_specified_ = false;

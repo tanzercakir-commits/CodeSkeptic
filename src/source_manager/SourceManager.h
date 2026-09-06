@@ -7,6 +7,7 @@
 #include <vector>
 #include "core/Messages.h"
 #include "core/AnalysisResult.h"
+#include "source_manager/InputIdentity.h"
 
 namespace clang {
 class ASTContext;
@@ -42,12 +43,16 @@ public:
     // Warm AST cache (MCP server / long-lived process): parsed TUs are
     // kept for the PROCESS lifetime, so subsequent calls do not pay the
     // parse cost. The key includes path, build-path and loaded compile
-    // commands (so changed flags cannot reuse an old AST); if the fingerprint
-    // (source mtime+size) does not match, it is rebuilt. This is not a
-    // full transitive-header/environment dependency model. Stays off in
+    // commands plus observed source/header bytes and filesystem lookups.
+    // Unknown or volatile input mechanisms bypass reuse. Stays off in
     // one-shot CLI runs (memory: we do not want to
     // keep all ASTs alive during a large directory scan).
     void enableWarmCache(bool enabled) { warm_cache_ = enabled; }
+
+    // Bind actual per-command observations to the caller's frozen request.
+    // Empty context disables witness production for ordinary cold analysis.
+    void recordInputs(std::string context) { input_context_ = std::move(context); }
+    const InputIdentity& inputIdentity() const { return input_identity_; }
 
     // Test/diagnostics: cache counters and reset (process-lifetime store)
     static unsigned warmCacheHits();
@@ -86,6 +91,8 @@ private:
     std::vector<SourceCoverage> coverage_;
     std::unique_ptr<clang::tooling::CompilationDatabase> comp_db_;
     bool warm_cache_ = false;
+    std::string input_context_;
+    InputIdentity input_identity_;
 };
 
 } // namespace codeskeptic

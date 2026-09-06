@@ -1,5 +1,6 @@
 #include "contracts/Sidecar.h"
 #include "contracts/ModelInput.h"
+#include "source_manager/InputIdentity.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
@@ -18,6 +19,8 @@ namespace {
 
 struct SidecarFileData {
     bool exists = false;
+    bool witnessed = false;
+    std::string consumed_text;
     // anchor -> entries (an anchor may carry several clauses)
     std::map<std::string, std::vector<ContractClause>> byAnchor;
 };
@@ -41,21 +44,35 @@ std::string trim(const std::string& s) {
 
 const SidecarFileData& loadSidecar(const std::string& cskPath) {
     auto it = cache().find(cskPath);
-    if (it != cache().end()) return it->second;
+    if (it != cache().end()) {
+        const auto& data = it->second;
+        if (!data.witnessed) refuseInputReuse("sidecar_input_unavailable");
+        else if (!data.exists) observeSidecarAbsence(cskPath);
+        else observeSidecarText(cskPath, data.consumed_text);
+        return data;
+    }
 
     SidecarFileData& data = cache()[cskPath];
     std::error_code ec;
     const auto status = std::filesystem::symlink_status(cskPath, ec);
-    if (status.type() == std::filesystem::file_type::not_found)
+    if (status.type() == std::filesystem::file_type::not_found) {
+        data.witnessed = !ec || ec == std::errc::no_such_file_or_directory || ec == std::errc::not_a_directory;
+        if (data.witnessed) observeSidecarAbsence(cskPath);
+        else refuseInputReuse("sidecar_status_unavailable");
         return data; // optional sidecar is genuinely absent
+    }
     data.exists = true;
 
     std::string text;
     if (!model_input::readTextFile(cskPath, 1024 * 1024, text)) {
+        refuseInputReuse("sidecar_input_unavailable");
         pendingIssues().push_back({cskPath, {1,
             "unreadable, non-regular, oversized or binary sidecar input"}});
         return data;
     }
+    data.witnessed = true;
+    data.consumed_text = text;
+    observeSidecarText(cskPath, text);
 
     std::vector<SidecarEntry> entries;
     std::vector<ContractSyntaxIssue> issues;
@@ -141,7 +158,10 @@ ParsedContracts sidecarContractsForDecl(const FunctionDecl* func,
     const std::string file =
         sm.getFilename(sm.getExpansionLoc(func->getLocation())).str();
     if (file.empty()) return out;
-    const std::string cskPath = file + ".csk";
+    // Bind the lexical alias in the compiler directory, not a process-wide
+    // relative cache key shared by differently rooted compile variants. Never
+    // canonicalize a symlink before appending the alias-specific .csk suffix.
+    const std::string cskPath = std::filesystem::absolute(file + ".csk").string();
 
     const SidecarFileData& data = loadSidecar(cskPath);
     if (!data.exists || data.byAnchor.empty()) return out;

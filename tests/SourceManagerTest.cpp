@@ -1,13 +1,16 @@
 #include "source_manager/SourceManager.h"
 #include "analyzer/StaticAnalyzer.h"
 #include "rules/DivByZeroRule.h"
+#include "rules/NullDerefRule.h"
 #include <clang/AST/ASTContext.h>
+#include <clang/Basic/SourceManager.h>
 #include <clang/Tooling/CompilationDatabase.h>
 #include <llvm/Support/JSON.h>
 #include <gtest/gtest.h>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <stdexcept>
 
 namespace fs = std::filesystem;
 using codeskeptic::SourceManager;
@@ -129,6 +132,206 @@ void coverageDatabase(const fs::path& root, bool missingAst) {
     std::ofstream(root / "compile_commands.json") << text;
 }
 } // namespace
+
+class SourceInputCacheTest : public SourceManagerTargetTest {
+protected:
+    void SetUp() override {
+        SourceManagerTargetTest::SetUp();
+        SourceManager::clearWarmCache();
+        llvm::json::Array args{"clang++", "-std=c++17", "-c", "kept.cpp"};
+        llvm::json::Array commands;
+        commands.push_back(llvm::json::Object{{"directory", root.string()},
+            {"file", "kept.cpp"}, {"arguments", std::move(args)}});
+        std::string text;
+        llvm::raw_string_ostream out(text);
+        out << llvm::json::Value(std::move(commands));
+        write(root / "compile_commands.json", text);
+    }
+    void TearDown() override {
+        SourceManager::clearWarmCache();
+        SourceManagerTargetTest::TearDown();
+    }
+    static void write(const fs::path& path, const std::string& text) {
+        std::ofstream stream(path, std::ios::binary | std::ios::trunc);
+        ASSERT_TRUE(stream);
+        stream.write(text.data(), static_cast<std::streamsize>(text.size()));
+        ASSERT_TRUE(stream);
+    }
+    codeskeptic::AnalysisResult scan(bool warm, bool null_rule = false) {
+        std::vector<std::string> args{"codeskeptic", (root / "kept.cpp").string(),
+                                      "--build-path", root.string()};
+        std::vector<char*> argv;
+        for (auto& arg : args) argv.push_back(arg.data());
+        codeskeptic::Config config;
+        EXPECT_TRUE(config.parseArgs(static_cast<int>(argv.size()), argv.data()));
+        config.setWarmCache(warm);
+        codeskeptic::StaticAnalyzer analyzer(config);
+        if (null_rule) analyzer.addRule<codeskeptic::NullDerefRule>();
+        else analyzer.addRule<codeskeptic::DivByZeroRule>();
+        auto result = analyzer.run();
+        EXPECT_TRUE(result.complete());
+        EXPECT_EQ(result.failed_tus, 0u);
+        return result;
+    }
+};
+
+TEST_F(SourceInputCacheTest, ActualInputWitnessAllowsUnchangedHeaderBearingReuse) {
+    write(root / "leaf.h", "#define VALUE 1\n");
+    write(root / "kept.cpp", "#include \"leaf.h\"\nint kept(){return VALUE;}\n");
+    std::string database_error;
+    auto database = clang::tooling::CompilationDatabase::loadFromDirectory(root.string(), database_error);
+    ASSERT_TRUE(database) << database_error;
+    auto commands = database->getCompileCommands((root / "kept.cpp").string());
+    ASSERT_EQ(commands.size(), 1u);
+    ASSERT_TRUE(codeskeptic::cacheableCommand(commands.front().CommandLine))
+        << ::testing::PrintToString(commands.front().CommandLine);
+    SourceManager manager(root.string());
+    manager.enableWarmCache(true);
+    manager.recordInputs(codeskeptic::inputDigest("test-request"));
+    ASSERT_TRUE(manager.addSourceFile((root / "kept.cpp").string()));
+    ASSERT_EQ(manager.processAll([](clang::ASTContext&) {}), 0);
+    const auto& identity = manager.inputIdentity();
+    ASSERT_TRUE(identity.reusable) << identity.reason;
+    ASSERT_TRUE(identity.hasBuffer((root / "kept.cpp").string()));
+    ASSERT_TRUE(identity.hasBuffer((root / "leaf.h").string()));
+    for (const auto& observation : identity.observations) {
+        auto single = identity;
+        single.observations = {observation};
+        EXPECT_TRUE(single.matchesCurrent()) << static_cast<unsigned>(observation.kind) << ":" << observation.path;
+    }
+    ASSERT_TRUE(identity.matchesCurrent()) << identity.reason;
+    ASSERT_EQ(manager.processAll([](clang::ASTContext&) {}), 0);
+    EXPECT_EQ(SourceManager::warmCacheHits(), 1u);
+}
+
+TEST_F(SourceInputCacheTest, RelativeCompilationSidecarsUseCompilerDirectoryAndKeepWarmParity) {
+    write(root / "kept.cpp", "int f(int *p); int kept(){return f(nullptr);}\n");
+    write(root / "kept.cpp.csk", "f: requires p != null\n");
+    const auto caller = root / "caller";
+    ASSERT_TRUE(fs::create_directory(caller));
+    write(caller / "kept.cpp.csk", "unrelated: requires q != null\n");
+    struct RestoreDirectory {
+        fs::path path = fs::current_path();
+        ~RestoreDirectory() { fs::current_path(path); }
+    } restore;
+    fs::current_path(caller);
+    ASSERT_EQ(scan(false, true).findings, 1u);
+    EXPECT_EQ(scan(true, true).findings, 1u);
+    EXPECT_EQ(scan(true, true).findings, 1u);
+    EXPECT_EQ(SourceManager::warmCacheHits(), 1u);
+    EXPECT_EQ(fs::current_path(), caller);
+}
+
+TEST_F(SourceInputCacheTest, RelativeHeaderSidecarCreationChangeAndRemovalInvalidateReuse) {
+    write(root / "kept.cpp", "#include \"api.h\"\nint kept(){return f(nullptr);}\n");
+    write(root / "api.h", "int f(int *p);\n");
+    ASSERT_EQ(scan(true, true).findings, 0u);
+    ASSERT_EQ(scan(true, true).findings, 0u);
+    ASSERT_EQ(SourceManager::warmCacheHits(), 1u);
+    write(root / "api.h.csk", "f: requires p != null\n");
+    EXPECT_EQ(scan(true, true).findings, 1u);
+    EXPECT_EQ(scan(false, true).findings, 1u);
+    EXPECT_EQ(SourceManager::warmCacheHits(), 1u);
+    const auto stamp = fs::last_write_time(root / "api.h.csk");
+    write(root / "api.h.csk", "g: requires p != null\n");
+    fs::last_write_time(root / "api.h.csk", stamp);
+    EXPECT_EQ(scan(true, true).findings, 0u);
+    EXPECT_EQ(SourceManager::warmCacheHits(), 1u);
+    ASSERT_TRUE(fs::remove(root / "api.h.csk"));
+    EXPECT_EQ(scan(true, true).findings, 0u);
+    EXPECT_EQ(SourceManager::warmCacheMisses(), 4u);
+}
+
+TEST_F(SourceInputCacheTest, HeaderSymlinkKeepsAliasSpecificSidecarMeaning) {
+    write(root / "real.h", "int f(int *p);\n");
+    std::error_code error;
+    fs::create_symlink(root / "real.h", root / "alias.h", error);
+    if (error) GTEST_SKIP() << "host cannot create the symlink fixture";
+    write(root / "kept.cpp", "#include \"alias.h\"\nint kept(){return f(nullptr);}\n");
+    write(root / "alias.h.csk", "f: requires p != null\n");
+    write(root / "real.h.csk", "unrelated: requires q != null\n");
+    ASSERT_EQ(scan(false, true).findings, 1u);
+    EXPECT_EQ(scan(true, true).findings, 1u);
+    EXPECT_EQ(scan(true, true).findings, 1u);
+    EXPECT_EQ(SourceManager::warmCacheHits(), 1u);
+}
+
+TEST_F(SourceInputCacheTest, CallbackFailureRestoresNativeAndRetainedVirtualDirectories) {
+    const auto original = fs::current_path();
+    struct RestoreDirectory {
+        fs::path path;
+        ~RestoreDirectory() { fs::current_path(path); }
+    } restore{original}; // fixture cleanup even if restoration assertions fail
+    for (bool warm : {false, true}) {
+        SourceManager manager(root.string());
+        manager.enableWarmCache(warm);
+        ASSERT_TRUE(manager.addSourceFile((root / "kept.cpp").string()));
+        ASSERT_EQ(manager.processAll([](clang::ASTContext&) {}), 0);
+        EXPECT_THROW(manager.processAll([&](clang::ASTContext& context) {
+            EXPECT_EQ(fs::current_path(), root);
+            auto directory = context.getSourceManager().getFileManager().getVirtualFileSystem().getCurrentWorkingDirectory();
+            ASSERT_TRUE(directory);
+            EXPECT_EQ(fs::path(*directory), root);
+            throw std::runtime_error("callback fixture");
+        }), std::runtime_error);
+        EXPECT_EQ(fs::current_path(), original);
+        EXPECT_EQ(manager.processAll([&](clang::ASTContext&) { EXPECT_EQ(fs::current_path(), root); }), 0);
+        EXPECT_EQ(fs::current_path(), original);
+    }
+}
+
+TEST_F(SourceInputCacheTest, SameSizeAndRestoredMtimeSourceEditInvalidatesWarmAst) {
+    write(root / "kept.cpp", "int kept(){return 12 / 0;}\n");
+    ASSERT_EQ(scan(true).findings, 1u);
+    const auto stamp = fs::last_write_time(root / "kept.cpp");
+    const auto bytes = fs::file_size(root / "kept.cpp");
+    write(root / "kept.cpp", "int kept(){return 12 / 1;}\n");
+    fs::last_write_time(root / "kept.cpp", stamp);
+    ASSERT_EQ(fs::file_size(root / "kept.cpp"), bytes);
+    ASSERT_EQ(scan(false).findings, 0u);
+    EXPECT_EQ(scan(true).findings, 0u);
+    EXPECT_EQ(SourceManager::warmCacheMisses(), 2u);
+}
+
+TEST_F(SourceInputCacheTest, SameSizeAndRestoredMtimeTransitiveHeaderEditInvalidatesWarmAst) {
+    write(root / "kept.cpp", "#include \"outer.h\"\nint kept(){return 12 / VALUE;}\n");
+    write(root / "outer.h", "#include \"leaf.h\"\n");
+    write(root / "leaf.h", "#define VALUE 0\n");
+    ASSERT_EQ(scan(true).findings, 1u);
+    ASSERT_EQ(scan(true).findings, 1u);
+    ASSERT_EQ(SourceManager::warmCacheHits(), 1u); // a genuine header-bearing hit
+    const auto stamp = fs::last_write_time(root / "leaf.h");
+    const auto bytes = fs::file_size(root / "leaf.h");
+    write(root / "leaf.h", "#define VALUE 1\n");
+    fs::last_write_time(root / "leaf.h", stamp);
+    ASSERT_EQ(fs::file_size(root / "leaf.h"), bytes);
+    ASSERT_EQ(scan(false).findings, 0u);
+    EXPECT_EQ(scan(true).findings, 0u);
+    EXPECT_EQ(SourceManager::warmCacheMisses(), 2u);
+}
+
+TEST_F(SourceInputCacheTest, ExistenceOnlyHeaderAppearanceInvalidatesWarmAst) {
+    write(root / "kept.cpp", "#if __has_include(\"optional.h\")\n#define VALUE 1\n"
+          "#else\n#define VALUE 0\n#endif\nint kept(){return 12 / VALUE;}\n");
+    ASSERT_EQ(scan(true).findings, 1u);
+    write(root / "optional.h", "// queried but never included\n");
+    ASSERT_EQ(scan(false).findings, 0u);
+    EXPECT_EQ(scan(true).findings, 0u);
+    EXPECT_EQ(SourceManager::warmCacheMisses(), 2u);
+}
+
+TEST_F(SourceInputCacheTest, WarmBackendPreservesOriginalAssertPreprocessingSemantics) {
+    write(root / "kept.cpp", "typedef __SIZE_TYPE__ size_t; extern void* malloc(size_t);\n"
+          "#define DEBUGASSERT(x)\nint kept(){int* p=(int*)malloc(4); DEBUGASSERT(p); return *p;}\n");
+    ASSERT_EQ(scan(false, true).findings, 0u);
+    EXPECT_EQ(scan(true, true).findings, 0u);
+    // A different parse clears the process-global vanished-assert list.
+    write(root / "other.cpp", "int other(){return 1;}\n");
+    SourceManager other(root.string(), nullptr, true);
+    ASSERT_TRUE(other.addSourceFile((root / "other.cpp").string()));
+    ASSERT_EQ(other.processAll([](clang::ASTContext&) {}), 0);
+    EXPECT_EQ(scan(true, true).findings, 0u);
+}
 
 TEST_F(SourceManagerTargetTest, CompileVariantsDoNotInflateAnalyzedSourceCount) {
     coverageDatabase(root, false);

@@ -18,6 +18,8 @@ codeskeptic <source_path> [options]
                          (default 120000; zero/unlimited is not accepted)
   --worker-memory-mb <N> Per-worker native memory cap in MiB, 16..65536
                          (default 2048; platform semantics below)
+  --analysis-cache      Opt in to bounded process-local worker-result reuse
+  --no-analysis-cache   Disable result reuse (the default)
   --json <file>          JSON output file
   --sarif <file>         SARIF 2.1.0 output file (GitHub code scanning)
   --html <file>          Self-contained HTML report: summary cards double
@@ -205,6 +207,53 @@ does not preserve a process-lifetime warm AST cache between files or MCP calls.
 Embedders using it must retain exclusive ownership of their worker children and
 must not independently reap them. No sudo is required for these worker controls.
 
+## Optional analysis cache
+
+`--analysis-cache` (configuration `analysis_cache=true`) enables a process-local
+worker-result cache; `--no-analysis-cache` disables it. It is off by default.
+The current cache has no disk persistence, cross-invocation resume or daemon.
+It can reuse work across requests in a long-lived `--serve` process. Each MCP
+request inherits the launch preference without adding client-side RPC fields.
+A separate one-shot CLI invocation starts empty; this is not a promised speedup.
+
+The key binds the exact worker request, tool bytes, environment, working
+directory and resource settings. Evidence records the frontend's actual source
+and header bytes, search/existence observations (including missing candidates),
+compiler settings/predefines and consumed `.csk` sidecars. Same-size edits with
+restored modification time do not preserve content identity. Expanded volatile
+date/time macros, unsupported driver options, PCH/modules/overlays and inputs
+that cannot be completely witnessed stay fresh-only. Currently reusable driver
+inputs are a conservative plain-text C/C++ subset; unknown options still receive
+ordinary analysis, not silently ignored flags. Files must remain stable during a
+scan; this cache is not a transactional filesystem snapshot.
+
+Every candidate still launches a normal supervised same-build worker. The child
+validates its actual loaded runtime and current input evidence before skipping
+AST/rule work. Normal exit, memory acknowledgement, strict response binding and
+cancellation checks remain mandatory. A candidate lookup is not a successful
+hit. Incomplete, recovered, warning-bearing or malformed worker results are not
+admitted. Parent reporting, suppression and baseline processing remain current.
+
+Runtime qualification currently uses bounded Linux `/proc` file mappings,
+opened-file content hashes and the worker's resolved platform/resource-directory
+arguments; Windows/macOS use ordinary fresh analysis. Ambiguous,
+deleted, recently installed/modified, oversized or unavailable mapped files
+refuse reuse. Main-executable identity can be anchored through the kernel's
+executable handle on Btrfs; unresolved non-main mapping/device mismatches remain
+fresh-only. This does not attest against privileged mutation, historical clock
+changes or filesystem implementations that cannot supply coherent identities.
+Each runtime capture allows at most 256 files, 512 MiB per file and 1 GiB total,
+with a five-second checked budget. Input evidence is limited to 4 MiB/16,384
+observations, 16 MiB per consumed buffer and 64 MiB of buffers per recording.
+Reaching evidence limits declines caching; it does not truncate ordinary analysis.
+
+The store holds at most 128 entries and 64 MiB of accounted key/packet/witness
+payload, excluding container/allocator overhead. Deterministic eviction affects
+reuse only. Hashing and validation have costs; no benchmarked speedup is claimed.
+The programmatic in-process warm AST cache is separate, limited to 16 entries,
+and revalidates actual inputs. It retains the existing broken-TU policy and does
+not cache ASTs dependent on vanished-assert records owned by another parse.
+
 ## Configuration file
 
 Options can also be set in a `.codeskeptic.conf` file (`key=value` lines;
@@ -217,6 +266,7 @@ fail with exit `2`):
 `model_file` entries. Resource keys `worker_timeout_ms` and `worker_memory_mb`
 have the same finite integer ranges/defaults as their CLI options; signed,
 fractional, overflowing and out-of-range values are rejected transactionally.
+`analysis_cache` accepts `true`/`false` or `1`/`0` and defaults to false.
 An allocator may appear in multiple `allocator_pairs`
 entries to admit multiple exact deallocators.
 

@@ -15,6 +15,7 @@ const std::string& workerExecutable();
 
 struct WorkerExecution {
     bool valid = false;
+    bool cache_hit = false;
     std::string reason;
     std::string detail;
     WorkerResponse response;

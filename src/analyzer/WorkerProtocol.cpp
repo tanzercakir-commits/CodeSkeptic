@@ -248,6 +248,7 @@ std::string encodeWorkerRequest(const WorkerRequest& request) {
     writer.text(request.global_summaries);
     writer.flag(request.harvest);
     writer.number(request.memory_mb);
+    writer.flag(request.record_inputs);
     return std::move(writer.bytes);
 }
 
@@ -290,6 +291,7 @@ bool decodeWorkerRequest(const std::string& packet, WorkerRequest& request, std:
         candidate.global_summaries = reader.text();
         candidate.harvest = reader.flag();
         candidate.memory_mb = reader.number();
+        candidate.record_inputs = reader.flag();
         require(validWorkerLimits({1, candidate.memory_mb}), "invalid worker memory limit");
         reader.finish();
         request = std::move(candidate);
@@ -318,6 +320,9 @@ std::string encodeWorkerResponse(const WorkerResponse& response) {
         writer.number(static_cast<std::uint32_t>(gap.gap));
     }
     writer.text(response.global_summaries);
+    writer.text(response.input_witness);
+    writer.text(response.runtime_digest);
+    writer.flag(response.cache_hit);
     return std::move(writer.bytes);
 }
 
@@ -346,6 +351,13 @@ bool decodeWorkerResponse(const std::string& packet, const WorkerRequest& reques
             candidate.gaps.push_back(std::move(entry));
         }
         candidate.global_summaries = reader.text();
+        candidate.input_witness = reader.text();
+        candidate.runtime_digest = reader.text();
+        candidate.cache_hit = reader.flag();
+        require(!candidate.cache_hit || (request.record_inputs && !candidate.input_witness.empty() &&
+                candidate.runtime_digest.size() == 64 &&
+                candidate.runtime_digest.find_first_not_of("0123456789abcdef") == std::string::npos),
+                "unbound worker cache hit");
         reader.finish();
         validateCoverage(candidate, request);
         response = std::move(candidate);

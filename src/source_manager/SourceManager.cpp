@@ -8,12 +8,14 @@
 #include <exception>
 #include <iostream>
 #include <map>
+#include <stdexcept>
 
 #include <clang/AST/ASTConsumer.h>
 #include <clang/AST/ASTContext.h>
 #include <clang/Frontend/ASTUnit.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/FrontendAction.h>
+#include <clang/Lex/PreprocessorOptions.h>
 #include <clang/Tooling/ArgumentsAdjusters.h>
 #include <clang/Tooling/CompilationDatabase.h>
 #include <clang/Tooling/Tooling.h>
@@ -41,6 +43,30 @@ bool tuIsBroken(clang::ASTContext& ctx) {
     return ctx.getDiagnostics().hasErrorOccurred();
 }
 
+void callInCompilerDirectory(clang::ASTContext& context, const fs::path& directory,
+                             const codeskeptic::ASTCallback& callback) {
+    // ClangTool restores cwd before a retained-AST callback. Native consumers
+    // (sidecars and baseline function binding) must see the same directory as
+    // the AST's real FileManager VFS. The production AST pipeline is serialized;
+    // this does not promise concurrent-library-call safety.
+    auto& virtual_fs = context.getSourceManager().getFileManager().getVirtualFileSystem();
+    const auto native_before = fs::current_path();
+    const auto virtual_before = virtual_fs.getCurrentWorkingDirectory();
+    if (!virtual_before) throw std::runtime_error("cannot read compiler working directory");
+    std::exception_ptr failure;
+    try {
+        fs::current_path(directory);
+        if (virtual_fs.setCurrentWorkingDirectory(directory.string()))
+            throw std::runtime_error("cannot set compiler working directory");
+        callback(context);
+    } catch (...) { failure = std::current_exception(); }
+    const auto virtual_error = virtual_fs.setCurrentWorkingDirectory(*virtual_before);
+    std::error_code native_error;
+    fs::current_path(native_before, native_error);
+    if (virtual_error || native_error) throw std::runtime_error("cannot restore compiler working directory");
+    if (failure) std::rethrow_exception(failure);
+}
+
 class CodeSkepticASTConsumer : public clang::ASTConsumer {
 public:
     explicit CodeSkepticASTConsumer(codeskeptic::ASTCallback callback)
@@ -64,12 +90,10 @@ public:
     std::unique_ptr<clang::ASTConsumer>
     CreateASTConsumer(clang::CompilerInstance& ci,
                       llvm::StringRef /*file*/) override {
-        // AR.3: the vanished-assert recorder is a PPCallbacks hook, so
-        // it must be installed HERE, before preprocessing. The warm-AST
-        // path (processAllOnWorker) never reaches this point and is
-        // therefore inert — AssertGuardCache's SourceManager fence
-        // makes that a no-op rather than a stale-pointer read.
+        // Both fresh and retained-AST construction must install these hooks
+        // before preprocessing; an AST alone cannot reconstruct discarded macros.
         codeskeptic::installAssertRecovery(ci);
+        codeskeptic::observeCompilerInputs(ci);
         return std::make_unique<CodeSkepticASTConsumer>(callback_);
     }
 
@@ -89,6 +113,50 @@ public:
 
 private:
     codeskeptic::ASTCallback callback_;
+};
+
+class RetainedAstAction : public clang::tooling::ToolAction {
+public:
+    explicit RetainedAstAction(codeskeptic::ASTCallback callback) : fallback_(std::move(callback)) {}
+    bool runInvocation(std::shared_ptr<clang::CompilerInvocation> invocation,
+        clang::FileManager* files,
+        std::shared_ptr<clang::PCHContainerOperations> pch,
+        clang::DiagnosticConsumer* consumer) override {
+        const auto& inputs = invocation->getFrontendOpts().Inputs;
+        const auto& preprocessor = invocation->getPreprocessorOpts();
+        const bool supported = inputs.size() == 1 && inputs.front().isFile() &&
+            inputs.front().getFile() != "-" &&
+            inputs.front().getKind().getFormat() == clang::InputKind::Source &&
+            (inputs.front().getKind().getLanguage() == clang::Language::C ||
+             inputs.front().getKind().getLanguage() == clang::Language::CXX) &&
+            !inputs.front().getKind().isPreprocessed() && !inputs.front().getKind().isHeader() &&
+            !inputs.front().getKind().isHeaderUnit() && preprocessor.ImplicitPCHInclude.empty() &&
+            preprocessor.ChainedIncludes.empty() && preprocessor.PCHThroughHeader.empty();
+        if (!supported) {
+            codeskeptic::refuseInputReuse("unsupported_frontend_input");
+            CodeSkepticActionFactory factory(fallback_);
+            return factory.runInvocation(std::move(invocation), files, std::move(pch), consumer);
+        }
+        auto diagnostics = clang::CompilerInstance::createDiagnostics(
+            files->getVirtualFileSystem(), &invocation->getDiagnosticOpts(), consumer, false);
+        if (!diagnostics) return false;
+        auto candidate = clang::ASTUnit::create(invocation, diagnostics,
+            clang::CaptureDiagsKind::None, false);
+        candidate->getFileManager().setVirtualFileSystem(files->getVirtualFileSystemPtr());
+        // The persistent consumer must not retain references to the caller's
+        // stack. Rules run once after loading, while fresh PP state is valid.
+        CodeSkepticAction action([](clang::ASTContext&) {});
+        auto* loaded = clang::ASTUnit::LoadFromCompilerInvocationAction(
+            invocation, pch, diagnostics, &action, candidate.get(), true, {},
+            false, clang::CaptureDiagsKind::None, 0, false, false);
+        if (!loaded) return false;
+        const bool success = diagnostics->getClient()->getNumErrors() == 0;
+        unit = std::move(candidate);
+        return success;
+    }
+    std::unique_ptr<clang::ASTUnit> unit;
+private:
+    codeskeptic::ASTCallback fallback_;
 };
 
 // Fallback compilation database (no compile_commands.json found):
@@ -264,13 +332,14 @@ void applyPlatformAdjusters(clang::tooling::ClangTool& tool) {
 //
 // Deliberate global state (not the OPPOSITE of the filter-leak lesson,
 // but its complement): here cross-call persistence IS the feature, and
-// the key includes the loaded compile commands and paths, with a source
-// mtime+size freshness fingerprint. Changed commands/source metadata rebuild
-// the AST; transitive header/environment tracking is outside this cache model.
+// the key binds the recipe and PP settings, and the witness binds the actual
+// input bytes plus positive/negative filesystem observations. Unsupported or
+// volatile inputs still parse normally but cannot populate the store.
 struct CachedAst {
-    std::string fingerprint;
+    InputIdentity identity;
     std::unique_ptr<clang::ASTUnit> unit;
     int frontend_result = 0;
+    std::function<InputIdentity()> snapshot;
 };
 
 // ClangTool's aggregate result cannot identify which of a source's compile
@@ -295,21 +364,6 @@ unsigned g_warmMisses = 0;
 // Simple memory ceiling: not worth LRU complexity — flush everything on
 // overflow (in MCP usage the file count is small, rarely triggered)
 constexpr size_t kMaxCachedAsts = 16;
-
-std::string fingerprintOf(const std::string& path) {
-    std::error_code ec;
-    auto size = fs::file_size(path, ec);
-    if (ec) return {};
-    auto mtime = fs::last_write_time(path, ec);
-    if (ec) return {};
-    // Explicit casts: on Apple libc++ file_time_type's rep is __int128,
-    // which has no std::to_string overload (ambiguous-call error). The
-    // narrowing is harmless — this is a cache fingerprint, not a
-    // timestamp.
-    return std::to_string(static_cast<unsigned long long>(size)) + ":" +
-           std::to_string(static_cast<long long>(
-               mtime.time_since_epoch().count()));
-}
 
 } // anonymous namespace
 
@@ -353,6 +407,13 @@ int SourceManager::processAll(ASTCallback callback) {
 
 int SourceManager::processAllOnWorker(ASTCallback callback) {
     coverage_.clear();
+    input_identity_ = {};
+    if (!input_context_.empty()) {
+        input_identity_.reusable = true;
+        input_identity_.reason.clear();
+        input_identity_.context = input_context_;
+        input_identity_.environment = inputEnvironmentIdentity();
+    }
     for (const auto& file : source_files_) coverage_.push_back(SourceCoverage{file});
     bool anyFailed = false;
     for (auto& source : coverage_) {
@@ -370,62 +431,96 @@ int SourceManager::processAllOnWorker(ASTCallback callback) {
             continue;
         }
         for (const auto& command : commands) {
+            const auto command_directory = fs::absolute(command.Directory);
             bool visited = false, completed = false, broken = false;
+            std::exception_ptr callback_failure;
             auto guardedCall = [&](clang::ASTContext& ctx) {
+                if (callback_failure) return;
                 visited = true;
                 broken = broken || tuIsBroken(ctx);
                 if (tuIsBroken(ctx) && !analyzeBrokenTUs()) {
                     recordBrokenTU(file);
                     return;
                 }
-                callback(ctx);
+                try { callInCompilerDirectory(ctx, command_directory, callback); }
+                catch (...) {
+                    // Finish Clang's action normally so it restores its own
+                    // working directory and unwinds frontend ownership before
+                    // the exception crosses the public SourceManager boundary.
+                    callback_failure = std::current_exception();
+                    return;
+                }
                 completed = true;
             };
             int frontendResult = 0;
             SingleCommandDatabase database(command);
+            std::string key;
+            auto bind = [&](const std::string& field) {
+                key += std::to_string(field.size()) + ":" + field;
+            };
+            bind(file); bind(build_path_); bind(fs::current_path().string());
+            bind(command.Directory); bind(command.Filename); bind(command.Output);
+            bind(std::to_string(command.CommandLine.size()));
+            for (const auto& argument : command.CommandLine) bind(argument);
+            for (const auto& argument : platformExtraArgs()) bind(argument);
+            bind(assertRecoveryEnabled() ? "asserts-on" : "asserts-off");
+            bind(std::to_string(extraAssertMacros().size()));
+            for (const auto& name : extraAssertMacros()) bind(name);
+            bind(std::to_string(negativeAssertMacros().size()));
+            for (const auto& name : negativeAssertMacros()) bind(name);
+            key = inputDigest(key);
+            const bool supported = cacheableCommand(command.CommandLine);
+            std::unique_ptr<InputRecording> recording;
+            if (warm_cache_ || !input_context_.empty()) {
+                recording = std::make_unique<InputRecording>(key);
+                if (!supported) recording->refuse("unsupported_compiler_arguments");
+            }
+            auto filesystem = recording ? recording->filesystem() : llvm::vfs::getRealFileSystem();
+            InputIdentity command_identity;
             // Retain the existing one-command warm-cache boundary. Multiple
             // variants always execute normally; none is silently discarded.
-            if (warm_cache_ && commands.size() == 1) {
-                // Length-prefix fields prevent delimiter collisions. Retain
-                // the existing source mtime/size cache freshness model.
-                std::string key;
-                auto bind = [&](const std::string& field) {
-                    key += std::to_string(field.size()) + ":" + field;
-                };
-                bind(file);
-                bind(build_path_);
-                bind(std::to_string(commands.size()));
-                bind(command.Directory);
-                bind(command.Filename);
-                bind(command.Output);
-                bind(std::to_string(command.CommandLine.size()));
-                for (const auto& argument : command.CommandLine) bind(argument);
-                for (const auto& argument : platformExtraArgs()) bind(argument);
-                const std::string fp = fingerprintOf(file);
+            if (warm_cache_ && commands.size() == 1 && supported) {
                 auto it = astCache().find(key);
-                if (!fp.empty() && it != astCache().end() &&
-                    it->second.fingerprint == fp && it->second.unit) {
+                if (it != astCache().end() && it->second.unit && it->second.identity.matchesCurrent()) {
                     ++g_warmHits;
                     frontendResult = it->second.frontend_result;
                     guardedCall(it->second.unit->getASTContext());
+                    command_identity = it->second.snapshot();
+                    command_identity.append(recording->finish());
+                    it->second.identity = command_identity;
                 } else {
                     ++g_warmMisses;
-                    clang::tooling::ClangTool tool(database, {file});
+                    if (it != astCache().end()) astCache().erase(it);
+                    clang::tooling::ClangTool tool(database, {file},
+                        std::make_shared<clang::PCHContainerOperations>(), filesystem);
                     applyPlatformAdjusters(tool);
-                    std::vector<std::unique_ptr<clang::ASTUnit>> units;
-                    frontendResult = tool.buildASTs(units);
-                    if (!units.empty() && units[0]) {
-                        guardedCall(units[0]->getASTContext());
-                        if (astCache().size() >= kMaxCachedAsts) astCache().clear();
-                        astCache()[key] = {fp, std::move(units[0]), frontendResult};
+                    RetainedAstAction builder(guardedCall);
+                    frontendResult = tool.run(&builder);
+                    if (builder.unit) {
+                        guardedCall(builder.unit->getASTContext());
+                        command_identity = recording->finish();
+                        // Assert records are globally owned by the most recently
+                        // parsed SourceManager, not by ASTUnit. Only a zero-record
+                        // AST is independent of that volatile external ownership.
+                        if (!callback_failure && recordedVanishedAssertCount() == 0 && command_identity.hasBuffer(file) &&
+                            command_identity.matchesCurrent()) {
+                            if (astCache().size() >= kMaxCachedAsts) astCache().clear();
+                            astCache()[key] = {command_identity, std::move(builder.unit), frontendResult,
+                                              recording->snapshotter()};
+                        }
                     }
                 }
             } else {
-                clang::tooling::ClangTool tool(database, {file});
+                if (warm_cache_ && commands.size() == 1) ++g_warmMisses;
+                clang::tooling::ClangTool tool(database, {file},
+                    std::make_shared<clang::PCHContainerOperations>(), filesystem);
                 applyPlatformAdjusters(tool);
                 CodeSkepticActionFactory factory(guardedCall);
                 frontendResult = tool.run(&factory);
+                if (recording) command_identity = recording->finish();
             }
+            if (callback_failure) std::rethrow_exception(callback_failure);
+            if (!input_context_.empty()) input_identity_.append(command_identity);
             if (!visited || (!broken && frontendResult != 0)) {
                 ++source.failed_commands;
                 source.reason = frontendResult != 0 ? "frontend_failed"

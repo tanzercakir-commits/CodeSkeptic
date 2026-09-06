@@ -37,6 +37,7 @@ struct WorkerRequest {
     std::string global_summaries;
     bool harvest = false;
     unsigned memory_mb = WorkerLimits{}.memory_mb;
+    bool record_inputs = false;
 };
 
 struct WorkerResponse {
@@ -47,6 +48,11 @@ struct WorkerResponse {
     DiagnosticList diagnostics;
     std::vector<CoverageEntry> gaps;
     std::string global_summaries;
+    // Empty is a valid ordinary response, but never a reusable one. The exact
+    // build binding covers private same-build layout changes within schema v1.
+    std::string input_witness;
+    std::string runtime_digest;
+    bool cache_hit = false;
 };
 
 // Encoding throws on limits/invalid values. Decoding is transactional: an
