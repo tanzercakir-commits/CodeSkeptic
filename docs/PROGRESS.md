@@ -2,6 +2,25 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH02-S04-U001 — Compilation discovery için native LLVM/MSVC uyumluluğunu doğrula
+
+- Commit: `94cb335ffc7a73509c64a98ee029f5f44c7322f0`
+- Dal: `agent/cs3-ch02-s04-u001-native-compilation`
+- Implementer: `primary-cwe-restart-20260906`
+- Bağımsız denetçi: `independent-cwe-ch02-s04-u001-product-94cb335-20260906`
+- İnceleme SHA-256: `b8dceebff92fe4db13eb60f6b2a968b00c5bbbf2af43337acf013d6ec8901dfe`
+- Tarih: 2026-09-06T11:15:15.039366+00:00
+- Sonuç: Mevcut Windows toolchain compilation discovery kodunu derler; komut kimliği doğrulaması ve ürün kapıları korunur.
+- linux-suite: PASS; SHA-256 `4ac9049143423cb677412b0b0e365a7098ac51bd0ad760b6bd362252d2f80a35`; `bash scripts/local_test.sh full; exact-head qualification via bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S04-U001/verify_native_candidate.sh 94cb335ffc7a73509c64a98ee029f5f44c7322f0`
+- compilation-database-cli: PASS; SHA-256 `275bab733506dd716c1366a2244ecf1db063bd6cd386398c125f1d455e448301`; `python3 -B tests/CompilationDatabaseCliTest.py /workspace/build/src/codeskeptic; bash scripts/local_test.sh smoke; exact-head stages of verify_native_candidate.sh 94cb335ffc7a73509c64a98ee029f5f44c7322f0`
+- hosted-windows: PASS; SHA-256 `92887f0fa0ec4c427b95471e22f2b548d1f15709339a8aeed84fd0d93cb508ca`; `GitHub Actions Windows run 34028582912, windows-native job 101473882322: cmake --build build -- -k 0; ctest --test-dir build --output-on-failure; .\build\tests\codeskeptic_tests.exe; native smoke, SDK discovery, both package rehearsals and relocation smoke from exact-head .github/workflows/windows.yml. All required steps succeeded; the unchanged unreadable-directory fixture was explicitly skipped on Windows and passed on Linux.`
+- hosted-windows-status: PASS; SHA-256 `76467b92c987e1128c34b9cef22b2f35fbf9aa1c2ec06422ea75462277834a9c`; `jq '{headSha,databaseId,status,conclusion,url,jobs:[.jobs[]|{name,databaseId,status,conclusion,steps}]}' windows-final.json; independently verify exact candidate and successful terminal required steps for run 34028582912`
+- queue-check: PASS; SHA-256 `1b9ca795495970b7005d1700e7abf22b6800b5d68dcb6122153339f473707ea6`; `python3 -B scripts/project_queue.py check; python3 -B scripts/project_queue.py guard --base HEAD^; bash scripts/check_docs_sync.sh; git diff --check; verify clean exact HEAD, task branch and unchanged main`
+- hosted-linux: PASS; SHA-256 `e8198aadba240f68e6073988b6d40bbe8e17e97c325f757a5174a40b5b3fd1d1`; `GitHub Actions CI run 34028582902, build-and-test job 101473882108: ctest --test-dir build --output-on-failure; ./build/tests/codeskeptic_tests; native smoke; ./build/src/codeskeptic src/ --build-path build --policy no-absolute-paths --json /tmp/selfscan.json; bash scripts/run_corpus.sh ./build/src/codeskeptic /tmp/corpus; bash scripts/run_thesis.sh ./build/src/codeskeptic`
+- hosted-linux-status: PASS; SHA-256 `ceb376ff2fdc2bc401e4cc84b40cc06264928837ec44ea578d28fb1ce6e44783`; `jq '{headSha,headBranch,databaseId,status,conclusion,event,url,jobs}' linux-hosted-final.json; independently verify exact candidate and successful terminal required steps for run 34028582902`
+- corpus-same-input: PASS; SHA-256 `5fd326ce4a986751468a82d22e3a18113bd5e0506bdd2e264c54d76ad8b6b5cf`; `python3 -B /evidence/compare_diagnostic_corpus.py candidate-94cb335ffc7a73509c64a98ee029f5f44c7322f0 /workspace/build/src/codeskeptic; independent raw-report multiset, source-identity, summary-delta and 497 frozen-input hash inspection`
+- hosted-juliet: PASS; SHA-256 `5283a2130e17b5fbcaa9947d190d2c4bb1917a6aecdab26ceaa402a5b45ddbb9`; `GitHub Actions Juliet run 34028582866: python3 scripts/juliet_eval.py --selftest; bash scripts/run_juliet.sh ./build/src/codeskeptic juliet-work 400; python3 scripts/render_quality_dashboard.py --juliet-output juliet-output.txt --baseline scripts/measurement_baseline.json --time-output juliet-time.txt --json-output juliet-dashboard.json --markdown-output juliet-dashboard.md. Push-time gates only; scheduled deep corpus was skipped and is not claimed.`
+
 ## CS3-CH02-S03-U002 — Frontend ve CFG düşmanca geçerli girdilerde sonlansın
 
 - Commit: `5cfa9022f9aafc8d07c22a6f3f2fb06232e8c423`
