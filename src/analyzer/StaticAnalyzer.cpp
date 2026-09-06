@@ -1,4 +1,6 @@
 #include "analyzer/StaticAnalyzer.h"
+#include "analyzer/AnalysisState.h"
+#include "analyzer/AnalysisCoordinator.h"
 #include "source_manager/CompilationDatabaseDiscovery.h"
 
 #include "analyzer/Baseline.h"
@@ -42,6 +44,8 @@ void setFindingCounts(AnalysisResult& result,
         }));
 }
 
+} // namespace
+
 void clearAnalysisState() {
     setFunctionFilter({});
     setLineRanges({});
@@ -66,7 +70,24 @@ void clearAnalysisState() {
     CoverageReport::instance().clear();
 }
 
-} // namespace
+void initializeAnalysisState(const Config& config) {
+    setLang(parseLang(config.lang()));
+    setFunctionFilter(config.functions());
+    setLineRanges(config.lines());
+    setFatalCallNames(config.fatalAsserts());
+    setAssertRecoveryEnabled(config.assertRecovery());
+    setExtraAssertMacros(config.assertMacros());
+    setNegativeAssertMacros(config.negativeAssertMacros());
+    setAllocFunctionNames(config.allocFunctions());
+    setFreeFunctionNames(config.freeFunctions());
+    setAllocatorPairs(config.allocatorPairs());
+    setOwningPointerNames(config.owningPointers());
+    setUntrustedIntSourceNames(config.untrustedIntSources());
+    setProfilePolicies(config.policies());
+    setAssumptionMode(config.assumptions());
+    clearSidecarCache();
+    CoverageReport::instance().clear();
+}
 
 std::size_t StaticAnalyzer::totalTUs() const {
     return source_mgr_ ? source_mgr_->fileCount() : 0;
@@ -79,33 +100,51 @@ std::size_t StaticAnalyzer::brokenTUCount() const {
 
 StaticAnalyzer::StaticAnalyzer(Config config)
     try : config_(std::move(config)) {
-    setLang(parseLang(config_.lang()));
-    setFunctionFilter(config_.functions());
-    setLineRanges(config_.lines());
-    setFatalCallNames(config_.fatalAsserts());
-    setAssertRecoveryEnabled(config_.assertRecovery());
-    setExtraAssertMacros(config_.assertMacros());
-    setNegativeAssertMacros(config_.negativeAssertMacros());
-    setAllocFunctionNames(config_.allocFunctions());
-    setFreeFunctionNames(config_.freeFunctions());
-    setAllocatorPairs(config_.allocatorPairs());
-    setOwningPointerNames(config_.owningPointers());
-    setUntrustedIntSourceNames(config_.untrustedIntSources());
-    setProfilePolicies(config_.policies());
-    setAssumptionMode(config_.assumptions());
     // Sidecar contracts are cached per file path for the process
     // lifetime; a new analyzer run re-reads them (the MCP server
     // lives long — an edited .csk must be seen).
-    clearSidecarCache();
     // Coverage gaps belong to a single run; a long-lived process (the
     // MCP server) must not inherit the previous run's non-convergence.
-    CoverageReport::instance().clear();
+    initializeAnalysisState(config_);
 
     auto selection = discoverCompilationDatabase(config_);
     compilation_input_ready_ = selection.ready;
     writeCompilationDoctor(selection, std::cerr);
     const auto buildDirectory = selection.database.empty() ? "." :
         std::filesystem::path(selection.database).parent_path().string();
+    worker_executable_ = workerExecutable();
+    if (!worker_executable_.empty() && selection.ready) {
+        // Discovery already freezes canonical, sorted files and expanded command
+        // variants. Capture them before moving the database, not after a second
+        // lookup in a child with a potentially changed project configuration.
+        for (const auto& file : selection.files) {
+            WorkerRequest request;
+            request.ordinal = static_cast<std::uint32_t>(worker_requests_.size());
+            request.source = file;
+            request.build_directory = buildDirectory;
+            request.synthetic = selection.synthetic;
+            if (selection.synthetic) {
+                // The no-database selection intentionally owns no DB object.
+                // Freeze the existing documented single-file GNU11/C++17
+                // recipe here; the child must not rediscover or replace it.
+                const bool is_c = std::filesystem::path(file).extension() == ".c";
+                std::vector<std::string> arguments = is_c
+                    ? std::vector<std::string>{"clang", "-x", "c", "-std=gnu11"}
+                    : std::vector<std::string>{"clang++", "-std=c++17"};
+                arguments.insert(arguments.end(), {"-fsyntax-only", file});
+                request.commands.emplace_back(".", file, std::move(arguments), "");
+            } else {
+                request.commands = selection.commands->getCompileCommands(file);
+            }
+            request.arguments = workerAnalysisArguments(config_);
+            for (const auto& family : ruleCapabilities()) {
+                const std::string id(family.id);
+                if ((id != "assumption" || config_.assumptions()) && config_.isRuleEnabled(id))
+                    request.selected_families.push_back(id);
+            }
+            worker_requests_.push_back(std::move(request));
+        }
+    }
     source_mgr_ = std::make_unique<SourceManager>(
         buildDirectory, std::move(selection.commands), selection.synthetic);
     if (config_.warmCache()) source_mgr_->enableWarmCache(true);
@@ -151,6 +190,52 @@ StaticAnalyzer::~StaticAnalyzer() {
     // InterproceduralTest's tests — ctest's per-process isolation had
     // been hiding it.)
     clearAnalysisState();
+}
+
+std::vector<SourceCoverage> StaticAnalyzer::processIsolated(bool prepass) {
+    std::vector<SourceCoverage> coverage;
+    for (const auto& frozen : worker_requests_) {
+        WorkerRequest request = frozen;
+        request.phase = prepass ? WorkerPhase::Harvest : WorkerPhase::Analyze;
+        request.harvest = !config_.summaryOut().empty();
+        request.producers = engine_.ruleIds();
+        SourceCoverage failed{request.source};
+        failed.commands = failed.failed_commands = request.commands.size();
+        failed.reason = "worker_summary_export_failed";
+        std::string error;
+        if (!exportWorkerSummaries(request.global_summaries, error)) {
+            std::cerr << "[CodeSkeptic] worker summary export failed: " << error << '\n';
+            coverage.push_back(std::move(failed));
+            continue;
+        }
+        auto execution = executeAnalysisWorker(worker_executable_, request);
+        if (!execution.detail.empty()) std::cerr << execution.detail << '\n';
+        if (!execution.valid) {
+            failed.reason = execution.reason;
+            std::cerr << "[CodeSkeptic] " << execution.reason << ": " << request.source << '\n';
+            coverage.push_back(std::move(failed));
+            continue;
+        }
+        // The response has been fully decoded and bound to this exact request.
+        // Import its rolling state before allowing another source to consume it.
+        if (!importWorkerSummaries(execution.response.global_summaries, error)) {
+            failed.reason = "worker_summary_import_failed";
+            std::cerr << "[CodeSkeptic] worker summary import failed: " << error << '\n';
+            coverage.push_back(std::move(failed));
+            continue;
+        }
+        auto& response = execution.response;
+        if (response.coverage.skipped_commands > 0)
+            SourceManager::recordBrokenTU(request.source);
+        for (const auto& gap : response.gaps) {
+            if (gap.gap == CoverageGap::CfgUnavailable)
+                CoverageReport::instance().recordCfgUnavailable(gap.function);
+            else CoverageReport::instance().recordNonConvergence(gap.function);
+        }
+        diagnostics_.insert(diagnostics_.end(), response.diagnostics.begin(), response.diagnostics.end());
+        coverage.push_back(std::move(response.coverage));
+    }
+    return coverage;
 }
 
 AnalysisResult StaticAnalyzer::run() {
@@ -279,14 +364,18 @@ AnalysisResult StaticAnalyzer::run() {
     if (config_.wholeProgram()) {
         std::cerr << msg(MsgId::WholeProgramPass,
                          std::to_string(source_mgr_->fileCount())) << "\n";
-        source_mgr_->processAll([](clang::ASTContext& ctx) {
-            auto& registry = SummaryRegistry::instance();
-            registry.rebuild(ctx);
-            registry.harvestGlobal();
-            registry.clear();
-            CfgCache::instance().clear();
-        });
-        prepassCoverage = source_mgr_->coverage();
+        if (!worker_executable_.empty()) {
+            prepassCoverage = processIsolated(true);
+        } else {
+            source_mgr_->processAll([](clang::ASTContext& ctx) {
+                auto& registry = SummaryRegistry::instance();
+                registry.rebuild(ctx);
+                registry.harvestGlobal();
+                registry.clear();
+                CfgCache::instance().clear();
+            });
+            prepassCoverage = source_mgr_->coverage();
+        }
     }
 
     // --summary-out: harvest from the per-TU local table runAll builds —
@@ -297,12 +386,16 @@ AnalysisResult StaticAnalyzer::run() {
 
     SourceManager::clearBrokenTUs();
 
-    source_mgr_->processAll([this](clang::ASTContext& ctx) {
-        auto findings = engine_.runAll(ctx);
-        bindBaselineFunctions(ctx, findings);
-        diagnostics_.insert(diagnostics_.end(), findings.begin(), findings.end());
-    });
-    result.sources = source_mgr_->coverage();
+    if (!worker_executable_.empty()) {
+        result.sources = processIsolated(false);
+    } else {
+        source_mgr_->processAll([this](clang::ASTContext& ctx) {
+            auto findings = engine_.runAll(ctx);
+            bindBaselineFunctions(ctx, findings);
+            diagnostics_.insert(diagnostics_.end(), findings.begin(), findings.end());
+        });
+        result.sources = source_mgr_->coverage();
+    }
     // Both passes use the same frozen source ordering. A later successful
     // parse cannot erase missing summary evidence from the required prepass.
     for (std::size_t i = 0; i < prepassCoverage.size(); ++i) {

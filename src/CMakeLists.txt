@@ -27,6 +27,8 @@ add_library(codeskeptic_core STATIC
     reporter/SarifReporter.cpp
     config/Config.cpp
     analyzer/StaticAnalyzer.cpp
+    analyzer/AnalysisCoordinator.cpp
+    analyzer/WorkerProtocol.cpp
     analyzer/SuppressionFilter.cpp
     analyzer/Baseline.cpp
     server/McpServer.cpp

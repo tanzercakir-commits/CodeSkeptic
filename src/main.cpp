@@ -1,32 +1,33 @@
 #include "analyzer/StaticAnalyzer.h"
+#include "analyzer/AnalysisCoordinator.h"
+#include "analyzer/BuiltinRules.h"
 #include "core/Capabilities.h"
 #include "config/Config.h"
 #include "core/Messages.h"
 #include "engine/SummaryDiff.h"
-#include "rules/DivByZeroRule.h"
-#include "rules/IntOverflowRule.h"
-#include "rules/SignConversionRule.h"
-#include "rules/AllocSizeOverflowRule.h"
-#include "rules/BoundsRule.h"
-#include "rules/AssumptionRule.h"
-#include "rules/MemoryLeakRule_Ex.h"
-#include "rules/FdResourceRule.h"
-#include "rules/NullDerefRule.h"
-#include "rules/ContractRule.h"
-#include "rules/PolicyRule.h"
-#include "rules/UninitPointerRule_Ex.h"
-#include "rules/UninitScalarRule.h"
 #include "server/McpServer.h"
 #include "source_manager/CompilationDatabaseDiscovery.h"
 
 #include <cstring>
 #include <iostream>
+#include <llvm/Support/FileSystem.h>
 
 #ifndef CODESKEPTIC_VERSION
 #define CODESKEPTIC_VERSION "0.0.0-dev"
 #endif
 
 int main(int argc, char* argv[]) {
+    // Internal transport is exclusive and precedes every ordinary shortcut or
+    // project-config read. A child cannot recursively start a coordinator.
+    for (int i = 1; i < argc; ++i) {
+        if (std::strncmp(argv[i], "--codeskeptic-worker", sizeof("--codeskeptic-worker") - 1) == 0) {
+            if (i != 1 || argc != 4 || std::strcmp(argv[1], "--codeskeptic-worker-v1") != 0) {
+                std::cerr << "[CodeSkeptic] invalid internal worker invocation\n";
+                return 2;
+            }
+            return codeskeptic::runAnalysisWorker(argv[2], argv[3]);
+        }
+    }
     // --version exits 0 by convention (unlike --help's usage-error exit)
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--version") == 0) {
@@ -91,6 +92,13 @@ int main(int argc, char* argv[]) {
         return selection.ready ? 0 : 2;
     }
 
+    const auto executable = llvm::sys::fs::getMainExecutable(argv[0], reinterpret_cast<void*>(&main));
+    if (executable.empty()) {
+        std::cerr << "[CodeSkeptic] cannot resolve the analysis worker executable\n";
+        return 2;
+    }
+    codeskeptic::setWorkerExecutable(executable);
+
     if (config.serve()) {
         return codeskeptic::runMcpServer(config);
     }
@@ -111,19 +119,7 @@ int main(int argc, char* argv[]) {
 
     codeskeptic::StaticAnalyzer analyzer(std::move(config));
 
-    analyzer.addRule<codeskeptic::UninitPointerRule_Ex>();
-    analyzer.addRule<codeskeptic::UninitScalarRule>();
-    analyzer.addRule<codeskeptic::MemoryLeakRule_Ex>();
-    analyzer.addRule<codeskeptic::FdResourceRule>();
-    analyzer.addRule<codeskeptic::DivByZeroRule>();
-    analyzer.addRule<codeskeptic::IntOverflowRule>();
-    analyzer.addRule<codeskeptic::SignConversionRule>();
-    analyzer.addRule<codeskeptic::AllocSizeOverflowRule>();
-    analyzer.addRule<codeskeptic::BoundsRule>();
-    analyzer.addRule<codeskeptic::AssumptionRule>();
-    analyzer.addRule<codeskeptic::NullDerefRule>();
-    analyzer.addRule<codeskeptic::ContractRule>();
-    analyzer.addRule<codeskeptic::PolicyRule>();
+    codeskeptic::addBuiltinRules(analyzer);
 
     const codeskeptic::AnalysisResult result = analyzer.run();
     const int exit_code = result.exitCode();

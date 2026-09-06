@@ -13,6 +13,8 @@
 
 namespace codeskeptic {
 
+struct WorkerRequest;
+
 class StaticAnalyzer {
 public:
     // Post-run coverage stats for the exit-code policy (ExitPolicy.h).
@@ -37,7 +39,10 @@ public:
     const Config& config() const { return config_; }
 
 private:
+    std::vector<SourceCoverage> processIsolated(bool prepass);
     Config config_;
+    std::string worker_executable_;
+    std::vector<WorkerRequest> worker_requests_;
     bool compilation_input_ready_ = false;
     std::vector<SourceCoverage> requested_sources_;
     std::unique_ptr<SourceManager> source_mgr_;

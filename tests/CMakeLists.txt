@@ -13,6 +13,8 @@ add_executable(codeskeptic_tests
     TestHelper.cpp
     DiagnosticTest.cpp
     AnalysisResultTest.cpp
+    WorkerProtocolTest.cpp
+    AnalysisCoordinatorTest.cpp
     CapabilitiesTest.cpp
     FindingFingerprintTest.cpp
     ConfigTest.cpp
@@ -64,7 +66,17 @@ target_link_libraries(codeskeptic_tests
         codeskeptic_core
         GTest::gtest_main
 )
-add_dependencies(codeskeptic_tests codeskeptic_corpus_inputs)
+add_executable(codeskeptic_worker_fixture WorkerProtocolTest.cpp)
+target_compile_definitions(codeskeptic_worker_fixture PRIVATE CODESKEPTIC_WORKER_TEST_CHILD=1)
+target_link_libraries(codeskeptic_worker_fixture PRIVATE codeskeptic_core)
+target_compile_definitions(codeskeptic_tests PRIVATE
+    CODESKEPTIC_BINARY_PATH="$<TARGET_FILE:codeskeptic>"
+    CODESKEPTIC_WORKER_FIXTURE_PATH="$<TARGET_FILE:codeskeptic_worker_fixture>")
+if(MSVC)
+    target_sources(codeskeptic_tests PRIVATE ../src/windows_utf8.manifest)
+    target_sources(codeskeptic_worker_fixture PRIVATE ../src/windows_utf8.manifest)
+endif()
+add_dependencies(codeskeptic_tests codeskeptic_corpus_inputs codeskeptic codeskeptic_worker_fixture)
 
 include(GoogleTest)
 gtest_discover_tests(codeskeptic_tests)
