@@ -284,6 +284,88 @@ class CompilationDatabaseCliTest(unittest.TestCase):
                     self.assertEqual(console.returncode, expected)
                     self.assertNotIn("Clean!", console.stdout + console.stderr)
 
+    def test_promoted_warning_obeys_broken_ast_policy_and_prepass(self):
+        rejected = self.root / "rejected.cpp"
+        rejected.write_text("#if UNDEFINED_CONTROL\nint unused;\n#endif\n"
+                            "int rejected(){int zero=0; return 4/zero;}\n", encoding="utf-8")
+        build = self.root / "build"
+        for promoted in (False, True):
+            self.database(build, [self.source, rejected],
+                          extra=["-Wundef", *(["-Werror"] if promoted else [])])
+            for whole_program in (False, True):
+                for flag in (None, "--accept-partial-coverage", "--analyze-broken-tus"):
+                    with self.subTest(promoted=promoted, whole_program=whole_program, flag=flag):
+                        recover = promoted and flag == "--analyze-broken-tus"
+                        skipped = int(promoted and not recover)
+                        expected = 2 if promoted and flag is None else 0 if skipped else 1
+                        args = [self.root, "--build-path", build, *([flag] if flag else []),
+                                *(["--whole-program"] if whole_program else [])]
+                        coverage = self.coverage_formats(args, expected)
+                        self.assertEqual(coverage["complete"], not promoted)
+                        self.assertEqual(coverage["attempted_tus"], 2)
+                        self.assertEqual(coverage["analyzed_tus"], 2 - skipped)
+                        self.assertEqual(coverage["skipped_tus"], skipped)
+                        self.assertEqual(coverage["failed_tus"], 0)
+                        self.assertEqual(coverage["recovery_tus"], int(recover))
+                        row = next(s for s in coverage["sources"] if s["file"] == str(rejected))
+                        self.assertEqual(row["status"], "skipped" if skipped else "analyzed")
+                        self.assertEqual(row["recovery_commands"], int(recover))
+                        self.assertEqual(row["prepass"]["status"],
+                                         row["status"] if whole_program else "not_requested")
+                        self.assertEqual(row["prepass"]["recovery_commands"],
+                                         int(recover and whole_program))
+                        payload = json.loads((self.root / "coverage.json").read_text())
+                        # Rejected ASTs must not leak a seeded rule finding.
+                        self.assertEqual(payload["total"], 0 if skipped else 1)
+                        if promoted:
+                            console = self.run_cli(*args)
+                            self.assertEqual(console.returncode, expected)
+                            self.assertNotIn("Clean!", console.stdout + console.stderr)
+
+    def test_all_promoted_warning_sources_still_fail_partial_acceptance(self):
+        self.source.write_text("#if UNDEFINED_CONTROL\nint unused;\n#endif\n"
+                               "int safe(){return 42;}\n", encoding="utf-8")
+        build = self.root / "build"
+        self.database(build, extra=["-Werror", "-Wundef"])
+        for whole_program in (False, True):
+            coverage = self.coverage_formats(
+                [self.source, "--build-path", build, "--accept-partial-coverage",
+                 *(["--whole-program"] if whole_program else [])], 2)
+            self.assertFalse(coverage["complete"])
+            self.assertEqual(coverage["analyzed_tus"], 0)
+            self.assertEqual(coverage["skipped_tus"], 1)
+            self.assertEqual(coverage["failed_tus"], 0)
+
+    def test_real_failed_variant_dominates_diagnostic_rejection_and_recovery(self):
+        self.source.write_text("#if UNDEFINED_CONTROL\nint unused;\n#endif\n"
+                               "int safe(){return 42;}\n", encoding="utf-8")
+        build = self.root / "build"
+        database = self.database(build, extra=["-Werror", "-Wundef"])
+        rejected = json.loads(database.read_text())[0]
+        valid = dict(rejected, arguments=["clang++", "-DUNDEFINED_CONTROL=0", "-c", str(self.source)])
+        failed = dict(rejected, arguments=["clang++", "-target", "invalid-cs-target", "-c", str(self.source)])
+        for entries in ([valid, rejected, failed], [failed, rejected, valid]):
+            database.write_text(json.dumps(entries), encoding="utf-8")
+            for whole_program in (False, True):
+                for recover in (False, True):
+                    with self.subTest(entries=entries, whole_program=whole_program, recover=recover):
+                        coverage = self.coverage_formats(
+                            [self.source, "--build-path", build, "--accept-partial-coverage",
+                             *(["--analyze-broken-tus"] if recover else []),
+                             *(["--whole-program"] if whole_program else [])], 2)
+                        self.assertFalse(coverage["complete"])
+                        self.assertEqual(coverage["attempted_tus"], 1)
+                        self.assertEqual(coverage["failed_tus"], 1)
+                        self.assertEqual(coverage["attempted_commands"], 3)
+                        self.assertEqual(coverage["analyzed_commands"], 2 if recover else 1)
+                        self.assertEqual(coverage["skipped_commands"], 0 if recover else 1)
+                        self.assertEqual(coverage["failed_commands"], 1)
+                        row = coverage["sources"][0]
+                        self.assertEqual(row["status"], "failed")
+                        self.assertEqual(row["reason"], "frontend_failed")
+                        self.assertEqual(row["prepass"]["status"],
+                                         "failed" if whole_program else "not_requested")
+
     def test_failed_variant_dominates_success_in_both_orders_and_prepass(self):
         build = self.root / "build"
         database = self.database(build)

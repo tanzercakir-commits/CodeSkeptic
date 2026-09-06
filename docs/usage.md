@@ -341,9 +341,14 @@ These opt-ins retain their findings-based exit policy, but use the explicit
 `partial-accepted` or `recovery-accepted` status, never `clean`. The top-level
 `complete` field describes whether the configured verdict policy was satisfied;
 `coverage.complete` is false when sources were skipped or recovery ASTs were
-used. Missing commands, absent ASTs and frontend failures cannot be accepted by
-either flag. A source with any failed compile variant remains failed, even when
-its other variants produced findings successfully.
+used. When Clang produces an AST but reports compiler errors, including warnings
+promoted by the command's `-Werror` policy, that compilation is skipped before
+rules or summary harvesting unless recovery analysis is explicitly requested.
+Ordinary warnings do not cause a skip. Partial acceptance still fails if no
+source was analyzed. Missing commands, absent ASTs and tool/frontend execution
+failures not explained by that AST's compiler-error diagnostics cannot be
+accepted by either flag. A source with any failed compile variant remains
+failed, even when its other variants were skipped or produced findings.
 
 Coverage schema `codeskeptic-source-coverage/v1` counts canonical requested
 sources exactly once: `attempted_tus = analyzed_tus + skipped_tus + failed_tus`.

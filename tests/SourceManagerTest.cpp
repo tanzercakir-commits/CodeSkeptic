@@ -1,6 +1,7 @@
 #include "source_manager/SourceManager.h"
 #include "analyzer/StaticAnalyzer.h"
 #include "rules/DivByZeroRule.h"
+#include <clang/AST/ASTContext.h>
 #include <clang/Tooling/CompilationDatabase.h>
 #include <llvm/Support/JSON.h>
 #include <gtest/gtest.h>
@@ -191,4 +192,90 @@ TEST_F(SourceManagerTargetTest, WarmCachePreservesBrokenAstEvidenceAcrossOptInCh
     }
     EXPECT_EQ(SourceManager::warmCacheMisses(), 1u);
     EXPECT_EQ(SourceManager::warmCacheHits(), 3u);
+}
+
+TEST_F(SourceManagerTargetTest, DiagnosticErrorGuardPreservesColdAndCachedOptInEvidence) {
+    std::ofstream(root / "kept.cpp") <<
+        "#if UNDEFINED_CONTROL\nint unused;\n#endif\nint kept(){return 1;}\n";
+    struct Restore {
+        ~Restore() {
+            SourceManager::setAnalyzeBrokenTUs(false);
+            SourceManager::clearBrokenTUs();
+            SourceManager::clearWarmCache();
+        }
+    } restore;
+    for (bool warm : {false, true}) {
+        for (bool promoted : {false, true}) {
+            SCOPED_TRACE(::testing::Message() << "warm=" << warm << " promoted=" << promoted);
+            auto arguments = std::vector<std::string>{"-std=c++17", "-Wundef"};
+            if (promoted) arguments.push_back("-Werror");
+            auto database = std::make_unique<clang::tooling::FixedCompilationDatabase>(
+                root.string(), arguments);
+            SourceManager manager(root.string(), std::move(database), false);
+            ASSERT_TRUE(manager.addSourceFile((root / "kept.cpp").string()));
+            manager.enableWarmCache(warm);
+            SourceManager::clearWarmCache();
+            for (bool recover : {false, true, false, true}) {
+                SCOPED_TRACE(recover ? "recovery" : "default");
+                SourceManager::setAnalyzeBrokenTUs(recover);
+                SourceManager::clearBrokenTUs();
+                unsigned visits = 0;
+                const bool skip = promoted && !recover;
+                EXPECT_EQ(manager.processAll([&](clang::ASTContext& ctx) {
+                    ++visits;
+                    EXPECT_EQ(ctx.getDiagnostics().hasErrorOccurred(), promoted);
+                    // This regression is specifically an error promoted from a
+                    // warning, not a hard parse error already covered above.
+                    EXPECT_FALSE(ctx.getDiagnostics().hasUncompilableErrorOccurred());
+                }), skip ? 1 : 0);
+                EXPECT_EQ(visits, skip ? 0u : 1u);
+                ASSERT_EQ(manager.coverage().size(), 1u);
+                const auto& source = manager.coverage()[0];
+                EXPECT_EQ(source.file, fs::canonical(root / "kept.cpp").string());
+                EXPECT_EQ(source.commands, 1u);
+                EXPECT_EQ(source.status, skip ? codeskeptic::SourceStatus::Skipped
+                                              : codeskeptic::SourceStatus::Analyzed);
+                EXPECT_EQ(source.analyzed_commands, skip ? 0u : 1u);
+                EXPECT_EQ(source.skipped_commands, skip ? 1u : 0u);
+                EXPECT_EQ(source.failed_commands, 0u);
+                EXPECT_EQ(source.recovery_commands, promoted && recover ? 1u : 0u);
+                EXPECT_EQ(SourceManager::brokenTUs().size(), skip ? 1u : 0u);
+            }
+            EXPECT_EQ(SourceManager::warmCacheMisses(), warm ? 1u : 0u);
+            EXPECT_EQ(SourceManager::warmCacheHits(), warm ? 3u : 0u);
+        }
+    }
+}
+
+TEST_F(SourceManagerTargetTest, NoAstFailureCannotBecomeCachedDiagnosticRecovery) {
+    struct Restore {
+        ~Restore() {
+            SourceManager::setAnalyzeBrokenTUs(false);
+            SourceManager::clearBrokenTUs();
+            SourceManager::clearWarmCache();
+        }
+    } restore;
+    for (bool warm : {false, true}) {
+        auto database = std::make_unique<clang::tooling::FixedCompilationDatabase>(
+            root.string(), std::vector<std::string>{"-target", "invalid-cs-target", "-Werror", "-Wundef"});
+        SourceManager manager(root.string(), std::move(database), false);
+        ASSERT_TRUE(manager.addSourceFile((root / "kept.cpp").string()));
+        manager.enableWarmCache(warm);
+        SourceManager::clearWarmCache();
+        for (bool recover : {false, true, false, true}) {
+            SourceManager::setAnalyzeBrokenTUs(recover);
+            unsigned visits = 0;
+            EXPECT_NE(manager.processAll([&](clang::ASTContext&) { ++visits; }), 0);
+            EXPECT_EQ(visits, 0u);
+            ASSERT_EQ(manager.coverage().size(), 1u);
+            const auto& source = manager.coverage()[0];
+            EXPECT_EQ(source.status, codeskeptic::SourceStatus::Failed);
+            EXPECT_EQ(source.reason, "frontend_failed");
+            EXPECT_EQ(source.failed_commands, 1u);
+            EXPECT_EQ(source.skipped_commands, 0u);
+            EXPECT_EQ(source.recovery_commands, 0u);
+        }
+        EXPECT_EQ(SourceManager::warmCacheHits(), 0u);
+        EXPECT_EQ(SourceManager::warmCacheMisses(), warm ? 4u : 0u);
+    }
 }

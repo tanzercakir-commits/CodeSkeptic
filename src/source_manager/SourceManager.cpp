@@ -34,7 +34,11 @@ namespace {
 // --analyze-broken-tus restores the old behavior for consumers who
 // accept the risk (AI-generated code that never compiled at all).
 bool tuIsBroken(clang::ASTContext& ctx) {
-    return ctx.getDiagnostics().hasUncompilableErrorOccurred();
+    // Honor the compilation command's diagnostic policy too: -Werror can
+    // reject an AST without an "uncompilable" parse error. Do not run rules
+    // or harvest summaries from a rejected compilation unless the caller
+    // explicitly accepts recovery. Ordinary warnings are not errors.
+    return ctx.getDiagnostics().hasErrorOccurred();
 }
 
 class CodeSkepticASTConsumer : public clang::ASTConsumer {
