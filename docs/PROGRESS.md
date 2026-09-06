@@ -2,6 +2,20 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH02-S03-U001 — İstenen/analiz edilen/atlanan/başarısız dosyaları uzlaştır
+
+- Commit: `36b332cf7f5fa0bcc37429fcca92278e112dcbfc`
+- Dal: `agent/cs3-ch02-s03-u001-coverage-reconciliation`
+- Implementer: `root-cs3-ch02-s03-u001-20260906`
+- Bağımsız denetçi: `independent-cwe-ch02-s03-u001-product-36b332c-20260906`
+- İnceleme SHA-256: `7abc6a99f3717375859afbb3f3966505ba89ca5ecdcbaa7d20efa0b292bf6496`
+- Tarih: 2026-09-06T08:01:47.811078+00:00
+- Sonuç: Her istenen kaynak tek kimlikle sonuç sınıfına ve gerekçeye sahip olur.
+- build: PASS; SHA-256 `b297497743c66c1f0cc5d737380d8c384e2a726171fc461e546e41bbc7b7df92`; `bash scripts/local_test.sh build`
+- focused-tests: PASS; SHA-256 `45f94b14e8b49fb8abe0748f4cbbb1a7dbe9085b00ebe405632cda931dc13f27`; `bash scripts/local_test.sh focused 'McpServerTest.*:SourceManagerTargetTest.*:ConfigTest.*:AnalysisResultTest.*:VerdictIntegrityTest.*:ExitPolicyTest.*:JsonReporterTest.*:SarifReporterTest.*:HtmlReporterTest.*:BrokenTuTest.*:CoverageReportTest.*' && python3 -B tests/RealworldCampaignTest.py && python3 -B tests/RegressionCheckpointTest.py`
+- cli-smoke: PASS; SHA-256 `006128110605867ce84654a36a08a8bb60afe9a29f68139bd019cbc8d2b967b3`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S03-U001/run_coverage_cli.sh`
+- queue-check: PASS; SHA-256 `f8ceb5f685d0202d327d417cf85f5e0114ab713730ac518b366d082ace86ca6f`; `python3 -B scripts/project_queue.py check && python3 -B scripts/project_queue.py guard --base HEAD^ && bash scripts/check_docs_sync.sh && git diff --check`
+
 ## CS3-CH02-S02-U002 — MCP istek zarfını ve yaşam döngüsünü sınırla
 
 - Commit: `e9ec726d8a4b49a4eb5f0dd9cd5a6d2d237cffea`
