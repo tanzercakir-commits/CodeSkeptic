@@ -171,10 +171,19 @@ const CweMetadata* findCweMetadata(int id) {
     return nullptr;
 }
 
-std::vector<int> findingCweIds(const Diagnostic& diagnostic) {
-    const auto* rule = findRuleCapability(diagnostic.rule_id);
+namespace {
+
+std::vector<FindingKind> findingKinds(const Diagnostic& diagnostic) {
+    auto kinds = diagnostic.additional_kinds;
+    kinds.push_back(diagnostic.kind);
+    std::sort(kinds.begin(), kinds.end());
+    kinds.erase(std::unique(kinds.begin(), kinds.end()), kinds.end());
+    return kinds;
+}
+
+std::vector<int> kindCweIds(std::string_view ruleId, FindingKind kind) {
+    const auto* rule = findRuleCapability(ruleId);
     if (!rule) return {};
-    const auto kind = diagnostic.kind;
     if (kind == FindingKind::Unspecified)
         return rule->cwe_ids.size() == 1 ? rule->cwe_ids : std::vector<int>{};
     std::vector<int> ids;
@@ -215,6 +224,31 @@ std::vector<int> findingCweIds(const Diagnostic& diagnostic) {
     return ids;
 }
 
+} // namespace
+
+std::vector<int> findingCweIds(const Diagnostic& diagnostic) {
+    std::vector<int> ids;
+    for (const auto kind : findingKinds(diagnostic)) {
+        const auto selected = kindCweIds(diagnostic.rule_id, kind);
+        ids.insert(ids.end(), selected.begin(), selected.end());
+    }
+    std::sort(ids.begin(), ids.end());
+    ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
+    return ids;
+}
+
+void mergeFindingMetadata(Diagnostic& target, const Diagnostic& source) {
+    // Only evidence belonging to an already-equivalent finding may combine.
+    if (!(target == source)) return;
+    auto kinds = findingKinds(target);
+    const auto others = findingKinds(source);
+    kinds.insert(kinds.end(), others.begin(), others.end());
+    std::sort(kinds.begin(), kinds.end());
+    kinds.erase(std::unique(kinds.begin(), kinds.end()), kinds.end());
+    target.kind = kinds.front();
+    target.additional_kinds.assign(kinds.begin() + 1, kinds.end());
+}
+
 void writeCweReferencesJson(std::ostream& out, const std::vector<int>& ids) {
     out << "[";
     bool first = true;
@@ -234,11 +268,20 @@ void writeCweReferencesJson(std::ostream& out, const std::vector<int>& ids) {
 void writeFindingMetadataJson(std::ostream& out, const Diagnostic& diagnostic) {
     const auto* rule = findRuleCapability(diagnostic.rule_id);
     const auto ids = findingCweIds(diagnostic);
-    const char* mapping = !ids.empty() ? "mapped" :
-        rule && rule->cwe_ids.empty() && diagnostic.kind == FindingKind::Unspecified
+    const auto kinds = findingKinds(diagnostic);
+    const bool incomplete = std::any_of(kinds.begin(), kinds.end(), [&](FindingKind kind) {
+        return kindCweIds(diagnostic.rule_id, kind).empty();
+    });
+    const char* mapping = !ids.empty() ? (incomplete ? "partial" : "mapped") :
+        rule && rule->cwe_ids.empty() && kinds.size() == 1 && kinds.front() == FindingKind::Unspecified
         ? "not-applicable" : "unclassified";
-    out << "{\"kind\": \"" << findingKindName(diagnostic.kind)
-        << "\", \"description\": \""
+    out << "{\"kind\": \"" << (kinds.size() == 1 ? findingKindName(kinds.front()) : "multiple")
+        << "\", \"kinds\": [";
+    for (size_t index = 0; index < kinds.size(); ++index) {
+        if (index) out << ", ";
+        out << "\"" << findingKindName(kinds[index]) << "\"";
+    }
+    out << "], \"description\": \""
         << escapeJson(rule ? rule->description : "Unclassified rule")
         << "\", \"help_uri\": \"" << escapeJson(rule ? rule->help_uri : "")
         << "\", \"cwe_mapping\": \"" << mapping << "\", \"cwes\": ";

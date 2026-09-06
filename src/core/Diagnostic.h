@@ -65,6 +65,10 @@ struct Diagnostic {
     // cannot change finding deduplication.
     std::string fingerprint;
     FindingKind kind = FindingKind::Unspecified;
+    // Equivalent findings from different compilation commands can carry
+    // different proven subtypes. Retain their union without changing the
+    // existing finding key, count or source fingerprint.
+    std::vector<FindingKind> additional_kinds;
 
     std::string severityToString() const {
         switch (severity) {

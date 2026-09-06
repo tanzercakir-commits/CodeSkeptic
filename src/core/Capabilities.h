@@ -39,6 +39,7 @@ struct CweMetadata {
 
 const CweMetadata* findCweMetadata(int id);
 std::vector<int> findingCweIds(const Diagnostic& diagnostic);
+void mergeFindingMetadata(Diagnostic& target, const Diagnostic& source);
 // Shared additive machine metadata for CLI discovery, JSON and SARIF.
 void writeCweReferencesJson(std::ostream& out, const std::vector<int>& ids);
 void writeFindingMetadataJson(std::ostream& out, const Diagnostic& diagnostic);

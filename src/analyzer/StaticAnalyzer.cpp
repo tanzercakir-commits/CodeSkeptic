@@ -455,10 +455,19 @@ AnalysisResult StaticAnalyzer::run() {
     std::sort(diagnostics_.begin(), diagnostics_.end());
 
     // Functions defined in headers are analyzed in multiple TUs; the
-    // same finding arrives once per TU — deduplicate.
-    diagnostics_.erase(
-        std::unique(diagnostics_.begin(), diagnostics_.end()),
-        diagnostics_.end());
+    // same finding arrives once per TU — deduplicate, retaining independently
+    // proven subtype evidence from every equivalent compilation variant.
+    // The finding equivalence key and survivor count remain unchanged.
+    auto output = diagnostics_.begin();
+    for (auto input = diagnostics_.begin(); input != diagnostics_.end(); ++input) {
+        if (output != diagnostics_.begin() && *(output - 1) == *input) {
+            mergeFindingMetadata(*(output - 1), *input);
+        } else {
+            if (output != input) *output = std::move(*input);
+            ++output;
+        }
+    }
+    diagnostics_.erase(output, diagnostics_.end());
 
     setFindingCounts(result, diagnostics_);
     return finishReport();

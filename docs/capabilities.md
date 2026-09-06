@@ -133,6 +133,14 @@ subtype, `cwe_mapping` is `unclassified` with an empty selected CWE list;
 it does not inherit the family set. `not-applicable` identifies project-only
 rules. Unknown rules retain their existing fail-closed verdict behavior.
 
+Equivalent findings from multiple compilation commands keep a canonical union
+of their proven `kinds` and selected CWEs while retaining one finding and its
+source fingerprint. `kind: multiple` describes variant evidence, not a claim
+that all operations occur in the same execution. A union containing an
+unclassified subtype is marked `partial`; known evidence is not discarded and
+the unknown part is not silently upgraded. Duplicate same-kind evidence is
+idempotent and command order does not choose the reported weakness.
+
 The rule help URI points to the published capability overview; per-CWE links
 point directly to MITRE. This branch's new metadata documentation is not a
 claim that the branch has been merged into the published default branch.

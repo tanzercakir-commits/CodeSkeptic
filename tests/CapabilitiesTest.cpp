@@ -193,3 +193,38 @@ TEST(CapabilitiesTest, RegistryCwesHaveUniqueExplanationsAndStableLinks) {
     EXPECT_EQ(findCweMetadata(-1), nullptr);
     EXPECT_EQ(findCweMetadata(999999), nullptr);
 }
+
+TEST(CapabilitiesTest, MetadataUnionIsCanonicalIdempotentAndKeepsUnknownEvidence) {
+    using namespace codeskeptic;
+    Diagnostic read{Severity::Error, "a.cpp", 2, 3, "bounds", "same"};
+    read.kind = FindingKind::BoundsRead;
+    read.fingerprint = "fixed-source-fingerprint";
+    auto write = read;
+    write.kind = FindingKind::BoundsWrite;
+    auto forward = read;
+    auto reverse = write;
+    mergeFindingMetadata(forward, write);
+    mergeFindingMetadata(reverse, read);
+    mergeFindingMetadata(forward, forward);
+    EXPECT_EQ(findingCweIds(forward), (std::vector<int>{125,787}));
+    EXPECT_EQ(forward.fingerprint, read.fingerprint);
+    EXPECT_EQ(forward, read);
+    std::ostringstream one, two;
+    writeFindingMetadataJson(one, forward);
+    writeFindingMetadataJson(two, reverse);
+    EXPECT_EQ(one.str(), two.str());
+    EXPECT_NE(one.str().find("\"kind\": \"multiple\""), std::string::npos);
+    auto unrelated = read;
+    unrelated.rule_id = "null-deref";
+    mergeFindingMetadata(forward, unrelated);
+    std::ostringstream after;
+    writeFindingMetadataJson(after, forward);
+    EXPECT_EQ(one.str(), after.str());
+    auto unknown = read;
+    unknown.kind = FindingKind::Unspecified;
+    mergeFindingMetadata(forward, unknown);
+    EXPECT_EQ(findingCweIds(forward), (std::vector<int>{125,787}));
+    std::ostringstream partial;
+    writeFindingMetadataJson(partial, forward);
+    EXPECT_NE(partial.str().find("\"cwe_mapping\": \"partial\""), std::string::npos);
+}
