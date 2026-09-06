@@ -24,6 +24,7 @@
 // receives them and reports contract-syntax diagnostics.
 
 #include <string>
+#include <optional>
 #include <vector>
 
 namespace codeskeptic {
@@ -86,7 +87,16 @@ struct ParsedContracts {
 // Non-`cs:` lines are ignored (ordinary prose). Line numbers in the
 // result are relative to the block (1-based); the caller offsets them
 // with the block's source location.
+// Inclusive limits: 1 MiB raw comment, 16 KiB normalized physical line,
+// 1024 cs: lines, and 64 combined unary/parenthesis nesting levels.
+// Byte/line/count/binary failures reject the whole block with a bounded issue;
+// ordinary clause syntax errors are collected alongside other valid clauses.
 ParsedContracts parseContractComment(const std::string& commentText);
+
+// The same one-line grammar, without a comment leader or cs: prefix. Used
+// by sidecars before publishing any model. Accepts the existing optional ai
+// tag; at most 16 KiB, no embedded newline/CR/NUL. Caller assigns source line.
+std::optional<ContractClause> parseContractClause(const std::string& clauseText);
 
 } // namespace codeskeptic
 

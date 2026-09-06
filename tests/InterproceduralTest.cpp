@@ -1301,7 +1301,7 @@ TEST(SummaryPersistTest, StaleSummary_WarnsButStillWorks) {
     // break correctness, at worst it carries missing/extra claims)
     GlobalStoreGuard guard;
     auto sumPath = writePersistFile("sum_stale.txt",
-        "codeskeptic-summaries v2\nfind/1\tM\t-\tU\n");
+        "codeskeptic-summaries v2\nfind/1\tM\tO\tU\n");
     auto src = writePersistFile("sum_stale_caller.cpp", R"(
         int* find(int c);
         void f(int c) {

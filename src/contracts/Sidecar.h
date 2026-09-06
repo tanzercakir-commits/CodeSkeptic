@@ -17,6 +17,11 @@
 // function in the current TU are NOT reported (the function may
 // legitimately live in another TU); a whole-program anchor coverage
 // check is a recorded residual.
+// The loader validates every clause before publishing any usable guarantee;
+// one malformed entry rejects that file, with issues reported once per load.
+// Inclusive input ceilings: 1 MiB raw bytes, 16 KiB normalized physical line,
+// 4096 non-comment/nonblank entries (duplicates included). LF/CRLF accepted;
+// embedded NUL, bare CR, non-regular and unreadable inputs are rejected.
 
 #include "contracts/ContractParser.h"
 
@@ -50,7 +55,9 @@ takeSidecarIssues();
 void clearSidecarCache();
 
 // Parses sidecar text (exposed for unit tests): fills anchor->entries
-// and syntax issues exactly as the file loader does.
+// and framing/integrity issues. Partial entries are useful for diagnostics;
+// they are NOT safe to apply. The loader additionally validates all clauses
+// using the shared grammar and publishes only if there are no issues.
 struct SidecarEntry {
     unsigned line = 0;          // 1-based line in the .csk file
     std::string anchor;         // function name [ "/" arity ]

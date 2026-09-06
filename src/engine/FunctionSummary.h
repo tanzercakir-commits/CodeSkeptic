@@ -242,6 +242,12 @@ public:
     // weak claim). A corrupt file is REJECTED wholesale (false; store
     // unchanged) — partial/wrong data can never silently become a
     // strong claim.
+    // Input ceilings (inclusive): 16 MiB raw bytes, 64 KiB per normalized
+    // record, 100000 physical lines after the header (including duplicates
+    // and blanks), arity 4096, 256 written field names per parameter.
+    // All historical versions have exact column counts. Effects cover every
+    // formal parameter; O is unknown, while '-' means zero parameters only.
+    // Regular-file inputs accept LF/CRLF, but reject binary NUL/bare CR.
     bool saveGlobal(const std::string& path) const;
     bool loadGlobal(const std::string& path);
 

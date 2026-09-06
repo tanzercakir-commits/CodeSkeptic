@@ -102,7 +102,8 @@ TEST(ContractParserTest, InputLimitsAndBinaryIntegrity) {
     };
     rejected(clause + std::string("// prose") + '\0' + "\n");
     rejected(clause + "\r");
-    const std::string maxLine = "// cs: requires p" + std::string(16384 - 16, ' ');
+    std::string maxLine = "// cs: requires p";
+    maxLine.resize(16384, ' ');
     ASSERT_EQ(maxLine.size(), 16384u);
     EXPECT_EQ(parseContractComment(maxLine).clauses.size(), 1u);
     rejected(maxLine + " ");
@@ -894,7 +895,18 @@ TEST(SidecarTest, MalformedFileDoesNotPublishEarlierGuarantees) {
         clearSidecarCache();
         const auto results = runRule(rule, body, src);
         EXPECT_EQ(results.size(), control.size());
-        EXPECT_FALSE(takeSidecarIssues().empty());
+        for (size_t i = 0; i < results.size() && i < control.size(); ++i) {
+            EXPECT_EQ(results[i].rule_id, control[i].rule_id);
+            EXPECT_EQ(results[i].message, control[i].message);
+            EXPECT_EQ(results[i].line, control[i].line);
+        }
+        // runRule clears per-TU caches on exit. Inspect the real reporting
+        // consumer during the TU, not the already-drained global queue.
+        ContractRule syntaxRule;
+        const auto issues = runRule(syntaxRule, body, src);
+        ASSERT_EQ(issues.size(), 1u);
+        EXPECT_EQ(issues[0].rule_id, "contract-syntax");
+        EXPECT_EQ(issues[0].file, src + ".csk");
     }
     clearSidecarCache();
 }
@@ -943,7 +955,13 @@ TEST(SidecarTest, TextAndFileLimitsAreInclusiveAndDoNotPublishGuarantees) {
         const auto src = writeSidecar("sidecar_limits.cpp", text);
         const auto result = runRule(rule, body, src);
         EXPECT_EQ(result.size(), valid ? 0u : control.size());
-        EXPECT_EQ(takeSidecarIssues().empty(), valid);
+        ContractRule syntaxRule;
+        const auto diagnostics = runRule(syntaxRule, body, src);
+        ASSERT_EQ(diagnostics.size(), valid ? 0u : 1u);
+        if (!valid) {
+            EXPECT_EQ(diagnostics[0].rule_id, "contract-syntax");
+            EXPECT_EQ(diagnostics[0].file, src + ".csk");
+        }
     };
     std::string records;
     for (unsigned i = 0; i < 4096; ++i) records += record;

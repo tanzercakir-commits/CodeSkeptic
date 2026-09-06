@@ -1,6 +1,7 @@
 #include "engine/FunctionSummary.h"
 
 #include "contracts/GuardContracts.h"
+#include "contracts/ModelInput.h"
 #include "engine/AllocFunctions.h"
 #include "engine/CallRefArgs.h"
 #include "engine/ConditionWalk.h"
@@ -16,11 +17,13 @@
 #include <clang/AST/Stmt.h>
 
 #include <algorithm>
-#include <cerrno>
-#include <cstdlib>
+#include <charconv>
 #include <fstream>
+#include <new>
 #include <optional>
 #include <set>
+#include <sstream>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -3792,6 +3795,9 @@ SummaryRegistry::lookup(const clang::CallExpr* call) const {
 namespace {
 
 std::string globalKey(const FunctionDecl* func) {
+    // In C, an earlier non-prototype declaration can have zero parameters
+    // while the definition (whose effects we summarize) has real parameters.
+    if (const auto* definition = func->getDefinition()) func = definition;
     return func->getQualifiedNameAsString() + "/" +
            std::to_string(func->getNumParams());
 }
@@ -4306,9 +4312,10 @@ bool SummaryRegistry::saveGlobal(const std::string& path) const {
 
 bool SummaryRegistry::parseSummaryFile(
     const std::string& path,
-    std::map<std::string, FunctionSummary>& out) {
-    std::ifstream in(path);
-    if (!in.is_open()) return false;
+    std::map<std::string, FunctionSummary>& out) try {
+    std::string text;
+    if (!model_input::readTextFile(path, 16 * 1024 * 1024, text)) return false;
+    std::istringstream in(std::move(text));
 
     std::string line;
     if (!std::getline(in, line)) return false;
@@ -4332,12 +4339,15 @@ bool SummaryRegistry::parseSummaryFile(
                            : (version >= 9) ? 13
                            : (version >= 8) ? 10
                            : (version >= 7) ? 8 : (version >= 5) ? 7
-                       : (version == 4) ? 6 : (version == 3) ? 5 : 4;
+                       : (version == 4) ? 6 : (version == 3) ? 5
+                       : (version == 2) ? 4 : 3;
 
     // Parse fully first, then hand over: a corrupt file is rejected
     // without leaving partial state behind
     std::map<std::string, FunctionSummary> parsed;
+    size_t recordCount = 0;
     while (std::getline(in, line)) {
+        if (++recordCount > 100000 || line.size() > 65536) return false;
         if (line.empty()) continue;
 
         std::vector<std::string> fields;
@@ -4345,21 +4355,40 @@ bool SummaryRegistry::parseSummaryFile(
         for (auto tab = line.find('\t'); tab != std::string::npos;
              tab = line.find('\t', start)) {
             fields.push_back(line.substr(start, tab - start));
+            if (fields.size() >= maxFields) return false;
             start = tab + 1;
         }
         fields.push_back(line.substr(start));
 
         // v1: 3 fields (no zeroness -> Unknown); v2: 4; v3: 5 (null
         // cond); v4: 6 (zero-passthrough param)
-        if (fields.size() < 3 || fields.size() > maxFields) return false;
-        if (version == 9 && fields.size() != 13) return false;
-        if (version == 8 && fields.size() != 10) return false;
-        if (version == 10 && fields.size() != 14) return false;
-        if (version == 11 && fields.size() != 15) return false;
+        if (fields.size() != maxFields) return false;
         const std::string& key = fields[0];
         const std::string& rn = fields[1];
         const std::string& pe = fields[2];
         if (key.empty() || rn.size() != 1 || pe.empty()) return false;
+        const auto slash = key.rfind('/');
+        if (slash == std::string::npos || slash == 0) return false;
+        for (unsigned char c : key)
+            if (c < 0x20 || c == 0x7f) return false;
+        auto decimal = [](const std::string& value, size_t& result) {
+            if (value.empty()) return false;
+            const auto [end, ec] = std::from_chars(
+                value.data(), value.data() + value.size(), result);
+            return ec == std::errc{} && end == value.data() + value.size();
+        };
+        size_t arity = 0;
+        const auto encodedArity = key.substr(slash + 1);
+        if (!decimal(encodedArity, arity) || arity > 4096 ||
+            encodedArity != std::to_string(arity)) return false;
+        if ((arity == 0) != (pe == "-") ||
+            (arity != 0 && pe.size() != arity)) return false;
+        auto parseIndex = [&](const std::string& value, int& result) {
+            size_t index = 0;
+            if (!decimal(value, index) || index >= arity) return false;
+            result = static_cast<int>(index); // arity is bounded to 4096
+            return true;
+        };
 
         FunctionSummary summary;
         if (!rnFromChar(rn[0], summary.returnNullness)) return false;
@@ -4382,17 +4411,12 @@ bool SummaryRegistry::parseSummaryFile(
                 if (s == "~") { *inf = true; return true; }
                 *inf = false;
                 if (s.empty()) return false;
-                errno = 0;
-                char* end = nullptr;
-                long long r = std::strtoll(s.c_str(), &end, 10);
-                if (errno != 0 || end != s.c_str() + s.size()) return false;
-                *v = r;
-                return true;
+                const auto [end, ec] = std::from_chars(s.data(), s.data() + s.size(), *v);
+                return ec == std::errc{} && end == s.data() + s.size();
             };
-            int64_t paramIdx = 0, lo = 0, hi = 0;
-            bool dummyInf = false, loInf = false, hiInf = false;
-            if (!parseBound(cond.substr(0, c1), &dummyInf, &paramIdx) ||
-                dummyInf || paramIdx < 0)
+            int64_t lo = 0, hi = 0;
+            bool loInf = false, hiInf = false;
+            if (!parseIndex(cond.substr(0, c1), summary.nullCondParam))
                 return false;
             if (!parseBound(cond.substr(c1 + 1, c2 - c1 - 1), &loInf, &lo))
                 return false;
@@ -4400,7 +4424,6 @@ bool SummaryRegistry::parseSummaryFile(
             // A condition is only meaningful on a MaybeNull summary.
             if (summary.returnNullness != ReturnNullness::MaybeNull)
                 return false;
-            summary.nullCondParam = static_cast<int>(paramIdx);
             if (loInf && hiInf)
                 summary.nullCondRange = codeskeptic::Interval::top();
             else if (loInf)
@@ -4414,36 +4437,23 @@ bool SummaryRegistry::parseSummaryFile(
         }
         if (fields.size() >= 6 && fields[5] != "-") {
             const std::string& zf = fields[5];
-            errno = 0;
-            char* end = nullptr;
-            long long idx = std::strtoll(zf.c_str(), &end, 10);
-            if (errno != 0 || end != zf.c_str() + zf.size() || idx < 0)
+            if (!parseIndex(zf, summary.zeroFromParam))
                 return false;
             // The claim lives only where it is defined: zeroness Unknown.
             if (summary.returnZeroness != ReturnZeroness::Unknown)
                 return false;
-            summary.zeroFromParam = static_cast<int>(idx);
         }
         if (fields.size() >= 7 && fields[6] != "-") {
             const std::string& nf = fields[6];
-            errno = 0;
-            char* end = nullptr;
-            long long idx = std::strtoll(nf.c_str(), &end, 10);
-            if (errno != 0 || end != nf.c_str() + nf.size() || idx < 0)
+            if (!parseIndex(nf, summary.nullFromParam))
                 return false;
             if (summary.returnNullness != ReturnNullness::Unknown)
                 return false;
-            summary.nullFromParam = static_cast<int>(idx);
         }
         if (fields.size() >= 8 && fields[7] != "-") {
             const std::string& alias = fields[7];
-            errno = 0;
-            char* end = nullptr;
-            long long idx = std::strtoll(alias.c_str(), &end, 10);
-            if (errno != 0 || end != alias.c_str() + alias.size() ||
-                idx < 0)
+            if (!parseIndex(alias, summary.returnAliasParam))
                 return false;
-            summary.returnAliasParam = static_cast<int>(idx);
         }
         if (pe != "-") {
             summary.params.reserve(pe.size());
@@ -4540,7 +4550,8 @@ bool SummaryRegistry::parseSummaryFile(
                                     if (c <= 0x20 || c == ',' || c == ';' ||
                                         c == '!' || c == '?')
                                         return false;
-                                if (!parsedFields.fields.insert(name).second)
+                                if (!parsedFields.fields.insert(name).second ||
+                                    parsedFields.fields.size() > 256)
                                     return false;
                                 if (comma == std::string::npos) break;
                                 nameStart = comma + 1;
@@ -4574,17 +4585,27 @@ bool SummaryRegistry::parseSummaryFile(
 
     out = std::move(parsed);
     return true;
+} catch (const std::bad_alloc&) {
+    return false;
+} catch (const std::length_error&) {
+    return false;
 }
 
-bool SummaryRegistry::loadGlobal(const std::string& path) {
+bool SummaryRegistry::loadGlobal(const std::string& path) try {
     std::map<std::string, FunctionSummary> parsed;
     if (!parseSummaryFile(path, parsed)) return false;
 
+    auto staged = globalStore_;
     for (const auto& [key, summary] : parsed) {
-        auto [it, inserted] = globalStore_.emplace(key, summary);
+        auto [it, inserted] = staged.emplace(key, summary);
         if (!inserted) mergeConservative(it->second, summary);
     }
+    globalStore_.swap(staged);
     return true;
+} catch (const std::bad_alloc&) {
+    return false;
+} catch (const std::length_error&) {
+    return false;
 }
 
 } // namespace codeskeptic

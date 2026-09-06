@@ -1,11 +1,11 @@
 #include "contracts/Sidecar.h"
+#include "contracts/ModelInput.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
 #include <clang/Basic/SourceManager.h>
 
 #include <filesystem>
-#include <fstream>
 #include <map>
 #include <set>
 #include <sstream>
@@ -19,7 +19,7 @@ namespace {
 struct SidecarFileData {
     bool exists = false;
     // anchor -> entries (an anchor may carry several clauses)
-    std::map<std::string, std::vector<SidecarEntry>> byAnchor;
+    std::map<std::string, std::vector<ContractClause>> byAnchor;
 };
 
 std::map<std::string, SidecarFileData>& cache() {
@@ -44,18 +44,36 @@ const SidecarFileData& loadSidecar(const std::string& cskPath) {
     if (it != cache().end()) return it->second;
 
     SidecarFileData& data = cache()[cskPath];
-    std::ifstream in(cskPath);
-    if (!in) return data;  // exists stays false
+    std::error_code ec;
+    const auto status = std::filesystem::symlink_status(cskPath, ec);
+    if (status.type() == std::filesystem::file_type::not_found)
+        return data; // optional sidecar is genuinely absent
     data.exists = true;
+
+    std::string text;
+    if (!model_input::readTextFile(cskPath, 1024 * 1024, text)) {
+        pendingIssues().push_back({cskPath, {1,
+            "unreadable, non-regular, oversized or binary sidecar input"}});
+        return data;
+    }
 
     std::vector<SidecarEntry> entries;
     std::vector<ContractSyntaxIssue> issues;
-    std::stringstream buf;
-    buf << in.rdbuf();
-    parseSidecarText(buf.str(), entries, issues);
+    parseSidecarText(text, entries, issues);
 
-    for (auto& e : entries)
-        data.byAnchor[e.anchor].push_back(e);
+    // Validate unmatched anchors too; grammar validity is independent of the
+    // declaration that happens to trigger this load. Never publish a prefix.
+    decltype(data.byAnchor) staged;
+    for (const auto& e : entries) {
+        auto clause = parseContractClause(e.clause);
+        if (!clause) {
+            issues.push_back({e.line, e.clause});
+            continue;
+        }
+        clause->line = e.line;
+        staged[e.anchor].push_back(std::move(*clause));
+    }
+    if (issues.empty()) data.byAnchor.swap(staged);
     for (auto& iss : issues)
         pendingIssues().emplace_back(cskPath, std::move(iss));
     return data;
@@ -66,14 +84,37 @@ const SidecarFileData& loadSidecar(const std::string& cskPath) {
 void parseSidecarText(const std::string& text,
                       std::vector<SidecarEntry>& entries,
                       std::vector<ContractSyntaxIssue>& issues) {
-    std::istringstream in(text);
+    if (text.size() > 1024 * 1024) {
+        issues.push_back({1, "sidecar input exceeds 1 MiB"});
+        return;
+    }
+    std::string normalized = text;
+    if (!model_input::normalizeText(normalized, 1024 * 1024)) {
+        issues.push_back({1, "sidecar input contains NUL or bare CR"});
+        return;
+    }
+    std::istringstream in(std::move(normalized));
     std::string raw;
     unsigned lineNo = 0;
+    size_t recordCount = 0;
     while (std::getline(in, raw)) {
         ++lineNo;
+        if (raw.size() > 16384) {
+            issues.push_back({lineNo, "sidecar line exceeds 16 KiB"});
+            return;
+        }
         std::string line = trim(raw);
         if (line.empty() || line[0] == '#') continue;
+        if (++recordCount > 4096) {
+            issues.push_back({lineNo, "sidecar input exceeds 4096 entries"});
+            return;
+        }
         auto colon = line.find(':');
+        // A namespace separator belongs to the qualified anchor, not to the
+        // anchor/clause delimiter (ns::name/arity: clause).
+        while (colon != std::string::npos && colon + 1 < line.size() &&
+               line[colon + 1] == ':')
+            colon = line.find(':', colon + 2);
         // Every entry must be anchored — a colonless line, or one with
         // an empty anchor/clause, is a syntax issue, never skipped.
         if (colon == std::string::npos || colon == 0 ||
@@ -117,19 +158,7 @@ ParsedContracts sidecarContractsForDecl(const FunctionDecl* func,
         auto it = data.byAnchor.find(anchor);
         if (it == data.byAnchor.end()) continue;
         for (const auto& entry : it->second) {
-            // Reuse the one contract grammar: a sidecar clause is
-            // exactly a cs: line without the comment leader. Clause
-            // line numbers are rewritten to the ABSOLUTE .csk line.
-            ParsedContracts one =
-                parseContractComment("// cs: " + entry.clause + "\n");
-            for (auto& clause : one.clauses) {
-                clause.line = entry.line;
-                out.clauses.push_back(std::move(clause));
-            }
-            for (auto& err : one.syntaxErrors) {
-                err.line = entry.line;
-                out.syntaxErrors.push_back(std::move(err));
-            }
+            out.clauses.push_back(entry);
         }
         if (sidecarFile) *sidecarFile = cskPath;
     }

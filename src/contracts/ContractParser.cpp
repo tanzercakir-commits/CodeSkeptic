@@ -1,6 +1,8 @@
 #include "contracts/ContractParser.h"
+#include "contracts/ModelInput.h"
 
 #include <cctype>
+#include <charconv>
 #include <optional>
 
 namespace codeskeptic {
@@ -90,7 +92,10 @@ public:
                    std::isdigit(static_cast<unsigned char>(s_[pos_])))
                 ++pos_;
             Token t{Token::Int, s_.substr(start, pos_ - start), 0, {}};
-            t.value = std::stoll(t.text);
+            const auto [end, ec] = std::from_chars(
+                t.text.data(), t.text.data() + t.text.size(), t.value);
+            if (ec != std::errc{} || end != t.text.data() + t.text.size())
+                t.kind = Token::Bad;
             return t;
         }
         if (std::isalpha(static_cast<unsigned char>(c)) || c == '_') {
@@ -159,8 +164,11 @@ public:
 
     std::optional<ContractPred> parseAtom() {
         if (tok_.kind == Token::LParen) {
+            if (depth_ == 64) { failed_ = true; return std::nullopt; }
+            ++depth_;
             advance();
             auto inner = parsePred();
+            --depth_;
             if (!inner) return std::nullopt;
             if (tok_.kind != Token::RParen) { failed_ = true; return std::nullopt; }
             advance();
@@ -187,8 +195,11 @@ public:
 
     std::optional<ContractPred> parseUnary() {
         if (tok_.kind == Token::Bang) {
+            if (depth_ == 64) { failed_ = true; return std::nullopt; }
+            ++depth_;
             advance();
             auto sub = parseUnary();
+            --depth_;
             if (!sub) return std::nullopt;
             ContractPred p;
             p.kind = ContractPred::Not;
@@ -234,6 +245,7 @@ private:
     Lexer lex_;
     Token tok_;
     bool failed_ = false;
+    unsigned depth_ = 0;
 };
 
 // Parses ONE clause body (the text after "cs:"/"cs:ai"). Returns
@@ -294,9 +306,8 @@ std::optional<ContractClause> parseClauseBody(const std::string& body) {
         // remainder of the body verbatim instead.
         auto pos = body.find("policy");
         std::string rest = body.substr(pos + 6);
-        while (!rest.empty() && std::isspace(
-                   static_cast<unsigned char>(rest.front())))
-            rest.erase(rest.begin());
+        const auto first = rest.find_first_not_of(" \t\r\n\f\v");
+        rest.erase(0, first == std::string::npos ? rest.size() : first);
         while (!rest.empty() && std::isspace(
                    static_cast<unsigned char>(rest.back())))
             rest.pop_back();
@@ -336,41 +347,56 @@ std::string stripCommentLine(std::string line) {
 
 } // anonymous namespace
 
+std::optional<ContractClause> parseContractClause(const std::string& clauseText) {
+    if (clauseText.size() > 16384 ||
+        clauseText.find_first_of(std::string("\0\r\n", 3)) != std::string::npos)
+        return std::nullopt;
+    std::string body = clauseText;
+    bool machine = false;
+    if (body.rfind("ai", 0) == 0 &&
+        (body.size() == 2 || std::isspace(static_cast<unsigned char>(body[2])))) {
+        machine = true;
+        body.erase(0, 2);
+    }
+    const auto first = body.find_first_not_of(" \t\f\v");
+    body.erase(0, first == std::string::npos ? body.size() : first);
+    auto clause = parseClauseBody(body);
+    if (clause) clause->machineProposed = machine;
+    return clause;
+}
+
 ParsedContracts parseContractComment(const std::string& commentText) {
+    if (commentText.size() > 1024 * 1024)
+        return {{}, {{1, "contract input exceeds 1 MiB"}}};
+    std::string text = commentText;
+    if (!model_input::normalizeText(text, 1024 * 1024))
+        return {{}, {{1, "contract input contains NUL or bare CR"}}};
     ParsedContracts out;
     unsigned lineNo = 0;
+    unsigned clauseCount = 0;
     size_t start = 0;
-    while (start <= commentText.size()) {
-        size_t end = commentText.find('\n', start);
+    while (start <= text.size()) {
+        size_t end = text.find('\n', start);
+        const size_t length = (end == std::string::npos ? text.size() : end) - start;
+        if (length > 16384)
+            return {{}, {{lineNo + 1, "contract line exceeds 16 KiB"}}};
         std::string rawLine =
-            commentText.substr(start, end == std::string::npos
+            text.substr(start, end == std::string::npos
                                           ? std::string::npos
                                           : end - start);
         ++lineNo;
-        start = (end == std::string::npos) ? commentText.size() + 1 : end + 1;
+        start = (end == std::string::npos) ? text.size() + 1 : end + 1;
 
         std::string line = stripCommentLine(rawLine);
         if (line.rfind("cs:", 0) != 0) continue;
 
-        std::string body = line.substr(3);
-        bool machine = false;
-        // "cs:ai <clause>" — the tag is glued to the prefix.
-        if (body.rfind("ai", 0) == 0 &&
-            (body.size() == 2 ||
-             std::isspace(static_cast<unsigned char>(body[2])))) {
-            machine = true;
-            body.erase(0, 2);
-        }
-        while (!body.empty() &&
-               std::isspace(static_cast<unsigned char>(body.front())))
-            body.erase(body.begin());
-
-        auto clause = parseClauseBody(body);
+        if (++clauseCount > 1024)
+            return {{}, {{lineNo, "contract input exceeds 1024 clauses"}}};
+        auto clause = parseContractClause(line.substr(3));
         if (!clause) {
             out.syntaxErrors.push_back({lineNo, line});
             continue;
         }
-        clause->machineProposed = machine;
         clause->line = lineNo;
         out.clauses.push_back(std::move(*clause));
     }
