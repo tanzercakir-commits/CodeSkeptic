@@ -2,6 +2,20 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH03-S02-U002 — Minimal ilk tarama ve CI kullanımını doğrula
+
+- Commit: `4e283ddea28a0f47c671f7a7d37baee37aa7fa56`
+- Dal: `agent/cs3-ch03-s02-u002-first-scan`
+- Implementer: `root-cwe-ch03-s02-u002-20260906`
+- Bağımsız denetçi: `independent-cwe-ch03-s02-u002-product-4e283dd-20260906`
+- İnceleme SHA-256: `4e5e8693a07ae346109efe718f80dc58b60611a6223cc01398537c0a4f330cf0`
+- Tarih: 2026-09-06T15:20:05.704259+00:00
+- Sonuç: Temiz bir örnek projede kurulmuş araçla ilk tarama ve rapor-only CI akışı tekrarlanır.
+- focused-tests: PASS; SHA-256 `0357be461d1611c3c1fb988d6a2006a7b485bbe4a073b254ea8334f89ebeff0f`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S02-U002/qualify.sh`
+- cli-smoke: PASS; SHA-256 `53abaa221e86934690e3611c4aa6dd50df172b13b673c3209c34b5423f37f2e7`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S02-U002/qualify.sh`
+- queue-check: PASS; SHA-256 `0851f93f0b6cea990902124ec7b7fd357a7a95867f9162538d6a92b7c4111a90`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S02-U002/qualify.sh`
+- binary-provenance: PASS; SHA-256 `0e1d4cadf9e89bb403e62776891f9d82db1906c0c9fdaf83bec4f5cd6438eefe`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S02-U002/qualify.sh`
+
 ## CS3-CH03-S02-U001 — Baseline/suppression ile yalnız yeni bulguyu ayır
 
 - Commit: `3a222ffee8343d567318530c49ce27ba02b1ee98`
