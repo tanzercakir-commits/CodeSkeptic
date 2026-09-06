@@ -64,6 +64,7 @@ target_link_libraries(codeskeptic_tests
         codeskeptic_core
         GTest::gtest_main
 )
+add_dependencies(codeskeptic_tests codeskeptic_corpus_inputs)
 
 include(GoogleTest)
 gtest_discover_tests(codeskeptic_tests)
@@ -76,6 +77,8 @@ add_test(NAME CompilationDatabaseCliContract
          COMMAND ${Python3_EXECUTABLE} -B
                  ${CMAKE_CURRENT_SOURCE_DIR}/CompilationDatabaseCliTest.py
                  $<TARGET_FILE:codeskeptic>)
+set_tests_properties(CompilationDatabaseCliContract PROPERTIES
+    ENVIRONMENT "CODESKEPTIC_CORPUS_COMPILER=${LLVM_TOOLS_BINARY_DIR}/clang${CMAKE_EXECUTABLE_SUFFIX}")
 if(UNIX)
     add_test(NAME ProjectQueueContract
              COMMAND ${Python3_EXECUTABLE} -B

@@ -17,6 +17,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 CS_BIN="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+CORPUS_INPUTS="$(dirname "$CS_BIN")/codeskeptic_corpus_inputs"
+[ -x "$CORPUS_INPUTS" ] || { echo '[corpus] missing corpus input producer' >&2; exit 2; }
 WORK="${2:-corpus-work}"
 mkdir -p "$WORK"
 cd "$WORK"
@@ -59,6 +61,22 @@ run_one() { # <mode: scan|db> <dir> [extra cmake args...]
         -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5 "$@" > /dev/null
 
+    local scan_db="build-$dir"
+    if [ "$mode" = "scan" ]; then
+        local anchor prepared
+        case "$dir" in
+            cjson) anchor="$dir/cJSON.c" ;;
+            tinyxml2) anchor="$dir/tinyxml2.cpp" ;;
+            *) echo "[corpus] unknown full-tree recipe profile: $dir" >&2; return 2 ;;
+        esac
+        prepared=$(mktemp -d "prepared-$dir-XXXXXX")
+        # Retain the original DB unchanged. Strictly validate its frozen rows
+        # before materializing LLVM's previous inferred full-tree recipes into
+        # a separate explicit DB plus provenance. No source/pin is dropped.
+        "$CORPUS_INPUTS" "build-$dir/compile_commands.json" "$dir" "$anchor" "$prepared/database"
+        scan_db="$prepared/database"
+    fi
+
     # NO pipe: the exit code must belong to the analyzer, not the pipe
     # (the tee trap — this is how the fake green appeared on Juliet)
     set +e
@@ -75,7 +93,7 @@ PYEOF
         # The scan-mode pins deliberately include the source tree's own
         # non-build test fixtures. Their skipped TUs are measured below and
         # accepted explicitly; the analyzer's default remains fail-closed.
-        "$CS_BIN" "$dir" --build-path "build-$dir" \
+        "$CS_BIN" "$dir" --build-path "$scan_db" \
             --accept-partial-coverage > "out-$dir.txt" 2>&1
     fi
     local code=$?

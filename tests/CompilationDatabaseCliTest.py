@@ -20,13 +20,15 @@ class CompilationDatabaseCliTest(unittest.TestCase):
     def setUp(self):
         self.fixture = tempfile.TemporaryDirectory(prefix="codeskeptic-compdb-")
         self.addCleanup(self.fixture.cleanup)
-        self.root = Path(self.fixture.name)
+        # Windows temp paths may use 8.3 spelling. The reporting contract is
+        # canonical identity, not the temporary-directory provider's spelling.
+        self.root = Path(self.fixture.name).resolve(strict=True)
         self.source = self.root / "input.cpp"
         self.source.write_text("int safe() { return 42; }\n", encoding="utf-8")
 
     def run_cli(self, *args):
         return subprocess.run(
-            [BINARY, *map(str, args)], cwd=self.root, text=True,
+            [BINARY, *map(str, args)], cwd=self.root, text=True, encoding="utf-8",
             capture_output=True, check=False, timeout=45,
         )
 
@@ -87,6 +89,150 @@ class CompilationDatabaseCliTest(unittest.TestCase):
             reports.append(coverage)
         self.assertEqual(reports[0], reports[1])
         return reports[0]
+
+    def corpus_inputs(self, database, root, anchor, output, expected=0):
+        producer = Path(BINARY).with_name("codeskeptic_corpus_inputs" + Path(BINARY).suffix)
+        self.assertTrue(producer.is_file(), "corpus helper must be built with the CLI contract")
+        result = subprocess.run([str(producer), str(database), str(root), str(anchor), str(output)],
+                                text=True, encoding="utf-8", capture_output=True, timeout=20)
+        self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
+        if expected:
+            self.assertFalse(output.exists(), "invalid original input published a replacement")
+            return None
+        self.assertIn("CORPUS_INPUTS", result.stdout)
+        return (json.loads((output / "compile_commands.json").read_text(encoding="utf-8")),
+                json.loads((output / "provenance.json").read_text(encoding="utf-8")))
+
+    def test_corpus_cmake_recipes_preserve_full_surface_and_partial_coverage(self):
+        source = self.root / "corpus space ç-資料"
+        source.mkdir()
+        include = source / "include"
+        include.mkdir()
+        (include / "seeded.h").write_text("#define SEEDED 7\n", encoding="utf-8")
+        requirements = '#include "seeded.h"\n#ifndef REQUIRED\n#error missing recipe define\n#endif\n'
+        anchor = source / "configured.c"
+        anchor.write_text(requirements + "int configured(void){return SEEDED + REQUIRED;}\n", encoding="utf-8")
+        missing = source / "omitted.c"
+        missing.write_text(requirements + "int omitted(void){int zero=0; return SEEDED/zero;}\n", encoding="utf-8")
+        broken = source / "broken.c"
+        broken.write_text(requirements + "int broken(void){return undeclared;}\n", encoding="utf-8")
+        (source / "CMakeLists.txt").write_text(
+            'cmake_minimum_required(VERSION 3.16)\nproject(CorpusRecipe C)\n'
+            'add_library(configured OBJECT configured.c)\n'
+            'target_compile_definitions(configured PRIVATE REQUIRED=3)\n'
+            'target_include_directories(configured PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")\n',
+            encoding="utf-8")
+        compiler = os.environ.get("CODESKEPTIC_CORPUS_COMPILER") or shutil.which("clang")
+        self.assertIsNotNone(compiler, "the pinned toolchain must supply clang")
+        build = self.root / "cmake corpus build"
+        configured = subprocess.run(["cmake", "-S", str(source), "-B", str(build), "-G", "Ninja",
+                                     "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON", "-DCMAKE_C_COMPILER=" + compiler],
+                                    text=True, encoding="utf-8", capture_output=True, timeout=45)
+        self.assertEqual(configured.returncode, 0, configured.stdout + configured.stderr)
+        original = build / "compile_commands.json"
+        original_bytes = original.read_bytes()
+        self.doctor(source, "--build-path", build, expected=2)
+        prepared = self.root / "explicit corpus ç-資料"
+        commands, evidence = self.corpus_inputs(original, source, anchor, prepared)
+        self.assertEqual(original.read_bytes(), original_bytes)
+        identities = {str(anchor), str(missing), str(broken)}
+        self.assertEqual({command["file"] for command in commands}, identities)
+        self.assertEqual({row["file"] for row in evidence["sources"]}, identities)
+        self.assertEqual(len(evidence["original_commands"]), 1)
+        for row in evidence["sources"]:
+            self.assertEqual(row["inferred"], row["file"] != str(anchor))
+            self.assertEqual(len(row["commands"]), 1)
+            command = row["commands"][0]
+            self.assertIn("-DREQUIRED=3", command["arguments"])
+            self.assertEqual(command["directory"], str(build))
+            self.assertEqual(bool(command["heuristic"]), row["inferred"])
+        self.doctor(source, "--build-path", prepared)
+        coverage = self.coverage_formats([source, "--build-path", prepared, "--accept-partial-coverage"], 1)
+        self.assertFalse(coverage["complete"])
+        self.assertEqual(coverage["attempted_tus"], 3)
+        self.assertEqual(coverage["analyzed_tus"], 2)
+        self.assertEqual(coverage["skipped_tus"], 1)
+        self.assertEqual(coverage["failed_tus"], 0)
+        self.assertEqual({row["file"] for row in coverage["sources"]}, identities)
+
+    def test_corpus_keeps_direct_variants_and_infers_one_frozen_recipe(self):
+        source = self.root / "corpus"
+        source.mkdir()
+        anchor = source / "anchor.cpp"
+        anchor.write_text("int anchor(){return FLAVOR;}\n", encoding="utf-8")
+        missing = source / "missing.cpp"
+        missing.write_text("int missing(){return FLAVOR;}\n", encoding="utf-8")
+        database = self.database(self.root / "original", [anchor], extra=["-DFLAVOR=1"])
+        originals = json.loads(database.read_text(encoding="utf-8"))
+        originals.append(dict(originals[0], arguments=["clang++", "-DFLAVOR=2", "-c", str(anchor)]))
+        database.write_text(json.dumps(originals), encoding="utf-8")
+        original_bytes = database.read_bytes()
+        prepared = self.root / "prepared"
+        commands, evidence = self.corpus_inputs(database, source, anchor, prepared)
+        direct = [row for row in commands if row["file"] == str(anchor)]
+        self.assertEqual(database.read_bytes(), original_bytes)
+        self.assertEqual(direct, evidence["original_commands"])
+        self.assertEqual(len(direct), 2)
+        for index, row in enumerate(direct, 1):
+            self.assertEqual(row["arguments"], ["clang++", "--driver-mode=g++", "-DFLAVOR=" + str(index),
+                                                "-c", str(anchor)])
+        inferred = [row for row in commands if row["file"] == str(missing)]
+        self.assertEqual(len(inferred), 1)
+        self.assertIn("-DFLAVOR=1", inferred[0]["arguments"])
+        self.assertEqual(inferred[0]["arguments"][-2:], ["--", str(missing)])
+        self.assertEqual(len(evidence["original_commands"]), 2)
+        coverage = self.coverage_formats([source, "--build-path", prepared], 0)
+        self.assertTrue(coverage["complete"])
+        self.assertEqual(coverage["analyzed_tus"], 2)
+        self.assertEqual(coverage["analyzed_commands"], 3)
+
+    def test_corpus_rejects_invalid_non_anchor_originals_before_inference(self):
+        source = self.root / "corpus"
+        source.mkdir()
+        anchor = source / "anchor.cpp"
+        anchor.write_text("int anchor(){return 1;}\n", encoding="utf-8")
+        missing = source / "missing.cpp"
+        missing.write_text("int missing(){return 1;}\n", encoding="utf-8")
+        database = self.database(self.root / "original", [anchor])
+        original = json.loads(database.read_text(encoding="utf-8"))[0]
+        for index, other in enumerate((
+                dict(original, file=str(missing)),
+                dict(original, arguments=["clang++", "@missing.rsp", "-c", str(anchor)]),
+                dict(original, arguments=["clang++", "-c", str(anchor), "--", str(missing)]),
+                dict(original, arguments=["clang++", 3]),
+                dict(original, directory=str(self.root / "absent-working-directory"), file=str(missing),
+                     arguments=["clang++", "-c", str(missing)]))):
+            with self.subTest(index=index):
+                database.write_text(json.dumps([original, other]), encoding="utf-8")
+                self.corpus_inputs(database, source, anchor, self.root / ("rejected-" + str(index)), expected=2)
+
+    def test_corpus_freezes_expanded_response_before_consuming_prepared_database(self):
+        source = self.root / "corpus"
+        source.mkdir()
+        anchor = source / "anchor.cpp"
+        anchor.write_text("int anchor(){return FLAVOR;}\n", encoding="utf-8")
+        missing = source / "missing.cpp"
+        missing.write_text("int missing(){return FLAVOR;}\n", encoding="utf-8")
+        response = self.root / "flags.rsp"
+        response.write_text("-DFLAVOR=4", encoding="utf-8")
+        database = self.database(self.root / "original", [anchor], extra=["@flags.rsp"])
+        prepared = self.root / "prepared"
+        commands, evidence = self.corpus_inputs(database, source, anchor, prepared)
+        self.assertTrue(all("-DFLAVOR=4" in row["arguments"] for row in commands))
+        self.assertFalse(any(arg.startswith("@") for row in commands for arg in row["arguments"]))
+        response.write_text("-DFLAVOR=undefined_symbol", encoding="utf-8")
+        database.write_text("{invalid later database", encoding="utf-8")
+        self.scan(source, "--build-path", prepared, count=2)
+
+    @unittest.skipUnless(os.name == "posix", "raw byte response fixture uses POSIX paths")
+    def test_corpus_rejects_non_utf8_response_values_without_output(self):
+        source = self.root / "corpus"
+        source.mkdir()
+        anchor = source / "anchor.cpp"
+        anchor.write_text("int anchor(){return 1;}\n", encoding="utf-8")
+        (self.root / "flags.rsp").write_bytes(b"-DFLAVOR=\xff")
+        database = self.database(self.root / "original", [anchor], extra=["@flags.rsp"])
+        self.corpus_inputs(database, source, anchor, self.root / "rejected", expected=2)
 
     def test_source_coverage_json_sarif_cli_parity_for_clean_and_findings(self):
         for finding in (False, True):
@@ -281,6 +427,29 @@ class CompilationDatabaseCliTest(unittest.TestCase):
         coverage = self.coverage_formats([source], 0)
         self.assertTrue(coverage["complete"])
         self.assertEqual(coverage["sources"][0]["file"], str(source))
+
+    def test_unicode_directory_and_output_paths_preserve_identity(self):
+        directory = self.root / "çalışma-λ-資料"
+        directory.mkdir()
+        source = directory / "kaynak-測試.cpp"
+        source.write_text("int safe(){return 0;}\n", encoding="utf-8")
+        self.doctor(source)
+        for option, filename in (("--json", "sonuç-結果.json"),
+                                 ("--sarif", "sonuç-結果.sarif")):
+            with self.subTest(option=option):
+                output = directory / filename
+                result = self.run_cli(source, option, output)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                payload = json.loads(output.read_text(encoding="utf-8"))
+                coverage = (payload["coverage"] if option == "--json" else
+                            payload["runs"][0]["invocations"][0]["properties"]["codeskeptic/coverage"])
+                self.assertTrue(coverage["complete"])
+                self.assertEqual(coverage["analyzed_tus"], 1)
+                self.assertEqual(coverage["sources"][0]["file"], str(source))
+                prefix = "[CodeSkeptic] source coverage: "
+                console = [json.loads(line[len(prefix):]) for line in result.stderr.splitlines()
+                           if line.startswith(prefix)]
+                self.assertEqual(console, [coverage])
 
     def test_explicit_malformed_database_never_falls_back(self):
         build = self.root / "build"
@@ -579,6 +748,28 @@ class CompilationDatabaseCliTest(unittest.TestCase):
         self.database(self.root / "build", extra=["-include", str(include)])
         self.doctor(self.source)
         self.scan(self.source)
+
+    def test_end_of_options_preserves_exactly_one_declared_source(self):
+        other = self.root / "other.cpp"
+        other.write_text("int other(){return 42;}\n", encoding="utf-8")
+        path = self.database(self.root / "build")
+        for before, after, expected in (
+            ([], ["input.cpp"], 0),
+            (["input.cpp"], [], 0),
+            (["-include", "other.cpp"], ["input.cpp"], 0),
+            ([], ["other.cpp"], 2),
+            ([], ["input.cpp", "other.cpp"], 2),
+            (["input.cpp"], ["other.cpp"], 2),
+            ([], ["input.cpp", "input.cpp"], 2),
+            ([], ["input.cpp", "-DNOT_AN_OPTION=1"], 2),
+            ([], [], 2),
+        ):
+            with self.subTest(before=before, after=after):
+                entry = {"directory": str(self.root), "file": str(self.source),
+                         "arguments": ["clang++", "-c", *before, "--", *after]}
+                path.write_text(json.dumps([entry]), encoding="utf-8")
+                self.doctor(self.source, expected=expected)
+                self.scan(self.source, expected=expected)
 
     def test_cl_mode_keeps_option_operands_and_rejects_wrong_actual_input(self):
         include = self.root / "included.cpp"

@@ -62,6 +62,18 @@ endif()
 add_executable(codeskeptic main.cpp)
 target_link_libraries(codeskeptic PRIVATE codeskeptic_core)
 
+# Development corpus harness, not an installed analyzer inference mode.
+add_executable(codeskeptic_corpus_inputs ../scripts/corpus_compile_commands.cpp)
+target_link_libraries(codeskeptic_corpus_inputs PRIVATE codeskeptic_core)
+
+if(MSVC)
+    # Set the process code page before CRT argv initialization. Changing the
+    # locale inside main cannot recover characters already replaced by '?'.
+    # Windows 10 1903+ honors this setting; no privilege request is added.
+    target_sources(codeskeptic PRIVATE windows_utf8.manifest)
+    target_sources(codeskeptic_corpus_inputs PRIVATE windows_utf8.manifest)
+endif()
+
 # Relocatable-tarball rpath: distro LLVM packages link the clang libs
 # against a shared libLLVM.so; the release layout bundles it in ../lib
 # next to the binary (package_release.sh). Harmless for dev builds —

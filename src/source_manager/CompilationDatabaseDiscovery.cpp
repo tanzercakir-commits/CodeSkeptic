@@ -71,7 +71,12 @@ bool commandTargetsDeclaredFile(const clang::tooling::CompileCommand& command) {
     const auto parsed = clang::driver::getDriverOptTable().ParseArgs(
         arguments, missingIndex, missingCount, llvm::opt::Visibility(visibility));
     if (missingCount != 0) return false;
-    const auto inputs = parsed.getAllArgValues(clang::driver::options::OPT_INPUT);
+    auto inputs = parsed.getAllArgValues(clang::driver::options::OPT_INPUT);
+    // LLVM stores operands following the explicit option terminator in a
+    // separate argument. They are still actual inputs, including names that
+    // look like options; count them together with any preceding input.
+    const auto terminatedInputs = parsed.getAllArgValues(clang::driver::options::OPT__DASH_DASH);
+    inputs.insert(inputs.end(), terminatedInputs.begin(), terminatedInputs.end());
     if (inputs.size() != 1) return false;
     fs::path working = command.Directory;
     // The driver resolves relative inputs after its last working-directory

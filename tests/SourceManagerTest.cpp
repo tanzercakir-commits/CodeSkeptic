@@ -82,7 +82,7 @@ TEST_F(SourceManagerTargetTest, ValidScanAfterRejectedScanCommitsTogether) {
     EXPECT_TRUE(manager.files().empty());
     ASSERT_TRUE(manager.scanDirectory(root.string(), &error));
     EXPECT_TRUE(error.reason.empty());
-    EXPECT_EQ(manager.files(), std::vector<std::string>{(root / "kept.cpp").string()});
+    EXPECT_EQ(manager.files(), std::vector<std::string>{fs::canonical(root / "kept.cpp").string()});
 }
 
 TEST_F(SourceManagerTargetTest, CanonicalAliasesAndRescanKeepOneSourceIdentity) {

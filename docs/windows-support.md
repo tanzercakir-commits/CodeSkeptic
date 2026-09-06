@@ -17,6 +17,30 @@ per-push packaging rehearsal + relocation smoke in windows.yml. The
 per-item notes below record what landed and what each gap turned out
 to be in practice.
 
+## Current restart qualification and Unicode paths
+
+The dated landed results below describe historical revisions, not automatic
+qualification of the current restart. At `d98354a`, the native MSVC build passed
+after the source-specific conforming-preprocessor fix, but CTest failed and
+the later smoke, SDK and relocation gates were skipped. A later candidate must
+pass those actual gates before this restart is qualified.
+
+The native CLI and development corpus helper embed `src/windows_utf8.manifest`, requesting a UTF-8
+process code page before the CRT constructs `argv`. This is intended to preserve Unicode
+filenames across argument, narrow filesystem and report-output boundaries;
+calling `setlocale` inside `main` cannot recover characters already replaced
+at startup. No elevated execution level or machine-wide locale change is
+requested. Tests decode the CLI's UTF-8 output explicitly rather than using
+the test runner's locale.
+
+Microsoft supports this process setting from **Windows 10 version 1903 onward**.
+The qualification host is Windows Server 2025. The manifest does not establish
+Unicode correctness on older Windows versions, which would require explicit
+encoding conversions and their own evidence. Native Unicode input/directory/
+output round trips and package relocation remain required candidate evidence;
+adding the manifest alone is not a successful runtime qualification.
+See [Microsoft's process-code-page documentation](https://learn.microsoft.com/en-us/windows/apps/design/globalizing/use-utf8-code-page).
+
 ## Starting point: the core is already portable
 
 - **No POSIX process/syscall use.** A scan for `fork`/`exec*`/`popen`/

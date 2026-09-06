@@ -460,6 +460,26 @@ def _path_prefix_pattern(path):
     )
 
 
+def _compile_path_prefixes(value):
+    """Find actual identities in path-valued substrings, including -I.
+
+    Roots supplied by the caller can use long Windows names while database
+    flags use 8.3 names (or directory symlinks). Resolve prefixes only: never
+    normalize an entire compiler argument and thereby change a flag's value.
+    """
+    prefixes = {}
+    for start in re.finditer(r"(?:[A-Za-z]:)?[/\\]", value):
+        for end in re.finditer(r"[/\\\s\"\']|$", value[start.end():]):
+            prefix = value[start.start():start.end() + end.start()]
+            if not os.path.isabs(prefix):
+                continue
+            try:
+                prefixes[prefix] = os.path.realpath(prefix)
+            except (OSError, ValueError):
+                continue
+    return prefixes
+
+
 def _rewrite_compile_path(value, src_root, dst_root, protect=None):
     """Rewrite source paths while preserving build-only dependencies."""
     hidden = []
@@ -469,20 +489,36 @@ def _rewrite_compile_path(value, src_root, dst_root, protect=None):
         hidden.append((token, match.group(0)))
         return token
 
-    if protect:
-        value = _path_prefix_pattern(protect).sub(hide, value)
+    prefixes = _compile_path_prefixes(value)
+    roots = {src_root}
+    protected = {protect} if protect else set()
+    for prefix, canonical in prefixes.items():
+        if os.path.normcase(canonical) == os.path.normcase(src_root):
+            roots.add(prefix)
+        if protect and os.path.normcase(canonical) == os.path.normcase(protect):
+            protected.add(prefix)
+        # Build aliases can occur below the root too (OUTGEN~1, BUILDO~1).
+        # Compare identities before any replacement and keep original bytes.
+        if (os.path.normcase(os.path.dirname(canonical)) == os.path.normcase(src_root) and
+                re.fullmatch(r"(?:build|cmake-build)(?:[-_.].*)?",
+                             os.path.basename(canonical), re.IGNORECASE)):
+            protected.add(prefix)
+    for prefix in sorted(protected, key=len, reverse=True):
+        value = _path_prefix_pattern(prefix).sub(hide, value)
 
     # A compile DB may reuse dependencies from an older sibling build. Those
     # directories do not exist in a source-only base worktree and must retain
     # their HEAD paths just like the explicitly selected BUILD_PATH.
-    build_root = re.compile(
-        _path_pattern_body(src_root)
-        + r"[/\\]+(?:build|cmake-build)(?:[-_.][^/\\\s\"\']*)?"
-        + r"(?=[/\\\s\"\']|$)",
-        re.IGNORECASE,
-    )
-    value = build_root.sub(hide, value)
-    value = _path_prefix_pattern(src_root).sub(lambda _m: dst_root, value)
+    # Keep lexical matching too: cross-host review fixtures can contain Windows
+    # paths on POSIX, where native filesystem alias resolution cannot help.
+    for root in roots:
+        build_root = re.compile(
+            _path_pattern_body(root)
+            + r"[/\\]+(?:build|cmake-build)(?:[-_.][^/\\\s\"\']*)?"
+            + r"(?=[/\\\s\"\']|$)", re.IGNORECASE)
+        value = build_root.sub(hide, value)
+    for root in sorted(roots, key=len, reverse=True):
+        value = _path_prefix_pattern(root).sub(lambda _m: dst_root, value)
     for token, original in hidden:
         value = value.replace(token, original)
     return value
@@ -504,15 +540,17 @@ def _compile_renames(path, src_root, dst_root):
                         any(part in ("", ".", "..") for part in name.split("/"))):
                     raise ValueError("rename paths must be contained repository-relative paths")
             old, new = fields
-            if old in seen_old or new in result:
+            target = _compile_identity(old, dst_root)
+            identity = os.path.normcase(_compile_identity(new, src_root))
+            if os.path.normcase(target) in seen_old or identity in result:
                 raise ValueError("duplicate rename identity")
-            seen_old.add(old)
-            result[new] = os.path.normpath(os.path.join(dst_root, old))
-    return {os.path.normpath(os.path.join(src_root, new)): old for new, old in result.items()}
+            seen_old.add(os.path.normcase(target))
+            result[identity] = target
+    return result
 
 
 def _compile_identity(path, working):
-    return os.path.normpath(path if os.path.isabs(path) else os.path.join(working, path))
+    return os.path.realpath(path if os.path.isabs(path) else os.path.join(working, path))
 
 
 def _remap_compile_arguments(arguments, source, working, target, renamed, rw):
@@ -529,14 +567,15 @@ def _remap_compile_arguments(arguments, source, working, target, renamed, rw):
     if any(arg in (";", "&&", "||", "|", "<", ">") for arg in arguments):
         raise ValueError("shell command chains are not compilation arguments")
     matching = [index for index, value in enumerate(arguments) if index and
-                not value.startswith(("-", "@")) and _compile_identity(value, working) == source]
+                not value.startswith(("-", "@")) and
+                os.path.normcase(_compile_identity(value, working)) == os.path.normcase(source)]
     if renamed and len(matching) != 1:
         raise ValueError("rename requires exactly one original declared source operand")
     if renamed:
         for index, value in enumerate(arguments):
             if index == 0 or index in matching or value.startswith(("-", "@")):
                 continue
-            if os.path.normpath(rw(_compile_identity(value, working))) == target:
+            if os.path.normcase(_compile_identity(rw(_compile_identity(value, working)), working)) == os.path.normcase(target):
                 raise ValueError("rename would conflate another original argument with the BASE source")
     remapped = [rw(value) for value in arguments]
     # Absolute source operands remain correct when a protected build working
@@ -593,8 +632,8 @@ def cmd_remap_db(args):
             raise ValueError("output must be a string")
         working = _compile_identity(e["directory"], os.path.dirname(os.path.abspath(args.src)))
         source = _compile_identity(e["file"], working)
-        target = renames.get(source, rw(source))
-        renamed = source in renames
+        target = renames.get(os.path.normcase(source), rw(source))
+        renamed = os.path.normcase(source) in renames
         if "arguments" in e:
             e["arguments"] = _remap_compile_arguments(e["arguments"], source, working, target, renamed, rw)
         if "command" in e:

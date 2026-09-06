@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """Input preparation regressions; existing review verdict gates stay unchanged."""
 import json
+import importlib.util
+import ntpath
 import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest import mock
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "review_report.py"
 BINARY = str(Path(sys.argv.pop(1)).resolve()) if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else None
@@ -16,7 +20,7 @@ class ReviewInputTest(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="codeskeptic-review-input-")
         self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
+        self.root = Path(temporary.name).resolve(strict=True)
         self.head = self.root / "head"
         self.base = self.root / "base"
         self.head.mkdir()
@@ -138,6 +142,75 @@ class ReviewInputTest(unittest.TestCase):
                         "a.c\tnew.c\nb.c\tnew.c\n"):
             with self.subTest(mapping=mapping):
                 self.remap([self.entry("new.c")], renames=mapping, expected=2)
+
+    @unittest.skipUnless(os.name == "posix", "real directory symlink fixture uses POSIX")
+    def test_real_alias_remaps_to_base_without_repairing_wrong_input(self):
+        alias = self.root / "head-alias"
+        alias.symlink_to(self.head, target_is_directory=True)
+        entry = {"directory": str(alias), "file": str(alias / "new.c"),
+                 "arguments": ["clang", "-c", str(alias / "new.c")]}
+        result = self.remap([entry], renames="old.c\tnew.c\n")[0]
+        self.assertEqual(result["file"], str(self.base / "old.c"))
+        self.assertEqual(result["arguments"], ["clang", "-c", str(self.base / "old.c")])
+        self.output.unlink()
+        entry["arguments"][-1] = str(alias / "old.c")
+        self.remap([entry], renames="old.c\tnew.c\n", expected=2)
+
+    def test_windows_short_alias_identity_and_protected_flags(self):
+        # Exercise Windows path semantics on every host, including Linux CI.
+        # Only realpath's filesystem-dependent 8.3 expansion is substituted.
+        spec = importlib.util.spec_from_file_location("review_alias_contract", SCRIPT)
+        report = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(report)
+        head = r"C:\Users\RunnerAdmin\project space\head"
+        short = r"C:\Users\RUNNER~1\project space\head"
+        base = r"C:\Users\RunnerAdmin\project space\base"
+
+        def realpath(value):
+            normalized = ntpath.normpath(value)
+            return normalized.replace("RUNNER~1", "RunnerAdmin").replace("OUTGEN~1", "out").replace("BUILDO~1", "build-old")
+
+        winpath = SimpleNamespace(**{name: getattr(ntpath, name) for name in dir(ntpath)})
+        winpath.realpath = realpath
+        winos = SimpleNamespace(path=winpath, name="nt", sep="\\", makedirs=os.makedirs)
+        rename = self.root / "alias-renames.txt"
+        rename.write_text("old.c\tnew.c\n", encoding="utf-8")
+        args = SimpleNamespace(src=str(self.source), out=str(self.output), from_root=head,
+                               to_root=base, protect=head + r"\out", renames=str(rename))
+        flags = ["-DNAME=new.c", "-I" + short + r"\include",
+                 "-I" + short + r"\out\generated", "-I" + short + r"\build-old\include",
+                 "-I" + short + r"-other\include", "-I" + short + r"\OUTGEN~1\include",
+                 "-I" + short + r"\BUILDO~1\include"]
+        entries = [{"directory": short + r"\out", "file": r"..\new.c",
+                    "arguments": ["clang", *flags, "-DVARIANT=" + str(i), "-c", short + r"\new.c"]}
+                   for i in (1, 2)]
+        with mock.patch.object(report, "os", winos):
+            self.source.write_text(json.dumps(entries), encoding="utf-8")
+            self.assertEqual(report.cmd_remap_db(args), 0)
+            results = json.loads(self.output.read_text(encoding="utf-8"))
+            self.assertEqual(len(results), 2)
+            for i, result in enumerate(results, 1):
+                self.assertEqual(result["file"], base + r"\old.c")
+                self.assertEqual(result["directory"], head + r"\out")
+                self.assertEqual(result["arguments"],
+                                 ["clang", flags[0], "-I" + base + r"\include", *flags[2:],
+                                  "-DVARIANT=" + str(i), "-c", base + r"\old.c"])
+            # A short alias can occur only in flags, not in directory/file.
+            entries[0]["directory"] = head + r"\out"
+            entries[0]["file"] = head + r"\new.c"
+            self.source.write_text(json.dumps(entries[:1]), encoding="utf-8")
+            self.assertEqual(report.cmd_remap_db(args), 0)
+            self.assertEqual(json.loads(self.output.read_text(encoding="utf-8"))[0], results[0])
+            self.output.unlink()
+            for operands in ([short + r"\old.c"], [], [short + r"\new.c"] * 2,
+                             ["-include", short + r"\new.c", "-c", short + r"\old.c"],
+                             ["@flags.rsp", short + r"\new.c"]):
+                with self.subTest(operands=operands):
+                    entries[0]["arguments"] = ["clang", *operands]
+                    self.source.write_text(json.dumps(entries), encoding="utf-8")
+                    with self.assertRaises(ValueError):
+                        report.cmd_remap_db(args)
+                    self.assertFalse(self.output.exists())
 
 
 @unittest.skipUnless(BINARY and os.name == "posix", "actual POSIX review flow needs an analyzer binary")
