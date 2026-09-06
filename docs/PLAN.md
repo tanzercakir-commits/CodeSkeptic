@@ -1,6 +1,6 @@
 # CodeSkeptic — CWE Ürün Planı
 
-Sürüm: 28. Eski planın devamı değil; main tabanlı yeni program.
+Sürüm: 29. Eski planın devamı değil; main tabanlı yeni program.
 
 PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.
 
@@ -441,7 +441,7 @@ PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. G
 
 **Test bütçesi:** T1
 **Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/core/RuleCapabilities.def, src/core/Capabilities*, src/core/Diagnostic.h, src/core/AnalysisResult.h, src/reporter/*, src/rules/*, tests/SarifReporterTest.cpp, tests/CapabilitiesTest.cpp, docs/capabilities.md, src/core/Messages.*, tests/IntOverflowRuleTest.cpp, tests/JsonReporterTest.cpp, tests/CapabilitiesCliTest.py, README.md, scripts/check_capabilities_sync.py
+**Kapsam:** src/core/RuleCapabilities.def, src/core/Capabilities*, src/core/Diagnostic.h, src/core/AnalysisResult.h, src/reporter/*, src/rules/*, tests/SarifReporterTest.cpp, tests/CapabilitiesTest.cpp, docs/capabilities.md, src/core/Messages.*, tests/IntOverflowRuleTest.cpp, tests/JsonReporterTest.cpp, tests/CapabilitiesCliTest.py, README.md, scripts/check_capabilities_sync.py, tests/BoundsRuleTest.cpp
 **Bağımlılıklar:** Yok
 
 #### CS3-CH03-S01-U002 — CLI/JSON/SARIF/HTML bulgu ve verdict tutarlılığını sabitle
