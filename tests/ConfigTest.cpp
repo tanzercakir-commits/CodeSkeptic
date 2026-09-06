@@ -502,7 +502,8 @@ TEST(ConfigTest, FileListReadFailureIsAtomicAndCrLfPathsStayExact) {
 
 TEST(ConfigTest, ChangedCompilationCommandsInvalidateWarmAstCache) {
     namespace fs = std::filesystem;
-    const auto root = fs::path(::testing::TempDir()) /
+    // This positive reuse fixture must record the canonical main-file spelling.
+    const auto root = fs::canonical(fs::path(::testing::TempDir())) /
         ("codeskeptic-compdb-cache-" + std::to_string(
             std::chrono::steady_clock::now().time_since_epoch().count()));
     ASSERT_TRUE(fs::create_directory(root));

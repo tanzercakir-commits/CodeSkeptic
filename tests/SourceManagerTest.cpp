@@ -7,6 +7,7 @@
 #include <clang/Basic/SourceManager.h>
 #include <clang/Tooling/CompilationDatabase.h>
 #include <llvm/Support/JSON.h>
+#include <llvm/Support/MemoryBuffer.h>
 #include <gtest/gtest.h>
 #include <chrono>
 #include <cstdlib>
@@ -200,6 +201,9 @@ class SourceInputCacheTest : public SourceManagerTargetTest {
 protected:
     void SetUp() override {
         SourceManagerTargetTest::SetUp();
+        // Positive reuse requires a buffer under the canonical requested path;
+        // Windows TempDir may instead return an 8.3 alias of that directory.
+        root = fs::canonical(root);
         SourceManager::clearWarmCache();
         llvm::json::Array args{"clang++", "-std=c++17", "-c", "kept.cpp"};
         llvm::json::Array commands;
@@ -257,6 +261,10 @@ TEST_F(SourceInputCacheTest, ActualInputWitnessAllowsUnchangedHeaderBearingReuse
     ASSERT_TRUE(identity.reusable) << identity.reason;
     ASSERT_TRUE(identity.hasBuffer((root / "kept.cpp").string()));
     ASSERT_TRUE(identity.hasBuffer((root / "leaf.h").string()));
+    ASSERT_EQ(manager.files().size(), 1u);
+    ASSERT_TRUE(identity.hasBuffer(manager.files().front()))
+        << "canonical main: " << manager.files().front()
+        << "; fixture main: " << (root / "kept.cpp").string();
     for (const auto& observation : identity.observations) {
         auto single = identity;
         single.observations = {observation};
@@ -265,6 +273,27 @@ TEST_F(SourceInputCacheTest, ActualInputWitnessAllowsUnchangedHeaderBearingReuse
     ASSERT_TRUE(identity.matchesCurrent()) << identity.reason;
     ASSERT_EQ(manager.processAll([](clang::ASTContext&) {}), 0);
     EXPECT_EQ(SourceManager::warmCacheHits(), 1u);
+}
+
+TEST_F(SourceInputCacheTest, ActualAliasBufferDoesNotClaimCanonicalSpelling) {
+    ASSERT_TRUE(fs::create_directory(root / "spelling"));
+    const auto canonical = (root / "kept.cpp").string();
+    const auto alias = (root / "spelling" / ".." / "kept.cpp").string();
+    ASSERT_NE(alias, canonical);
+    ASSERT_EQ(fs::canonical(alias).string(), canonical);
+    const std::string source = "int kept(){return 17;}\n";
+    write(root / "kept.cpp", source);
+    codeskeptic::InputRecording recording(codeskeptic::inputDigest("exact-query-spelling"));
+    auto buffer = recording.filesystem()->getBufferForFile(alias);
+    ASSERT_TRUE(buffer);
+    EXPECT_EQ((*buffer)->getBuffer().str(), source);
+    const auto identity = recording.finish();
+    ASSERT_TRUE(identity.reusable) << identity.reason;
+    ASSERT_TRUE(identity.matchesCurrent()) << identity.reason;
+    EXPECT_TRUE(identity.hasBuffer(alias));
+    // A valid read through one spelling is not a recorded read through another.
+    // Keep this strict admission boundary; do not normalize product witnesses.
+    EXPECT_FALSE(identity.hasBuffer(canonical));
 }
 
 TEST_F(SourceInputCacheTest, RelativeCompilationSidecarsUseCompilerDirectoryAndKeepWarmParity) {
