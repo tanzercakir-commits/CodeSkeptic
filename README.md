@@ -27,6 +27,13 @@ returning machine-readable findings with dataflow traces.
 
 ## Quickstart
 
+For the current CWE development branch, start with the
+[locally tested C/C++ first-scan walkthrough](docs/first-scan.md#a-small-reproducible-c-and-c-project)
+and its [report-only CI recipe](docs/integrations.md#local-report-only-ci).
+It checks a locally installed binary, real compilation inputs and complete
+reports. This local qualification does **not** mean the development changes
+are in the releases/actions below or have passed new cross-platform release CI.
+
 **Binary** — Linux x86_64 (macOS arm64: `codeskeptic-darwin-arm64.tar.gz`),
 no LLVM install needed; the tarball bundles the Clang headers and every
 non-glibc library, and each release is smoke-tested in clean containers

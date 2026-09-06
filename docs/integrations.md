@@ -1,10 +1,121 @@
 # Integrations: CI gates, editors, agents
 
 How CodeSkeptic plugs into a PR pipeline, an editor, and an AI coding
-loop. Adoption advice up front, learned the honest way: **run
-report-only for the first week** (`--gate warn`, or upload SARIF without
-failing the job) and let the findings earn the right to block your CI —
-see [evaluate.md](evaluate.md).
+loop. Start adoption with complete findings visible but non-blocking; keep
+input, analysis and artifact failures blocking. Ordinary scans do not have a
+`--gate warn` mode: that flag belongs to summary diff (and the review script's
+own gate). Use the locally tested recipe below; see [evaluate.md](evaluate.md)
+for the broader evaluation process.
+
+## Local report-only CI
+
+First run the [small C/C++ project](first-scan.md). Save this block as
+`ci/report_only.py` in that example project. It uses only Python's standard
+library and an installed `codeskeptic` on `PATH`. This deliberately narrow
+recipe scans a source-only `src` tree (`.c`, `.cpp`, `.cc`, `.cxx`), with the
+generated build directory **outside** it. Review that intended source set for
+your own project; it is not a universal build-system adapter.
+
+The output directory must be new: reusing an old report is not evidence that
+this run worked. A complete supported-finding verdict stays `1` in the artifact
+while this adoption wrapper exits `0`. Experimental-only CLI reports already
+exit `0`. Missing/malformed reports, missing intended files, incomplete coverage,
+launch failures, timeouts and exit `2` remain wrapper failures. This example's
+300-second analysis budget can be changed deliberately for larger projects.
+
+<!-- first-scan:report-only-file -->
+```python
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+
+def require(condition, message):
+    if not condition:
+        raise ValueError(message)
+
+
+def main():
+    try:
+        require(len(sys.argv) == 4, "usage: report_only.py <source-dir> <build-dir> <new-output-dir>")
+        source, build, output = map(Path, sys.argv[1:])
+        source = source.resolve(strict=True)
+        require(source.is_dir(), "choose a source-only directory")
+        expected = {str(p.resolve()) for p in source.rglob("*")
+                    if p.is_file() and p.suffix in {".c", ".cpp", ".cc", ".cxx"}}
+        require(bool(expected), "no intended C/C++ sources")
+        output.mkdir()  # Refuse an existing directory, including stale reports.
+        artifact = output / "codeskeptic.sarif"
+        result = subprocess.run(
+            ["codeskeptic", "--source", str(source), "--build-path", str(build),
+             "--sarif", str(artifact)], timeout=300, check=False)
+        require(result.returncode in (0, 1), "analysis failed: exit " + str(result.returncode))
+        data = json.loads(artifact.read_text(encoding="utf-8"))
+        require(data["version"] == "2.1.0" and len(data["runs"]) == 1, "invalid SARIF run")
+        run = data["runs"][0]
+        report = run["properties"]["codeskeptic/report"]
+        require(report["schema"] == "codeskeptic-report/v1", "unsupported report schema")
+        require(report["tool"] == "CodeSkeptic" and report["complete"] is True,
+                "analysis evidence incomplete")
+        require(type(report["exit_code"]) is int and report["exit_code"] == result.returncode,
+                "process/report exit mismatch")
+        require(report["status"] in ("clean", "report-only", "findings"), "unexpected verdict")
+        require(len(run["invocations"]) == 1, "missing invocation")
+        invocation = run["invocations"][0]
+        properties = invocation["properties"]
+        require(invocation["executionSuccessful"] is True
+                and properties["codeskeptic/exitCode"] == result.returncode
+                and properties["codeskeptic/status"] == report["status"], "invocation mismatch")
+        coverage = properties["codeskeptic/coverage"]
+        require(coverage["schema"] == "codeskeptic-source-coverage/v1"
+                and coverage["complete"] is True, "source coverage incomplete")
+        require(coverage["accept_partial_coverage"] is False
+                and coverage["analyze_broken_tus"] is False, "partial/recovery opt-in not allowed")
+        require(coverage["attempted_tus"] == coverage["analyzed_tus"] == len(expected),
+                "intended source count mismatch")
+        require(all(coverage[key] == 0 for key in (
+            "broken_tus", "skipped_tus", "failed_tus", "recovery_tus", "incomplete_functions",
+            "skipped_commands", "failed_commands")), "failed or incomplete coverage")
+        rows = coverage["sources"]
+        require(len(rows) == len(expected) and {row["file"] for row in rows} == expected,
+                "intended source identity mismatch")
+        for row in rows:
+            require(row["status"] == "analyzed"
+                    and row["commands"] == row["analyzed_commands"] > 0
+                    and row["skipped_commands"] == row["failed_commands"] == row["recovery_commands"] == 0
+                    and row["prepass"]["recovery_commands"] == 0, "incomplete source command")
+        counts = report["finding_counts"]
+        require(all(type(counts[key]) is int and counts[key] >= 0
+                    for key in ("total", "blocking", "report_only")), "invalid finding counts")
+        require(counts["total"] == counts["blocking"] + counts["report_only"]
+                == report["total"] == len(run["results"]), "finding count mismatch")
+        require((counts["blocking"] > 0) == (result.returncode == 1), "finding verdict mismatch")
+        require(report["status"] == ("findings" if counts["blocking"] else
+                                     "report-only" if counts["total"] else "clean"), "status mismatch")
+        print("REPORT_ONLY_OK analyzer_exit=" + str(result.returncode)
+              + " sources=" + str(len(expected)) + " artifact=" + str(artifact))
+        return 0
+    except (OSError, ValueError, KeyError, TypeError, IndexError, subprocess.TimeoutExpired) as error:
+        print("REPORT_ONLY_FAILED: " + str(error), file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+```
+
+<!-- first-scan:report-only-run -->
+```bash
+python3 ci/report_only.py src build scan-artifacts
+```
+
+For another run, choose a new output directory. Keep the SARIF findings and
+original analyzer verdict for review; `REPORT_ONLY_OK` means acceptable
+execution/coverage, **not** “no defects.” The recipe adds no baseline, rule
+disabling, suppression or reduced quality floor. It assumes a trusted installed
+analyzer and trusted project configuration; it does not attest a malicious
+producer or establish all-CWE coverage.
 
 ## Semantic regression gate (summary diff)
 
@@ -111,8 +222,9 @@ The markdown review contains:
 * **New findings** — introduced by the change, with dataflow traces;
   findings and trace steps that sit on changed lines are marked. A
   finding that merely *shifted* (code added above it) does not
-  resurface: matching uses the baseline's line-content keys, and pure
-  renames are mapped old→new, so refactor PRs stay quiet.
+  resurface when its strong v3 function-bound identity matches; pure
+  renames are mapped old→new. Changed ownership, signatures, severity or
+  message are not silently accepted by weaker line-content matching.
 * **New assumptions** — on by default in review mode: a new inferred,
   unchecked precondition ("parameter `p` is assumed non-null —
   dereferenced, never checked") is exactly the CWE-476 shape reviews
@@ -121,7 +233,10 @@ The markdown review contains:
   116-commit history range (the delta bounds the assumption engine's
   volume). It is experimental/report-only, so it informs even under
   `--strict`. Opt out with `--no-assumptions`.
-* **Fixed findings** — present at base, gone at head.
+* **Fixed findings** — supported by the complete comparison evidence, not merely
+  hidden at head. Applied suppressions retain an audit section and cannot be
+  claimed as fixes; baseline-filtered input that consumed findings cannot
+  establish the full delta. Ambiguous ownership stays conservative.
 * **Contract changes** — the summary diff of both sides' inferred
   contracts; `WEAKENED` entries gate.
 * **Coverage** — what was *not* analyzed and why (headers, deleted
@@ -138,8 +253,8 @@ themselves: **new supported definite findings (error) and weakened contracts
 gate; new supported "may" findings (warning) are reported but do not** —
 pass `--strict` to gate supported warnings too. Experimental findings are
 always report-only, including under `--strict`. Use `--gate warn` to
-always exit `0` while still printing a supported failing verdict (adoption
-ramp). The last line is
+exit `0` for a complete supported failing verdict (adoption ramp), not for
+missing or invalid evidence: those failures remain `2`. The last line is
 machine-greppable for CI dashboards:
 
 ```
@@ -232,47 +347,28 @@ line, and CodeSkeptic's dataflow traces show up as *related locations*
 (the allocation/free/null-assignment chain behind each finding is
 navigable step by step).
 
-**GitHub code scanning.** Upload the same file from CI and findings
-appear in the repository's Security tab and as PR annotations. A complete
-workflow — build CodeSkeptic, generate your project's compilation
-database, analyze, upload:
+**GitHub code scanning.** After local qualification, a repository with code
+scanning enabled and appropriate permissions can upload the checked SARIF.
+The following is an integration fragment, **not a commissioned workflow or
+release test**. It assumes checkout, an installed matching development binary,
+Python/CMake/Ninja/compilers, and the saved recipe above. Add these steps only
+through your repository's normal review and CI authorization process:
 
 ```yaml
-# .github/workflows/codeskeptic.yml
-name: CodeSkeptic
-on: [push, pull_request]
-
-permissions:
-  contents: read
-  security-events: write        # required to upload SARIF to code scanning
-
-jobs:
-  analyze:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build CodeSkeptic
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y llvm-18-dev libclang-18-dev cmake
-          cmake -B cs-build -DCMAKE_BUILD_TYPE=Release
-          cmake --build cs-build -j
-
-      - name: Generate your project's compile_commands.json
-        run: cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-
-      - name: Analyze -> SARIF
-        run: ./cs-build/src/codeskeptic . --build-path build --sarif codeskeptic.sarif || true
-
-      - uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: codeskeptic.sarif
+- name: Generate the example project's compilation inputs
+  run: cmake -S . -B build -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+- name: Analyze with checked report-only acceptance
+  run: python3 ci/report_only.py src build scan-artifacts
+- uses: github/codeql-action/upload-sarif@v3
+  if: success()
+  with:
+    sarif_file: scan-artifacts/codeskeptic.sarif
 ```
 
-(`|| true` because CodeSkeptic exits 1 on findings; code scanning does
-its own gating — this is the report-only mode that first-week adoption
-should use.)
+The job requires `contents: read` and `security-events: write` as permitted by
+the hosting repository. Do not add blanket shell success or `continue-on-error`
+to the analysis step: it would also hide infrastructure and coverage failures.
+No hosted upload is required by the local first-scan test.
 
 For a shareable, tool-free view of the same findings, use `--html` —
 one self-contained file with filters and source-context traces.

@@ -12,6 +12,8 @@ codeskeptic <source_path> [options]
 
   --source <path>        Directory/file to analyze
   --build-path <path>    compile_commands.json directory
+  --doctor              Explain compilation-input readiness (text only;
+                         does not run analysis or generate report files)
   --json <file>          JSON output file
   --sarif <file>         SARIF 2.1.0 output file (GitHub code scanning)
   --html <file>          Self-contained HTML report: summary cards double
@@ -112,7 +114,12 @@ findings (it may include experimental report-only findings), `1` means a
 complete analysis with supported findings, and `2` means no trustworthy
 verdict was produced (invalid input/config, incomplete coverage/evidence,
 or an output artifact could not be written). Integrations must never turn
-`2` green. The tier matrix is the [capability contract](capabilities.md).
+`2` green. A process exit alone is not an artifact: launch/usage failures can
+also produce no report (including the legacy no-source exit `1`). The
+[report-only recipe](integrations.md#local-report-only-ci) requires a fresh,
+valid report and complete intended source coverage before accepting `0`/`1`.
+`--gate warn` is a summary-diff option, not a switch for ordinary scans.
+The tier matrix is the [capability contract](capabilities.md).
 
 JSON, SARIF and HTML artifacts carry that same status and exit code together
 with translation-unit/dataflow coverage. An empty HTML findings list says
@@ -187,13 +194,22 @@ Individual findings can be suppressed with source comments:
 int x = 1 / z;  // codeskeptic-disable-line
 int y = 1 / w;  // codeskeptic-disable-line div-by-zero
 
-// codeskeptic-disable-next-line memory-leak
+// codeskeptic-disable-next-line memory-leak -- lifetime owned by the host process
 p = new int(7);
 ```
 
 A bare marker suppresses every rule on that line; a comma- or
-space-separated rule list limits it to those rules. The count of
-suppressed findings is reported on stderr.
+space-separated rule list limits it to those rules. Use `-- reason` to record
+the reviewed justification. Markers must be in actual source comments: string
+contents and malformed directives do not suppress findings. Suppression removes
+selected findings from the visible list, not from the analysis coverage.
+
+The count is reported on stderr and applied audit records are retained in the
+report's `suppressions`: original finding identity, marker/target lines, rule
+scope, reason and occurrence count. Legacy comments without a reason remain
+usable, with `reason: null` and `reason_status: legacy-unspecified`; the analyzer
+does not invent a justification. Record-only baseline mode emits the audit and
+coverage on stderr rather than producing ordinary report files.
 
 ## Baseline workflow
 
@@ -201,19 +217,30 @@ Adopting the analyzer on an existing codebase without fixing every
 legacy finding first:
 
 ```bash
-codeskeptic src/ --write-baseline .codeskeptic-baseline   # record & exit clean
-codeskeptic src/ --baseline .codeskeptic-baseline         # only NEW findings fail
+codeskeptic src/ --build-path build --write-baseline .codeskeptic-baseline
+codeskeptic src/ --build-path build --baseline .codeskeptic-baseline
 ```
 
-Baseline keys are **line-independent**: instead of the line number they
-hash the (whitespace-trimmed) text of the finding's source line, so
-adding or removing code elsewhere in the file does not invalidate the
-baseline. If the flagged line itself changes, the finding resurfaces as
-new — deliberately, since a changed line deserves a fresh look.
-Identical findings on identical lines are tracked by count, so
-baselining one occurrence never hides a second one. Old (v1,
-line-numbered) baseline files keep working with their original meaning;
-rewrite with `--write-baseline` to migrate.
+Record first, then load; a missing requested baseline fails with exit `2`.
+Recording is an acceptance snapshot, not a clean-code claim. It writes versioned
+text (`# codeskeptic-baseline v3`), not JSON. A record-only command does not
+produce an ordinary JSON/SARIF/HTML report; inspect stderr coverage and audit.
+
+V3 keys bind the rule, full source path, public function name, AST-proven
+function signature, indentation-relative column, trimmed source line, severity
+and message. Harmless line shifts or reindentation can match; changed ownership,
+overload, signature, severity or finding content cannot consume the old budget.
+Logical occurrences are counted, so one accepted site cannot hide another.
+When ownership is ambiguous or unavailable (including unsupported template,
+lambda or macro contexts), explicit unbound records never match. They cannot
+fall back to weaker identity. Moving a checkout can require reviewed regeneration
+because the baseline binds the full path.
+
+V1 (line-numbered) and v2 (line-content) files retain their explicitly weaker
+legacy behavior, disclosed on each use. Review and regenerate to migrate;
+malformed, mixed or unknown versions fail closed. This acceptance identity is
+separate from the public `csf1` finding fingerprint. New, changed and unbound
+findings remain reportable; baselines never repair incomplete analysis evidence.
 
 ## Incremental analysis
 

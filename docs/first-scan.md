@@ -1,5 +1,115 @@
 # Your first scan on a real codebase
 
+## A small, reproducible C and C++ project
+
+Start with an installed `codeskeptic` on `PATH`, Python 3, CMake, Ninja and
+working C/C++ compilers. This walkthrough is qualified locally on Linux with
+the current development binary; it is not evidence of a published release,
+standalone package portability or a hosted GitHub job.
+
+For an already-built development binary, an **unprivileged local installation**
+can be made on the same machine. Set `CODESKEPTIC_BUILT_BINARY` to its absolute
+path and `CODESKEPTIC_LOCAL_PREFIX` to a **new, empty prefix you own**. This copy
+still needs the build environment's LLVM shared libraries and Clang resource
+headers; it is not a replacement for the later release-packaging checks.
+
+<!-- first-scan:install -->
+```bash
+set -eu
+test ! -e "$CODESKEPTIC_LOCAL_PREFIX"
+install -d "$CODESKEPTIC_LOCAL_PREFIX/bin"
+install -m 755 "$CODESKEPTIC_BUILT_BINARY" "$CODESKEPTIC_LOCAL_PREFIX/bin/codeskeptic"
+export PATH="$CODESKEPTIC_LOCAL_PREFIX/bin:$PATH"
+codeskeptic --version
+```
+
+Create a new project directory (including `src`, `include` and `ci`
+subdirectories), and save these four files. No fixture executable needs to run.
+
+`CMakeLists.txt`:
+
+<!-- first-scan:cmake-file -->
+```cmake
+cmake_minimum_required(VERSION 3.20)
+project(FirstScan LANGUAGES C CXX)
+add_library(example OBJECT src/answer.c src/answer.cpp)
+target_include_directories(example PRIVATE include)
+target_compile_definitions(example PRIVATE FIRST_SCAN_VALUE=42)
+set_target_properties(example PROPERTIES C_STANDARD 11 CXX_STANDARD 17)
+```
+
+`include/fixture.h`:
+
+<!-- first-scan:header-file -->
+```c
+#ifndef FIRST_SCAN_VALUE
+#error Configure this project to supply FIRST_SCAN_VALUE
+#endif
+```
+
+`src/answer.c`:
+
+<!-- first-scan:c-file -->
+```c
+#include "fixture.h"
+#include <stddef.h>
+int c_answer(void) { return FIRST_SCAN_VALUE + (int)sizeof(size_t); }
+```
+
+`src/answer.cpp`:
+
+<!-- first-scan:cpp-file -->
+```cpp
+#include "fixture.h"
+#include <stddef.h>
+int cpp_answer() { return FIRST_SCAN_VALUE + static_cast<int>(sizeof(size_t)); }
+```
+
+From this project's root, generate the real include/define settings and scan:
+
+<!-- first-scan:configure -->
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+```
+
+If compiler discovery fails, select installed compilers with `CC` and `CXX`
+before configuring a fresh build directory. Install missing dependencies through
+your normal environment setup; the analyzer does not download them.
+
+<!-- first-scan:doctor -->
+```bash
+codeskeptic --doctor --source src --build-path build
+```
+
+<!-- first-scan:scan -->
+```bash
+codeskeptic --source src --build-path build --json findings.json
+```
+
+These safe fixtures should return `0`: doctor says `status: ready`, and the
+JSON report says `schema: codeskeptic-report/v1`, `complete: true`, with both
+source files analyzed and `coverage.complete: true`. Check those fields, not
+just an empty findings list. A supported finding returns `1`; invalid input,
+incomplete analysis or an output failure returns `2` and must not be accepted.
+These tiny examples prove the commands work, not coverage of every CWE.
+
+**Missing compilation inputs:** before configuration, the doctor command above
+returns `2`, `status: unavailable`, and `reason` / `next` guidance. Run the
+configure command, then rerun the same doctor and scan commands. If a source
+has no command, add it to your CMake target and regenerate the database. If
+headers/defines are missing, fix the target's include paths/definitions and
+regenerate; `status: ready` alone does not prove a source can be parsed.
+Do not use partial-coverage/recovery options to make this walkthrough pass.
+
+For adoption CI, save and run the [checked report-only recipe](integrations.md#local-report-only-ci).
+It accepts complete finding reports without disguising them as clean, and
+rejects missing inputs, stale output directories and incomplete evidence.
+
+The repository's direct T1 check, `bash scripts/test_first_scan.sh <binary>`,
+installs a temporary local copy and executes the marked recipes above and
+below on both languages, with negative controls. It performs no download,
+GitHub write or release commissioning.
+
 ## First establish the compilation inputs
 
 Run the input doctor before interpreting findings:
@@ -64,9 +174,10 @@ directory scans, or file-list requests.
 
 The first run on a mature C/C++ project surfaces a few well-known
 families of findings. This is the map: recognise the family, apply the
-lever. **Every lever below is precision — a fact you hand the analyzer,
-not a mute button.** You are refining the proof, never hiding output;
-that is why the findings that remain stay trustworthy.
+lever. Verified allocator/assert contracts refine analysis assumptions;
+baselines and suppression comments instead accept or hide selected findings.
+Those are review decisions, not proof that the source is safe. Keep their
+reason and audit evidence visible.
 
 ## Start here: baseline
 
@@ -74,13 +185,17 @@ Adopting CodeSkeptic on an existing project? Snapshot today's findings
 and gate only what's NEW, so you get PR-gating without triaging history
 up front:
 
-```
-codeskeptic src/ --build-path build --baseline .codeskeptic-baseline.json
+<!-- first-scan:baseline -->
+```bash
+codeskeptic src/ --build-path build --write-baseline .codeskeptic-baseline
+codeskeptic src/ --build-path build --baseline .codeskeptic-baseline
 ```
 
-This is the single most important first move. Tune the families below
-second — with a baseline in place, none of them block you meanwhile.
-(Details: docs/usage.md#baseline-workflow.)
+Review the initial findings before recording that acceptance. This is versioned
+text, not JSON. Record mode returns `0` only with acceptable analysis evidence;
+it writes the baseline, not an ordinary JSON/SARIF report. New, changed or
+unbound findings can still block on the second command; input/evidence failures
+remain `2`. See the [v3 identity and legacy limits](usage.md#baseline-workflow).
 
 ## The families and their levers
 
@@ -122,7 +237,6 @@ size, is reported.
 
 ## The short version
 
-Baseline first, tune second. Each lever states a fact the compiler
-already relies on — that a handler aborts, that a pointer is non-null,
-that a wrapper allocates. You are not silencing the analyzer; you are
-finishing the proof it started.
+Establish full compilation coverage first, inspect findings, then introduce
+reviewed contracts or recorded acceptance decisions. Report-only CI must keep
+analysis failures red even when supported findings are temporarily non-blocking.
