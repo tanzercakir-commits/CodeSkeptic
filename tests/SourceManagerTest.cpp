@@ -1,5 +1,8 @@
 #include "source_manager/SourceManager.h"
+#include "analyzer/StaticAnalyzer.h"
+#include "rules/DivByZeroRule.h"
 #include <clang/Tooling/CompilationDatabase.h>
+#include <llvm/Support/JSON.h>
 #include <gtest/gtest.h>
 #include <chrono>
 #include <filesystem>
@@ -80,4 +83,78 @@ TEST_F(SourceManagerTargetTest, ValidScanAfterRejectedScanCommitsTogether) {
     ASSERT_TRUE(manager.scanDirectory(root.string(), &error));
     EXPECT_TRUE(error.reason.empty());
     EXPECT_EQ(manager.files(), std::vector<std::string>{(root / "kept.cpp").string()});
+}
+
+TEST_F(SourceManagerTargetTest, CanonicalAliasesAndRescanKeepOneSourceIdentity) {
+    SourceManager manager(root.string(), nullptr, true);
+    ASSERT_TRUE(manager.addSourceFile((root / "kept.cpp").string()));
+    ASSERT_TRUE(manager.addSourceFile((root / "." / "kept.cpp").string()));
+    ASSERT_TRUE(manager.scanDirectory(root.string()));
+    EXPECT_EQ(manager.files(),
+              std::vector<std::string>{fs::canonical(root / "kept.cpp").string()});
+}
+
+namespace {
+codeskeptic::Config coverageConfig(const fs::path& root, bool warm) {
+    std::vector<std::string> args = {"codeskeptic", root.string(),
+                                   "--build-path", root.string()};
+    std::vector<char*> argv;
+    for (auto& arg : args) argv.push_back(arg.data());
+    codeskeptic::Config config;
+    EXPECT_TRUE(config.parseArgs(static_cast<int>(argv.size()), argv.data()));
+    config.setWarmCache(warm);
+    return config;
+}
+
+void coverageDatabase(const fs::path& root, bool missingAst) {
+    llvm::json::Array commands;
+    auto add = [&](const char* name, std::initializer_list<const char*> arguments) {
+        llvm::json::Array args;
+        for (const char* arg : arguments) args.push_back(arg);
+        commands.push_back(llvm::json::Object{
+            {"directory", root.string()}, {"file", name},
+            {"arguments", std::move(args)}});
+    };
+    add("kept.cpp", {"clang++", "-DONE=1", "-c", "kept.cpp"});
+    add("kept.cpp", {"clang++", "-DONE=2", "-c", "kept.cpp"});
+    if (missingAst) {
+        std::ofstream(root / "missing-ast.cpp") << "int other(){return 2;}\n";
+        add("missing-ast.cpp", {"clang++", "-target", "invalid-cs-target",
+                               "-c", "missing-ast.cpp"});
+    }
+    std::string text;
+    llvm::raw_string_ostream out(text);
+    out << llvm::json::Value(std::move(commands));
+    std::ofstream(root / "compile_commands.json") << text;
+}
+} // namespace
+
+TEST_F(SourceManagerTargetTest, CompileVariantsDoNotInflateAnalyzedSourceCount) {
+    coverageDatabase(root, false);
+    for (bool warm : {false, true}) {
+        SCOPED_TRACE(warm ? "warm" : "cold");
+        codeskeptic::StaticAnalyzer analyzer(coverageConfig(root, warm));
+        analyzer.addRule<codeskeptic::DivByZeroRule>();
+        const auto result = analyzer.run();
+        EXPECT_EQ(result.attempted_tus, 1u);
+        EXPECT_EQ(result.analyzed_tus, 1u);
+        EXPECT_EQ(result.exitCode(), 0);
+    }
+    SourceManager::clearWarmCache();
+}
+
+TEST_F(SourceManagerTargetTest, DuplicateCallbacksCannotHideMissingAst) {
+    coverageDatabase(root, true);
+    for (bool warm : {false, true}) {
+        SCOPED_TRACE(warm ? "warm" : "cold");
+        codeskeptic::StaticAnalyzer analyzer(coverageConfig(root, warm));
+        analyzer.addRule<codeskeptic::DivByZeroRule>();
+        const auto result = analyzer.run();
+        EXPECT_EQ(result.attempted_tus, 2u);
+        EXPECT_EQ(result.analyzed_tus, 1u);
+        EXPECT_TRUE(result.tool_failed);
+        EXPECT_FALSE(result.complete());
+        EXPECT_EQ(result.exitCode(), 2);
+    }
+    SourceManager::clearWarmCache();
 }
