@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH04-S02-U001
-
-### CS3-CH04-S02-U001 — Cache kimliğini gerçek girdilere bağla
-
-**Sonuç:** Cache yalnız aynı araç/ayar/girdi/header bağımlılıkları için kullanılabilir.
-
-**Kabul:**
-
-- Değişen header/compiler flag/profile/tool veya volatile input eski kaydı reddeder.
-- Cache'siz ve cache'li normalize sonuç aynı olur.
-- Eski a79c375 yardımcı fikir kaynağıdır; kanıt veya dosya paketi olarak taşınmaz.
-
-**Test bütçesi:** T1
-**Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/analyzer/*, src/source_manager/*, src/config/Config*, tests/UnitEvidenceStoreTest.cpp, tests/AnalysisCoordinatorTest.cpp, src/CMakeLists.txt, tests/CMakeLists.txt, tests/SourceManagerTest.cpp, src/contracts/Sidecar.cpp, src/server/McpServer.cpp, docs/usage.md
-**Bağımlılıklar:** Yok
+## FRONT — CS3-CH04-S02-U002
 
 ### CS3-CH04-S02-U002 — Cache yazımı ve saklama sınırını güvenli yap
 

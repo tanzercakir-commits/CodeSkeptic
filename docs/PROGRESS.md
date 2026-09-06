@@ -2,6 +2,19 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH04-S02-U001 — Cache kimliğini gerçek girdilere bağla
+
+- Commit: `490205087393f5a3c9215e9efda4ea48d0bcdad5`
+- Dal: `agent/cs3-ch04-s02-u001-cache-identity`
+- Implementer: `root-cwe-ch04-s02-u001-20260906`
+- Bağımsız denetçi: `independent-cwe-ch04-s02-u001-product-4902050-cache-exact-verifier-20260906`
+- İnceleme SHA-256: `4d2664bf768b99f3000f3c0314037c796176b43cc3773bae1e89934b108c383e`
+- Tarih: 2026-09-06T19:34:47.329135+00:00
+- Sonuç: Cache yalnız aynı araç/ayar/girdi/header bağımlılıkları için kullanılabilir.
+- focused-tests: PASS; SHA-256 `da1313bc5cb38862be5566900d9e706c6dda6b578dbeadf8a6df8103cd98c80f`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S02-U001/qualify.sh 490205087393f5a3c9215e9efda4ea48d0bcdad5`
+- cli-smoke: PASS; SHA-256 `990fac6f6e6c1f5c8de1f838ca7a5b86824624bb06034d68ff89e188f112c986`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S02-U001/qualify.sh 490205087393f5a3c9215e9efda4ea48d0bcdad5`
+- queue-check: PASS; SHA-256 `6314ef412b3401459c07f507905cc7d3b2555c1a7bb59cec57eec6bec23d9538`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S02-U001/qualify.sh 490205087393f5a3c9215e9efda4ea48d0bcdad5`
+
 ## CS3-CH04-S01-U002 — Timeout/bellek/iptal bütçesini uygula
 
 - Commit: `81f1d505854e57e4b222860d7a469db494326200`
