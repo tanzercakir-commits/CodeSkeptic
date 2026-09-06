@@ -1,6 +1,6 @@
 # CodeSkeptic — CWE Ürün Planı
 
-Sürüm: 23. Eski planın devamı değil; main tabanlı yeni program.
+Sürüm: 24. Eski planın devamı değil; main tabanlı yeni program.
 
 PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.
 
@@ -388,7 +388,7 @@ PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. G
 
 **Test bütçesi:** T1
 **Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/analyzer/StaticAnalyzer*, src/source_manager/SourceManager*, src/core/AnalysisResult.h, src/core/ExitPolicy.h, src/core/Messages*, src/reporter/*, tests/StaticAnalyzerTest.cpp, tests/SourceManagerTest.cpp, tests/ExitPolicyTest.cpp, tests/ReporterTest.cpp, src/source_manager/CompilationDatabaseDiscovery.cpp, tests/VerdictIntegrityTest.cpp, tests/AnalysisResultTest.cpp, tests/JsonReporterTest.cpp, tests/SarifReporterTest.cpp, tests/HtmlReporterTest.cpp, tests/CompilationDatabaseCliTest.py, docs/usage.md, tests/ConfigTest.cpp, tests/CapabilitiesCliTest.py, scripts/run_realworld_campaign.py, tests/RealworldCampaignTest.py, docs/reproduce.md, scripts/verify_regression_checkpoint.py, tests/RegressionCheckpointTest.py, src/server/McpServer.cpp, tests/McpServerTest.cpp
+**Kapsam:** src/analyzer/StaticAnalyzer*, src/source_manager/SourceManager*, src/core/AnalysisResult.h, src/core/ExitPolicy.h, src/core/Messages*, src/reporter/*, tests/StaticAnalyzerTest.cpp, tests/SourceManagerTest.cpp, tests/ExitPolicyTest.cpp, tests/ReporterTest.cpp, src/source_manager/CompilationDatabaseDiscovery.cpp, tests/VerdictIntegrityTest.cpp, tests/AnalysisResultTest.cpp, tests/JsonReporterTest.cpp, tests/SarifReporterTest.cpp, tests/HtmlReporterTest.cpp, tests/CompilationDatabaseCliTest.py, docs/usage.md, tests/ConfigTest.cpp, tests/CapabilitiesCliTest.py, scripts/run_realworld_campaign.py, tests/RealworldCampaignTest.py, docs/reproduce.md, scripts/verify_regression_checkpoint.py, tests/RegressionCheckpointTest.py, src/server/McpServer.cpp, tests/McpServerTest.cpp, scripts/run_regression_checkpoint.py
 **Bağımlılıklar:** Yok
 
 #### CS3-CH02-S03-U002 — Frontend ve CFG düşmanca geçerli girdilerde sonlansın
