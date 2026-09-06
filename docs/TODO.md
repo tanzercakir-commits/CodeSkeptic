@@ -16,7 +16,7 @@ Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter aç
 
 **Test bütçesi:** T2
 **Kontroller:** linux-suite, relevant-corpus, queue-check
-**Kapsam:** src/analyzer/*, src/core/AnalysisResult.h, src/main.cpp, src/CMakeLists.txt, tests/WorkerProtocolTest.cpp, tests/AnalysisCoordinatorTest.cpp, tests/CMakeLists.txt
+**Kapsam:** src/analyzer/*, src/core/AnalysisResult.h, src/main.cpp, src/CMakeLists.txt, tests/WorkerProtocolTest.cpp, tests/AnalysisCoordinatorTest.cpp, tests/CMakeLists.txt, tests/HtmlReporterTest.cpp
 **Bağımlılıklar:** Yok
 
 ### CS3-CH04-S01-U002 — Timeout/bellek/iptal bütçesini uygula

@@ -1,6 +1,6 @@
 # CodeSkeptic — CWE Ürün Planı
 
-Sürüm: 33. Eski planın devamı değil; main tabanlı yeni program.
+Sürüm: 34. Eski planın devamı değil; main tabanlı yeni program.
 
 PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.
 
@@ -507,7 +507,7 @@ PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. G
 
 **Test bütçesi:** T2
 **Kontroller:** linux-suite, relevant-corpus, queue-check
-**Kapsam:** src/analyzer/*, src/core/AnalysisResult.h, src/main.cpp, src/CMakeLists.txt, tests/WorkerProtocolTest.cpp, tests/AnalysisCoordinatorTest.cpp, tests/CMakeLists.txt
+**Kapsam:** src/analyzer/*, src/core/AnalysisResult.h, src/main.cpp, src/CMakeLists.txt, tests/WorkerProtocolTest.cpp, tests/AnalysisCoordinatorTest.cpp, tests/CMakeLists.txt, tests/HtmlReporterTest.cpp
 **Bağımlılıklar:** Yok
 
 #### CS3-CH04-S01-U002 — Timeout/bellek/iptal bütçesini uygula
