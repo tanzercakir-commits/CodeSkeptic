@@ -2,6 +2,21 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH04-S02-U003 — Checkpoint yalnız aynı geçerli analizi sürdürsün
+
+- Commit: `8551582173200c13fbe6b935786b0c0ce141d6b3`
+- Dal: `agent/cs3-ch04-s02-u003-checkpoint-resume`
+- Implementer: `root-cwe-ch04-s02-u003-20260906`
+- Bağımsız denetçi: `independent-cwe-ch04-s02-u003-composite-8551582-cache-exact-verifier-20260907`
+- İnceleme SHA-256: `d2f0f1882d3695f5188416f986f00d4c8ff3090fa444141ac0f6492d47e21c1f`
+- Tarih: 2026-09-06T22:28:33.344664+00:00
+- Sonuç: Kesilen çalışma tam girdi kimliği doğrulandıktan sonra devam eder.
+- linux-suite: PASS; SHA-256 `512f7bf2a508095a78d577675ace49d4dc4388bf73b58a7c7c28c3e58c86172f`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S02-U003/qualify.sh b3ce9d8820edcb9c5804b30820e96acfeef8dae6`
+- relevant-corpus: PASS; SHA-256 `2dcf072a96332c1e88df525c0df62d9e08482c71263df96e56a0aa37d70b1887`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S02-U003/qualify.sh b3ce9d8820edcb9c5804b30820e96acfeef8dae6`
+- queue-check: PASS; SHA-256 `835f636e5e3a069d751a91da90cb8bca1e13a66417c4b52cb9e36db2ffaaa028`; `python3 -B scripts/project_queue.py check && python3 -B scripts/project_queue.py guard --base b3ce9d8820edcb9c5804b30820e96acfeef8dae6 && bash scripts/check_docs_sync.sh && python3 -B scripts/check_capabilities_sync.py && git diff --check && git status --short --branch && git rev-parse HEAD main`
+- artifact-equivalence: PASS; SHA-256 `8d8bd35c7e0946bf8d0d0b9c4c8480f06f9d319d3689293196356ebde1f6e44d`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S02-U003/verify_ledger_artifact.py`
+- cli-smoke: PASS; SHA-256 `ef422ca62075269d5ee1dad2ea172d280fd674a3df59a0c7578a8b5d67976be2`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S02-U003/qualify.sh b3ce9d8820edcb9c5804b30820e96acfeef8dae6`
+
 ## CS3-CH04-S02-U002 — Cache yazımı ve saklama sınırını güvenli yap
 
 - Commit: `481c19f079d3007df64151ce0e2254285dafedb1`

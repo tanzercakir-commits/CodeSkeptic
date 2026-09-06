@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH04-S02-U003
-
-### CS3-CH04-S02-U003 — Checkpoint yalnız aynı geçerli analizi sürdürsün
-
-**Sonuç:** Kesilen çalışma tam girdi kimliği doğrulandıktan sonra devam eder.
-
-**Kabul:**
-
-- Changed source/header/config/corrupt manifest resume'u reddeder.
-- Resume ve fresh run sonuç/kapsam eşittir; eksik worker sonucu DONE sayılmaz.
-- Disk ve süreç sınırları cache/worker sözleşmesini aşmaz.
-
-**Test bütçesi:** T2
-**Kontroller:** linux-suite, relevant-corpus, queue-check
-**Kapsam:** src/analyzer/*, src/config/Config*, src/main.cpp, tests/UnitEvidenceStoreTest.cpp, tests/AnalysisCoordinatorTest.cpp, tests/ConfigTest.cpp, docs/usage.md, tests/McpServerTest.cpp
-**Bağımlılıklar:** CS3-CH04-S02-U002
+## FRONT — CS3-CH04-S03-U001
 
 ### CS3-CH04-S03-U001 — Windows fixture taşınabilirliğini gerçek hosted kapılarla doğrula
 
