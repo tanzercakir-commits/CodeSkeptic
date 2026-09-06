@@ -15,6 +15,7 @@
 #include <clang/Tooling/Tooling.h>
 
 #include <fstream>
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
@@ -354,6 +355,99 @@ TEST(McpServerTest, Initialize) {
     EXPECT_NE(response.find("\"protocolVersion\""), std::string::npos);
     EXPECT_NE(response.find("codeskeptic"), std::string::npos);
     EXPECT_NE(response.find("\"tools\""), std::string::npos);
+}
+
+TEST(McpServerTest, CoverageTracksVariantsAndResetsFailedRequests) {
+    namespace fs = std::filesystem;
+    const auto root = fs::path(::testing::TempDir()) / ("mcp-coverage-" +
+        std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    ASSERT_TRUE(fs::create_directory(root));
+    struct Cleanup {
+        fs::path root;
+        ~Cleanup() {
+            SourceManager::clearWarmCache();
+            std::error_code error;
+            fs::remove_all(root, error);
+        }
+    } cleanup{root};
+    const auto source = fs::canonical(root).generic_string() + "/input.cpp";
+    std::ofstream(source) << "int safe(){return 0;}\n";
+    const llvm::json::Value request = llvm::json::Object{
+        {"jsonrpc", "2.0"}, {"id", 19}, {"method", "tools/call"},
+        {"params", llvm::json::Object{{"name", "analyze"},
+            {"arguments", llvm::json::Object{{"path", source},
+                {"build_path", root.generic_string()}}}}}};
+    // Failure must dominate a successful variant in either command order.
+    // Two subsequent valid requests also exercise long-lived request isolation.
+    for (int pass = 0; pass < 4; ++pass) {
+        SCOPED_TRACE(pass);
+        llvm::json::Array commands;
+        for (int variant = 0; variant < 2; ++variant) {
+            llvm::json::Array args;
+            args.push_back("clang++");
+            if (pass < 2 && variant == pass) {
+                args.push_back("-target");
+                args.push_back("invalid-cs-target");
+            } else {
+                args.push_back(variant ? "-DONE=1" : "-DONE=2");
+            }
+            args.push_back("-c");
+            args.push_back("input.cpp");
+            commands.push_back(llvm::json::Object{{"directory", root.generic_string()},
+                {"file", "input.cpp"}, {"arguments", std::move(args)}});
+        }
+        std::ofstream(root / "compile_commands.json")
+            << llvm::formatv("{0}", llvm::json::Value(std::move(commands))).str();
+        ::testing::internal::CaptureStderr();
+        const auto responseText = handleMcpMessage(llvm::formatv("{0}", request).str());
+        const auto stderrText = ::testing::internal::GetCapturedStderr();
+        auto response = llvm::json::parse(responseText);
+        ASSERT_TRUE(static_cast<bool>(response));
+        const auto* responseObject = response->getAsObject();
+        ASSERT_NE(responseObject, nullptr);
+        const auto* result = responseObject->getObject("result");
+        ASSERT_NE(result, nullptr) << responseText;
+        EXPECT_EQ(result->getBoolean("isError"), pass < 2);
+        const auto* content = result->getArray("content");
+        ASSERT_NE(content, nullptr);
+        ASSERT_EQ(content->size(), 1u);
+        const auto* message = content->front().getAsObject();
+        ASSERT_NE(message, nullptr);
+        const auto text = message->getString("text");
+        ASSERT_TRUE(text.has_value());
+        auto payload = llvm::json::parse(*text);
+        ASSERT_TRUE(static_cast<bool>(payload));
+        const auto* payloadObject = payload->getAsObject();
+        ASSERT_NE(payloadObject, nullptr);
+        EXPECT_EQ(payloadObject->getInteger("exit_code"), pass < 2 ? 2 : 0);
+        const auto* coverage = payloadObject->getObject("coverage");
+        ASSERT_NE(coverage, nullptr);
+        EXPECT_EQ(coverage->getString("schema"), "codeskeptic-source-coverage/v1");
+        EXPECT_EQ(coverage->getInteger("attempted_tus"), 1);
+        EXPECT_EQ(coverage->getInteger("analyzed_tus"), pass < 2 ? 0 : 1);
+        EXPECT_EQ(coverage->getInteger("failed_tus"), pass < 2 ? 1 : 0);
+        EXPECT_EQ(coverage->getInteger("attempted_commands"), 2);
+        EXPECT_EQ(coverage->getInteger("analyzed_commands"), pass < 2 ? 1 : 2);
+        EXPECT_EQ(coverage->getInteger("failed_commands"), pass < 2 ? 1 : 0);
+        EXPECT_EQ(coverage->getBoolean("complete"), pass >= 2);
+        const auto* sources = coverage->getArray("sources");
+        ASSERT_NE(sources, nullptr);
+        ASSERT_EQ(sources->size(), 1u);
+        const auto* row = sources->front().getAsObject();
+        ASSERT_NE(row, nullptr);
+        EXPECT_EQ(row->getString("file"), fs::canonical(source).string());
+        EXPECT_EQ(row->getString("status"), pass < 2 ? "failed" : "analyzed");
+        ASSERT_TRUE(row->getString("reason").has_value());
+        EXPECT_FALSE(row->getString("reason")->empty());
+        const std::string prefix = "[CodeSkeptic] source coverage: ";
+        const auto start = stderrText.rfind(prefix);
+        ASSERT_NE(start, std::string::npos) << stderrText;
+        const auto end = stderrText.find('\n', start);
+        auto console = llvm::json::parse(stderrText.substr(start + prefix.size(),
+            end == std::string::npos ? end : end - start - prefix.size()));
+        ASSERT_TRUE(static_cast<bool>(console));
+        EXPECT_EQ(*console, *payloadObject->get("coverage"));
+    }
 }
 
 TEST(McpServerTest, NotificationGetsNoResponse) {

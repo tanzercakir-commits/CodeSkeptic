@@ -4,6 +4,7 @@
 #include "core/Capabilities.h"
 #include "core/FindingFingerprint.h"
 #include "config/Config.h"
+#include "reporter/Coverage.h"
 #include "rules/DivByZeroRule.h"
 #include "rules/IntOverflowRule.h"
 #include "rules/SignConversionRule.h"
@@ -27,6 +28,7 @@
 #include <exception>
 #include <optional>
 #include <set>
+#include <sstream>
 #include <string>
 
 #ifdef _WIN32
@@ -419,17 +421,20 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args,
         });
     }
 
+    // Use exactly the CLI/JSON/SARIF representation, including source identities
+    // and failed command evidence. Do not reconstruct a second coverage schema.
+    std::ostringstream coverageText;
+    codeskeptic::writeCoverageJson(coverageText, result);
+    auto coverage = json::parse(coverageText.str());
+    if (!coverage) {
+        llvm::consumeError(coverage.takeError());
+        return makeError(id, -32603, "unable to serialize source coverage");
+    }
     json::Object payload{
         {"status", result.statusName()},
         {"complete", result.complete()},
         {"exit_code", static_cast<int64_t>(result.exitCode())},
-        {"coverage", json::Object{
-            {"attempted_tus", static_cast<int64_t>(result.attempted_tus)},
-            {"analyzed_tus", static_cast<int64_t>(result.analyzed_tus)},
-            {"broken_tus", static_cast<int64_t>(result.broken_tus)},
-            {"incomplete_functions",
-             static_cast<int64_t>(result.incomplete_functions)},
-        }},
+        {"coverage", std::move(*coverage)},
         {"evidence", json::Object{
             {"tool_failed", result.tool_failed},
             {"summary_load_failed", result.summary_load_failed},

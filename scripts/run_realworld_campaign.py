@@ -14,7 +14,7 @@ import string
 import subprocess
 import sys
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import urlparse
 
@@ -476,15 +476,114 @@ def checkpoint_matches(receipt: dict[str, Any], identity: dict[str, Any]) -> boo
     )
 
 
+def load_analysis_report(path: Path) -> dict[str, Any]:
+    def object_pairs(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise EvidenceError(f"duplicate analyzer report key: {key}")
+            result[key] = value
+        return result
+
+    def invalid_constant(value):
+        raise EvidenceError(f"nonfinite analyzer report number: {value}")
+
+    try:
+        return json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=object_pairs,
+                          parse_constant=invalid_constant)
+    except (UnicodeError, json.JSONDecodeError) as error:
+        raise EvidenceError(f"analyzer report is malformed: {error}") from error
+
+
+def _source_coverage_commands(coverage, count, digest, absolute_sources,
+                              relative_sources, whole_program):
+    """Validate modern raw evidence before projecting unchanged legacy pins.
+
+    Replayed artifact paths belong to the original worker: validate their lexical
+    identity, never resolve them against the verifier's unrelated filesystem.
+    """
+    numeric = {"attempted_tus", "analyzed_tus", "broken_tus", "skipped_tus",
+               "failed_tus", "recovery_tus", "incomplete_functions",
+               "attempted_commands", "analyzed_commands", "skipped_commands", "failed_commands"}
+    if (set(coverage) != numeric | {"schema", "complete", "accept_partial_coverage",
+                                   "analyze_broken_tus", "sources"}
+            or coverage["schema"] != "codeskeptic-source-coverage/v1"):
+        raise EvidenceError("unknown or malformed source coverage schema")
+    if any(type(coverage[key]) is not int or coverage[key] < 0 for key in numeric):
+        raise EvidenceError("source coverage counters must be nonnegative integers")
+    if (coverage["complete"] is not True or coverage["accept_partial_coverage"] is not False
+            or coverage["analyze_broken_tus"] is not False):
+        raise EvidenceError("source coverage does not prove an unqualified complete analysis")
+    if (type(count) is not int or count < 1 or type(whole_program) is not bool
+            or not isinstance(absolute_sources, list) or not isinstance(relative_sources, list)
+            or len(absolute_sources) != count or len(relative_sources) != count):
+        raise EvidenceError("source coverage requires the exact requested source lists and mode")
+    if any(not isinstance(p, str) or not p or any(c in p for c in "\\\r\n\0")
+           for p in absolute_sources + relative_sources):
+        raise EvidenceError("invalid requested source identity")
+    if (relative_sources != sorted(set(relative_sources))
+            or any(p.startswith("/") or any(c in ("", ".", "..") for c in p.split("/"))
+                   for p in relative_sources)
+            or translation_unit_digest(relative_sources) != digest):
+        raise EvidenceError("relative source identities or digest differ")
+    roots = set()
+    for absolute, relative in zip(absolute_sources, relative_sources):
+        path = PurePosixPath(absolute)
+        if (not path.is_absolute() or str(path) != absolute or ".." in path.parts
+                or absolute.startswith("//") or not absolute.endswith("/" + relative)):
+            raise EvidenceError("absolute and relative source identities differ")
+        roots.add(absolute[:-(len(relative) + 1)])
+    if len(set(absolute_sources)) != count or len(roots) != 1 or not next(iter(roots)):
+        raise EvidenceError("source identities must be unique under one source root")
+    sources = coverage["sources"]
+    if not isinstance(sources, list) or len(sources) != count:
+        raise EvidenceError("source coverage row count differs from the requested list")
+    row_numeric = {"commands", "analyzed_commands", "skipped_commands",
+                   "failed_commands", "recovery_commands"}
+    identities = []
+    commands = 0
+    expected_prepass = {"status": "analyzed" if whole_program else "not_requested",
+                        "reason": "analyzed" if whole_program else "", "recovery_commands": 0}
+    for source in sources:
+        if (not isinstance(source, dict)
+                or set(source) != row_numeric | {"file", "status", "reason", "prepass"}
+                or not isinstance(source["file"], str)
+                or source["status"] != "analyzed" or source["reason"] != "analyzed"):
+            raise EvidenceError("source coverage contains a missing or unsuccessful source")
+        if (any(type(source[key]) is not int or source[key] < 0 for key in row_numeric)
+                or source["commands"] < 1 or source["commands"] != source["analyzed_commands"]
+                or any(source[key] for key in ("skipped_commands", "failed_commands", "recovery_commands"))):
+            raise EvidenceError("source command evidence is incomplete or inconsistent")
+        prepass = source["prepass"]
+        if (not isinstance(prepass, dict) or prepass != expected_prepass
+                or type(prepass.get("recovery_commands")) is not int):
+            raise EvidenceError("source prepass evidence differs from the campaign mode")
+        identities.append(source["file"])
+        commands += source["analyzed_commands"]
+    if len(set(identities)) != count or set(identities) != set(absolute_sources):
+        raise EvidenceError("reported source identities differ from the requested list")
+    expected = {key: 0 for key in numeric}
+    expected.update(attempted_tus=count, analyzed_tus=count,
+                    attempted_commands=commands, analyzed_commands=commands)
+    if any(coverage[key] != value for key, value in expected.items()):
+        raise EvidenceError("aggregate source coverage differs from per-source command evidence")
+    return commands
+
+
 def _report_semantic(
     process_exit: int,
     report: dict[str, Any],
     translation_units: int,
     translation_unit_sha256: str,
+    *,
+    absolute_sources: list[str] | None = None,
+    relative_sources: list[str] | None = None,
+    whole_program: bool | None = None,
 ) -> dict[str, Any]:
     if not isinstance(report, dict):
         raise EvidenceError("analyzer report root is not an object")
-    if process_exit not in (0, 1) or report.get("exit_code") not in (0, 1):
+    if (type(process_exit) is not int or type(report.get("exit_code")) is not int
+            or process_exit not in (0, 1) or report["exit_code"] not in (0, 1)):
         raise EvidenceError("unavailable verdict exit 2")
     if report.get("exit_code") != process_exit:
         raise EvidenceError("process/report exit classification mismatch")
@@ -493,12 +592,21 @@ def _report_semantic(
     coverage = report.get("coverage")
     if not isinstance(coverage, dict):
         raise EvidenceError("report has no coverage evidence")
+    # Only genuine legacy four-field objects use the historical path. A partial
+    # modern object (including a stripped/unknown schema) cannot fall back to it.
+    legacy_fields = {"attempted_tus", "analyzed_tus", "broken_tus", "incomplete_functions"}
+    command_count = None
+    if set(coverage) != legacy_fields:
+        command_count = _source_coverage_commands(coverage, translation_units,
+            translation_unit_sha256, absolute_sources, relative_sources, whole_program)
     normalized_coverage: dict[str, int] = {}
     for key in ("attempted_tus", "analyzed_tus", "broken_tus", "incomplete_functions"):
         value = coverage.get(key)
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
             raise EvidenceError(f"coverage field {key} is invalid")
         normalized_coverage[key] = value
+    if command_count is not None:
+        normalized_coverage["analyzed_tus"] = command_count
     if (
         normalized_coverage["attempted_tus"] != translation_units
         or normalized_coverage["analyzed_tus"] < normalized_coverage["attempted_tus"]
@@ -612,9 +720,14 @@ def semantic_from_report(
     report: dict[str, Any],
     translation_units: int,
     translation_unit_sha256: str,
+    *,
+    absolute_sources: list[str] | None = None,
+    relative_sources: list[str] | None = None,
 ) -> dict[str, Any]:
     semantic = _report_semantic(
-        process_exit, report, translation_units, translation_unit_sha256
+        process_exit, report, translation_units, translation_unit_sha256,
+        absolute_sources=absolute_sources, relative_sources=relative_sources,
+        whole_program="--whole-program" in project["analyzer_args"],
     )
     _validate_semantic(project, semantic)
     return semantic
@@ -920,14 +1033,11 @@ def run_shard(
         )
         if not report_path.is_file():
             raise EvidenceError(f"analyzer did not write report (exit {result.returncode})")
-        try:
-            report = json.loads(report_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as error:
-            raise EvidenceError(f"analyzer report is malformed: {error}") from error
-        semantic = _report_semantic(
-            result.returncode, report, len(files), actual_tu_sha
+        report = load_analysis_report(report_path)
+        semantic = semantic_from_report(
+            project, result.returncode, report, len(files), actual_tu_sha,
+            absolute_sources=[path.as_posix() for path in files], relative_sources=relative_files,
         )
-        _validate_semantic(project, semantic)
     except (CampaignError, OSError, subprocess.SubprocessError) as error:
         failures.append(str(error))
 

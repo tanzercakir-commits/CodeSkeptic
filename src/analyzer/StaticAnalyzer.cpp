@@ -161,8 +161,8 @@ AnalysisResult StaticAnalyzer::run() {
     SourceManager::clearBrokenTUs();
     SourceManager::setAttemptedTUCount(result.attempted_tus);
     auto finishReport = [&] {
-        writeCoverageConsole(std::cerr, result);
         if (!reporter_->report(diagnostics_, &result)) result.report_write_failed = true;
+        writeCoverageConsole(std::cerr, result);
         return result;
     };
 

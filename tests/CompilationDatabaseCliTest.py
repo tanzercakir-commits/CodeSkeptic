@@ -65,6 +65,121 @@ class CompilationDatabaseCliTest(unittest.TestCase):
             self.assertEqual(payload["coverage"]["analyzed_tus"], count, payload)
         return result, payload
 
+    def coverage_formats(self, args, expected):
+        reports = []
+        for option, name in (("--json", "coverage.json"), ("--sarif", "coverage.sarif")):
+            output = self.root / name
+            result = self.run_cli(*args, option, output)
+            self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            if option == "--json":
+                self.assertEqual(payload["exit_code"], expected)
+                coverage = payload["coverage"]
+            else:
+                invocation = payload["runs"][0]["invocations"][0]
+                self.assertEqual(invocation["properties"]["codeskeptic/exitCode"], expected)
+                coverage = invocation["properties"]["codeskeptic/coverage"]
+            prefix = "[CodeSkeptic] source coverage: "
+            console = [json.loads(line[len(prefix):]) for line in result.stderr.splitlines()
+                       if line.startswith(prefix)]
+            self.assertEqual(console, [coverage], result.stderr)
+            reports.append(coverage)
+        self.assertEqual(reports[0], reports[1])
+        return reports[0]
+
+    def test_source_coverage_json_sarif_cli_parity_for_clean_and_findings(self):
+        for finding in (False, True):
+            self.source.write_text("int f(){int zero=0; return 4/zero;}\n" if finding
+                                   else "int f(){return 4;}\n", encoding="utf-8")
+            for whole_program in (False, True):
+                with self.subTest(finding=finding, whole_program=whole_program):
+                    coverage = self.coverage_formats(
+                        [self.source, *(["--whole-program"] if whole_program else [])], int(finding))
+                    self.assertTrue(coverage["complete"])
+                    self.assertEqual(coverage["attempted_tus"], 1)
+                    self.assertEqual(coverage["analyzed_tus"], 1)
+                    self.assertEqual(coverage["analyzed_commands"], 1)
+                    row = coverage["sources"][0]
+                    self.assertEqual(row["file"], str(self.source))
+                    self.assertEqual(row["status"], "analyzed")
+                    self.assertEqual(row["prepass"], {"status": "analyzed" if whole_program else "not_requested",
+                                                    "reason": "analyzed" if whole_program else "",
+                                                    "recovery_commands": 0})
+
+    def test_partial_and_recovery_opt_ins_never_claim_full_coverage(self):
+        broken = self.root / "broken.cpp"
+        broken.write_text("int broken(){ return undeclared_value; }\n", encoding="utf-8")
+        build = self.root / "build"
+        self.database(build, [self.source, broken])
+        for whole_program in (False, True):
+            for flag, expected, analyzed, skipped, recovery in (
+                (None, 2, 1, 1, 0), ("--accept-partial-coverage", 0, 1, 1, 0),
+                ("--analyze-broken-tus", 0, 2, 0, 1)):
+                with self.subTest(flag=flag, whole_program=whole_program):
+                    args = [self.root, "--build-path", build, *([flag] if flag else []),
+                            *(["--whole-program"] if whole_program else [])]
+                    coverage = self.coverage_formats(args, expected)
+                    self.assertFalse(coverage["complete"])
+                    self.assertEqual(coverage["attempted_tus"], 2)
+                    self.assertEqual(coverage["analyzed_tus"], analyzed)
+                    self.assertEqual(coverage["skipped_tus"], skipped)
+                    self.assertEqual(coverage["failed_tus"], 0)
+                    self.assertEqual(coverage["recovery_tus"], recovery)
+                    row = next(row for row in coverage["sources"] if row["file"] == str(broken))
+                    self.assertEqual(row["status"], "analyzed" if recovery else "skipped")
+                    self.assertEqual(row["recovery_commands"], recovery)
+                    if whole_program:
+                        self.assertEqual(row["prepass"]["status"], row["status"])
+                        self.assertEqual(row["prepass"]["recovery_commands"], recovery)
+                    # Console-only mode must not label accepted partial/recovery
+                    # evidence clean merely because it produced zero findings.
+                    console = self.run_cli(*args)
+                    self.assertEqual(console.returncode, expected)
+                    self.assertNotIn("Clean!", console.stdout + console.stderr)
+
+    def test_failed_variant_dominates_success_in_both_orders_and_prepass(self):
+        build = self.root / "build"
+        database = self.database(build)
+        valid = json.loads(database.read_text())[0]
+        failed = dict(valid, arguments=["clang++", "-target", "invalid-cs-target", "-c", str(self.source)])
+        for entries in ([valid, failed], [failed, valid]):
+            database.write_text(json.dumps(entries), encoding="utf-8")
+            for flags in ([], ["--whole-program"], ["--accept-partial-coverage", "--analyze-broken-tus"]):
+                with self.subTest(entries=entries, flags=flags):
+                    coverage = self.coverage_formats([self.source, "--build-path", build, *flags], 2)
+                    self.assertFalse(coverage["complete"])
+                    self.assertEqual(coverage["attempted_tus"], 1)
+                    self.assertEqual(coverage["analyzed_tus"], 0)
+                    self.assertEqual(coverage["failed_tus"], 1)
+                    self.assertEqual(coverage["attempted_commands"], 2)
+                    self.assertEqual(coverage["analyzed_commands"], 1)
+                    self.assertEqual(coverage["failed_commands"], 1)
+                    row = coverage["sources"][0]
+                    self.assertEqual(row["file"], str(self.source))
+                    self.assertEqual(row["status"], "failed")
+                    self.assertTrue(row["reason"])
+                    self.assertEqual(row["prepass"]["status"], "failed" if "--whole-program" in flags else "not_requested")
+
+    def test_early_input_failure_has_identical_coverage_in_all_formats(self):
+        build = self.root / "build"
+        build.mkdir()
+        (build / "compile_commands.json").write_text("[{broken", encoding="utf-8")
+        coverage = self.coverage_formats([self.source, "--build-path", build], 2)
+        self.assertEqual(coverage["attempted_tus"], 1)
+        self.assertEqual(coverage["failed_tus"], 1)
+        self.assertEqual(coverage["sources"][0]["file"], str(self.source))
+        self.assertFalse(coverage["complete"])
+
+    def test_output_write_failure_is_reflected_in_final_console_coverage(self):
+        result = self.run_cli(self.source, "--json", self.root / "missing" / "report.json")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        prefix = "[CodeSkeptic] source coverage: "
+        coverage = [json.loads(line[len(prefix):]) for line in result.stderr.splitlines()
+                    if line.startswith(prefix)]
+        self.assertEqual(len(coverage), 1, result.stderr)
+        self.assertEqual(coverage[0]["analyzed_tus"], 1)
+        self.assertFalse(coverage[0]["complete"], result.stderr)
+
     def test_explicit_malformed_database_never_falls_back(self):
         build = self.root / "build"
         build.mkdir()

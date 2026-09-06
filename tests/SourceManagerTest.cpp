@@ -158,3 +158,37 @@ TEST_F(SourceManagerTargetTest, DuplicateCallbacksCannotHideMissingAst) {
     }
     SourceManager::clearWarmCache();
 }
+
+TEST_F(SourceManagerTargetTest, WarmCachePreservesBrokenAstEvidenceAcrossOptInChanges) {
+    std::ofstream(root / "kept.cpp") << "#error deliberate fixture error\nint kept(){return 1;}\n";
+    auto database = std::make_unique<clang::tooling::FixedCompilationDatabase>(
+        root.string(), std::vector<std::string>{"-std=c++17"});
+    SourceManager manager(root.string(), std::move(database), true);
+    ASSERT_TRUE(manager.addSourceFile((root / "kept.cpp").string()));
+    manager.enableWarmCache(true);
+    SourceManager::clearWarmCache();
+    struct Restore {
+        ~Restore() {
+            SourceManager::setAnalyzeBrokenTUs(false);
+            SourceManager::clearBrokenTUs();
+            SourceManager::clearWarmCache();
+        }
+    } restore;
+    for (bool accept : {false, true, false, true}) {
+        SourceManager::setAnalyzeBrokenTUs(accept);
+        unsigned visits = 0;
+        EXPECT_EQ(manager.processAll([&](clang::ASTContext&) { ++visits; }), accept ? 0 : 1);
+        EXPECT_EQ(visits, accept ? 1u : 0u);
+        ASSERT_EQ(manager.coverage().size(), 1u);
+        const auto& source = manager.coverage()[0];
+        EXPECT_EQ(source.file, fs::canonical(root / "kept.cpp").string());
+        EXPECT_EQ(source.commands, 1u);
+        EXPECT_EQ(source.status, accept ? codeskeptic::SourceStatus::Analyzed : codeskeptic::SourceStatus::Skipped);
+        EXPECT_EQ(source.analyzed_commands, accept ? 1u : 0u);
+        EXPECT_EQ(source.skipped_commands, accept ? 0u : 1u);
+        EXPECT_EQ(source.failed_commands, 0u);
+        EXPECT_EQ(source.recovery_commands, accept ? 1u : 0u);
+    }
+    EXPECT_EQ(SourceManager::warmCacheMisses(), 1u);
+    EXPECT_EQ(SourceManager::warmCacheHits(), 3u);
+}

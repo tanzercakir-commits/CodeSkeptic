@@ -460,7 +460,8 @@ def verify_raw_shard(root, manifest, project, repetition, binary_sha256):
     try:
         semantic = campaign.semantic_from_report(campaign.project_by_id(manifest, project),
                                                 receipt["semantic"]["exit_code"], report,
-                                                len(paths), campaign.translation_unit_digest(paths))
+                                                len(paths), campaign.translation_unit_digest(paths),
+                                                absolute_sources=absolute, relative_sources=paths)
     except campaign.CampaignError as error:
         raise CheckpointError(str(error)) from error
     require(semantic == receipt["semantic"], "raw report/TU list differs from accepted semantic receipt")

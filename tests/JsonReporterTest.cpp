@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <gtest/gtest.h>
+#include <llvm/Support/JSON.h>
 
 using namespace codeskeptic;
 
@@ -75,4 +76,31 @@ TEST(JsonReporterTest, PublishesPerFindingCapabilityMetadata) {
               std::string::npos);
     EXPECT_NE(json.find("\"fingerprint\": \"csf1-"),
               std::string::npos);
+}
+
+TEST(JsonReporterTest, SourceIdentitiesAndReasonsRoundTripEveryControlByte) {
+    std::string identity = "quote\"-backslash\\-";
+    for (int byte = 0; byte < 32; ++byte) identity.push_back(static_cast<char>(byte));
+    AnalysisResult result;
+    SourceCoverage source{identity, SourceStatus::Failed, identity};
+    source.prepass_status = "failed";
+    source.prepass_reason = identity;
+    result.sources = {source};
+    result.reconcileSources();
+    auto parsed = llvm::json::parse(readJsonReport(result));
+    ASSERT_TRUE(static_cast<bool>(parsed));
+    const auto* report = parsed->getAsObject();
+    ASSERT_NE(report, nullptr);
+    const auto* coverage = report->getObject("coverage");
+    ASSERT_NE(coverage, nullptr);
+    EXPECT_EQ(coverage->getBoolean("complete"), false);
+    const auto* sources = coverage->getArray("sources");
+    ASSERT_NE(sources, nullptr);
+    ASSERT_EQ(sources->size(), 1u);
+    const auto* row = sources->front().getAsObject();
+    ASSERT_NE(row, nullptr);
+    EXPECT_EQ(row->getString("file"), identity);
+    EXPECT_EQ(row->getString("reason"), identity);
+    ASSERT_NE(row->getObject("prepass"), nullptr);
+    EXPECT_EQ(row->getObject("prepass")->getString("reason"), identity);
 }

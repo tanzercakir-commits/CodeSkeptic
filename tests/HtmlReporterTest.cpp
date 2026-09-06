@@ -181,3 +181,31 @@ TEST(HtmlReporterTest, MissingSourceFile_NoContextButNoCrash) {
     EXPECT_NE(html.find("allocated here"), std::string::npos);
     EXPECT_EQ(html.find("cl hit"), std::string::npos);
 }
+
+TEST(HtmlReporterTest, AcceptedPartialAndRecoveryEscapeSourceEvidenceWithoutCleanLabel) {
+    const std::string out = ::testing::TempDir() + "source_coverage_escape.html";
+    for (bool recovery : {false, true}) {
+        AnalysisResult result;
+        SourceCoverage safe{"safe.cpp", SourceStatus::Analyzed, "analyzed"};
+        safe.commands = safe.analyzed_commands = 1;
+        SourceCoverage risky{"bad<script>&\".cpp", recovery ? SourceStatus::Analyzed : SourceStatus::Skipped,
+                             "reason<&\""};
+        risky.commands = 1;
+        risky.analyzed_commands = risky.recovery_commands = recovery ? 1 : 0;
+        risky.skipped_commands = recovery ? 0 : 1;
+        result.sources = {safe, risky};
+        result.reconcileSources();
+        result.analyze_broken_tus = recovery;
+        result.accept_partial_coverage = !recovery;
+        ASSERT_EQ(result.exitCode(), 0);
+        HtmlReporter reporter(out);
+        ASSERT_TRUE(reporter.report({}, &result));
+        const auto html = readWhole(out);
+        EXPECT_EQ(html.find("Clean! No issues found."), std::string::npos);
+        EXPECT_NE(html.find("Full coverage: no"), std::string::npos);
+        EXPECT_NE(html.find(recovery ? "recovery-accepted" : "partial-accepted"), std::string::npos);
+        EXPECT_EQ(html.find(risky.file), std::string::npos);
+        EXPECT_NE(html.find("bad&lt;script&gt;&amp;&quot;.cpp"), std::string::npos);
+        EXPECT_NE(html.find("reason&lt;&amp;&quot;"), std::string::npos);
+    }
+}

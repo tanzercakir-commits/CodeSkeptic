@@ -245,7 +245,8 @@ def adjudicated_config(manifest, cfg=None):
     return cfg, document
 
 
-def make_bundle(root, cfg=None, ctx=None, inputs=None, manifest=None, adjudications=None):
+def make_bundle(root, cfg=None, ctx=None, inputs=None, manifest=None, adjudications=None,
+                source_coverage=False):
     manifest = full_fixture_manifest() if manifest is None else manifest
     cfg = config() if cfg is None else cfg
     ctx = context() if ctx is None else ctx
@@ -278,6 +279,11 @@ def make_bundle(root, cfg=None, ctx=None, inputs=None, manifest=None, adjudicati
         report = {"exit_code": receipt["semantic"]["exit_code"], "complete": True,
                   "coverage": receipt["semantic"]["coverage"], "total": len(fingerprints),
                   "diagnostics": [{"fingerprint": fingerprint} for fingerprint in fingerprints]}
+        if source_coverage and side == "head":
+            count = receipt["semantic"]["coverage"]["analyzed_tus"]
+            whole_program = "--whole-program" in campaign.project_by_id(manifests[side], project)["analyzer_args"]
+            report["coverage"] = fixtures.source_coverage_report(
+                paths, f"/fixture/{project}", [count - 1, 1], whole_program)["coverage"]
         runner.write_json(directory / "report.json", report)
         runner.seal_artifact(directory, cfg, ctx, inputs, "shard",
                              {"side": side, "project": project, "repetition": repetition,
@@ -296,6 +302,73 @@ def refresh_fixture_envelope(directory):
 
 
 class ArtifactBundleTest(unittest.TestCase):
+    def test_head_cannot_downgrade_by_removing_all_modern_coverage_fields(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cfg, ctx, inputs, manifest = make_bundle(root, source_coverage=True)
+            # This project's old execution count equals its source count, so
+            # deletion alone (no forged count) must not pass as legacy evidence.
+            shard = root / verify.artifact_name(ctx, "shard", "head", "rtp2httpd", 1)
+            report = verify.load_json(shard / "report.json")
+            report["coverage"] = {key: report["coverage"][key] for key in
+                ("attempted_tus", "analyzed_tus", "broken_tus", "incomplete_functions")}
+            (shard / "report.json").write_bytes(verify.canonical(report))
+            refresh_fixture_envelope(shard)
+            with self.assertRaises(verify.CheckpointError):
+                verify.verify_realworld_bundle(root, cfg, ctx, inputs, manifest, NEEDS)
+
+    def test_modern_head_and_legacy_base_preserve_the_same_48_cell_pins(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = full_fixture_manifest()
+            manifest["projects"][0]["analyzer_args"].append("--whole-program")
+            cfg, ctx, inputs, manifest = make_bundle(root, manifest=manifest, source_coverage=True)
+            result = verify.verify_realworld_bundle(root, cfg, ctx, inputs, manifest, NEEDS)
+            self.assertEqual(result["status"], "accepted")
+            self.assertEqual(len(verify.full_matrix(manifest)), 48)
+            self.assertEqual(campaign.project_by_id(manifest, "libgit2")["expected"]["analyzed_tus"], 3)
+
+    def test_rehashed_modern_coverage_forgeries_fail_raw_replay(self):
+        for mutation in ("source", "duplicate", "missing", "commands", "recovery", "prepass",
+                         "schema", "stripped-schema", "mixed-roots", "same-count-other-list"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                cfg, ctx, inputs, manifest = make_bundle(root, source_coverage=True)
+                shard = root / verify.artifact_name(ctx, "shard", "head", "libgit2", 1)
+                report = verify.load_json(shard / "report.json")
+                coverage = report["coverage"]
+                rows = coverage["sources"]
+                if mutation == "source":
+                    rows[0]["file"] = "/different/source.c"
+                elif mutation == "duplicate":
+                    rows[1]["file"] = rows[0]["file"]
+                elif mutation == "missing":
+                    rows.pop()
+                elif mutation == "commands":
+                    rows[0]["analyzed_commands"] += 1
+                elif mutation == "recovery":
+                    rows[0]["recovery_commands"] = 1
+                elif mutation == "prepass":
+                    rows[0]["prepass"]["status"] = "failed"
+                elif mutation == "schema":
+                    coverage["schema"] = "codeskeptic-source-coverage/v2"
+                elif mutation == "stripped-schema":
+                    del coverage["schema"]
+                elif mutation == "mixed-roots":
+                    paths = (shard / "translation-units.txt").read_text().splitlines()
+                    paths[0] = paths[0].replace("/fixture/", "/other/")
+                    rows[0]["file"] = paths[0]
+                    (shard / "translation-units.txt").write_text("\n".join(paths) + "\n")
+                else:
+                    for filename in ("translation-units.txt", "translation-units.relative.txt"):
+                        path = shard / filename
+                        path.write_text(path.read_text().replace("_one.c", "_other.c"))
+                    rows[0]["file"] = rows[0]["file"].replace("_one.c", "_other.c")
+                (shard / "report.json").write_bytes(verify.canonical(report))
+                refresh_fixture_envelope(shard)
+                with self.assertRaises(verify.CheckpointError):
+                    verify.verify_realworld_bundle(root, cfg, ctx, inputs, manifest, NEEDS)
+
     def test_all_48_fresh_cells_four_groups_and_distinct_side_binaries(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

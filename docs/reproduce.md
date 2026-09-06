@@ -78,11 +78,23 @@ build system, and analyzed from an exact source list derived from
 timeout, broken/incomplete/skipped coverage, TU drift, receipt tampering, a
 missing repetition, or semantic disagreement is a failure.
 
-`attempted_tus` is the exact requested source-list size. `analyzed_tus` is the
-analyzer execution count and can be larger only when an admitted mode such as
-`--whole-program` performs additional executions. It must never be smaller
-than `attempted_tus`; both values are pinned per project, while any broken TU
-or incomplete function remains an unavailable verdict.
+In the frozen campaign receipts, `attempted_tus` is the exact requested
+source-list size and legacy `analyzed_tus` counts final-pass analysis executions
+(including compile variants), not distinct sources or whole-program prepasses.
+Both values remain pinned per project; no historical pin or receipt is rewritten.
+
+Modern `codeskeptic-source-coverage/v1` reports count distinct sources in
+`attempted_tus` and `analyzed_tus`, and expose final-pass command counts separately.
+The campaign adapter first binds every unique source identity to the actual
+absolute/relative requested lists and their pinned digest, checks all per-source
+and aggregate counters, and requires complete coverage without skipped, failed,
+recovered or incomplete evidence. Prepass evidence must match the recipe's
+`--whole-program` mode. Only then is the validated `analyzed_commands` count
+projected into the unchanged legacy execution-count pin. Raw checkpoint replay
+performs the same validation without requiring the original worker filesystem.
+Malformed modern metadata cannot fall back to the legacy four-field format;
+genuine legacy base reports remain readable. This compatibility mapping does
+not itself prove fresh hosted qualification or accept any new semantic drift.
 
 The single executable authority is
 [`scripts/realworld_manifest.json`](../scripts/realworld_manifest.json); the

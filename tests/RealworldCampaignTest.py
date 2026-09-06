@@ -78,6 +78,28 @@ def fixture_manifest() -> dict:
     }
 
 
+def source_coverage_report(paths, root, command_counts, whole_program=False):
+    """Synthetic v1 report, not real execution or hosted qualification."""
+    sources = [{"file": f"{root}/{path}", "status": "analyzed", "reason": "analyzed",
+                "commands": commands, "analyzed_commands": commands,
+                "skipped_commands": 0, "failed_commands": 0, "recovery_commands": 0,
+                "prepass": {"status": "analyzed" if whole_program else "not_requested",
+                            "reason": "analyzed" if whole_program else "",
+                            "recovery_commands": 0}}
+               for path, commands in zip(paths, command_counts)]
+    return {"complete": True, "exit_code": 1, "total": 1,
+            "diagnostics": [{"fingerprint": "csf1-0000000000000001"}],
+            "coverage": {"schema": "codeskeptic-source-coverage/v1",
+                         "attempted_tus": len(paths), "analyzed_tus": len(paths),
+                         "broken_tus": 0, "skipped_tus": 0, "failed_tus": 0,
+                         "recovery_tus": 0, "incomplete_functions": 0,
+                         "attempted_commands": sum(command_counts),
+                         "analyzed_commands": sum(command_counts),
+                         "skipped_commands": 0, "failed_commands": 0,
+                         "complete": True, "accept_partial_coverage": False,
+                         "analyze_broken_tus": False, "sources": sources}}
+
+
 def accepted_receipt(
     manifest: dict,
     repetition: int,
@@ -348,7 +370,184 @@ class ManifestContractTest(unittest.TestCase):
             campaign.validate_manifest(manifest)
 
 
+class SourceCoverageContractTest(unittest.TestCase):
+    def setUp(self):
+        self.relative = ["src/one.c", "src/two.c"]
+        self.absolute = ["/fixture/alpha/" + path for path in self.relative]
+        self.digest = campaign.translation_unit_digest(self.relative)
+        self.project = fixture_manifest()["projects"][0]
+        self.project["expected"].update(analyzed_tus=3, translation_unit_sha256=self.digest)
+        self.report = source_coverage_report(self.relative, "/fixture/alpha", [2, 1])
+
+    def normalize(self, report=None, **kwargs):
+        args = {"absolute_sources": self.absolute, "relative_sources": self.relative}
+        args.update(kwargs)
+        return campaign.semantic_from_report(self.project, 1, self.report if report is None else report,
+                                              2, self.digest, **args)
+
+    def test_verified_commands_map_to_unchanged_legacy_pins(self):
+        original = copy.deepcopy(self.report)
+        normalized = self.normalize()
+        self.assertEqual(normalized["coverage"], {"attempted_tus": 2, "analyzed_tus": 3,
+                                                  "broken_tus": 0, "incomplete_functions": 0})
+        self.assertEqual(self.report, original)
+        self.report["coverage"]["sources"].reverse()
+        self.assertEqual(self.normalize(), normalized)
+        self.project["analyzer_args"].append("--whole-program")
+        self.report = source_coverage_report(self.relative, "/fixture/alpha", [2, 1], True)
+        self.assertEqual(self.normalize(), normalized)  # Never count the prepass again.
+
+    def test_legacy_execution_pin_is_still_exact(self):
+        self.report = source_coverage_report(self.relative, "/fixture/alpha", [1, 1])
+        with self.assertRaisesRegex(campaign.EvidenceError, "expectation drift"):
+            self.normalize()
+
+    def test_modern_schema_fields_cannot_be_dropped_or_extended(self):
+        for target in ("coverage", "source", "prepass"):
+            template = self.report["coverage"]
+            if target != "coverage":
+                template = template["sources"][0]
+            if target == "prepass":
+                template = template["prepass"]
+            for field in [*template, "unknown-extra"]:
+                broken = copy.deepcopy(self.report)
+                node = broken["coverage"]
+                if target != "coverage":
+                    node = node["sources"][0]
+                if target == "prepass":
+                    node = node["prepass"]
+                if field == "unknown-extra":
+                    node[field] = 0
+                else:
+                    del node[field]
+                with self.subTest(target=target, field=field), self.assertRaises(campaign.EvidenceError):
+                    self.normalize(broken)
+        for schema in (None, True, 1, "codeskeptic-source-coverage/v2"):
+            broken = copy.deepcopy(self.report)
+            broken["coverage"]["schema"] = schema
+            with self.subTest(schema=schema), self.assertRaises(campaign.EvidenceError):
+                self.normalize(broken)
+
+    def test_all_counters_reject_booleans_floats_and_negative_values(self):
+        for target in ("coverage", "source", "prepass"):
+            template = self.report["coverage"]
+            if target != "coverage":
+                template = template["sources"][0]
+            if target == "prepass":
+                template = template["prepass"]
+            for field in [key for key, value in template.items() if type(value) is int]:
+                for value in (False, 0.0, -1):
+                    broken = copy.deepcopy(self.report)
+                    node = broken["coverage"]
+                    if target != "coverage":
+                        node = node["sources"][0]
+                    if target == "prepass":
+                        node = node["prepass"]
+                    node[field] = value
+                    with self.subTest(target=target, field=field, value=value), self.assertRaises(campaign.EvidenceError):
+                        self.normalize(broken)
+
+    def test_aggregate_counters_cannot_contradict_rows(self):
+        for field, value in self.report["coverage"].items():
+            if type(value) is not int:
+                continue
+            broken = copy.deepcopy(self.report)
+            broken["coverage"][field] += 1
+            with self.subTest(field=field), self.assertRaises(campaign.EvidenceError):
+                self.normalize(broken)
+
+    def test_incomplete_recovered_or_zero_command_sources_are_not_accepted(self):
+        mutations = [("status", "skipped"), ("status", "failed"), ("reason", "error_recovery_ast"),
+                     ("commands", 0), ("commands", 3), ("analyzed_commands", 1),
+                     ("skipped_commands", 1), ("failed_commands", 1), ("recovery_commands", 1),
+                     ("prepass", {"status": "failed", "reason": "ast_not_produced", "recovery_commands": 0}),
+                     ("prepass", {"status": "analyzed", "reason": "analyzed", "recovery_commands": 0})]
+        for field, value in mutations:
+            broken = copy.deepcopy(self.report)
+            broken["coverage"]["sources"][0][field] = value
+            with self.subTest(field=field, value=value), self.assertRaises(campaign.EvidenceError):
+                self.normalize(broken)
+        for field, values in (("complete", (False, 1)), ("accept_partial_coverage", (True, 0)),
+                              ("analyze_broken_tus", (True, 0))):
+            for value in values:
+                broken = copy.deepcopy(self.report)
+                broken["coverage"][field] = value
+                with self.subTest(field=field, value=value), self.assertRaises(campaign.EvidenceError):
+                    self.normalize(broken)
+        self.project["analyzer_args"].append("--whole-program")
+        with self.assertRaisesRegex(campaign.EvidenceError, "prepass"):
+            self.normalize()  # A missing required prepass is not complete.
+
+    def test_source_rows_must_match_every_requested_identity(self):
+        for mutation in ("duplicate", "substitute", "missing", "extra", "nonobject", "not-list"):
+            broken = copy.deepcopy(self.report)
+            rows = broken["coverage"]["sources"]
+            if mutation == "duplicate":
+                rows[1]["file"] = rows[0]["file"]
+            elif mutation == "substitute":
+                rows[1]["file"] = "/other/source.c"
+            elif mutation == "missing":
+                rows.pop()
+            elif mutation == "extra":
+                rows.append(copy.deepcopy(rows[0]))
+            elif mutation == "nonobject":
+                rows[0] = None
+            else:
+                broken["coverage"]["sources"] = {}
+            with self.subTest(mutation=mutation), self.assertRaises(campaign.EvidenceError):
+                self.normalize(broken)
+
+    def test_source_lists_are_bound_to_digest_and_common_lexical_root(self):
+        cases = [{"absolute_sources": None}, {"relative_sources": None},
+                 {"absolute_sources": self.absolute[:1]},
+                 {"absolute_sources": [self.absolute[0]] * 2},
+                 {"relative_sources": list(reversed(self.relative))},
+                 {"relative_sources": [self.relative[0]] * 2},
+                 {"relative_sources": ["src/one.c", "src/different.c"]},
+                 {"relative_sources": ["../one.c", "src/two.c"]},
+                 {"relative_sources": ["src/./one.c", "src/two.c"]},
+                 {"relative_sources": ["src\\one.c", "src/two.c"]},
+                 {"absolute_sources": ["/fixture/alpha/../alpha/src/one.c", self.absolute[1]]},
+                 {"absolute_sources": ["/fixture//alpha/src/one.c", self.absolute[1]]},
+                 {"absolute_sources": ["relative/src/one.c", self.absolute[1]]},
+                 {"absolute_sources": [42, self.absolute[1]]}]
+        for kwargs in cases:
+            with self.subTest(kwargs=kwargs), self.assertRaises(campaign.EvidenceError):
+                self.normalize(**kwargs)
+        # Even mutually consistent rows and lists may not mix checkout roots.
+        self.absolute[1] = "/different/checkout/src/two.c"
+        self.report["coverage"]["sources"][1]["file"] = self.absolute[1]
+        with self.assertRaisesRegex(campaign.EvidenceError, "one source root"):
+            self.normalize()
+
+    def test_report_loader_rejects_duplicate_keys_and_nonfinite_numbers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "report.json"
+            path.write_text(json.dumps(self.report), encoding="utf-8")
+            self.assertEqual(campaign.load_analysis_report(path), self.report)
+            for raw in ('{"coverage":{},"coverage":{}}', '{"sources":[{"commands":0,"commands":1}]}',
+                        '{"count":NaN}', '{"count":Infinity}', '{"count":-Infinity}', '{bad'):
+                path.write_text(raw, encoding="utf-8")
+                with self.subTest(raw=raw), self.assertRaises(campaign.EvidenceError):
+                    campaign.load_analysis_report(path)
+
+
 class EvidenceContractTest(unittest.TestCase):
+    def test_source_schema_cannot_be_accepted_without_source_list_binding(self):
+        report = source_coverage_report(["src/one.c", "src/two.c"], "/fixture/alpha", [1, 1])
+        with self.assertRaises(campaign.EvidenceError):
+            campaign.semantic_from_report(fixture_manifest()["projects"][0], 1,
+                                          report, 2, "a" * 64)
+
+    def test_legacy_projection_cannot_hide_partial_source_evidence(self):
+        report = source_coverage_report(["src/one.c", "src/two.c"], "/fixture/alpha", [1, 1])
+        report["coverage"]["complete"] = False
+        report["coverage"]["recovery_tus"] = 1
+        report["coverage"]["sources"][0]["recovery_commands"] = 1
+        with self.assertRaises(campaign.EvidenceError):
+            campaign.semantic_from_report(fixture_manifest()["projects"][0], 1,
+                                          report, 2, "a" * 64)
+
     def test_whole_program_coverage_pins_extra_analysis_executions(self) -> None:
         manifest = fixture_manifest()
         manifest["projects"][0]["expected"]["analyzed_tus"] = 3
