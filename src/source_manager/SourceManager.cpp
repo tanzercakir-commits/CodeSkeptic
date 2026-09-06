@@ -5,6 +5,7 @@
 #include "source_manager/ResourceDir.h"
 
 #include <filesystem>
+#include <exception>
 #include <iostream>
 #include <map>
 
@@ -321,12 +322,21 @@ int SourceManager::processAll(ASTCallback callback) {
     // control. Sequential (one thread at a time) — the engine's global
     // caches see no concurrency.
     int result = 0;
+    std::exception_ptr failure;
     llvm::thread worker(
         std::optional<unsigned>(64u << 20),
-        [this, &result, cb = std::move(callback)]() mutable {
-            result = processAllOnWorker(std::move(cb));
+        [this, &result, &failure, cb = std::move(callback)]() mutable {
+            try {
+                result = processAllOnWorker(std::move(cb));
+            } catch (...) {
+                failure = std::current_exception();
+            }
         });
     worker.join();
+    // join synchronizes both result and exception ownership. The request's
+    // analyzer can now unwind/clean its caches on the calling thread instead
+    // of an uncaught exception terminating the long-lived MCP process.
+    if (failure) std::rethrow_exception(failure);
     return result;
 }
 

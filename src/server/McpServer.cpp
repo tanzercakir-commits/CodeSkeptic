@@ -22,6 +22,9 @@
 #include <llvm/Support/raw_ostream.h>
 
 #include <iostream>
+#include <charconv>
+#include <cstdint>
+#include <exception>
 #include <optional>
 #include <set>
 #include <string>
@@ -41,12 +44,137 @@ const char kServerName[] = "codeskeptic";
 #define CODESKEPTIC_VERSION "0.0.0-dev"
 #endif
 const char kServerVersion[] = CODESKEPTIC_VERSION;
+constexpr std::size_t kMaxMessageBytes = 1024 * 1024;
+constexpr unsigned kMaxMessageDepth = 64;
 
 std::string serialize(const json::Value& value) {
     std::string out;
     llvm::raw_string_ostream os(out);
     os << value;
     return out;
+}
+
+// Bound recursion before LLVM constructs or destroys a nested JSON tree.
+// This is only a budget check; LLVM still validates the complete JSON grammar.
+bool withinDepthBudget(const std::string& line) {
+    unsigned depth = 0;
+    bool quoted = false, escaped = false;
+    for (char ch : line) {
+        if (quoted) {
+            if (escaped) escaped = false;
+            else if (ch == '\\') escaped = true;
+            else if (ch == '"') quoted = false;
+        } else if (ch == '"') {
+            quoted = true;
+        } else if (ch == '{' || ch == '[') {
+            if (++depth > kMaxMessageDepth) return false;
+        } else if ((ch == '}' || ch == ']') && depth) {
+            --depth;
+        }
+    }
+    return true;
+}
+
+bool jsonSpace(char ch) {
+    return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
+}
+
+// The complete JSON grammar has already been checked by LLVM. Locate the
+// original top-level ID spelling before floating-point coercion loses bits.
+// Decode escaped key names as well; duplicate IDs are ambiguous and rejected.
+std::optional<llvm::StringRef> rawRequestId(const std::string& line) {
+    std::optional<llvm::StringRef> found;
+    unsigned depth = 0;
+    for (std::size_t i = 0; i < line.size(); ++i) {
+        const char ch = line[i];
+        if (ch == '{' || ch == '[') ++depth;
+        else if (ch == '}' || ch == ']') --depth;
+        else if (ch == '"') {
+            const auto start = i++;
+            while (i < line.size() && line[i] != '"') {
+                if (line[i] == '\\') ++i;
+                ++i;
+            }
+            auto colon = i + 1;
+            while (colon < line.size() && jsonSpace(line[colon])) ++colon;
+            if (depth != 1 || colon == line.size() || line[colon] != ':') continue;
+            const auto spelling = llvm::StringRef(line).slice(start, i + 1);
+            bool isId = spelling == "\"id\"";
+            if (!isId && spelling.contains('\\')) {
+                auto key = json::parse(spelling);
+                if (!key) { llvm::consumeError(key.takeError()); return std::nullopt; }
+                isId = key->getAsString() == "id";
+            }
+            if (!isId) continue;
+            if (found) return std::nullopt;
+            auto first = colon + 1;
+            while (first < line.size() && jsonSpace(line[first])) ++first;
+            auto last = first;
+            while (last < line.size() && !jsonSpace(line[last]) &&
+                   line[last] != ',' && line[last] != '}') ++last;
+            found = llvm::StringRef(line).slice(first, last);
+        }
+    }
+    return found;
+}
+
+bool parseRequestId(const json::Value& candidate, const std::string& line,
+                    json::Value& id) {
+    const auto raw = rawRequestId(line);
+    if (!raw) return false;
+    if (candidate.getAsString()) { id = candidate; return true; }
+    if (!candidate.getAsNumber()) return false;
+
+    // Parse decimal arithmetic exactly, including integral 1.0 / 10e-1 forms.
+    // No float-to-integer conversion, precision loss or unbounded bigint.
+    const auto token = *raw;
+    const bool negative = token.starts_with("-");
+    std::size_t i = negative ? 1 : 0, fractional = 0;
+    bool afterPoint = false;
+    std::string digits;
+    for (; i < token.size() && token[i] != 'e' && token[i] != 'E'; ++i) {
+        if (token[i] == '.') { afterPoint = true; continue; }
+        digits.push_back(token[i]);
+        if (afterPoint) ++fractional;
+    }
+    const auto nonzero = digits.find_first_not_of('0');
+    if (nonzero == std::string::npos) { id = std::int64_t(0); return true; }
+    digits.erase(0, nonzero);
+    std::int64_t exponent = 0;
+    if (i < token.size()) {
+        ++i;
+        if (token[i] == '+') ++i;
+        const auto parsed = std::from_chars(token.data() + i, token.end(), exponent);
+        if (parsed.ec != std::errc{} || parsed.ptr != token.end() ||
+            exponent > static_cast<std::int64_t>(kMaxMessageBytes) ||
+            exponent < -static_cast<std::int64_t>(kMaxMessageBytes)) return false;
+    }
+    const auto shift = exponent - static_cast<std::int64_t>(fractional);
+    if (shift < 0) {
+        const auto remove = static_cast<std::size_t>(-shift);
+        if (remove >= digits.size()) return false;
+        if (digits.find_first_not_of('0', digits.size() - remove) != std::string::npos)
+            return false;
+        digits.resize(digits.size() - remove);
+    } else {
+        if (digits.size() > 20 || static_cast<std::uint64_t>(shift) > 20 - digits.size())
+            return false;
+        digits.append(static_cast<std::size_t>(shift), '0');
+    }
+    if (digits.size() > 20) return false;
+    if (negative) {
+        digits.insert(digits.begin(), '-');
+        std::int64_t value = 0;
+        const auto parsed = std::from_chars(digits.data(), digits.data() + digits.size(), value);
+        if (parsed.ec != std::errc{} || parsed.ptr != digits.data() + digits.size()) return false;
+        id = value;
+    } else {
+        std::uint64_t value = 0;
+        const auto parsed = std::from_chars(digits.data(), digits.data() + digits.size(), value);
+        if (parsed.ec != std::errc{} || parsed.ptr != digits.data() + digits.size()) return false;
+        id = value;
+    }
+    return true;
 }
 
 json::Object makeResponse(const json::Value& id, json::Value result) {
@@ -346,47 +474,57 @@ std::string handleMcpMessage(const std::string& line) {
 }
 
 std::string handleMcpMessage(const std::string& line, const Config& defaults) {
-    auto parsed = json::parse(line);
-    if (!parsed) {
-        llvm::consumeError(parsed.takeError());
-        return serialize(json::Value(
-            makeError(nullptr, -32700, "parse error")));
+    json::Value id(nullptr);
+    try {
+        if (line.size() > kMaxMessageBytes || !withinDepthBudget(line))
+            return serialize(json::Value(makeError(nullptr, -32600, "request exceeds input budget")));
+        auto parsed = json::parse(line);
+        if (!parsed) {
+            llvm::consumeError(parsed.takeError());
+            return serialize(json::Value(
+                makeError(nullptr, -32700, "parse error")));
+        }
+
+        const json::Object* msg = parsed->getAsObject();
+        if (!msg) {
+            return serialize(json::Value(
+                makeError(nullptr, -32600, "invalid request")));
+        }
+
+        const auto version = msg->getString("jsonrpc");
+        const auto method = msg->getString("method");
+        const json::Value* idPtr = msg->get("id");
+        json::Value requestId(nullptr);
+        if (!version || *version != "2.0" || !method || method->empty() ||
+            method->contains('\0') || (idPtr && !parseRequestId(*idPtr, line, requestId)))
+            return serialize(json::Value(makeError(nullptr, -32600, "invalid request")));
+
+        // Absence of an ID is valid for notifications, not for an invalid envelope.
+        // This server has no analysis side effects for any notification method.
+        if (!idPtr) return "";
+        id = std::move(requestId);
+        if (msg->get("params") && !msg->getObject("params"))
+            return serialize(json::Value(makeError(id, -32602, "params must be an object")));
+
+        json::Value response(nullptr);
+        if (*method == "initialize") {
+            response = handleInitialize(id);
+        } else if (*method == "ping") {
+            response = makeResponse(id, json::Object{});
+        } else if (*method == "tools/list") {
+            response = handleToolsList(id);
+        } else if (*method == "tools/call") {
+            response = handleToolsCall(id, msg->getObject("params"), defaults);
+        } else {
+            response = makeError(id, -32601, "method not found");
+        }
+        return serialize(response);
+    } catch (...) {
+        // Analyzer lifetime cleanup has already run, including constructor
+        // failures and exceptions transferred from the joined worker. Never
+        // expose exception text or an incomplete payload as a successful result.
+        return serialize(json::Value(makeError(id, -32603, "internal error")));
     }
-
-    const json::Object* msg = parsed->getAsObject();
-    if (!msg) {
-        return serialize(json::Value(
-            makeError(nullptr, -32600, "invalid request")));
-    }
-
-    auto method = msg->getString("method");
-    const json::Value* idPtr = msg->get("id");
-    bool isNotification = (idPtr == nullptr);
-    json::Value id = idPtr ? *idPtr : json::Value(nullptr);
-
-    if (!method) {
-        if (isNotification) return "";
-        return serialize(json::Value(
-            makeError(id, -32600, "missing method")));
-    }
-
-    // Notifications (notifications/*) get no response
-    if (isNotification) return "";
-
-    json::Value response(nullptr);
-    if (*method == "initialize") {
-        response = handleInitialize(id);
-    } else if (*method == "ping") {
-        response = makeResponse(id, json::Object{});
-    } else if (*method == "tools/list") {
-        response = handleToolsList(id);
-    } else if (*method == "tools/call") {
-        response = handleToolsCall(id, msg->getObject("params"), defaults);
-    } else {
-        response = makeError(id, -32601,
-                             "method not found: " + method->str());
-    }
-    return serialize(response);
 }
 
 int runMcpServer() {
@@ -402,18 +540,38 @@ int runMcpServer(const Config& defaults) {
     _setmode(_fileno(stdin), _O_BINARY);
     _setmode(_fileno(stdout), _O_BINARY);
 #endif
-    std::string line;
-    while (std::getline(std::cin, line)) {
-        // Tolerate CRLF-framing clients on every platform: getline
-        // splits at '\n', so a client's "\r\n" leaves a trailing '\r'.
-        if (!line.empty() && line.back() == '\r') line.pop_back();
-        if (line.empty()) continue;
-        std::string response = handleMcpMessage(line, defaults);
-        if (!response.empty()) {
-            std::cout << response << "\n" << std::flush;
+    try {
+        std::string line;
+        bool oversized = false;
+        for (;;) {
+            const auto ch = std::cin.get();
+            const bool eof = ch == std::char_traits<char>::eof();
+            if (eof && (std::cin.bad() || !std::cin.eof())) return 2;
+            if (!eof && ch != '\n') {
+                // One additional byte allows a CRLF client's trailing CR.
+                if (line.size() <= kMaxMessageBytes) line.push_back(static_cast<char>(ch));
+                else oversized = true;
+                continue;
+            }
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            oversized = oversized || line.size() > kMaxMessageBytes;
+            if (oversized || !line.empty()) {
+                const std::string response = oversized
+                    ? serialize(json::Value(makeError(nullptr, -32600, "request exceeds input budget")))
+                    : handleMcpMessage(line, defaults);
+                if (!response.empty()) {
+                    std::cout << response << '\n' << std::flush;
+                    if (!std::cout) return 2;
+                }
+            }
+            if (eof) return 0;
+            line.clear();
+            oversized = false;
         }
+    } catch (...) {
+        // A broken input/output channel cannot deliver a reliable RPC reply.
+        return 2;
     }
-    return 0;
 }
 
 } // namespace codeskeptic

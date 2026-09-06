@@ -16,6 +16,8 @@
 #include "engine/CoverageReport.h"
 #include "engine/FatalCalls.h"
 #include "engine/FunctionSummary.h"
+#include "engine/ImmutableFlags.h"
+#include "engine/ParamIntervals.h"
 #include "reporter/ConsoleReporter.h"
 #include "reporter/HtmlReporter.h"
 #include "reporter/JsonReporter.h"
@@ -38,6 +40,30 @@ void setFindingCounts(AnalysisResult& result,
         }));
 }
 
+void clearAnalysisState() {
+    setFunctionFilter({});
+    setLineRanges({});
+    setFatalCallNames({});
+    setAssertRecoveryEnabled(true);
+    setExtraAssertMacros({});
+    setNegativeAssertMacros({});
+    setAllocFunctionNames({});
+    setFreeFunctionNames({});
+    setAllocatorPairs({});
+    setOwningPointerNames({});
+    setUntrustedIntSourceNames({});
+    setAssumptionMode(false);
+    SummaryRegistry::instance().clearGlobal();
+    // A rule exception skips RuleEngine's normal per-TU cleanup. Clear local
+    // pointer-keyed stores too, before a later request sees a different AST.
+    SummaryRegistry::instance().clear();
+    ParamIntervalCache::instance().clear();
+    ImmutableFlagCache::instance().clear();
+    CfgCache::instance().clear();
+    AssertGuardCache::instance().clear();
+    CoverageReport::instance().clear();
+}
+
 } // namespace
 
 std::size_t StaticAnalyzer::totalTUs() const {
@@ -50,7 +76,7 @@ std::size_t StaticAnalyzer::brokenTUCount() const {
 
 
 StaticAnalyzer::StaticAnalyzer(Config config)
-    : config_(std::move(config)) {
+    try : config_(std::move(config)) {
     setLang(parseLang(config_.lang()));
     setFunctionFilter(config_.functions());
     setLineRanges(config_.lines());
@@ -94,6 +120,11 @@ StaticAnalyzer::StaticAnalyzer(Config config)
     } else {
         reporter_ = std::make_unique<ConsoleReporter>();
     }
+} catch (...) {
+    // A failed constructor has no destructor. Its published request globals
+    // need the same cleanup as a completed or exceptionally unwound analyzer.
+    clearAnalysisState();
+    throw;
 }
 
 StaticAnalyzer::~StaticAnalyzer() {
@@ -102,25 +133,7 @@ StaticAnalyzer::~StaticAnalyzer() {
     // silently prune later ones. (In tests the same leak broke 11 of
     // InterproceduralTest's tests — ctest's per-process isolation had
     // been hiding it.)
-    setFunctionFilter({});
-    setLineRanges({});
-    setFatalCallNames({});
-    setAssertRecoveryEnabled(true);
-    setExtraAssertMacros({});
-    setNegativeAssertMacros({});
-    setAllocFunctionNames({});
-    setFreeFunctionNames({});
-    setAllocatorPairs({});
-    setOwningPointerNames({});
-    setUntrustedIntSourceNames({});
-    setAssumptionMode(false);
-    // Same rationale for the cross-TU summary store: one run's
-    // summaries must not leak into the next (the MCP server runs many
-    // analyses in the same process)
-    SummaryRegistry::instance().clearGlobal();
-    CfgCache::instance().clear();
-    AssertGuardCache::instance().clear();
-    CoverageReport::instance().clear();
+    clearAnalysisState();
 }
 
 AnalysisResult StaticAnalyzer::run() {

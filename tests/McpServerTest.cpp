@@ -1,14 +1,21 @@
 #include "server/McpServer.h"
 #include "config/Config.h"
+#include "analyzer/StaticAnalyzer.h"
 
 #include "core/FunctionFilter.h"
 #include "engine/FatalCalls.h"
 #include "engine/AllocFunctions.h"
+#include "engine/FunctionSummary.h"
+#include "engine/ImmutableFlags.h"
+#include "engine/ParamIntervals.h"
 #include "source_manager/SourceManager.h"
 #include <llvm/Support/JSON.h>
 #include <llvm/Support/FormatVariadic.h>
+#include <clang/Tooling/CompilationDatabase.h>
+#include <clang/Tooling/Tooling.h>
 
 #include <fstream>
+#include <cstdlib>
 #include <filesystem>
 #include <iostream>
 #include <sstream>
@@ -111,7 +118,9 @@ TEST(McpServerTest, EnvelopeRequiresVersionAndMethodBeforeNotificationHandling) 
 }
 
 TEST(McpServerTest, EnvelopeRejectsNonMcpIdsWithoutReflectingThem) {
-    for (const char* id : {"null", "true", "false", "[]", "{}", "1.5", "1e100"}) {
+    for (const char* id : {"null", "true", "false", "[]", "{}", "1.5", "1e100",
+                           "1.8446744073709551616e19", "-9223372036854775809",
+                           "18446744073709551616", "1.0000000000000000001", "1e-999"}) {
         SCOPED_TRACE(id);
         expectRpcError(handleMcpMessage(std::string(
             R"({"jsonrpc":"2.0","method":"ping","id":)") + id + "}"), -32600);
@@ -127,6 +136,28 @@ TEST(McpServerTest, EnvelopeRejectsNonMcpIdsWithoutReflectingThem) {
         ASSERT_NE(response->getAsObject()->get("id"), nullptr);
         EXPECT_EQ(llvm::formatv("{0}", *response->getAsObject()->get("id")).str(), id);
     }
+}
+
+TEST(McpServerTest, EnvelopeIntegralDecimalIdsPreserveExactValueAndRejectDuplicates) {
+    for (const auto& item : std::vector<std::pair<std::string, std::string>>{
+        {"1.0", "1"}, {"10e-1", "1"}, {"1E+2", "100"}, {"0.000e-99", "0"},
+        {"9.223372036854776e18", "9223372036854776000"},
+        {"1.8446744073709551615e19", "18446744073709551615"},
+        {"-9.223372036854775808e18", "-9223372036854775808"},
+        {"100000000000000000000000000e-26", "1"}}) {
+        auto response = llvm::json::parse(handleMcpMessage(std::string(
+            R"({"jsonrpc":"2.0","\u0069d":)") + item.first +
+            R"(,"method":"ping","params":{"id":3}})"));
+        ASSERT_TRUE(static_cast<bool>(response));
+        const auto* object = response->getAsObject();
+        ASSERT_NE(object, nullptr);
+        ASSERT_NE(object->get("result"), nullptr) << item.first;
+        EXPECT_EQ(llvm::formatv("{0}", *object->get("id")).str(), item.second);
+    }
+    expectRpcError(handleMcpMessage(
+        R"({"jsonrpc":"2.0","id":1,"\u0069d":2,"method":"ping"})"), -32600);
+    expectRpcError(handleMcpMessage(
+        R"({"jsonrpc":"2.0","id":"a","id":"b","method":"ping"})"), -32600);
 }
 
 TEST(McpServerTest, EnvelopeValidNotificationsNeverAnalyzeOrReply) {
@@ -282,6 +313,40 @@ TEST(McpServerTest, LifecycleWorkerExceptionReachesCallerAndNextAnalysisWorks) {
     }
 }
 #endif
+
+TEST(McpServerTest, LifecycleExceptionalOwnerExitClearsAllTuCaches) {
+    const auto path = writeTempSource("mcp_owner_failure.cpp", "int f(){return 0;}\n");
+    auto ast = clang::tooling::buildASTFromCodeWithArgs(
+        "static const int flag=1; static int inner(int x){return x;} "
+        "int outer(){return inner(3);}", {"-std=c++17"}, "owner.cpp");
+    ASSERT_NE(ast, nullptr);
+    const clang::FunctionDecl* inner = nullptr;
+    for (const auto* decl : ast->getASTContext().getTranslationUnitDecl()->decls())
+        if (const auto* function = llvm::dyn_cast<clang::FunctionDecl>(decl))
+            if (function->getNameAsString() == "inner") inner = function;
+    ASSERT_NE(inner, nullptr);
+    Config config;
+    config.setSourcePath(path);
+    try {
+        StaticAnalyzer analyzer(config);
+        SummaryRegistry::instance().rebuild(ast->getASTContext());
+        EXPECT_NE(SummaryRegistry::instance().lookup(inner), nullptr);
+        EXPECT_FALSE(ParamIntervalCache::instance().get(ast->getASTContext()).empty());
+        EXPECT_FALSE(ImmutableFlagCache::instance().get(ast->getASTContext()).empty());
+        throw std::runtime_error("injected owner exit after cache population");
+    } catch (const std::runtime_error&) {}
+    // Keep old AST alive while probing keys; this test never dereferences a
+    // dangling pointer even on the failing baseline.
+    EXPECT_EQ(SummaryRegistry::instance().lookup(inner), nullptr);
+    auto next = clang::tooling::buildASTFromCodeWithArgs(
+        "int fresh(){return 0;}", {"-std=c++17"}, "fresh.cpp");
+    ASSERT_NE(next, nullptr);
+    EXPECT_TRUE(ParamIntervalCache::instance().get(next->getASTContext()).empty());
+    EXPECT_TRUE(ImmutableFlagCache::instance().get(next->getASTContext()).empty());
+    SummaryRegistry::instance().clear();
+    ParamIntervalCache::instance().clear();
+    ImmutableFlagCache::instance().clear();
+}
 
 TEST(McpServerTest, Initialize) {
     auto response = handleMcpMessage(
@@ -607,7 +672,7 @@ TEST(McpServerTest, AnalyzeWithSummaries_CrossFileKnowledge) {
         }
     )");
     auto sumPath = writeTempSource("mcp_sum_store.txt",
-        "codeskeptic-summaries v2\nfind/1\tM\t-\tU\n");
+        "codeskeptic-summaries v2\nfind/1\tM\tO\tU\n");
 
     auto without = handleMcpMessage(
         std::string(R"({"jsonrpc":"2.0","id":30,"method":"tools/call",)") +
@@ -620,6 +685,8 @@ TEST(McpServerTest, AnalyzeWithSummaries_CrossFileKnowledge) {
         R"("params":{"name":"analyze","arguments":{"path":")" + caller +
         R"(","summaries":")" + sumPath + R"("}}})");
     EXPECT_NE(with.find("null-deref"), std::string::npos);
+    EXPECT_NE(with.find("\"isError\":false"), std::string::npos);
+    EXPECT_NE(with.find("\\\"complete\\\":true"), std::string::npos);
 }
 
 TEST(McpServerTest, ToolsListMentionsSummaries) {
