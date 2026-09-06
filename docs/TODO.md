@@ -17,7 +17,7 @@ Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter aç
 
 **Test bütçesi:** T2
 **Kontroller:** linux-suite, relevant-corpus, queue-check
-**Kapsam:** src/analyzer/StaticAnalyzer*, src/source_manager/SourceManager*, src/engine/*, tests/stress_corpus/*, tests/StressMatrixTest.py, scripts/run_stress_matrix.py, scripts/test_review_diff.sh, scripts/review_diff.sh, scripts/review_report.py
+**Kapsam:** src/analyzer/StaticAnalyzer*, src/source_manager/SourceManager*, src/engine/*, tests/stress_corpus/*, tests/StressMatrixTest.py, scripts/run_stress_matrix.py, scripts/test_review_diff.sh, scripts/review_diff.sh, scripts/review_report.py, tests/CMakeLists.txt, tests/ReviewInputTest.py
 **Bağımlılıklar:** Yok
 
 ### CS3-CH02-S04-U001 — Compilation discovery için native LLVM/MSVC uyumluluğunu doğrula
