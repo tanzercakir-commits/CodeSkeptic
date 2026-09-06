@@ -13,6 +13,8 @@
 
 namespace codeskeptic {
 
+const char* toolVersion() { return CODESKEPTIC_VERSION; }
+
 namespace {
 
 constexpr std::string_view kRuleHelpUri =

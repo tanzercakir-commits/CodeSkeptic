@@ -59,6 +59,8 @@ bool findingBlocksVerdict(std::string_view finding_id);
 // Stable discovery surface for CI, wrappers, and AI agents. The JSON form is
 // intentionally dependency-free so it is available before analysis starts.
 void writeCapabilities(std::ostream& out, bool json);
+// Build identity shared by discovery and report surfaces; not a schema version.
+const char* toolVersion();
 
 } // namespace codeskeptic
 

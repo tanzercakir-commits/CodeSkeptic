@@ -1,10 +1,6 @@
 #include "reporter/JsonReporter.h"
-
-#include "core/Capabilities.h"
-#include "core/FindingFingerprint.h"
+#include "reporter/ReportContract.h"
 #include "core/Messages.h"
-#include "reporter/Coverage.h"
-#include "reporter/ReportEncoding.h"
 
 #include <fstream>
 #include <iostream>
@@ -22,90 +18,7 @@ bool JsonReporter::report(const DiagnosticList& diagnostics,
         return false;
     }
 
-    file << "{\n";
-    file << "  \"tool\": \"CodeSkeptic\",\n";
-    if (result) {
-        file << "  \"status\": \"" << result->statusName() << "\",\n";
-        file << "  \"complete\": " << (result->complete() ? "true" : "false")
-             << ",\n";
-        file << "  \"exit_code\": " << result->exitCode() << ",\n";
-        file << "  \"coverage\": ";
-        writeCoverageJson(file, *result);
-        file << ",\n";
-        file << "  \"evidence\": { \"no_inputs\": "
-             << (result->no_inputs ? "true" : "false")
-             << ", \"no_rules\": "
-             << (result->no_rules ? "true" : "false")
-             << ", \"tool_failed\": "
-             << (result->tool_failed ? "true" : "false")
-             << ", \"summary_load_failed\": "
-             << (result->summary_load_failed ? "true" : "false")
-             << ", \"summary_stale\": "
-             << (result->summary_stale ? "true" : "false")
-             << ", \"summary_save_failed\": "
-             << (result->summary_save_failed ? "true" : "false")
-             << ", \"baseline_load_failed\": "
-             << (result->baseline_load_failed ? "true" : "false")
-             << ", \"baseline_write_failed\": "
-             << (result->baseline_write_failed ? "true" : "false")
-             << ", \"baseline_recorded\": "
-             << (result->baseline_recorded ? "true" : "false")
-             << ", \"report_write_failed\": "
-             << (result->report_write_failed ? "true" : "false")
-             << " },\n";
-        file << "  \"finding_counts\": { \"total\": "
-             << result->findings << ", \"blocking\": "
-             << result->blockingFindings() << ", \"report_only\": "
-             << result->report_only_findings << " },\n";
-    }
-    file << "  \"total\": " << diagnostics.size() << ",\n";
-    file << "  \"diagnostics\": [";
-
-    for (size_t i = 0; i < diagnostics.size(); ++i) {
-        const auto& diag = diagnostics[i];
-        const std::string fingerprint = diag.fingerprint.empty()
-            ? findingFingerprint(diag)
-            : diag.fingerprint;
-        if (i > 0) file << ",";
-        file << "\n    {\n";
-        file << "      \"severity\": \"" << diag.severityToString() << "\",\n";
-        file << "      \"rule_id\": \"" << escapeJson(diag.rule_id) << "\",\n";
-        file << "      \"rule_metadata\": ";
-        writeFindingMetadataJson(file, diag);
-        file << ",\n";
-        const RuleCapability* capability =
-            findRuleCapability(diag.rule_id);
-        file << "      \"capability_tier\": \""
-             << (capability ? capabilityTierName(capability->tier)
-                            : "unclassified")
-             << "\",\n";
-        file << "      \"blocks_verdict\": "
-             << (findingBlocksVerdict(diag.rule_id) ? "true" : "false")
-             << ",\n";
-        file << "      \"fingerprint\": \""
-             << escapeJson(fingerprint) << "\",\n";
-        file << "      \"file\": \"" << escapeJson(coveragePathIdentity(diag.file)) << "\",\n";
-        file << "      \"line\": " << diag.line << ",\n";
-        file << "      \"column\": " << diag.column << ",\n";
-        file << "      \"function\": \"" << escapeJson(diag.function)
-             << "\",\n";
-        file << "      \"message\": \"" << escapeJson(diag.message) << "\",\n";
-        file << "      \"notes\": [";
-        for (size_t n = 0; n < diag.notes.size(); ++n) {
-            const auto& note = diag.notes[n];
-            if (n > 0) file << ",";
-            file << "\n        { \"file\": \"" << escapeJson(coveragePathIdentity(note.file))
-                 << "\", \"line\": " << note.line
-                 << ", \"column\": " << note.column
-                 << ", \"message\": \"" << escapeJson(note.message)
-                 << "\" }";
-        }
-        file << (diag.notes.empty() ? "]" : "\n      ]") << "\n";
-        file << "    }";
-    }
-
-    file << "\n  ]\n";
-    file << "}\n";
+    writeReportJson(file, diagnostics, result);
     file.flush();
     if (!file.good()) {
         std::cerr << msg(MsgId::OutputFileOpenError, output_path_) << "\n";

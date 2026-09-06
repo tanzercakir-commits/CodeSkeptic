@@ -1,5 +1,6 @@
 #include "reporter/HtmlReporter.h"
 #include "reporter/Coverage.h"
+#include "reporter/ReportContract.h"
 
 #include "core/FindingFingerprint.h"
 #include "core/Messages.h"
@@ -14,16 +15,21 @@
 namespace {
 
 std::string escapeHtml(const std::string& s) {
+    const std::string text = llvm::json::isUTF8(s) ? s : llvm::json::fixUTF8(s);
     std::string out;
-    out.reserve(s.size());
-    for (char c : s) {
+    out.reserve(text.size());
+    for (char c : text) {
         switch (c) {
             case '&':  out += "&amp;";  break;
             case '<':  out += "&lt;";   break;
             case '>':  out += "&gt;";   break;
             case '"':  out += "&quot;"; break;
             case '\'': out += "&#39;";  break;
-            default:   out += c;        break;
+            default:
+                if (static_cast<unsigned char>(c) < 0x20 && c != '\n' && c != '\r' && c != '\t')
+                    out += codeskeptic::escapeJson(std::string(1, c));
+                else out += c;
+                break;
         }
     }
     return out;
@@ -71,11 +77,6 @@ std::string sourceContext(LineCache& cache, const std::string& path,
     }
     out << "</pre>";
     return out.str();
-}
-
-std::string baseName(const std::string& path) {
-    auto pos = path.find_last_of("/\\");
-    return pos == std::string::npos ? path : path.substr(pos + 1);
 }
 
 const char* kStyle = R"css(
@@ -183,6 +184,8 @@ bool HtmlReporter::report(const DiagnosticList& diagnostics,
          << "<title>CodeSkeptic Report</title>\n"
          << "<style>" << kStyle << "</style>\n</head>\n<body>\n"
          << "<div class=\"wrap\">\n<header>\n<h1>CodeSkeptic Report</h1>\n"
+         << "<p class=\"sub\">Tool version: " << escapeHtml(toolVersion())
+         << " &middot; schema: " << reportSchema << "</p>\n"
          << "<p class=\"sub\">Verdict: "
          << (result ? result->statusName() : "not-recorded") << "</p>\n"
          << "<p class=\"sub\">Exit code: "
@@ -269,12 +272,23 @@ bool HtmlReporter::report(const DiagnosticList& diagnostics,
              << "\" data-text=\"" << escapeHtml(haystack) << "\">\n"
              << "<div class=\"head\"><span class=\"badge " << sev << "\">"
              << sev << "</span><span class=\"rule\">" << escapeHtml(d.rule_id)
-             << "</span><span class=\"loc\">" << escapeHtml(d.file) << ":"
+             << "</span><span class=\"loc\">" << escapeHtml(coveragePathIdentity(d.file)) << ":"
              << d.line << ":" << d.column << "</span>";
         if (!d.function.empty())
             file << "<span class=\"fn\">in " << escapeHtml(d.function)
                  << "()</span>";
         file << "<span class=\"fp\">" << escapeHtml(fingerprint)
+             << "</span>";
+        const auto cwes = findingCweIds(d);
+        file << "<span class=\"cwe\">CWE: ";
+        if (cwes.empty()) file << "no classified mapping";
+        for (int id : cwes)
+            file << "<a href=\"https://cwe.mitre.org/data/definitions/" << id
+                 << ".html\">CWE-" << id << "</a> ";
+        const auto* capability = findRuleCapability(d.rule_id);
+        file << "</span><span class=\"tier\">"
+             << (capability ? capabilityTierName(capability->tier) : "unclassified")
+             << (findingBlocksVerdict(d.rule_id) ? "; blocks verdict" : "; report-only")
              << "</span>";
         file << "</div>\n<p class=\"msg\">" << escapeHtml(d.message)
              << "</p>\n";
@@ -289,20 +303,27 @@ bool HtmlReporter::report(const DiagnosticList& diagnostics,
             file << "</summary>\n";
             for (const auto& note : d.notes) {
                 file << "<div class=\"step\">&rarr; <span class=\"loc\">"
-                     << escapeHtml(baseName(note.file)) << ":" << note.line
+                     << escapeHtml(coveragePathIdentity(note.file)) << ":" << note.line << ":" << note.column
                      << "</span> " << escapeHtml(note.message)
                      << sourceContext(cache, note.file, note.line)
                      << "</div>\n";
             }
             file << "<div class=\"step\">&#9679; <span class=\"loc\">"
-                 << escapeHtml(baseName(d.file)) << ":" << d.line
+                 << escapeHtml(coveragePathIdentity(d.file)) << ":" << d.line << ":" << d.column
                  << "</span> " << escapeHtml(d.message) << findingCtx
                  << "</div>\n</details>\n";
         }
         file << "</article>\n";
     }
 
-    file << "</main>\n<footer>CodeSkeptic &middot; self-contained report "
+    std::ostringstream normalized;
+    writeReportJson(normalized, diagnostics, result);
+    // HTML-escaped text, not executable script: portable, inspectable and safe
+    // even for literal closing tags, entity-looking text, and control bytes.
+    file << "</main>\n<details><summary>Normalized report (" << reportSchema
+         << ")</summary><pre id=\"codeskeptic-report\">"
+         << escapeHtml(normalized.str()) << "</pre></details>\n";
+    file << "<footer>CodeSkeptic &middot; self-contained report "
             "&mdash; works offline</footer>\n</div>\n"
          << "<script>" << kScript << "</script>\n</body>\n</html>\n";
     file.flush();

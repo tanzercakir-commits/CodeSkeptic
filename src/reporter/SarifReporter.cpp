@@ -5,7 +5,7 @@
 
 #include "core/Messages.h"
 #include "reporter/Coverage.h"
-#include "reporter/ReportEncoding.h"
+#include "reporter/ReportContract.h"
 
 #include <fstream>
 #include <iostream>
@@ -96,6 +96,7 @@ bool SarifReporter::report(const DiagnosticList& diagnostics,
     file << "      \"tool\": {\n";
     file << "        \"driver\": {\n";
     file << "          \"name\": \"CodeSkeptic\",\n";
+    file << "          \"version\": \"" << escapeJson(toolVersion()) << "\",\n";
     file << "          \"informationUri\": "
             "\"https://github.com/tanzercakir-commits/CodeSkeptic\",\n";
     file << "          \"rules\": [";
@@ -119,6 +120,9 @@ bool SarifReporter::report(const DiagnosticList& diagnostics,
     file << (ruleIds.empty() ? "]" : "\n          ]") << "\n";
     file << "        }\n";
     file << "      },\n";
+    file << "      \"properties\": { \"codeskeptic/report\": ";
+    writeReportRunJson(file, diagnostics.size(), result);
+    file << " },\n";
     if (result) {
         file << "      \"invocations\": [ { \"executionSuccessful\": "
              << (result->complete() ? "true" : "false")
