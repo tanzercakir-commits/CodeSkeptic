@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH03-S01-U002
-
-### CS3-CH03-S01-U002 — CLI/JSON/SARIF/HTML bulgu ve verdict tutarlılığını sabitle
-
-**Sonuç:** Aynı analiz bütün çıktı yüzeylerinde aynı normalize bulguyu ve kapsamı verir.
-
-**Kabul:**
-
-- Rule/CWE, konum, trace, severity, tool/schema version ve verdict karşılaştırılır.
-- Malformed option/config deterministik hatadır; makine çıktısına log karışmaz.
-- Path component sınırları ve Windows path fixture'ları korunur.
-
-**Test bütçesi:** T1
-**Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** src/reporter/*, src/core/Capabilities*, src/core/Messages*, src/main.cpp, src/config/Config*, tests/*ReporterTest.cpp, tests/CapabilitiesTest.cpp, tests/ConfigTest.cpp, src/analyzer/StaticAnalyzer.cpp, tests/OutputParityCliTest.py, tests/CMakeLists.txt
-**Bağımlılıklar:** Yok
+## FRONT — CS3-CH03-S02-U001
 
 ### CS3-CH03-S02-U001 — Baseline/suppression ile yalnız yeni bulguyu ayır
 

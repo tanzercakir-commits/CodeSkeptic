@@ -2,6 +2,20 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH03-S01-U002 — CLI/JSON/SARIF/HTML bulgu ve verdict tutarlılığını sabitle
+
+- Commit: `184a30cdef4c33f4b70394d15fa771f823fd8c13`
+- Dal: `agent/cs3-ch03-s01-u002-output-parity`
+- Implementer: `root-cwe-ch03-s01-u002-20260906`
+- Bağımsız denetçi: `independent-cwe-ch03-s01-u002-product-184a30c-20260906`
+- İnceleme SHA-256: `0e560f735aaf5e4a8878a9cc480752a44fd04bfa2606588f91b769392b65a3fb`
+- Tarih: 2026-09-06T13:37:42.878585+00:00
+- Sonuç: Aynı analiz bütün çıktı yüzeylerinde aynı normalize bulguyu ve kapsamı verir.
+- focused-tests: PASS; SHA-256 `9c630397496e25943cc6b9702f61ce47fbe0cd2b53c5841e3ac5971b1e2c724f`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S01-U002/run_offline.sh /workspace/build/tests/codeskeptic_tests '--gtest_filter=JsonReporterTest.*:SarifReporterTest.*:HtmlReporterTest.*:OutputParityReporterTest.*:CapabilitiesTest.*:ConfigTest.*:ReportPathsTest.*:AnalysisResultTest.*'`
+- cli-smoke: PASS; SHA-256 `fad153ac35cc4ce38023a12ac46558fc34c920376c8e4e9b1289f6a7d49c3b7f`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S01-U002/complete_qualification.sh`
+- queue-check: PASS; SHA-256 `8f031226c14f3095c98ac49f9793bbcd09c25c700c73f34d1de48a0ff4355bce`; `python3 -B scripts/project_queue.py check; python3 -B scripts/project_queue.py guard --base HEAD^; bash scripts/check_docs_sync.sh; python3 -B scripts/check_capabilities_sync.py; git diff --check; test "$(git rev-parse HEAD)" = 184a30cdef4c33f4b70394d15fa771f823fd8c13; test -z "$(git status --porcelain)"`
+- exact-version: PASS; SHA-256 `6687641b8adba6ee940dfdea66223711715e97d3781fcf57076078f0b156bb89`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH03-S01-U002/run_offline.sh /workspace/build/src/codeskeptic --version`
+
 ## CS3-CH03-S01-U001 — Kural ve CWE eşlemesini tek sözleşmede yayınla
 
 - Commit: `160d8d8d5f0c1e0614c216f8a065d05c7c09cf79`
