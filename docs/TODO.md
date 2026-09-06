@@ -16,7 +16,7 @@ Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter aç
 
 **Test bütçesi:** T2
 **Kontroller:** linux-suite, compilation-database-cli, hosted-windows, queue-check
-**Kapsam:** src/source_manager/CompilationDatabaseDiscovery.cpp, tests/CompilationDatabaseCliTest.py
+**Kapsam:** src/source_manager/CompilationDatabaseDiscovery.cpp, tests/CompilationDatabaseCliTest.py, src/CMakeLists.txt
 **Bağımlılıklar:** CS3-CH02-S01-U001
 
 ## Sonraki chapter kuyruğu — henüz yürütülemez

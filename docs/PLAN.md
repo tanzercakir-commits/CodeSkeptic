@@ -1,6 +1,6 @@
 # CodeSkeptic — CWE Ürün Planı
 
-Sürüm: 25. Eski planın devamı değil; main tabanlı yeni program.
+Sürüm: 26. Eski planın devamı değil; main tabanlı yeni program.
 
 PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.
 
@@ -421,7 +421,7 @@ PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. G
 
 **Test bütçesi:** T2
 **Kontroller:** linux-suite, compilation-database-cli, hosted-windows, queue-check
-**Kapsam:** src/source_manager/CompilationDatabaseDiscovery.cpp, tests/CompilationDatabaseCliTest.py
+**Kapsam:** src/source_manager/CompilationDatabaseDiscovery.cpp, tests/CompilationDatabaseCliTest.py, src/CMakeLists.txt
 **Bağımlılıklar:** CS3-CH02-S01-U001
 
 ## CH03 — CWE bulgularını kullanılabilir ürüne dönüştürme
