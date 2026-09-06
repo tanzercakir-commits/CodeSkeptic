@@ -79,6 +79,31 @@ TEST(JsonReporterTest, PublishesPerFindingCapabilityMetadata) {
               std::string::npos);
 }
 
+TEST(JsonReporterTest, PublishesCweExplanationWithoutParsingMessage) {
+    AnalysisResult result;
+    result.attempted_tus = result.analyzed_tus = 1;
+    Diagnostic diagnostic{Severity::Error, "sample.cpp", 1, 1,
+                          "null-deref", "arbitrary translated message"};
+    auto parsed = llvm::json::parse(readJsonReport(result, {diagnostic}));
+    ASSERT_TRUE(static_cast<bool>(parsed));
+    const auto* root = parsed->getAsObject();
+    ASSERT_NE(root, nullptr);
+    const auto* diagnostics = root->getArray("diagnostics");
+    ASSERT_NE(diagnostics, nullptr);
+    ASSERT_EQ(diagnostics->size(), 1u);
+    const auto* row = diagnostics->front().getAsObject();
+    ASSERT_NE(row, nullptr);
+    const auto* metadata = row->getObject("rule_metadata");
+    ASSERT_NE(metadata, nullptr);
+    const auto* cwes = metadata->getArray("cwes");
+    ASSERT_NE(cwes, nullptr);
+    ASSERT_EQ(cwes->size(), 1u);
+    const auto* cwe = cwes->front().getAsObject();
+    ASSERT_NE(cwe, nullptr);
+    EXPECT_EQ(cwe->getInteger("id"), 476);
+    EXPECT_EQ(cwe->getString("help_uri"), "https://cwe.mitre.org/data/definitions/476.html");
+}
+
 TEST(JsonReporterTest, SourceIdentitiesAndReasonsRoundTripEveryControlByte) {
     std::string identity = "quote\"-backslash\\-";
     for (int byte = 0; byte < 32; ++byte) identity.push_back(static_cast<char>(byte));

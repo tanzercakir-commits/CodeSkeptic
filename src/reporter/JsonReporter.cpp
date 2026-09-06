@@ -89,6 +89,9 @@ bool JsonReporter::report(const DiagnosticList& diagnostics,
         file << "\n    {\n";
         file << "      \"severity\": \"" << diag.severityToString() << "\",\n";
         file << "      \"rule_id\": \"" << escapeJson(diag.rule_id) << "\",\n";
+        file << "      \"rule_metadata\": ";
+        writeFindingMetadataJson(file, diag);
+        file << ",\n";
         const RuleCapability* capability =
             findRuleCapability(diag.rule_id);
         file << "      \"capability_tier\": \""

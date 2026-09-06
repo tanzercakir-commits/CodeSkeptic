@@ -22,6 +22,17 @@ enum class FindingKind {
     NarrowingUpper,
     NarrowingLower,
     NarrowingBoth,
+    BoundsRead,
+    BoundsWrite,
+    BoundsReadWrite,
+    BoundsAddress,
+    BoundsUnboundedCopy,
+    SignedToUnsigned,
+    LossyConversion,
+    MemoryDoubleRelease,
+    ResourceDoubleRelease,
+    MemoryUseAfterRelease,
+    ResourceUseAfterRelease,
 };
 
 // Dataflow trace step attached to a finding: the chain of events that

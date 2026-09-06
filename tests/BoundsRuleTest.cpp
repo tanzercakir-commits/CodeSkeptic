@@ -1475,3 +1475,62 @@ TEST(BoundsRuleTest, C99FlexibleArrayMember_Clean) {
     )");
     EXPECT_EQ(results.size(), 0u);
 }
+
+TEST(BoundsRuleTest, MetadataFollowsActualSubscriptConsumer) {
+    const std::pair<const char*, FindingKind> cases[] = {
+        {"int f(){int a[1]={0}; return a[2];}", FindingKind::BoundsRead},
+        {"void f(){int a[1]; a[2]=1;}", FindingKind::BoundsWrite},
+        {"void f(){int a[1]={0}; a[2]+=1;}", FindingKind::BoundsReadWrite},
+        {"void f(){int a[1]={0}; ++a[2];}", FindingKind::BoundsReadWrite},
+        {"void f(){int a[1]={0}; (a[2])++;}", FindingKind::BoundsReadWrite},
+        {"int* f(){static int a[1]; return &(a[2]);}", FindingKind::BoundsAddress},
+        {"void f(){int x=0; int* p[1]={&x}; *p[2]=1;}", FindingKind::BoundsRead},
+        {"void f(){struct S{int x;}; S a[1]; a[2].x=1;}", FindingKind::BoundsWrite},
+        {"int f(){struct S{int x;}; S a[1]={}; return a[2].x;}", FindingKind::BoundsRead},
+        {"void f(){int a[1]; (0,a[2])=1;}", FindingKind::BoundsWrite},
+    };
+    for (const auto& [source, expected] : cases) {
+        SCOPED_TRACE(source);
+        BoundsRule rule;
+        const auto results = runRule(rule, source);
+        ASSERT_EQ(results.size(), 1u);
+        EXPECT_EQ(results[0].rule_id, "bounds");
+        EXPECT_EQ(results[0].kind, expected);
+    }
+}
+
+TEST(BoundsRuleTest, MetadataDoesNotInventOnePastReadOrWrite) {
+    BoundsRule rule;
+    EXPECT_TRUE(runRule(rule,
+        "int* f(){static int a[1]; return &(a[1]);}").empty());
+}
+
+TEST(BoundsRuleTest, CopySourceAndDestinationHaveIndependentMetadata) {
+    BoundsRule rule;
+    const auto results = runRule(rule, R"(
+        extern void* memcpy(void*,const void*,unsigned long);
+        void f(){char dst[2]={}; char src[1]={}; memcpy(dst,src,3);}
+    )");
+    ASSERT_EQ(results.size(), 2u);
+    unsigned reads=0, writes=0;
+    for (const auto& finding : results) {
+        reads += finding.kind == FindingKind::BoundsRead;
+        writes += finding.kind == FindingKind::BoundsWrite;
+    }
+    EXPECT_EQ(reads, 1u);
+    EXPECT_EQ(writes, 1u);
+}
+
+TEST(BoundsRuleTest, UnboundedCopyAndMemsetKeepDifferentWeaknesses) {
+    BoundsRule rule;
+    const auto results = runRule(rule, R"(
+        extern char* strcpy(char*,const char*);
+        extern void* memset(void*,int,unsigned long);
+        void copy(const char* src){char dst[2]; strcpy(dst,src);}
+        void fill(){char dst[2]; memset(dst,0,3);}
+    )");
+    ASSERT_EQ(results.size(), 2u);
+    for (const auto& finding : results)
+        EXPECT_EQ(finding.kind, finding.function == "copy"
+            ? FindingKind::BoundsUnboundedCopy : FindingKind::BoundsWrite);
+}

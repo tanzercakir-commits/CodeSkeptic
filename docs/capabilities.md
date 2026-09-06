@@ -94,7 +94,51 @@ Verdict tiers are decided from each emitted finding ID.
 `contract-syntax` and `contract-unsupported` are internal diagnostics, not
 separate selectable rules; both inherit the experimental `contract` tier.
 
+### CWE metadata
+
+These are possible mappings for each family, not a claim that every finding
+has every listed weakness. The registry preserves all existing maturity and
+verdict flags. JSON `rule_metadata.cwes` and SARIF
+`properties["codeskeptic/ruleMetadata"].cwes` contain the selected finding
+mapping; CLI discovery lists `potential_cwes`. Each numeric entry includes
+its explanation and canonical MITRE definition link. No CWE is invented for
+assumptions, contracts or project policy.
+
+<!-- CWE-METADATA-BEGIN -->
+| Rule ID | Potential CWE IDs | Description |
+|---|---|---|
+| `uninit-ptr` | CWE-824 | Dereference of an uninitialized pointer |
+| `uninit-scalar` | CWE-457 | Read of an uninitialized automatic scalar |
+| `memory-leak` | CWE-401 | Owned allocated memory is not released |
+| `double-free` | CWE-415, CWE-675 | Repeated release of memory or a resource |
+| `use-after-free` | CWE-416, CWE-672 | Use of memory or a resource after release |
+| `resource-leak` | CWE-775 | File stream, directory handle or descriptor left unclosed |
+| `div-by-zero` | CWE-369 | Division or remainder with a zero divisor |
+| `null-deref` | CWE-476 | Dereference of a null pointer |
+| `bounds` | CWE-120, CWE-125, CWE-787, CWE-823 | Out-of-range memory access, pointer offset or unchecked copy |
+| `int-overflow` | CWE-190, CWE-191, CWE-681 | Signed arithmetic or destination conversion exceeds its range |
+| `sign-conversion` | CWE-195, CWE-681 | Negative-to-unsigned or lossy narrowing conversion reaches a sink |
+| `alloc-size-overflow` | CWE-131 | Unsigned size calculation can under-allocate a buffer |
+| `assumption` | none | Report of an inferred analysis assumption |
+| `contract` | none | Declared contract violation or contract-processing limitation |
+| `policy` | none | Configured project policy violation |
+<!-- CWE-METADATA-END -->
+
+The producer's typed kind, never the translated message, selects the mapping.
+Reads use CWE-125, writes CWE-787, read-modify-write both; invalid address-only
+offsets use CWE-823. Unchecked string copies use CWE-120, but `memset` remains
+a write. Signed arithmetic upper/lower excursions use CWE-190/CWE-191;
+lossy destination narrowing uses CWE-681. If a multi-CWE family has no proven
+subtype, `cwe_mapping` is `unclassified` with an empty selected CWE list;
+it does not inherit the family set. `not-applicable` identifies project-only
+rules. Unknown rules retain their existing fail-closed verdict behavior.
+
+The rule help URI points to the published capability overview; per-CWE links
+point directly to MITRE. This branch's new metadata documentation is not a
+claim that the branch has been merged into the published default branch.
+
 ### Arithmetic direction and baseline compatibility
+
 
 The stable `int-overflow` family distinguishes a result above the arithmetic
 type's maximum from one below its minimum; addition, subtraction and

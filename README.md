@@ -229,7 +229,41 @@ The full [capability contract](docs/capabilities.md) defines these tiers,
 interfaces and explicit non-goals; analysis machinery is in
 [docs/engine.md](docs/engine.md).
 
+### CWE metadata
+
+These are possible mappings for each family, not a claim that every finding
+has every listed weakness. The registry preserves all existing maturity and
+verdict flags. JSON `rule_metadata.cwes` and SARIF
+`properties["codeskeptic/ruleMetadata"].cwes` contain the selected finding
+mapping; CLI discovery lists `potential_cwes`. Each numeric entry includes
+its explanation and canonical MITRE definition link. No CWE is invented for
+assumptions, contracts or project policy.
+
+<!-- CWE-METADATA-BEGIN -->
+| Rule ID | Potential CWE IDs | Description |
+|---|---|---|
+| `uninit-ptr` | CWE-824 | Dereference of an uninitialized pointer |
+| `uninit-scalar` | CWE-457 | Read of an uninitialized automatic scalar |
+| `memory-leak` | CWE-401 | Owned allocated memory is not released |
+| `double-free` | CWE-415, CWE-675 | Repeated release of memory or a resource |
+| `use-after-free` | CWE-416, CWE-672 | Use of memory or a resource after release |
+| `resource-leak` | CWE-775 | File stream, directory handle or descriptor left unclosed |
+| `div-by-zero` | CWE-369 | Division or remainder with a zero divisor |
+| `null-deref` | CWE-476 | Dereference of a null pointer |
+| `bounds` | CWE-120, CWE-125, CWE-787, CWE-823 | Out-of-range memory access, pointer offset or unchecked copy |
+| `int-overflow` | CWE-190, CWE-191, CWE-681 | Signed arithmetic or destination conversion exceeds its range |
+| `sign-conversion` | CWE-195, CWE-681 | Negative-to-unsigned or lossy narrowing conversion reaches a sink |
+| `alloc-size-overflow` | CWE-131 | Unsigned size calculation can under-allocate a buffer |
+| `assumption` | none | Report of an inferred analysis assumption |
+| `contract` | none | Declared contract violation or contract-processing limitation |
+| `policy` | none | Configured project policy violation |
+<!-- CWE-METADATA-END -->
+
+See [the capability contract](docs/capabilities.md) for subtype selection,
+unclassified metadata and message-dependent baseline compatibility.
+
 ## The numbers
+
 
 Two axes, tracked separately ([full methodology](docs/benchmarks.md)):
 

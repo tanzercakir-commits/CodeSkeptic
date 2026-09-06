@@ -101,7 +101,16 @@ bool SarifReporter::report(const DiagnosticList& diagnostics,
         for (const auto& id : ruleIds) {
             if (!first) file << ",";
             first = false;
-            file << "\n            { \"id\": \"" << escapeJson(id) << "\" }";
+            file << "\n            { \"id\": \"" << escapeJson(id) << "\"";
+            if (const auto* rule = findRuleCapability(id)) {
+                file << ", \"shortDescription\": { \"text\": \""
+                     << escapeJson(std::string(rule->description))
+                     << "\" }, \"helpUri\": \"" << escapeJson(std::string(rule->help_uri))
+                     << "\", \"properties\": { \"codeskeptic/potentialCwes\": ";
+                writeCweReferencesJson(file, rule->cwe_ids);
+                file << " }";
+            }
+            file << " }";
         }
     }
     file << (ruleIds.empty() ? "]" : "\n          ]") << "\n";
@@ -144,7 +153,9 @@ bool SarifReporter::report(const DiagnosticList& diagnostics,
                             : "unclassified")
              << "\", \"codeskeptic/blocksVerdict\": "
              << (findingBlocksVerdict(diag.rule_id) ? "true" : "false")
-             << " },\n";
+             << ", \"codeskeptic/ruleMetadata\": ";
+        writeFindingMetadataJson(file, diag);
+        file << " },\n";
         file << "          \"partialFingerprints\": { "
              << "\"codeskeptic/v1\": \"" << escapeJson(fingerprint)
              << "\" },\n";

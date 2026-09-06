@@ -790,6 +790,51 @@ bool isAddressOperand(const ArraySubscriptExpr* sub, ASTContext& ctx) {
     return false;
 }
 
+// Classify the actual consumer of the subscript's lvalue. Looking for an
+// enclosing assignment alone is wrong: *p[i] = 1 reads p[i], whereas
+// a[i].member = 1 writes part of a[i]. Unsupported consumers stay unclassified
+// rather than acquiring a CWE from the translated diagnostic message.
+codeskeptic::FindingKind subscriptKind(const ArraySubscriptExpr* sub,
+                                       ASTContext& ctx) {
+    using Kind = codeskeptic::FindingKind;
+    const Expr* current = sub;
+    for (unsigned depth = 0; depth < 64; ++depth) {
+        const auto parents = ctx.getParents(*current);
+        if (parents.size() != 1) return Kind::Unspecified;
+        const auto* parent = parents[0].get<Expr>();
+        if (!parent) return Kind::Unspecified;
+        if (const auto* cast = dyn_cast<ImplicitCastExpr>(parent)) {
+            if (cast->getCastKind() == CK_LValueToRValue) return Kind::BoundsRead;
+            if (cast->getCastKind() != CK_NoOp &&
+                cast->getCastKind() != CK_ArrayToPointerDecay)
+                return Kind::Unspecified;
+        } else if (const auto* unary = dyn_cast<UnaryOperator>(parent)) {
+            if (unary->getOpcode() == UO_AddrOf) return Kind::BoundsAddress;
+            if (unary->isIncrementDecrementOp()) return Kind::BoundsReadWrite;
+            return Kind::Unspecified;
+        } else if (const auto* binary = dyn_cast<BinaryOperator>(parent)) {
+            if (binary->getLHS() == current && binary->isAssignmentOp())
+                return binary->isCompoundAssignmentOp() ? Kind::BoundsReadWrite
+                                                       : Kind::BoundsWrite;
+            if (binary->getOpcode() != BO_Comma || binary->getRHS() != current)
+                return Kind::Unspecified;
+        } else if (const auto* member = dyn_cast<MemberExpr>(parent)) {
+            if (member->isArrow() || member->getBase() != current)
+                return Kind::Unspecified;
+        } else if (const auto* outer = dyn_cast<ArraySubscriptExpr>(parent)) {
+            if (outer->getBase() != current) return Kind::Unspecified;
+        } else if (const auto* conditional = dyn_cast<ConditionalOperator>(parent)) {
+            if (!conditional->isGLValue() ||
+                (conditional->getTrueExpr() != current &&
+                 conditional->getFalseExpr() != current)) return Kind::Unspecified;
+        } else if (!isa<ParenExpr>(parent)) {
+            return Kind::Unspecified;
+        }
+        current = parent;
+    }
+    return Kind::Unspecified;
+}
+
 // Keep infeasibility explicit for the new source model. A constant copy size
 // does not inherit an unrelated variable's empty interval. Nor can a later
 // assignment or loop widening make a contradictory path executable again.
@@ -918,6 +963,7 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         diag.severity = codeskeptic::Severity::Error;
         diag.message = codeskeptic::msg(codeskeptic::MsgId::BoundsArrayDefinite,
                                        idx.toString(), extentStr);
+        diag.kind = subscriptKind(sub, ctx);
         results.push_back(std::move(diag));
     }
 
@@ -974,6 +1020,7 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         diag.function = fn->getQualifiedNameAsString();
         diag.severity = definite ? codeskeptic::Severity::Error
                                  : codeskeptic::Severity::Warning;
+        diag.kind = codeskeptic::FindingKind::BoundsWrite;
         diag.message =
             definite ? codeskeptic::msg(codeskeptic::MsgId::BoundsCopyOverflow,
                                         sz.toString(),
@@ -1024,6 +1071,8 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
                 diag.line = sm.getSpellingLineNumber(loc);
                 diag.column = sm.getSpellingColumnNumber(loc);
                 diag.rule_id = "bounds";
+                diag.kind = source ? codeskeptic::FindingKind::BoundsRead
+                                   : codeskeptic::FindingKind::BoundsWrite;
                 diag.function = fn->getQualifiedNameAsString();
                 diag.severity = definite ? codeskeptic::Severity::Error : codeskeptic::Severity::Warning;
                 if (beforeStart) {
@@ -1087,6 +1136,7 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         diag.message = codeskeptic::msg(
             codeskeptic::MsgId::BoundsUnboundedStrCopy,
             callee->getNameAsString(), std::to_string(capacity.hi()));
+        diag.kind = codeskeptic::FindingKind::BoundsUnboundedCopy;
         results.push_back(std::move(diag));
     }
 }

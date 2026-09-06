@@ -1,20 +1,46 @@
-// id, tier, default-enabled, quality-gated, blocks-verdict, evidence
+// id, tier, default-enabled, quality-gated, blocks-verdict, evidence,
+// description, possible CWE IDs. A family set is not per-finding evidence.
 //
 // This file is the single machine-readable rule scope registry. Keep each
 // entry on one line: scripts/check_capabilities_sync.py also reads it to
 // prove README.md and docs/capabilities.md publish the same contract.
-CODESKEPTIC_RULE_CAPABILITY("uninit-ptr", Experimental, true, false, false, "per-rule precision sample pending")
-CODESKEPTIC_RULE_CAPABILITY("uninit-scalar", Experimental, true, false, false, "straight-line automatic integer/bool subset; independent precision sample pending")
-CODESKEPTIC_RULE_CAPABILITY("memory-leak", Supported, true, true, true, "Juliet 0.860 precision (80 TP / 13 FP); Phase 3 gate >= 0.85")
-CODESKEPTIC_RULE_CAPABILITY("double-free", Supported, true, true, true, "Juliet 1.000 precision (101 TP / 0 FP)")
-CODESKEPTIC_RULE_CAPABILITY("use-after-free", Supported, true, true, true, "Juliet 1.000 precision (212 TP / 0 FP)")
-CODESKEPTIC_RULE_CAPABILITY("resource-leak", Supported, true, true, true, "pinned libarchive v3.8.9 mutation sample 1.000 precision (3 TP / 0 FP); Phase 5 gate >= 0.90")
-CODESKEPTIC_RULE_CAPABILITY("div-by-zero", Supported, true, true, true, "Juliet 1.000 precision (43 TP / 0 FP)")
-CODESKEPTIC_RULE_CAPABILITY("null-deref", Supported, true, true, true, "Juliet 1.000 precision (140 TP / 0 FP)")
-CODESKEPTIC_RULE_CAPABILITY("bounds", Experimental, true, false, false, "per-rule precision sample pending")
-CODESKEPTIC_RULE_CAPABILITY("int-overflow", Supported, true, true, true, "Juliet 1.000 precision (23 TP / 0 FP)")
-CODESKEPTIC_RULE_CAPABILITY("sign-conversion", Experimental, true, false, false, "per-rule precision sample pending")
-CODESKEPTIC_RULE_CAPABILITY("alloc-size-overflow", Experimental, true, false, false, "per-rule precision sample pending")
-CODESKEPTIC_RULE_CAPABILITY("assumption", Experimental, false, false, false, "explicit --assumptions report-only mode")
-CODESKEPTIC_RULE_CAPABILITY("contract", Experimental, true, false, false, "contract corpus measured; independent precision sample pending")
-CODESKEPTIC_RULE_CAPABILITY("policy", Experimental, true, false, false, "policy corpus measured; independent precision sample pending")
+#ifdef CODESKEPTIC_RULE_CAPABILITY
+CODESKEPTIC_RULE_CAPABILITY("uninit-ptr", Experimental, true, false, false, "per-rule precision sample pending", "Dereference of an uninitialized pointer", (824))
+CODESKEPTIC_RULE_CAPABILITY("uninit-scalar", Experimental, true, false, false, "straight-line automatic integer/bool subset; independent precision sample pending", "Read of an uninitialized automatic scalar", (457))
+CODESKEPTIC_RULE_CAPABILITY("memory-leak", Supported, true, true, true, "Juliet 0.860 precision (80 TP / 13 FP); Phase 3 gate >= 0.85", "Owned allocated memory is not released", (401))
+CODESKEPTIC_RULE_CAPABILITY("double-free", Supported, true, true, true, "Juliet 1.000 precision (101 TP / 0 FP)", "Repeated release of memory or a resource", (415,675))
+CODESKEPTIC_RULE_CAPABILITY("use-after-free", Supported, true, true, true, "Juliet 1.000 precision (212 TP / 0 FP)", "Use of memory or a resource after release", (416,672))
+CODESKEPTIC_RULE_CAPABILITY("resource-leak", Supported, true, true, true, "pinned libarchive v3.8.9 mutation sample 1.000 precision (3 TP / 0 FP); Phase 5 gate >= 0.90", "File stream, directory handle or descriptor left unclosed", (775))
+CODESKEPTIC_RULE_CAPABILITY("div-by-zero", Supported, true, true, true, "Juliet 1.000 precision (43 TP / 0 FP)", "Division or remainder with a zero divisor", (369))
+CODESKEPTIC_RULE_CAPABILITY("null-deref", Supported, true, true, true, "Juliet 1.000 precision (140 TP / 0 FP)", "Dereference of a null pointer", (476))
+CODESKEPTIC_RULE_CAPABILITY("bounds", Experimental, true, false, false, "per-rule precision sample pending", "Out-of-range memory access, pointer offset or unchecked copy", (120,125,787,823))
+CODESKEPTIC_RULE_CAPABILITY("int-overflow", Supported, true, true, true, "Juliet 1.000 precision (23 TP / 0 FP)", "Signed arithmetic or destination conversion exceeds its range", (190,191,681))
+CODESKEPTIC_RULE_CAPABILITY("sign-conversion", Experimental, true, false, false, "per-rule precision sample pending", "Negative-to-unsigned or lossy narrowing conversion reaches a sink", (195,681))
+CODESKEPTIC_RULE_CAPABILITY("alloc-size-overflow", Experimental, true, false, false, "per-rule precision sample pending", "Unsigned size calculation can under-allocate a buffer", (131))
+CODESKEPTIC_RULE_CAPABILITY("assumption", Experimental, false, false, false, "explicit --assumptions report-only mode", "Report of an inferred analysis assumption", ())
+CODESKEPTIC_RULE_CAPABILITY("contract", Experimental, true, false, false, "contract corpus measured; independent precision sample pending", "Declared contract violation or contract-processing limitation", ())
+CODESKEPTIC_RULE_CAPABILITY("policy", Experimental, true, false, false, "policy corpus measured; independent precision sample pending", "Configured project policy violation", ())
+#endif
+
+// Concise explanations; canonical definitions are linked by numeric ID.
+#ifdef CODESKEPTIC_CWE
+CODESKEPTIC_CWE(120, "Buffer copy without adequate size checking")
+CODESKEPTIC_CWE(125, "Out-of-bounds memory read")
+CODESKEPTIC_CWE(131, "Incorrect buffer-size calculation")
+CODESKEPTIC_CWE(190, "Integer arithmetic exceeds the upper representable limit")
+CODESKEPTIC_CWE(191, "Integer arithmetic falls below the lower representable limit")
+CODESKEPTIC_CWE(195, "Negative signed value converted to unsigned")
+CODESKEPTIC_CWE(369, "Division by zero")
+CODESKEPTIC_CWE(401, "Allocated memory not released")
+CODESKEPTIC_CWE(415, "Memory allocation freed more than once")
+CODESKEPTIC_CWE(416, "Memory used after it is freed")
+CODESKEPTIC_CWE(457, "Uninitialized variable value used")
+CODESKEPTIC_CWE(476, "Null pointer dereferenced")
+CODESKEPTIC_CWE(672, "Resource used after its lifetime expires")
+CODESKEPTIC_CWE(675, "Resource operation repeated beyond its valid lifetime")
+CODESKEPTIC_CWE(681, "Numeric conversion loses representable value information")
+CODESKEPTIC_CWE(775, "File or resource handle not closed")
+CODESKEPTIC_CWE(787, "Out-of-bounds memory write")
+CODESKEPTIC_CWE(823, "Pointer offset forms an out-of-range address")
+CODESKEPTIC_CWE(824, "Uninitialized pointer accessed")
+#endif

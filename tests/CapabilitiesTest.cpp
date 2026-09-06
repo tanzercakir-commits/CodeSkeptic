@@ -1,9 +1,11 @@
 #include "core/Capabilities.h"
+#include "core/Diagnostic.h"
 
 #include <gtest/gtest.h>
 #include <llvm/Support/JSON.h>
 
 #include <sstream>
+#include <set>
 #include <string>
 
 TEST(CapabilitiesTest, RegistryEnforcesTierBehavior) {
@@ -88,6 +90,25 @@ TEST(CapabilitiesTest, TextSurfaceIsHumanReadable) {
     EXPECT_NE(out.str().find("out-of-scope:"), std::string::npos);
 }
 
+TEST(CapabilitiesTest, EveryFamilyPublishesDescriptionAndPotentialCwes) {
+    std::ostringstream out;
+    codeskeptic::writeCapabilities(out, true);
+    auto parsed = llvm::json::parse(out.str());
+    ASSERT_TRUE(static_cast<bool>(parsed));
+    const auto* root = parsed->getAsObject();
+    ASSERT_NE(root, nullptr);
+    const auto* rules = root->getArray("rule_capabilities");
+    ASSERT_NE(rules, nullptr);
+    ASSERT_EQ(rules->size(), 15u);
+    for (const auto& entry : *rules) {
+        const auto* rule = entry.getAsObject();
+        ASSERT_NE(rule, nullptr);
+        EXPECT_TRUE(rule->getString("description").has_value());
+        EXPECT_TRUE(rule->getString("help_uri").has_value());
+        EXPECT_NE(rule->getArray("potential_cwes"), nullptr);
+    }
+}
+
 TEST(CapabilitiesTest, ProducerInventoryContainsEverySiblingFamily) {
     using codeskeptic::producerFindingFamilies;
     EXPECT_EQ(producerFindingFamilies("memory-leak"),
@@ -100,4 +121,75 @@ TEST(CapabilitiesTest, ProducerInventoryContainsEverySiblingFamily) {
         EXPECT_EQ(producerFindingFamilies(producer), std::vector<std::string>{producer});
     EXPECT_EQ(producerFindingFamilies("contract-syntax"), std::vector<std::string>{"contract"});
     EXPECT_EQ(producerFindingFamilies("future-extension"), std::vector<std::string>{"future-extension"});
+}
+
+TEST(CapabilitiesTest, TypedFindingCwesAreNotFamilyWideOrMessageDerived) {
+    using namespace codeskeptic;
+    struct Case { const char* rule; FindingKind kind; std::vector<int> ids; };
+    const Case cases[] = {
+        {"bounds", FindingKind::BoundsRead, {125}},
+        {"bounds", FindingKind::BoundsWrite, {787}},
+        {"bounds", FindingKind::BoundsReadWrite, {125,787}},
+        {"bounds", FindingKind::BoundsAddress, {823}},
+        {"bounds", FindingKind::BoundsUnboundedCopy, {120}},
+        {"int-overflow", FindingKind::ArithmeticUpper, {190}},
+        {"int-overflow", FindingKind::ArithmeticLower, {191}},
+        {"int-overflow", FindingKind::ArithmeticBoth, {190,191}},
+        {"int-overflow", FindingKind::NarrowingUpper, {681}},
+        {"int-overflow", FindingKind::NarrowingLower, {681}},
+        {"int-overflow", FindingKind::NarrowingBoth, {681}},
+        {"sign-conversion", FindingKind::SignedToUnsigned, {195}},
+        {"sign-conversion", FindingKind::LossyConversion, {681}},
+        {"double-free", FindingKind::MemoryDoubleRelease, {415}},
+        {"double-free", FindingKind::ResourceDoubleRelease, {675}},
+        {"use-after-free", FindingKind::MemoryUseAfterRelease, {416}},
+        {"use-after-free", FindingKind::ResourceUseAfterRelease, {672}},
+        {"bounds", FindingKind::Unspecified, {}},
+        {"bounds", FindingKind::ArithmeticUpper, {}},
+        {"int-overflow", FindingKind::BoundsWrite, {}},
+        {"null-deref", FindingKind::BoundsRead, {}},
+        {"unknown-rule", FindingKind::BoundsRead, {}},
+        {"contract-syntax", FindingKind::Unspecified, {}},
+        {"policy", FindingKind::Unspecified, {}},
+    };
+    for (const auto& c : cases) {
+        SCOPED_TRACE(c.rule);
+        Diagnostic finding{Severity::Warning, "a.cpp", 1, 1, c.rule,
+                           "CWE-787 write overflow underflow arbitrary text"};
+        finding.kind = c.kind;
+        EXPECT_EQ(findingCweIds(finding), c.ids);
+        std::ostringstream out;
+        writeFindingMetadataJson(out, finding);
+        auto parsed = llvm::json::parse(out.str());
+        ASSERT_TRUE(static_cast<bool>(parsed));
+        const auto* row = parsed->getAsObject();
+        ASSERT_NE(row, nullptr);
+        const auto* cwes = row->getArray("cwes");
+        ASSERT_NE(cwes, nullptr);
+        EXPECT_EQ(cwes->size(), c.ids.size());
+        if (!c.ids.empty()) EXPECT_EQ(row->getString("cwe_mapping"), "mapped");
+        const auto original = finding;
+        finding.kind = FindingKind::Unspecified;
+        EXPECT_EQ(finding, original);
+        EXPECT_FALSE(finding < original);
+        EXPECT_FALSE(original < finding);
+    }
+}
+
+TEST(CapabilitiesTest, RegistryCwesHaveUniqueExplanationsAndStableLinks) {
+    using namespace codeskeptic;
+    for (const auto& rule : ruleCapabilities()) {
+        EXPECT_FALSE(rule.description.empty()) << rule.id;
+        EXPECT_FALSE(rule.help_uri.empty()) << rule.id;
+        std::set<int> unique;
+        for (const int id : rule.cwe_ids) {
+            EXPECT_TRUE(unique.insert(id).second) << rule.id;
+            const auto* cwe = findCweMetadata(id);
+            ASSERT_NE(cwe, nullptr) << id;
+            EXPECT_FALSE(cwe->description.empty());
+        }
+    }
+    EXPECT_EQ(findCweMetadata(0), nullptr);
+    EXPECT_EQ(findCweMetadata(-1), nullptr);
+    EXPECT_EQ(findCweMetadata(999999), nullptr);
 }

@@ -1,4 +1,5 @@
 #include "core/Capabilities.h"
+#include "core/Diagnostic.h"
 
 #include <algorithm>
 #include <ostream>
@@ -13,6 +14,33 @@
 namespace codeskeptic {
 
 namespace {
+
+constexpr std::string_view kRuleHelpUri =
+    "https://github.com/tanzercakir-commits/CodeSkeptic/blob/main/docs/capabilities.md#finding-rules";
+
+const char* findingKindName(FindingKind kind) {
+    switch (kind) {
+    case FindingKind::Unspecified: return "unspecified";
+    case FindingKind::ArithmeticUpper: return "arithmetic-upper";
+    case FindingKind::ArithmeticLower: return "arithmetic-lower";
+    case FindingKind::ArithmeticBoth: return "arithmetic-both";
+    case FindingKind::NarrowingUpper: return "narrowing-upper";
+    case FindingKind::NarrowingLower: return "narrowing-lower";
+    case FindingKind::NarrowingBoth: return "narrowing-both";
+    case FindingKind::BoundsRead: return "bounds-read";
+    case FindingKind::BoundsWrite: return "bounds-write";
+    case FindingKind::BoundsReadWrite: return "bounds-read-write";
+    case FindingKind::BoundsAddress: return "bounds-address";
+    case FindingKind::BoundsUnboundedCopy: return "bounds-unbounded-copy";
+    case FindingKind::SignedToUnsigned: return "signed-to-unsigned";
+    case FindingKind::LossyConversion: return "lossy-conversion";
+    case FindingKind::MemoryDoubleRelease: return "memory-double-release";
+    case FindingKind::ResourceDoubleRelease: return "resource-double-release";
+    case FindingKind::MemoryUseAfterRelease: return "memory-use-after-release";
+    case FindingKind::ResourceUseAfterRelease: return "resource-use-after-release";
+    }
+    return "unclassified";
+}
 
 using TieredCapability = std::pair<std::string_view, CapabilityTier>;
 
@@ -116,18 +144,106 @@ const std::vector<RuleCapability>& ruleCapabilities() {
     // a measured precision floor. Low-sample and sub-85% families remain
     // visible for measurement but cannot turn a complete verdict red.
     static const std::vector<RuleCapability> rules = {
+#define CODESKEPTIC_CWE_IDS(...) std::vector<int>{__VA_ARGS__}
 #define CODESKEPTIC_RULE_CAPABILITY(id, tier, default_enabled, quality_gated,  \
-                                    blocks_verdict, evidence)                  \
+                                    blocks_verdict, evidence, description, cwes) \
     {id,                                                                       \
      CapabilityTier::tier,                                                     \
      default_enabled,                                                          \
      quality_gated,                                                            \
      blocks_verdict,                                                           \
-     evidence},
+     evidence, description, kRuleHelpUri, CODESKEPTIC_CWE_IDS cwes},
 #include "core/RuleCapabilities.def"
 #undef CODESKEPTIC_RULE_CAPABILITY
+#undef CODESKEPTIC_CWE_IDS
     };
     return rules;
+}
+
+const CweMetadata* findCweMetadata(int id) {
+    static const CweMetadata entries[] = {
+#define CODESKEPTIC_CWE(number, description) {number, description},
+#include "core/RuleCapabilities.def"
+#undef CODESKEPTIC_CWE
+    };
+    for (const auto& entry : entries)
+        if (entry.id == id) return &entry;
+    return nullptr;
+}
+
+std::vector<int> findingCweIds(const Diagnostic& diagnostic) {
+    const auto* rule = findRuleCapability(diagnostic.rule_id);
+    if (!rule) return {};
+    const auto kind = diagnostic.kind;
+    if (kind == FindingKind::Unspecified)
+        return rule->cwe_ids.size() == 1 ? rule->cwe_ids : std::vector<int>{};
+    std::vector<int> ids;
+    if (rule->id == "bounds") {
+        switch (kind) {
+        case FindingKind::BoundsRead: ids = {125}; break;
+        case FindingKind::BoundsWrite: ids = {787}; break;
+        case FindingKind::BoundsReadWrite: ids = {125,787}; break;
+        case FindingKind::BoundsAddress: ids = {823}; break;
+        case FindingKind::BoundsUnboundedCopy: ids = {120}; break;
+        default: break;
+        }
+    } else if (rule->id == "int-overflow") {
+        switch (kind) {
+        case FindingKind::ArithmeticUpper: ids = {190}; break;
+        case FindingKind::ArithmeticLower: ids = {191}; break;
+        case FindingKind::ArithmeticBoth: ids = {190,191}; break;
+        case FindingKind::NarrowingUpper:
+        case FindingKind::NarrowingLower:
+        case FindingKind::NarrowingBoth: ids = {681}; break;
+        default: break;
+        }
+    } else if (rule->id == "sign-conversion") {
+        if (kind == FindingKind::SignedToUnsigned) ids = {195};
+        else if (kind == FindingKind::LossyConversion) ids = {681};
+    } else if (rule->id == "double-free") {
+        if (kind == FindingKind::MemoryDoubleRelease) ids = {415};
+        else if (kind == FindingKind::ResourceDoubleRelease) ids = {675};
+    } else if (rule->id == "use-after-free") {
+        if (kind == FindingKind::MemoryUseAfterRelease) ids = {416};
+        else if (kind == FindingKind::ResourceUseAfterRelease) ids = {672};
+    }
+    // A mismatched producer subtype never imports another family's CWE.
+    for (const int id : ids)
+        if (!findCweMetadata(id) ||
+            std::find(rule->cwe_ids.begin(), rule->cwe_ids.end(), id) == rule->cwe_ids.end())
+            return {};
+    return ids;
+}
+
+void writeCweReferencesJson(std::ostream& out, const std::vector<int>& ids) {
+    out << "[";
+    bool first = true;
+    for (const int id : ids) {
+        const auto* cwe = findCweMetadata(id);
+        if (!cwe) continue;
+        if (!first) out << ", ";
+        first = false;
+        out << "{\"id\": " << id << ", \"name\": \"CWE-" << id
+            << "\", \"description\": \"" << escapeJson(cwe->description)
+            << "\", \"help_uri\": \"https://cwe.mitre.org/data/definitions/"
+            << id << ".html\"}";
+    }
+    out << "]";
+}
+
+void writeFindingMetadataJson(std::ostream& out, const Diagnostic& diagnostic) {
+    const auto* rule = findRuleCapability(diagnostic.rule_id);
+    const auto ids = findingCweIds(diagnostic);
+    const char* mapping = !ids.empty() ? "mapped" :
+        rule && rule->cwe_ids.empty() && diagnostic.kind == FindingKind::Unspecified
+        ? "not-applicable" : "unclassified";
+    out << "{\"kind\": \"" << findingKindName(diagnostic.kind)
+        << "\", \"description\": \""
+        << escapeJson(rule ? rule->description : "Unclassified rule")
+        << "\", \"help_uri\": \"" << escapeJson(rule ? rule->help_uri : "")
+        << "\", \"cwe_mapping\": \"" << mapping << "\", \"cwes\": ";
+    writeCweReferencesJson(out, ids);
+    out << "}";
 }
 
 const RuleCapability* findRuleCapability(std::string_view finding_id) {
@@ -186,6 +302,12 @@ void writeCapabilities(std::ostream& out, bool json) {
             << "out-of-scope: injection-taint, race-detection, "
                "automatic-fixes, ide, cloud-dashboard\n"
             << "success-metric: CWE count is not a success metric\n";
+        for (const auto& rule : ruleCapabilities()) {
+            out << rule.id << ": " << rule.description << "; potential CWEs:";
+            for (const int id : rule.cwe_ids) out << " CWE-" << id;
+            if (rule.cwe_ids.empty()) out << " not applicable";
+            out << "; " << rule.help_uri << "\n";
+        }
         return;
     }
 
@@ -244,7 +366,11 @@ void writeCapabilities(std::ostream& out, bool json) {
             << (rule.quality_gated ? "true" : "false")
             << ", \"blocks_verdict\": "
             << (rule.blocks_verdict ? "true" : "false") << ", \"evidence\": \""
-            << escapeJson(rule.evidence) << "\"}";
+            << escapeJson(rule.evidence) << "\", \"description\": \""
+            << escapeJson(rule.description) << "\", \"help_uri\": \""
+            << escapeJson(rule.help_uri) << "\", \"potential_cwes\": ";
+        writeCweReferencesJson(out, rule.cwe_ids);
+        out << "}";
     }
     out << "\n  ]\n"
         << "}\n";

@@ -295,3 +295,62 @@ void heap_safe(){void* p=malloc(8);free(p);}
         check_report(json.loads(response["result"]["content"][0]["text"]),
                      Counter({"memory-leak": 1}), "findings", "rule")
 print("DIAGNOSTIC_SELECTION_CLI_MCP_OK mixed producers, JSON/SARIF, request isolation, server defaults")
+
+# One source location can be a read under one compilation command and a write
+# under another. Deduplication must retain both proven CWEs without multiplying
+# findings or changing the source fingerprint. Command order is not authority.
+with tempfile.TemporaryDirectory(prefix="codeskeptic-cwe-variants-") as directory:
+    root = Path(directory)
+    source = root / "variants.cpp"
+    source.write_text('''
+extern void sink(int);
+#if WRITE_MODE
+#define ACTION(x) ((x)=1)
+#else
+#define ACTION(x) sink(x)
+#endif
+void f(){int a[1]={}; ACTION(a[2]);}
+''')
+    fingerprints = set()
+    for label, modes, expected in (
+            ("read-write", [0, 1], [125, 787]),
+            ("write-read", [1, 0], [125, 787]),
+            ("same-read", [0, 0], [125]),
+            ("same-write", [1, 1], [787])):
+        database = root / label
+        database.mkdir()
+        entries = [{"directory": str(root), "file": str(source),
+                    "arguments": ["clang++", "-std=c++17", f"-DWRITE_MODE={mode}",
+                                  "-c", str(source)]} for mode in modes]
+        (database / "compile_commands.json").write_text(json.dumps(entries))
+        surfaces = []
+        for output_format in ("json", "sarif"):
+            output = database / ("result." + output_format)
+            result = subprocess.run(
+                [str(binary), str(source), "--build-path", str(database),
+                 "--" + output_format, str(output)], cwd=root,
+                capture_output=True, text=True, timeout=45)
+            assert result.returncode == 0, (label, output_format, result.stderr)
+            report = json.loads(output.read_text())
+            if output_format == "json":
+                assert report["complete"] is True, report
+                assert report["finding_counts"] == {"total": 1, "blocking": 0, "report_only": 1}, report
+                findings = report["diagnostics"]
+                assert len(findings) == 1, findings
+                row = findings[0]
+                assert row["rule_id"] == "bounds", row
+                metadata = row["rule_metadata"]
+                fingerprints.add(row["fingerprint"])
+            else:
+                findings = report["runs"][0]["results"]
+                assert len(findings) == 1, findings
+                row = findings[0]
+                assert row["ruleId"] == "bounds", row
+                metadata = row["properties"]["codeskeptic/ruleMetadata"]
+                fingerprints.add(row["partialFingerprints"]["codeskeptic/v1"])
+            actual = sorted(cwe["id"] for cwe in metadata["cwes"])
+            assert actual == expected, (label, output_format, expected, actual)
+            surfaces.append(metadata)
+        assert surfaces[0] == surfaces[1], surfaces
+    assert len(fingerprints) == 1, fingerprints
+print("CWE_VARIANT_METADATA_CLI_OK order-independent union, same-kind dedup, JSON/SARIF parity")

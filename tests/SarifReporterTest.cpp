@@ -2,7 +2,9 @@
 
 #include <fstream>
 #include <sstream>
+#include <set>
 #include <gtest/gtest.h>
+#include <llvm/Support/JSON.h>
 
 using namespace codeskeptic;
 
@@ -36,8 +38,22 @@ TEST(SarifReporterTest, MinimalStructure) {
     EXPECT_NE(out.find("sarif-schema-2.1.0.json"), std::string::npos);
     EXPECT_NE(out.find("\"name\": \"CodeSkeptic\""), std::string::npos);
     // Rules are listed uniquely under driver.rules
-    EXPECT_NE(out.find("{ \"id\": \"uninit-ptr\" }"), std::string::npos);
-    EXPECT_NE(out.find("{ \"id\": \"memory-leak\" }"), std::string::npos);
+    auto parsed = llvm::json::parse(out);
+    ASSERT_TRUE(static_cast<bool>(parsed));
+    const auto* descriptors = parsed->getAsObject()->getArray("runs")->front()
+        .getAsObject()->getObject("tool")->getObject("driver")->getArray("rules");
+    ASSERT_NE(descriptors, nullptr);
+    ASSERT_EQ(descriptors->size(), 2u);
+    std::set<std::string> ids;
+    for (const auto& entry : *descriptors) {
+        const auto* descriptor = entry.getAsObject();
+        ASSERT_NE(descriptor, nullptr);
+        ASSERT_TRUE(descriptor->getString("id").has_value());
+        ids.insert(descriptor->getString("id")->str());
+        EXPECT_NE(descriptor->getObject("shortDescription"), nullptr);
+        EXPECT_TRUE(descriptor->getString("helpUri").has_value());
+    }
+    EXPECT_EQ(ids, (std::set<std::string>{"uninit-ptr", "memory-leak"}));
 }
 
 TEST(SarifReporterTest, ResultFields) {
@@ -59,6 +75,40 @@ TEST(SarifReporterTest, ResultFields) {
               std::string::npos);
     // Absolute paths are converted to file:// URIs
     EXPECT_NE(out.find("\"uri\": \"file:///src/a.cpp\""), std::string::npos);
+}
+
+TEST(SarifReporterTest, PerResultCwesDoNotBecomeFamilyWideTags) {
+    Diagnostic read{Severity::Error, "a.cpp", 1, 1, "bounds", "identical message"};
+    Diagnostic write = read;
+    read.kind = FindingKind::BoundsRead;
+    write.kind = FindingKind::BoundsWrite;
+    auto parsed = llvm::json::parse(reportToString({read, write}));
+    ASSERT_TRUE(static_cast<bool>(parsed));
+    const auto* root = parsed->getAsObject();
+    ASSERT_NE(root, nullptr);
+    const auto* runs = root->getArray("runs");
+    ASSERT_NE(runs, nullptr);
+    ASSERT_EQ(runs->size(), 1u);
+    const auto* run = runs->front().getAsObject();
+    ASSERT_NE(run, nullptr);
+    const auto* results = run->getArray("results");
+    ASSERT_NE(results, nullptr);
+    ASSERT_EQ(results->size(), 2u);
+    for (size_t i = 0; i < 2; ++i) {
+        const auto* row = (*results)[i].getAsObject();
+        ASSERT_NE(row, nullptr);
+        EXPECT_EQ(row->getString("ruleId"), "bounds");
+        const auto* properties = row->getObject("properties");
+        ASSERT_NE(properties, nullptr);
+        EXPECT_EQ(properties->getBoolean("codeskeptic/blocksVerdict"), false);
+        const auto* metadata = properties->getObject("codeskeptic/ruleMetadata");
+        ASSERT_NE(metadata, nullptr);
+        const auto* cwes = metadata->getArray("cwes");
+        ASSERT_NE(cwes, nullptr);
+        ASSERT_EQ(cwes->size(), 1u);
+        ASSERT_NE(cwes->front().getAsObject(), nullptr);
+        EXPECT_EQ(cwes->front().getAsObject()->getInteger("id"), i == 0 ? 125 : 787);
+    }
 }
 
 TEST(SarifReporterTest, SeverityLevelMapping) {

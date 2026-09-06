@@ -641,6 +641,7 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
                 diag.line = sm.getSpellingLineNumber(loc);
                 diag.column = sm.getSpellingColumnNumber(loc);
                 diag.rule_id = "sign-conversion";
+                diag.kind = codeskeptic::FindingKind::LossyConversion;
                 diag.function = fn->getQualifiedNameAsString();
                 diag.severity = codeskeptic::Severity::Warning;
                 diag.message = "Lossy implicit narrowing from '" + proof.operand->getType().getAsString() +
@@ -701,6 +702,7 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         diag.line = line;
         diag.column = sm.getSpellingColumnNumber(loc);
         diag.rule_id = "sign-conversion";
+        diag.kind = codeskeptic::FindingKind::SignedToUnsigned;
         diag.function = fn->getQualifiedNameAsString();
         diag.severity = codeskeptic::Severity::Warning;
         diag.message = codeskeptic::msg(

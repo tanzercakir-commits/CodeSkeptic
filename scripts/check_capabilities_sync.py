@@ -13,8 +13,9 @@ DOCS = (ROOT / "README.md", ROOT / "docs" / "capabilities.md")
 ENTRY = re.compile(
     r'^CODESKEPTIC_RULE_CAPABILITY\("([^"]+)", '
     r'(Supported|Experimental), (true|false), (true|false), '
-    r'(true|false), "([^"]*)"\)$'
+    r'(true|false), "([^"]*)", "([^"]+)", \(([0-9,]*)\)\)$'
 )
+CWE_ENTRY = re.compile(r'^CODESKEPTIC_CWE\(([1-9][0-9]*), "([^"]+)"\)$')
 ROW_ID = re.compile(r'^`([^`]+)`$')
 
 PRODUCT_ARRAY = re.compile(
@@ -36,21 +37,63 @@ def fail(message: str) -> None:
 
 
 entries: dict[str, tuple[str, bool, bool, bool]] = {}
+metadata: dict[str, tuple[str, str]] = {}
+cwe_definitions: dict[int, str] = {}
 for line_no, raw in enumerate(REGISTRY.read_text(encoding="utf-8").splitlines(), 1):
+    if raw.startswith("CODESKEPTIC_CWE("):
+        cwe_match = CWE_ENTRY.fullmatch(raw)
+        if not cwe_match:
+            fail(f"unparseable CWE definition at line {line_no}")
+        cwe_id, description = cwe_match.groups()
+        if int(cwe_id) in cwe_definitions:
+            fail(f"duplicate CWE definition: {cwe_id}")
+        cwe_definitions[int(cwe_id)] = description
+        continue
     if not raw.startswith("CODESKEPTIC_RULE_CAPABILITY"):
         continue
     match = ENTRY.fullmatch(raw)
     if not match:
         fail(f"unparseable registry entry at {REGISTRY}:{line_no}")
-    rule_id, tier_name, default, quality, blocking, _ = match.groups()
+    rule_id, tier_name, default, quality, blocking, _, description, cwes = match.groups()
     tier = tier_name.lower()
     values = (tier, default == "true", quality == "true", blocking == "true")
     if rule_id in entries:
         fail(f"duplicate registry id: {rule_id}")
     entries[rule_id] = values
+    ids = [int(value) for value in cwes.split(",")] if cwes else []
+    if len(set(ids)) != len(ids):
+        fail(f"duplicate family CWE: {rule_id}")
+    metadata[rule_id] = (", ".join(f"CWE-{value}" for value in ids) or "none", description)
 
 if len(entries) != 15:
     fail(f"expected 15 public rule capabilities, got {len(entries)}")
+
+used_cwes = {int(value.removeprefix("CWE-"))
+             for ids, _ in metadata.values() if ids != "none"
+             for value in ids.split(", ")}
+if used_cwes != set(cwe_definitions):
+    fail("family CWE sets and explanation definitions differ")
+
+for document in DOCS:
+    text = document.read_text(encoding="utf-8")
+    if text.count("<!-- CWE-METADATA-BEGIN -->") != 1 or text.count("<!-- CWE-METADATA-END -->") != 1:
+        fail(f"{document.name} requires exactly one CWE metadata table")
+    section = text.split("<!-- CWE-METADATA-BEGIN -->", 1)[1].split("<!-- CWE-METADATA-END -->", 1)[0]
+    rows = {}
+    for line in section.splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip("|").split("|")]
+        if len(cells) != 3:
+            fail(f"{document.name} malformed CWE metadata row")
+        match = ROW_ID.fullmatch(cells[0])
+        if not match:
+            continue
+        if match.group(1) in rows:
+            fail(f"{document.name} duplicate CWE metadata row")
+        rows[match.group(1)] = (cells[1], cells[2])
+    if rows != metadata:
+        fail(f"{document.name} CWE metadata differs from registry")
 
 for rule_id, (tier, default, quality, blocking) in entries.items():
     if tier == "supported" and not (default and quality and blocking):

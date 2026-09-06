@@ -8,6 +8,8 @@
 
 namespace codeskeptic {
 
+struct Diagnostic;
+
 enum class CapabilityTier {
     Supported,
     Experimental,
@@ -24,7 +26,22 @@ struct RuleCapability {
     bool quality_gated;
     bool blocks_verdict;
     std::string_view evidence;
+    std::string_view description;
+    std::string_view help_uri;
+    // Possible family mappings, NOT tags to apply to every finding.
+    std::vector<int> cwe_ids;
 };
+
+struct CweMetadata {
+    int id;
+    std::string_view description;
+};
+
+const CweMetadata* findCweMetadata(int id);
+std::vector<int> findingCweIds(const Diagnostic& diagnostic);
+// Shared additive machine metadata for CLI discovery, JSON and SARIF.
+void writeCweReferencesJson(std::ostream& out, const std::vector<int>& ids);
+void writeFindingMetadataJson(std::ostream& out, const Diagnostic& diagnostic);
 
 const std::vector<RuleCapability>& ruleCapabilities();
 const RuleCapability* findRuleCapability(std::string_view finding_id);
