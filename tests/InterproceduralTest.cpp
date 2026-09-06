@@ -16,6 +16,7 @@
 #include <gtest/gtest.h>
 
 #include <fstream>
+#include <tuple>
 #include <map>
 #include <string>
 
@@ -806,7 +807,7 @@ namespace {
 std::string writePersistFile(const std::string& name,
                              const std::string& content) {
     std::string path = ::testing::TempDir() + name;
-    std::ofstream file(path);
+    std::ofstream file(path, std::ios::binary);
     file << content;
     return path;
 }
@@ -825,7 +826,168 @@ struct GlobalStoreGuard {
     ~GlobalStoreGuard() { SummaryRegistry::instance().clearGlobal(); }
 };
 
+auto summaryState(const SummaryRegistry::FunctionSummary& s) {
+    return std::make_tuple(s.returnNullness, s.returnZeroness, s.returnOwnership,
+        s.params, s.paramAccesses, s.paramOwnerships, s.paramFieldWrites,
+        s.paramPreconditions, s.paramPostconditions, s.paramAllocatorSizes,
+        s.zeroFromParam, s.nullFromParam, s.returnAliasParam,
+        s.nullCondParam, s.nullCondRange);
+}
+
+void expectSummaryRejectedWithoutPublication(const std::string& content) {
+    GlobalStoreGuard guard;
+    const auto good = writePersistFile("boundary_keep.txt",
+        "codeskeptic-summaries v2\nkeep/1\tN\tR\tU\n");
+    auto& registry = SummaryRegistry::instance();
+    ASSERT_TRUE(registry.loadGlobal(good));
+    const auto saved = ::testing::TempDir() + "boundary_snapshot.txt";
+    ASSERT_TRUE(registry.saveGlobal(saved));
+    const auto before = readWholeFile(saved);
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(good, parsed));
+    const auto prior = summaryState(parsed.at("keep/1"));
+    const auto malformed = writePersistFile("boundary_bad.txt", content);
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(malformed, parsed));
+    EXPECT_EQ(parsed.size(), 1u);
+    ASSERT_EQ(parsed.count("keep/1"), 1u);
+    EXPECT_EQ(summaryState(parsed.at("keep/1")), prior);
+    EXPECT_FALSE(registry.loadGlobal(malformed));
+    ASSERT_TRUE(registry.saveGlobal(saved));
+    EXPECT_EQ(readWholeFile(saved), before);
+}
+
 } // anonymous namespace
+
+TEST(SummaryPersistTest, ParserBoundariesRejectArityAndIndicesTransactionally) {
+    for (const std::string key : {"f", "/1", "f/", "f/-1", "f/+1", "f/1x",
+                                  "f/18446744073709551616", "f/2", "f/0"}) {
+        SCOPED_TRACE(key);
+        expectSummaryRejectedWithoutPublication("codeskeptic-summaries v2\n"
+            "keep/1\tM\tF\tU\nincoming/0\tU\t-\tU\n" + key + "\tN\tR\tU\n");
+    }
+    expectSummaryRejectedWithoutPublication(
+        "codeskeptic-summaries v2\nf/1\tN\t-\tU\n");
+    for (const std::string index : {"", "1", "4294967296", "9223372036854775807",
+                                    "-1", "+0", " 0"}) {
+        SCOPED_TRACE(index);
+        const std::vector<std::pair<int, std::string>> records = {
+            {3, "f/1\tM\tR\tU\t" + index + ":0:~"},
+            {4, "f/1\tU\tR\tU\t-\t" + index},
+            {5, "f/1\tU\tR\tU\t-\t-\t" + index},
+            {7, "f/1\tU\tR\tU\t-\t-\t-\t" + index},
+        };
+        for (const auto& [version, record] : records) {
+            SCOPED_TRACE(version);
+            expectSummaryRejectedWithoutPublication("codeskeptic-summaries v" +
+                std::to_string(version) + "\n" + record + "\n");
+        }
+    }
+}
+
+TEST(SummaryPersistTest, ParserBoundariesPreserveEveryHistoricalVersionAndCrlf) {
+    const std::vector<std::string> columns = {
+        "operator//1", "U", "R", "U", "-", "-", "-", "-",
+        "O", "U", "U", "B", "U", "?", "?"};
+    const unsigned widths[] = {0, 3, 4, 5, 6, 7, 7, 8, 10, 13, 14, 15};
+    for (unsigned version = 1; version <= 11; ++version) {
+        SCOPED_TRACE(version);
+        std::string record;
+        for (unsigned i = 0; i < widths[version]; ++i)
+            record += (i ? "\t" : "") + columns[i];
+        const auto header = "codeskeptic-summaries v" + std::to_string(version);
+        for (const std::string eol : {"\n", "\r\n"}) {
+            const auto path = writePersistFile("boundary_legacy.txt", header + eol + record);
+            std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+            ASSERT_TRUE(SummaryRegistry::parseSummaryFile(path, parsed));
+            ASSERT_EQ(parsed.count("operator//1"), 1u);
+            EXPECT_EQ(parsed.at("operator//1").params.size(), 1u);
+        }
+        expectSummaryRejectedWithoutPublication(header + "\n" + record + "\t-\n");
+        expectSummaryRejectedWithoutPublication(header + "\n" +
+            record.substr(0, record.rfind('\t')) + "\n");
+    }
+}
+
+TEST(SummaryPersistTest, ParserBoundariesRejectNulAndBareCrAnywhere) {
+    const std::string normal = "codeskeptic-summaries v2\nvalid/1\tN\tR\tU\n";
+    for (const auto offset : {size_t{0}, normal.find("valid") + 2, normal.size()}) {
+        auto text = normal;
+        text.insert(offset, 1, '\0');
+        expectSummaryRejectedWithoutPublication(text);
+    }
+    expectSummaryRejectedWithoutPublication("codeskeptic-summaries v2\nva\rlid/1\tN\tR\tU\n");
+    expectSummaryRejectedWithoutPublication(normal + "\r");
+    expectSummaryRejectedWithoutPublication("codeskeptic-summaries v12\nvalid/1\tN\tR\tU\n");
+}
+
+TEST(SummaryPersistTest, ParserLimitsAcceptBoundaryRejectNextWithoutPublication) {
+    const std::string header = "codeskeptic-summaries v2\n";
+    auto accepted = [](const std::string& text) {
+        std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+        EXPECT_TRUE(SummaryRegistry::parseSummaryFile(
+            writePersistFile("boundary_limit_valid.txt", text), parsed));
+        EXPECT_FALSE(parsed.empty());
+    };
+    // Limits are inclusive; duplicate records count too (not just distinct keys).
+    accepted(header + "f/4096\tU\t" + std::string(4096, 'R') + "\tU\n");
+    expectSummaryRejectedWithoutPublication(
+        header + "f/4097\tU\t" + std::string(4097, 'R') + "\tU\n");
+    const auto line = std::string(65536 - 8, 'a') + "/0\tU\t-\tU";
+    ASSERT_EQ(line.size(), 65536u);
+    accepted(header + line + "\n");
+    expectSummaryRejectedWithoutPublication(header + "a" + line + "\n");
+    std::string records = header;
+    for (unsigned i = 0; i < 100000; ++i) records += "f/0\tU\t-\tU\n";
+    accepted(records);
+    expectSummaryRejectedWithoutPublication(records + "f/0\tU\t-\tU\n");
+
+    // Build a valid exact-16-MiB file, without exceeding the other limits.
+    std::string bytes = header;
+    const std::string row = std::string(65000, 'a') + "/0\tU\t-\tU\n";
+    constexpr size_t maxBytes = 16 * 1024 * 1024;
+    while (maxBytes - bytes.size() > row.size() + 9) bytes += row;
+    bytes += std::string(maxBytes - bytes.size() - 9, 'b') + "/0\tU\t-\tU\n";
+    ASSERT_EQ(bytes.size(), maxBytes);
+    accepted(bytes);
+    expectSummaryRejectedWithoutPublication(bytes + "\n");
+
+    std::string names;
+    for (unsigned i = 0; i < 256; ++i)
+        names += (i ? "," : "") + std::string("field") + std::to_string(i);
+    const std::string v10 = "codeskeptic-summaries v10\nf/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t";
+    accepted(v10 + names + "\n");
+    expectSummaryRejectedWithoutPublication(v10 + names + ",extra\n");
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(::testing::TempDir(), parsed));
+}
+
+TEST(SummaryPersistTest, ParserHarvestRoundTripsCAndCppParameterShapes) {
+    GlobalStoreGuard guard;
+    for (const bool cSource : {false, true}) {
+        SCOPED_TRACE(cSource);
+        const auto src = writePersistFile(cSource ? "parser_harvest.c" : "parser_harvest.cpp",
+            cSource ? "int f(); int f(int x) {return x;} int zero(void){return 1;}"
+                    : "int f(int x) {return x;} int f(int* x) {return *x;} "
+                      "int zero(){return 1;} int rec(int n){return n ? rec(n-1) : 0;}");
+        const auto output = ::testing::TempDir() + "parser_harvest.txt";
+        {
+            Config config;
+            config.setSourcePath(src);
+            config.setSummaryOut(output);
+            StaticAnalyzer analyzer(std::move(config));
+            analyzer.addRule<NullDerefRule>();
+            analyzer.run();
+        }
+        const auto text = readWholeFile(output);
+        EXPECT_NE(text.find("f/1\t"), std::string::npos);
+        std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+        ASSERT_TRUE(SummaryRegistry::parseSummaryFile(output, parsed));
+        ASSERT_EQ(parsed.count("f/1"), 1u);
+        EXPECT_EQ(parsed.at("f/1").params.size(), 1u);
+        ASSERT_EQ(parsed.count("zero/0"), 1u);
+        EXPECT_TRUE(parsed.at("zero/0").params.empty());
+    }
+}
 
 TEST(SummaryPersistTest, FileFormat_RoundTripDeterministic) {
     GlobalStoreGuard guard;

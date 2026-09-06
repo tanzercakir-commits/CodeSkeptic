@@ -10,6 +10,7 @@
 #include <gtest/gtest.h>
 
 #include <fstream>
+#include <set>
 
 using namespace codeskeptic;
 using namespace codeskeptic::testing;
@@ -75,6 +76,58 @@ TEST(ContractParserTest, SyntaxErrorsAreNeverSilent) {
         "// ordinary prose, ignored\n");
     EXPECT_TRUE(parsed.clauses.empty());
     ASSERT_EQ(parsed.syntaxErrors.size(), 2u);
+}
+
+TEST(ContractParserTest, IntegerBoundariesRejectWithoutThrowing) {
+    for (const std::string literal : {"-9223372036854775808", "9223372036854775807", "0"}) {
+        const auto parsed = parseContractComment("// cs: requires n != " + literal + "\r\n");
+        EXPECT_TRUE(parsed.syntaxErrors.empty());
+        EXPECT_EQ(parsed.clauses.size(), 1u);
+    }
+    for (const std::string literal : {"-9223372036854775809", "9223372036854775808"}) {
+        SCOPED_TRACE(literal);
+        ParsedContracts parsed;
+        ASSERT_NO_THROW(parsed = parseContractComment("// cs: requires n != " + literal + "\n"));
+        EXPECT_TRUE(parsed.clauses.empty());
+        EXPECT_EQ(parsed.syntaxErrors.size(), 1u);
+    }
+}
+
+TEST(ContractParserTest, InputLimitsAndBinaryIntegrity) {
+    const std::string clause = "// cs: requires p != null\n";
+    auto rejected = [](const std::string& text) {
+        const auto parsed = parseContractComment(text);
+        EXPECT_TRUE(parsed.clauses.empty());
+        EXPECT_FALSE(parsed.syntaxErrors.empty());
+    };
+    rejected(clause + std::string("// prose") + '\0' + "\n");
+    rejected(clause + "\r");
+    const std::string maxLine = "// cs: requires p" + std::string(16384 - 16, ' ');
+    ASSERT_EQ(maxLine.size(), 16384u);
+    EXPECT_EQ(parseContractComment(maxLine).clauses.size(), 1u);
+    rejected(maxLine + " ");
+    std::string clauses;
+    for (unsigned i = 0; i < 1024; ++i) clauses += clause;
+    EXPECT_EQ(parseContractComment(clauses).clauses.size(), 1024u);
+    rejected(clauses + clause);
+    std::string bytes = clause;
+    while (bytes.size() + 8 <= 1024 * 1024) bytes += "// text\n";
+    bytes.append(1024 * 1024 - bytes.size(), ' ');
+    EXPECT_EQ(parseContractComment(bytes).clauses.size(), 1u);
+    rejected(bytes + " ");
+}
+
+TEST(ContractParserTest, NestingLimitIncludesUnaryAndParentheses) {
+    for (const auto& [prefix, suffix] : std::vector<std::pair<std::string, std::string>>{
+            {std::string(64, '!'), ""}, {std::string(64, '('), std::string(64, ')')},
+            {std::string(32, '!') + std::string(32, '('), std::string(32, ')')}}) {
+        const auto valid = parseContractComment("// cs: requires " + prefix + "p" + suffix);
+        EXPECT_TRUE(valid.syntaxErrors.empty());
+        ASSERT_EQ(valid.clauses.size(), 1u);
+        const auto invalid = parseContractComment("// cs: requires !" + prefix + "p" + suffix);
+        EXPECT_TRUE(invalid.clauses.empty());
+        EXPECT_EQ(invalid.syntaxErrors.size(), 1u);
+    }
 }
 
 // --- Rule tests (attachment + verification) ---
@@ -788,7 +841,7 @@ namespace {
 std::string writeSidecar(const std::string& srcName,
                          const std::string& content) {
     const std::string src = ::testing::TempDir() + srcName;
-    std::ofstream(src + ".csk") << content;
+    std::ofstream(src + ".csk", std::ios::binary) << content;
     return src;
 }
 } // namespace
@@ -822,6 +875,90 @@ TEST(SidecarTest, RequiresFromSidecar_SeedsCalleeBody) {
         "cs_sc_seed.cc", "parse/1: requires arg != null\n");
     auto guarded = runRule(rule, body, src);
     EXPECT_EQ(guarded.size(), 0u);
+}
+
+TEST(SidecarTest, MalformedFileDoesNotPublishEarlierGuarantees) {
+    const std::string body = R"(
+        int parse(int* arg) {
+            if (arg && arg[0] == 1) return 1;
+            return arg[0];
+        }
+    )";
+    NullDerefRule rule;
+    const auto control = runRule(rule, body, ::testing::TempDir() + "sidecar_partial_control.cpp");
+    ASSERT_FALSE(control.empty());
+    for (const std::string& bad : std::vector<std::string>{
+            "prose without an anchor", "other: requires n !=",
+            std::string("bad") + '\0' + "anchor: requires p != null"}) {
+        const auto src = writeSidecar("sidecar_partial.cpp", "parse/1: requires arg != null\n" + bad + "\n");
+        clearSidecarCache();
+        const auto results = runRule(rule, body, src);
+        EXPECT_EQ(results.size(), control.size());
+        EXPECT_FALSE(takeSidecarIssues().empty());
+    }
+    clearSidecarCache();
+}
+
+TEST(SidecarTest, QualifiedAndUnmatchedAnchorsPreserveValidGuarantees) {
+    NullDerefRule rule;
+    const auto src = writeSidecar("sidecar_qualified.cpp",
+        "other/2: requires p != null\r\nns::parse/1: requires arg != null\r\n");
+    const auto results = runRule(rule, R"(
+        namespace ns { int parse(int* arg) {
+            if (arg && arg[0] == 1) return 1;
+            return arg[0];
+        } }
+    )", src);
+    EXPECT_TRUE(results.empty());
+    EXPECT_TRUE(takeSidecarIssues().empty());
+}
+
+TEST(SidecarTest, RejectionReportsEveryIssueOnceAtAbsoluteLine) {
+    ContractRule rule;
+    const auto src = writeSidecar("sidecar_issue_lines.cpp",
+        "parse: requires p != null\nother: requires n !=\nprose without anchor\n");
+    const auto results = runRule(rule, "int parse(int* p) {return 1;} int second(){return 0;}", src);
+    ASSERT_EQ(results.size(), 2u);
+    std::set<unsigned> lines;
+    for (const auto& d : results) {
+        EXPECT_EQ(d.rule_id, "contract-syntax");
+        EXPECT_EQ(d.file, src + ".csk");
+        lines.insert(d.line);
+    }
+    EXPECT_EQ(lines, (std::set<unsigned>{2, 3}));
+    EXPECT_TRUE(takeSidecarIssues().empty());
+}
+
+TEST(SidecarTest, TextAndFileLimitsAreInclusiveAndDoNotPublishGuarantees) {
+    const std::string record = "parse/1: requires arg != null\n";
+    const std::string body = "int parse(int* arg) { if (arg && arg[0] == 1) return 1; return arg[0]; }";
+    NullDerefRule rule;
+    const auto control = runRule(rule, body, ::testing::TempDir() + "sidecar_limits_control.cpp");
+    ASSERT_FALSE(control.empty());
+    auto check = [&](const std::string& text, bool valid) {
+        std::vector<SidecarEntry> entries;
+        std::vector<ContractSyntaxIssue> issues;
+        parseSidecarText(text, entries, issues);
+        EXPECT_EQ(issues.empty(), valid);
+        const auto src = writeSidecar("sidecar_limits.cpp", text);
+        const auto result = runRule(rule, body, src);
+        EXPECT_EQ(result.size(), valid ? 0u : control.size());
+        EXPECT_EQ(takeSidecarIssues().empty(), valid);
+    };
+    std::string records;
+    for (unsigned i = 0; i < 4096; ++i) records += record;
+    check(records, true);
+    check(records + record, false);
+    const std::string line = "#" + std::string(16383, 'x');
+    check(record + line + "\n", true);
+    check(record + line + "x\n", false);
+    std::string bytes = record;
+    const std::string padding = "#" + std::string(16000, 'x') + "\n";
+    while (1024 * 1024 - bytes.size() > padding.size() + 1) bytes += padding;
+    bytes += "#" + std::string(1024 * 1024 - bytes.size() - 1, 'x');
+    ASSERT_EQ(bytes.size(), 1024u * 1024);
+    check(bytes, true);
+    check(bytes + "\n", false);
 }
 
 TEST(SidecarTest, EnsuresFromSidecar_ViolationPointsAtCskFile) {
