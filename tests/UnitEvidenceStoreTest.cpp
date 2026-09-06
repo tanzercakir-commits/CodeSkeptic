@@ -37,6 +37,7 @@ int main(int argc, char** argv) {
 #include "source_manager/InputIdentity.h"
 #include "analyzer/UnitEvidenceStore.h"
 #include "analyzer/RuntimeIdentity.h"
+#include "analyzer/WorkerProtocol.h"
 #include <gtest/gtest.h>
 #include <chrono>
 #include <filesystem>
@@ -334,5 +335,61 @@ TEST_F(InputIdentityTest, CandidateTransportDoesNotCountAsConfirmedReuse) {
     EXPECT_FALSE(store.candidate("key", inputDigest("wrong")));
     EXPECT_FALSE(store.candidate("key", identity.context, [] { return true; }));
     EXPECT_EQ(store.hits(), 0u);
+}
+
+TEST_F(InputIdentityTest, OptionalProofCompositionNeverBreaksAnOtherwiseValidResponse) {
+    WorkerRequest request;
+    request.source = (root / "input.cpp").string();
+    request.build_directory = root.string();
+    request.commands.emplace_back(root.string(), request.source,
+        std::vector<std::string>{"clang++", "-c", request.source}, "");
+    request.producers = {"null-deref"}; request.selected_families = {"null-deref"};
+    request.record_inputs = true;
+    WorkerResponse response;
+    response.request_digest = workerRequestDigest(encodeWorkerRequest(request));
+    response.coverage.file = request.source;
+    response.coverage.status = SourceStatus::Analyzed; response.coverage.reason = "analyzed";
+    response.coverage.commands = response.coverage.analyzed_commands = 1;
+    for (unsigned i = 0; i < 4; ++i) {
+        Diagnostic diagnostic{};
+        diagnostic.severity = Severity::Error; diagnostic.file = request.source;
+        diagnostic.line = diagnostic.column = 1; diagnostic.rule_id = "null-deref";
+        diagnostic.message.assign(kWorkerFieldLimit - 4096, 'x');
+        response.diagnostics.push_back(std::move(diagnostic));
+    }
+    const auto ordinary = encodeWorkerResponse(response);
+    WorkerResponse decoded;
+    std::string error;
+    ASSERT_TRUE(decodeWorkerResponse(ordinary, request, response.request_digest, decoded, error)) << error;
+    const auto room = kWorkerPacketLimit - ordinary.size();
+    ASSERT_GT(room, 64u); ASSERT_LT(room, kInputIdentityLimit);
+    // This is a wire-capacity fixture, not an actual frontend proof. Exact fit
+    // must preserve both fields; exceeding that by one byte must drop only
+    // optional proof, with every ordinary response byte unchanged.
+    response.runtime_digest = std::string(64, 'a');
+    response.input_witness.assign(room - response.runtime_digest.size(), 'w');
+    {
+        const auto exact_fit = encodeWorkerResponse(response);
+        EXPECT_EQ(exact_fit.size(), kWorkerPacketLimit);
+        ASSERT_TRUE(decodeWorkerResponse(exact_fit, request, response.request_digest, decoded, error)) << error;
+        EXPECT_EQ(decoded.input_witness, response.input_witness);
+        EXPECT_EQ(decoded.runtime_digest, response.runtime_digest);
+    }
+    response.input_witness.push_back('w');
+    std::string fallback;
+    EXPECT_NO_THROW(fallback = encodeWorkerResponse(response));
+    ASSERT_FALSE(fallback.empty());
+    EXPECT_EQ(inputDigest(fallback), inputDigest(ordinary));
+    ASSERT_TRUE(decodeWorkerResponse(fallback, request, response.request_digest, decoded, error)) << error;
+    EXPECT_TRUE(decoded.input_witness.empty()); EXPECT_TRUE(decoded.runtime_digest.empty());
+    EXPECT_FALSE(decoded.cache_hit);
+    response.cache_hit = true;
+    EXPECT_THROW(encodeWorkerResponse(response), std::runtime_error);
+    response.cache_hit = false;
+    response.input_witness.assign(kWorkerFieldLimit + 1, 'w');
+    EXPECT_THROW(encodeWorkerResponse(response), std::runtime_error);
+    response.input_witness.clear(); response.runtime_digest.clear();
+    for (auto& diagnostic : response.diagnostics) diagnostic.message.resize(kWorkerFieldLimit, 'x');
+    EXPECT_THROW(encodeWorkerResponse(response), std::runtime_error);
 }
 #endif

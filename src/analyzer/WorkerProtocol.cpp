@@ -320,8 +320,20 @@ std::string encodeWorkerResponse(const WorkerResponse& response) {
         writer.number(static_cast<std::uint32_t>(gap.gap));
     }
     writer.text(response.global_summaries);
-    writer.text(response.input_witness);
-    writer.text(response.runtime_digest);
+    // Optional fresh-result evidence must not make an otherwise representable
+    // analysis response fail. Preserve individual field limits and the fixed
+    // two text lengths + boolean tail; a confirmed hit may NEVER lose proof.
+    require(response.input_witness.size() <= kWorkerFieldLimit && response.runtime_digest.size() <= kWorkerFieldLimit,
+            "worker field exceeds limit");
+    constexpr std::size_t tail = 12;
+    const auto remaining = kWorkerPacketLimit - writer.bytes.size();
+    require(remaining >= tail, "worker packet exceeds limit");
+    const auto available = remaining - tail;
+    const bool proof_fits = response.input_witness.size() <= available &&
+        response.runtime_digest.size() <= available - response.input_witness.size();
+    require(proof_fits || !response.cache_hit, "worker cache proof exceeds packet limit");
+    writer.text(proof_fits ? response.input_witness : std::string{});
+    writer.text(proof_fits ? response.runtime_digest : std::string{});
     writer.flag(response.cache_hit);
     return std::move(writer.bytes);
 }

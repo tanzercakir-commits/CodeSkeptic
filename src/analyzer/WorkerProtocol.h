@@ -57,6 +57,9 @@ struct WorkerResponse {
 
 // Encoding throws on limits/invalid values. Decoding is transactional: an
 // invalid packet cannot publish a partial replacement into the caller's result.
+// A fresh response may omit individually bounded optional cache proof when only
+// its addition exceeds total packet capacity. Ordinary payload limits and every
+// confirmed-hit proof remain mandatory; omitted fields retain fixed empty slots.
 std::string encodeWorkerRequest(const WorkerRequest& request);
 bool decodeWorkerRequest(const std::string& packet, WorkerRequest& request,
                          std::string& error);
