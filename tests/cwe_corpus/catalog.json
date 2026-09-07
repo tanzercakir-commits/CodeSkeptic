@@ -2,7 +2,7 @@
   "schema": "codeskeptic-cwe-catalog/v1",
   "selection_base": "005b1264618dcf84aa20a5685efd9c03a26bd67f",
   "profile": "linux-x86_64-clang20-cxx17-isolated-rule",
-  "inventory_sha256": "799484c95b33b9f0692e10d3e1e7a965e145df015c1dc3f27f54c153897955e9",
+  "inventory_sha256": "f9b8e2984eb6847c78aa834ebab887fe04ec74ee686e7b4f5b70b39cdcbcdc8f",
   "rules": {
     "alloc-size-overflow": {
       "tier_at_selection": "experimental",

@@ -20,7 +20,7 @@
     },
     {
       "path": "CMakeLists.txt",
-      "sha256": "6a43a0c3abfced09a7e3bcc553946b00fbbf34fa2ae984cc22333e42e7337a11"
+      "sha256": "fbd19ddfa7d65fe0a1f0458bd5ba3c44f9b1511b8c97004b5348241315b0967e"
     },
     {
       "path": "ci/regression-adjudications.json",
@@ -124,7 +124,7 @@
     },
     {
       "path": "tests/AnalysisCoordinatorTest.cpp",
-      "sha256": "87599a153608a1703c3557ec366d286881d9947f9175f2be0b2a6fea861684d4"
+      "sha256": "9466d4a34c2c37d95e16e26f559ebd5c305765ddea84cd20af93306d0fac9c09"
     },
     {
       "path": "tests/AnalysisResultTest.cpp",
