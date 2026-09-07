@@ -66,15 +66,26 @@ stay silent until their source/contract/policy signal exists.
 | Contract verification | `contract` | experimental | on | no | report-only |
 | Policy enforcement | `policy` | experimental | on | no | report-only |
 
-`uninit-scalar` currently handles straight-line automatic integer/bool value
-reads, including compound updates. Initializers, assignment-first, ordinary
+`uninit-scalar` handles automatic integer/bool value reads in straight-line
+code and supported CFG branch/loop joins, including compound updates. A
+possibly uninitialized join is not presented as definite uninitialization.
+Initializers, assignment-first, ordinary
 `sizeof`/`alignof`/`noexcept`, address-taking and zero-initialized static/thread-local
 storage do not invent uninitialized reads. Address/reference escapes become
 unknown, not proven initialized. Volatile locals, enums, aggregates, heap storage,
-branch/loop merges, exception flow and unsupported/unspecified expression sequencing
-are outside this first unit; such functions do not acquire a straight-line proof.
+exception flow and unsupported/unspecified expression sequencing remain outside
+this subset; selected-lvalue aliases and opaque writes do not acquire a proof.
 `uninit-ptr` remains the separate pointer-dereference rule. Neither rule claims
-complete CWE-457 coverage or a measured precision tier for the new scalar subset.
+complete CWE-457 coverage or a supported precision tier for the scalar subset.
+
+CH05 measured all five experimental CWE families separately: see the
+[per-family results and support decisions](quality_results.md#2-experimental-families--cs3-ch05-s01-u003).
+All five remain enabled/report-only. The frozen regression sample passed, but
+does not provide independent family-wide precision evidence. No feature was
+removed and no target or existing floor was lowered. Registry evidence strings
+retain historical qualification checkpoints, not an exhaustive description of
+current implementation: the scalar string's original straight-line scope is
+superseded by the CFG behavior above, without silently rewriting frozen inputs.
 
 The supported evidence is the pinned Juliet precision gate: double-free
 1.000 (101 TP / 0 FP), use-after-free 1.000 (212 / 0), div-by-zero 1.000

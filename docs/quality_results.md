@@ -159,3 +159,137 @@ The output parent must already exist; existing output is never overwritten.
 The runner supports only the measured supported lane at this checkpoint.
 Full-suite and inherited gates are still required separately. No expectation
 refresh, skip-to-clean conversion, automatic promotion or hidden download exists.
+
+## 2. Experimental families — CS3-CH05-S01-U003
+
+Measured source: `157724b079803c2fbe28d1de8e2c1032eb8f703f`, tree
+`5faf560bcb25876ce1a97aea245084a5319ad65b`, on 2026-09-07.
+Version: `0.4.9-dev+g157724b07980`.
+Analyzer SHA-256:
+`f0fa65be72441fb5b5ecd62ad3e932daa1cfdd7e2378b96c309a65c400fef246`.
+Test executable SHA-256:
+`67a4fe5e2059b933c20445bf8669f721039a63f71dcd0d59d23bddd3ac5a1764`.
+The subsequent four-document results/scope update does not rebuild or relabel
+these artifacts. Its exact transition must be independently checked before POP.
+
+### 2.1 Complete frozen tier, not selected passing rules
+
+The runner now accepts `--tier experimental`; its default remains `supported`.
+It selects the entire frozen tier before execution, never an arbitrary family
+or result-dependent subset. All original 52 fixtures, their expectations, the
+catalog/inventory digests in section 1.1 and 124 protected inputs are unchanged.
+The frontend/ABI probe, isolated compile commands, configuration/source identity,
+disabled analysis cache and bounded offline environment are the same profile.
+
+All 27 experimental cases completed: 12 buggy, 10 safe, two unknown and three
+unsupported. Every experimental invocation returned exit 0, including the twelve
+true findings; each finding remained experimental and nonblocking. The evaluator
+scores actual diagnostics, not exit 0 as an absence of bugs.
+
+| Family | Buggy | Safe | Unknown | Unsupported | TP | FP | FN |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| uninit-ptr | 1 | 1 | 0 | 0 | 1 | 0 | 0 |
+| uninit-scalar | 2 | 2 | 1 | 1 | 2 | 0 | 0 |
+| bounds | 3 | 3 | 1 | 0 | 3 | 0 | 0 |
+| sign-conversion | 2 | 2 | 0 | 1 | 2 | 0 | 0 |
+| alloc-size-overflow | 4 | 2 | 0 | 1 | 4 | 0 | 0 |
+
+Per-family precision and addressable recall are 1.000 **only within these small
+seeded samples**; each family's deterministic safe FP count is zero. They exceed
+the numerical 0.90/0.70 promotion thresholds for this profile, but do not supply
+independent family-wide precision evidence. No pooled average or source-test
+assertion count is used to enlarge those denominators.
+
+The five predeclared boundary rows all completed with zero diagnostics and raw
+status `clean`/exit 0. Their measurement metrics remain null, not TN or FN:
+
+| Case ID | Frozen role | Interpretation of silence |
+| --- | --- | --- |
+| uninit-scalar-unknown-external-write | unknown | Opaque write does not prove initialization or a defect. |
+| uninit-scalar-unsupported-float | unsupported | The known float initialization defect is outside the integer/bool subset, not safe. |
+| bounds-unknown-extent | unknown | Missing capacity is not an in-bounds proof. |
+| sign-conversion-unsupported-explicit-narrowing | unsupported | Explicit narrowing is not the new implicit-narrowing subset. |
+| alloc-size-overflow-unknown-addend | unsupported | The frozen model does not establish arbitrary runtime addend overflow. |
+
+### 2.2 Source-regression and real-project evidence stay separate
+
+Fresh Linux execution passed **1,582 CTest tests** (291.40 seconds), **1,567
+single-process C++ tests** (407.775 seconds) and **48 Python measurement tests**.
+Discovery and actual executed/passed test identities match one-to-one, with no
+skipped test credited as a pass. The real header/cache-hit check passed before
+the suites. New measurement tests cover complete experimental selection,
+report-only TP scoring, rejected blocking verdicts and invalid tier subsets.
+
+The additional log-identity audit initially missed five genuine GTest PASS
+markers prefixed by non-newline stderr in the merged output. Its failed audit
+is retained. Corrected parsing matches exact test identities/time suffixes and
+all discovered/run/pass multiplicities; it does not edit the original logs or
+rerun/relabel a failed product test. The separate corrected audit passed.
+
+The complete source suite retains harder boundaries beyond the isolated seeds:
+
+| Family | Additional executed source-regression boundary evidence |
+| --- | --- |
+| uninit-ptr | `UninitPointerRuleExTest.cpp`: guaranteed versus bypassed/zero-trip loop assignment, correlated versus anti-correlated guards, reference-output versus value arguments, static/thread-local versus automatic storage. Its two isolated fixtures have no separate unknown/unsupported row; these source tests do not enter that denominator. |
+| uninit-scalar | `UninitScalarRuleTest.cpp`: CFG branches, loops/early exits, short-circuit reads, escapes, selected-storage aliases and deferred sequencing/EH boundaries. |
+| bounds | `BoundsRuleTest.cpp`: copy source/destination extents, constant offsets, casts and aliases; unknown extents and unsupported signatures do not acquire capacity proofs. |
+| sign-conversion | `SignConversionRuleTest.cpp`: narrowing fit/loss, source snapshots/mutation and the retained nlohmann/json-shaped regression; not universal explicit-cast or unknown-range analysis. |
+| alloc-size-overflow | `AllocSizeOverflowRuleTest.cpp`: uint64 guards, checked-add status/output identity, mutation/alias boundaries and the retained LVGL replay shape; not complete taint tracking or all allocators. |
+
+The separate supported rerun retained 25 cases, 13 TP, zero FP/FN and its one
+unscored unknown. Four fresh real-world profiles retained all 497 input hashes,
+exact semantic finding multisets, coverage and whole-program summary bytes:
+cJSON plain/whole 54/57 findings and tinyxml2 plain/whole 9/12. cJSON remains the
+explicitly partial historical 34 analyzed/76 requested TU slice, with 42 skipped
+and zero failed; tinyxml2 is 3/3. This is no claim of full clean-project precision.
+
+Section 1's Juliet, thesis and stress observations retain their original b284
+revision and binary: they were **not rerun in U003**. Production C++, registry,
+build configuration, original tests, frozen inputs and inherited gate bytes
+are unchanged from that qualified source. The only non-ledger/results changes
+since b284 are this isolated-tier selector and its Python tests. Their historical
+limitations and failures remain visible; those observations are not substituted
+for U003's fresh required suite and corpus executions. In particular, Juliet's
+six selected CWEs are not independent precision samples for these five families;
+cross-family noise, repeated real-project copies or thesis aggregates cannot
+be converted into such a sample.
+
+### 2.3 Support decision
+
+**Retain all five families as experimental, enabled and report-only.** No
+feature is removed from delivery, no expected finding or floor is weakened and
+no quality gate is disabled. All seven supported families retain their prior
+blocking behavior. The new features remain usable; experimental is an explicit
+evidence/tier limitation, not a silent deletion or deferred implementation.
+
+The contract requires independent precision evidence before promotion. These
+source-derived seeds and existing regression replicas are not that sample,
+even though every scored case passed. No unprovided minimum sample size is
+invented. A later promotion needs prospectively frozen, independently classified
+evidence for the declared subset, the existing precision/recall and zero-safe-FP
+floors, relevant regression/hosted gates and an authorized FIFO task. Nothing
+here asserts industrial certification, all-CWE coverage or market accuracy.
+
+The original scalar capability evidence string describes its historical first
+straight-line checkpoint. Current documented behavior includes tested CFG joins;
+the registry bytes are deliberately not silently re-frozen or treated as a new
+precision result. All tier flags remain identical. The known c395 Windows failure
+is still unresolved and owned by S02-U001; no current hosted Windows success,
+sanitizer/performance acceptance, package/release or main integration is claimed.
+
+### 2.4 Evidence and reproduction
+
+Fresh evidence: user-state `codeskeptic/cwe-restart-evidence/CS3-CH05-S01-U003/`
+under exact measured source `157724b079803c2fbe28d1de8e2c1032eb8f703f`.
+Experimental results SHA-256:
+`87d4a143139242a0e541bc4261e39e9d54fa7b81dbc1cdbf01d2521f7fa5cd1a`;
+separate supported results SHA-256:
+`5bd99902143f3726f6cb30252f453c3c2fbc9fa69aee0e9a1a6652fb96e66825`.
+Raw per-case reports, compile commands, actual exit/timing records, discovery,
+full logs and the failed/corrected log audit remain separate evidence.
+
+On a clean matching build, run `python3 -B scripts/cwe_quality.py run --binary
+<binary> --revision <full-checkout-SHA> --out <new-absolute-directory> --tier
+experimental`; use a different fresh directory for `--tier supported`.
+The parent must exist. Neither command refreshes expectations, promotes a family
+or replaces the full suite, independent audit and exact-head FIFO POP.
