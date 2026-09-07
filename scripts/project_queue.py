@@ -69,6 +69,35 @@ CHECKPOINT_POLICY_REASON = (
     "preserve original base pins and failed evidence; admit only independently reviewed exact head "
     "semantic deltas with source/regression proof, unchanged coverage and fresh hosted qualification."
 )
+# Owner2026-09-07 approved only the diagnosed RAII/fdopendir correction after
+# the same-function suppression collision was independently demonstrated.
+# Keep this separate from the old Abseil exception and ordinary amendment API.
+OWNERSHIP_CHECKPOINT_PARENT = "e4d52748937b39d5b72dd91d64a04d9a85c59fe8"
+OWNERSHIP_CHECKPOINT_BRANCH = "agent/cs3-ch04-s03-u001-windows-portability"
+OWNERSHIP_CHECKPOINT_TASK = "CS3-CH04-S03-U001"
+OWNERSHIP_CHECKPOINT_OLD_BOOK = "4e9cc86106ecdbe08404fc1ae8096e3c57e55d1c27d5b048df0773bfefa7360e"
+OWNERSHIP_CHECKPOINT_OLD_CONTRACT = "d28f5c31b6cfb720898921032ab9e6eec93d46fff9cc97dbab81ae0ac8781914"
+OWNERSHIP_CHECKPOINT_NEW_BOOK = "8a2beabed398c6dae6f5debf6a7b8d1c66a9c75deb35d816ec4defa26cea7a95"
+OWNERSHIP_CHECKPOINT_FILES = (*FILES[:3], *SCOPE_POLICY_FILES)
+OWNERSHIP_CHECKPOINT_ACCEPTANCE = (
+    "Sahibin 2026-09-07 açık onayıyla, yukarıdaki ürün/kural değişikliği yasağına yalnız şu dar istisna eklenir: "
+    "e4d52748937b39d5b72dd91d64a04d9a85c59fe8 self-scan kaydında teşhis edilen RAII yapıcı/yıkıcı sahipliği "
+    "ve başarıya bağlı fdopendir tanıtıcı aktarımı analizde doğru modellenir. Gerçek sahiplik ve kapanış "
+    "kanıtlanmadan her yapıcıya veya her fdopendir çağrısına koşulsuz tüketim/kaçış atanmaz; başarısız "
+    "fdopendir çağrısında tanıtıcı çağıranın sorumluluğunda kalır. Aynı fonksiyondaki ilgisiz gerçek sızıntı, "
+    "sahiplenmeyen yapıcı, eksik/koşullu kapanış ve başarısız aktarım negatifleri korunur; fonksiyon sonu "
+    "resource-leak bastırmasıyla gerçek sızıntıyı gizlemek yasaktır. Mevcut cache/worker çalışma semantiği, "
+    "ilgisiz kural davranışları, FIFO sırası, bitmiş kayıtlar, test bütçesi/kontrol adları, pinler, kalite eşikleri ve main "
+    "değişmez. Eski başarısız kanıtlar korunur; dar RED/GREEN regresyonları, tam self-scan kapsamı, mevcut "
+    "Linux/Windows hosted kapılarının yeni exact-head başarısı ve bağımsız inceleme yine zorunludur. "
+    "Bu yalnız kabul istisnasıdır; gerekli uygulama dosyaları ayrıca bağımsız kapsam geçişiyle eklenir."
+)
+OWNERSHIP_CHECKPOINT_REASON = (
+    "Owner 2026-09-07 explicitly approved a narrow RAII/fdopendir acceptance exception for the current "
+    "Windows-portability FRONT after exact-head self-scan diagnosis and a genuine same-function leak "
+    "counterexample rejected closing-brace suppression. Permit proven ownership-model corrections only; "
+    "preserve failure-path ownership, negative controls, FIFO, completed history, all existing gates and floors."
+)
 
 
 class QueueError(ValueError):
@@ -302,6 +331,21 @@ def checkpoint_policy_book(book):
     return validate_book(updated)
 
 
+def ownership_checkpoint_book(book):
+    """Pure frozen proposal for the owner's one exact ownership decision."""
+    validate_book(book)
+    require(digest(book) == OWNERSHIP_CHECKPOINT_OLD_BOOK and bool(pending(book)) and
+            pending(book)[0]["id"] == OWNERSHIP_CHECKPOINT_TASK and
+            digest(pending(book)[0]) == OWNERSHIP_CHECKPOINT_OLD_CONTRACT,
+            "not the owner-authorized ownership checkpoint book")
+    updated = copy.deepcopy(book)
+    pending(updated)[0]["acceptance"].append(OWNERSHIP_CHECKPOINT_ACCEPTANCE)
+    updated["revision"] += 1
+    updated["decisions"].append({"revision": updated["revision"], "reason": OWNERSHIP_CHECKPOINT_REASON,
+                                 "previous_plan_sha256": digest(book["chapters"])})
+    return validate_book(updated)
+
+
 def task_block(task, level=3):
     return (f"{'#' * level} {task['id']} — {task['title']}\n\n**Sonuç:** {task['outcome']}\n\n**Kabul:**\n\n" + "".join(f"- {x}\n" for x in task["acceptance"]) + f"\n**Test bütçesi:** {task['budget']}\n**Kontroller:** {', '.join(task['checks'])}\n**Kapsam:** {', '.join(task['scope'])}\n**Bağımlılıklar:** {', '.join(task['depends']) or 'Yok'}\n\n")
 
@@ -453,6 +497,17 @@ def checkpoint_policy_edge(root, parent, head, old, book, changed):
             book == checkpoint_policy_book(old))
 
 
+def ownership_checkpoint_edge(root, parent, head, old, book, changed):
+    """Eight exact files at one parent, never scope or acceptance amnesty."""
+    return (parent == OWNERSHIP_CHECKPOINT_PARENT and
+            git(root, "symbolic-ref", "--short", "HEAD") == OWNERSHIP_CHECKPOINT_BRANCH and
+            set(changed) == set(OWNERSHIP_CHECKPOINT_FILES) and
+            git(root, "rev-parse", head + "^") == parent and
+            digest(old) == OWNERSHIP_CHECKPOINT_OLD_BOOK and
+            digest(book) == OWNERSHIP_CHECKPOINT_NEW_BOOK and
+            book == ownership_checkpoint_book(old))
+
+
 def implementation_span(root, head, book):
     """Check every implementation edge, not just the last commit or final diff.
 
@@ -475,7 +530,8 @@ def implementation_span(root, head, book):
         parent = parents[0]
         old = validate_book(json.loads(git(root, "show", f"{parent}:{FILES[0]}"), object_pairs_hook=unique))
         changed = git(root, "diff", "--name-only", parent, cursor).splitlines()
-        if checkpoint_policy_edge(root, parent, cursor, old, book, changed):
+        if (checkpoint_policy_edge(root, parent, cursor, old, book, changed) or
+                ownership_checkpoint_edge(root, parent, cursor, old, book, changed)):
             # Do not stop replay here: earlier implementation still has to
             # obey its original contract all the way back to the previous POP.
             book = old
@@ -522,6 +578,9 @@ def guard(root, base):
     if checkpoint_policy_edge(root, base, head, old, book, changed):
         implementation_span(root, head, book)
         return "checkpoint-adjudication-policy"
+    if ownership_checkpoint_edge(root, base, head, old, book, changed):
+        implementation_span(root, head, book)
+        return "checkpoint-ownership-policy"
     if book == old:
         require(bool(pending(old)), "work after terminal queue")
         task = pending(old)[0]

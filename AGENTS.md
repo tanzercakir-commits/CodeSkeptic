@@ -52,6 +52,19 @@ Base pins stay original; any head delta needs exact source/regression evidence,
 independent classification and fresh successful hosted qualification. Never
 relabel the old failed campaign or accept unrelated drift under that decision.
 
+The owner separately approved the diagnosed RAII/fdopendir ownership-analysis
+correction on 2026-09-07. One exact checkpoint directly after
+e4d52748937b39d5b72dd91d64a04d9a85c59fe8 may append the frozen ownership
+exception to CS3-CH04-S03-U001, with independent exact-head review. Its eight
+files and old/new BOOK digests are enforced by project_queue. No POP, scope,
+outcome, budget/check name, FIFO order, completed record or quality floor changes.
+This permits proven constructor/destructor ownership and success-conditional
+fdopendir modeling, not blanket consumption or closing-brace suppression that
+hides genuine same-function leaks. All earlier failures remain failures and
+fresh actual Linux/Windows qualification is required. Necessary implementation
+files still need ordinary independently reviewed scope extensions afterward.
+This decision grants no general FRONT amendment or unrelated detector change.
+
 ## Delegation boundary
 
 Before each assignment name the one allowed repository/worktree, branch and

@@ -38,3 +38,10 @@
     acceptance clause and its decision; PROGRESS and all other contracts stay
     unchanged. Historical replay continues through the old contract to the
     prior POP. Ordinary amend/scope commands gain no FRONT-rewrite authority.
+12. The owner's2026-09-07 ownership-analysis exception is one direct edge after
+    e4d52748937b39d5b72dd91d64a04d9a85c59fe8, bound to its exact branch,
+    old/new BOOK digests and eight files. Only the frozen RAII/fdopendir
+    acceptance clause and decision are appended. Scope, outcome, budget/checks,
+    FIFO and completed records remain unchanged. History replay continues
+    under the old contracts to the previous POP; no retroactive scope amnesty,
+    general acceptance-edit API, product PASS or quality-floor reduction.

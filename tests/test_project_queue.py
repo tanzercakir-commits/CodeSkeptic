@@ -104,7 +104,52 @@ def checkpoint_policy_fixture(book, head=HEAD, branch=None):
         yield updated
 
 
+@contextlib.contextmanager
+def ownership_checkpoint_fixture(book, head=HEAD, branch=None):
+    """Exercise the new exact edge without replacing the older checkpoint."""
+    values = {
+        "OWNERSHIP_CHECKPOINT_PARENT": head,
+        "OWNERSHIP_CHECKPOINT_BRANCH": branch or branch_for(queue.pending(book)[0]),
+        "OWNERSHIP_CHECKPOINT_TASK": queue.pending(book)[0]["id"],
+        "OWNERSHIP_CHECKPOINT_OLD_BOOK": queue.digest(book),
+        "OWNERSHIP_CHECKPOINT_OLD_CONTRACT": queue.digest(queue.pending(book)[0]),
+    }
+    with contextlib.ExitStack() as stack:
+        for name, value in values.items():
+            stack.enter_context(mock.patch.object(queue, name, value))
+        updated = queue.ownership_checkpoint_book(book)
+        stack.enter_context(mock.patch.object(queue, "OWNERSHIP_CHECKPOINT_NEW_BOOK", queue.digest(updated)))
+        yield updated
+
+
 class QueueContractTests(unittest.TestCase):
+    def test_57_ownership_checkpoint_preserves_contract_except_exact_append(self):
+        old = advance(make_book())
+        before = copy.deepcopy(old)
+        with ownership_checkpoint_fixture(old) as updated:
+            expected = copy.deepcopy(queue.pending(old)[0])
+            expected["acceptance"].append(queue.OWNERSHIP_CHECKPOINT_ACCEPTANCE)
+            self.assertEqual(queue.pending(updated)[0], expected)
+            self.assertEqual(queue.pending(updated)[1:], queue.pending(old)[1:])
+            self.assertEqual(updated["progress"], old["progress"])
+            self.assertEqual(updated["revision"], old["revision"] + 1)
+            self.assertEqual(updated["decisions"][:-1], old["decisions"])
+            self.assertEqual(updated["decisions"][-1], {
+                "revision": updated["revision"], "reason": queue.OWNERSHIP_CHECKPOINT_REASON,
+                "previous_plan_sha256": queue.digest(old["chapters"]),
+            })
+            self.assertEqual(queue.render(updated)["docs/PROGRESS.md"], queue.render(old)["docs/PROGRESS.md"])
+            with self.assertRaises(queue.QueueError):
+                queue.ownership_checkpoint_book(updated)
+            with self.assertRaises(queue.QueueError):
+                queue.amend(old, updated["chapters"], queue.OWNERSHIP_CHECKPOINT_REASON)
+            for name, value in (("OWNERSHIP_CHECKPOINT_OLD_BOOK", "0" * 64),
+                                ("OWNERSHIP_CHECKPOINT_TASK", "CS3-CH09-S01-U001"),
+                                ("OWNERSHIP_CHECKPOINT_OLD_CONTRACT", "0" * 64)):
+                with self.subTest(name=name), mock.patch.object(queue, name, value), self.assertRaises(queue.QueueError):
+                    queue.ownership_checkpoint_book(old)
+            self.assertEqual(old, before)
+
     def test_48_checkpoint_policy_only_appends_exact_front_acceptance_and_decision(self):
         old = advance(make_book())
         before = copy.deepcopy(old)
@@ -819,6 +864,102 @@ q.publish(Path(sys.argv[2]), q.read_json(Path(sys.argv[3])))
             self.commit("Second policy edit is not covered by fixed parent")
             with self.assertRaises(queue.QueueError):
                 queue.guard(self.root, policy_head)
+
+    def commit_ownership_checkpoint(self, updated, omit=None):
+        for name in queue.OWNERSHIP_CHECKPOINT_FILES:
+            if name in queue.FILES or name == omit:
+                continue
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("Owner-authorized ownership checkpoint fixture\n", encoding="utf-8")
+        queue.publish(self.root, updated)
+        self.commit("Exact owner-approved ownership acceptance checkpoint")
+        return self.git("rev-parse", "HEAD")
+
+    def test_58_ownership_checkpoint_real_scope_product_pop_replays_full_history(self):
+        with ownership_checkpoint_fixture(self.book, self.head, self.branch) as updated:
+            policy_head = self.commit_ownership_checkpoint(updated)
+            self.assertEqual(queue.guard(self.root, self.head), "checkpoint-ownership-policy")
+            self.assertEqual(queue.check(self.root), updated)
+            self.assertEqual(self.cli("finalize", "--review", str(self.receipt)), 2)
+            receipt = scope_review_for(updated, policy_head, self.branch)
+            self.receipt.write_text(queue.canonical(receipt), encoding="utf-8")
+            self.assertEqual(self.cli("extend-scope", "--review", str(self.receipt)), 0)
+            self.commit("Reviewed scope only after ownership decision")
+            scope_head = self.git("rev-parse", "HEAD")
+            self.assertEqual(queue.guard(self.root, policy_head), "scope-extension")
+            source = self.root / "include/cwe.h"
+            source.parent.mkdir()
+            source.write_text("int admitted_ownership_correction;\n", encoding="utf-8")
+            self.commit("Scoped product after ownership decision")
+            product_head = self.git("rev-parse", "HEAD")
+            self.assertEqual(queue.guard(self.root, scope_head), "implementation")
+            self.review = review_for(queue.pending(queue.check(self.root))[0], product_head, self.branch, self.evidence)
+            self.save_review()
+            self.assertEqual(self.cli("finalize", "--review", str(self.receipt)), 0)
+            self.commit("Verified ordinary POP after ownership decision")
+            self.assertEqual(queue.guard(self.root, product_head), "finalized")
+
+    def test_59_ownership_checkpoint_rejects_wrong_parent_branch_and_digests(self):
+        with ownership_checkpoint_fixture(self.book, self.head, self.branch) as updated:
+            self.commit_ownership_checkpoint(updated)
+            for name, value in (("OWNERSHIP_CHECKPOINT_PARENT", "0" * 40),
+                                ("OWNERSHIP_CHECKPOINT_BRANCH", self.branch + "-other"),
+                                ("OWNERSHIP_CHECKPOINT_OLD_BOOK", "0" * 64),
+                                ("OWNERSHIP_CHECKPOINT_NEW_BOOK", "0" * 64)):
+                with self.subTest(name=name), mock.patch.object(queue, name, value), self.assertRaises(queue.QueueError):
+                    queue.guard(self.root, self.head)
+
+    def test_60_ownership_checkpoint_rejects_mixed_product(self):
+        with ownership_checkpoint_fixture(self.book, self.head, self.branch) as updated:
+            source = self.root / "src/mixed.cc"
+            source.parent.mkdir()
+            source.write_text("int mixed_product;\n", encoding="utf-8")
+            self.commit_ownership_checkpoint(updated)
+            with self.assertRaises(queue.QueueError):
+                queue.guard(self.root, self.head)
+
+    def test_61_ownership_checkpoint_cannot_launder_earlier_history(self):
+        source = self.root / "outside/escape.cc"
+        source.parent.mkdir()
+        source.write_text("int earlier_scope_violation;\n", encoding="utf-8")
+        self.commit("Earlier out-of-scope edge before ownership decision")
+        parent = self.git("rev-parse", "HEAD")
+        with ownership_checkpoint_fixture(self.book, parent, self.branch) as updated:
+            self.commit_ownership_checkpoint(updated)
+            with self.assertRaises(queue.QueueError):
+                queue.guard(self.root, parent)
+
+    def test_62_ownership_checkpoint_does_not_admit_unrelated_contract_or_history_changes(self):
+        for field, value in (("outcome", "Unrelated outcome"), ("scope", ["*"]),
+                             ("checks", ["different-check"]), ("budget", "T0"),
+                             ("completed_at", "Changed historical completion record")):
+            with self.subTest(field=field), ownership_checkpoint_fixture(self.book, self.head, self.branch) as expected:
+                changed = copy.deepcopy(expected)
+                if field == "completed_at":
+                    changed["progress"][0][field] = value
+                else:
+                    queue.pending(changed)[0][field] = value
+                # Changing the output digest cannot defeat the frozen transform.
+                with mock.patch.object(queue, "OWNERSHIP_CHECKPOINT_NEW_BOOK", queue.digest(changed)), \
+                     mock.patch.object(queue, "git", side_effect=lambda root, *args: self.branch if args[0] == "symbolic-ref" else self.head):
+                    self.assertFalse(queue.ownership_checkpoint_edge(self.root, self.head, HEAD,
+                        self.book, changed, queue.OWNERSHIP_CHECKPOINT_FILES))
+
+    def test_63_ownership_checkpoint_does_not_authorize_later_governance_change(self):
+        with ownership_checkpoint_fixture(self.book, self.head, self.branch) as updated:
+            policy_head = self.commit_ownership_checkpoint(updated)
+            self.assertEqual(queue.guard(self.root, self.head), "checkpoint-ownership-policy")
+            (self.root / "AGENTS.md").write_text("Unauthorized later policy edit\n", encoding="utf-8")
+            self.commit("Cannot replay ownership authorization")
+            with self.assertRaises(queue.QueueError):
+                queue.guard(self.root, policy_head)
+
+    def test_64_ownership_checkpoint_requires_all_eight_files(self):
+        with ownership_checkpoint_fixture(self.book, self.head, self.branch) as updated:
+            self.commit_ownership_checkpoint(updated, omit="docs/QUEUE_GUIDE.md")
+            with self.assertRaises(queue.QueueError):
+                queue.guard(self.root, self.head)
 
     def commit_checkpoint_policy(self, updated):
         for name in queue.CHECKPOINT_POLICY_FILES:

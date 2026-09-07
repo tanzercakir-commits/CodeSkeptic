@@ -57,7 +57,7 @@ en fazla 10 MiB ve digest'i doğru dosyadır. Receipt en fazla 64 KiB'dır.
 Denetçi gerçek dosyaları, komut çıktısını, RED/GREEN ve risk sınırlarını inceler.
 Bu ortak kullanıcı hesabında prosedürel bağımsızlıktır, imza/uzak attestation değil.
 
-### Onaylı tek semantik kabul checkpoint'i
+### Onaylı tarihsel Abseil kabul checkpoint'i
 
 Sahip, gerçek Abseil taramasında saptanan eski one-past yanlış alarmı için
 2026-09-05 tarihinde açık kabul politikası onayı verdi. Yalnız doğrudan parent
@@ -81,6 +81,31 @@ Kaynak ve regresyon kanıtı, fingerprint çoklu-küme farkı, tam kapsam, üç 
 yeni başarılı exact-head hosted sonuç ve bağımsız ham kanıt denetimi şarttır.
 Başarısız eski receipt'ler başarısız kalır. Uygulama dosyaları için daha sonra
 normal bağımsız scope-extension gerekir; bu checkpoint ürün PASS'i değildir.
+
+### Onaylı RAII/fdopendir kabul istisnası
+
+Sahip2026-09-07 tarihinde, teşhis edilmiş RAII/fdopendir yanlış alarmlarının
+analizde düzeltilmesini açıkça onayladı. Yalnız doğrudan parent
+`e4d52748937b39d5b72dd91d64a04d9a85c59fe8` ve
+`agent/cs3-ch04-s03-u001-windows-portability` dalındaki tek geçiş kullanılabilir.
+Sekiz dosya: BOOK/PLAN/TODO, AGENTS, INVARIANTS, QUEUE_GUIDE, project_queue.py,
+test_project_queue.py. Eski/yeni BOOK digest'leri ve saf
+`ownership_checkpoint_book` çıktısı exact guard ile doğrulanır. Mevcut işlem
+yazıcısı görünümleri birlikte hazırlar; bağımsız exact-head inceleme ve guard
+olmadan ürün uygulamasına geçilmez. Önceki Abseil geçişi aynen korunur.
+
+Yalnız FRONT kabulüne dondurulmuş dar istisna ve karar eklenir. PROGRESS byte
+eşit kalır; scope, outcome, bütçe/kontrol adları, bağımlılıklar ve sıra değişmez.
+Yapıcı/yıkıcı sahipliği kanıtlanmalı, fdopendir başarısızlığında çağıranın
+sorumluluğu korunmalıdır. Aynı fonksiyondaki gerçek sızıntıyı gizleyen satır
+bastırması veya koşulsuz tüketim/kaçış kabul edilmez. Başarısız eski kanıtlar
+başarısız kalır; Linux/Windows kapıları ve kalite eşikleri değişmez.
+
+Bu kayıt tamamlanma değildir. Uygulama dosyaları sonra bağımsız scope-extension
+ile eklenir, dar RED/GREEN ve yeni exact-head gerçek kapılar tekrar doğrulanır.
+Geçmiş denetimi checkpoint'te durmaz: eski kapsamla önceki POP'a kadar sürer.
+Ordinary amend ve extend-scope herhangi bir FRONT kabulünü yeniden yazamaz;
+bu tek istisna daha sonra yönetişim değişikliği yapma yetkisi vermez.
 
 ## Değişiklik ve hata kurtarma
 
