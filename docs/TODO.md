@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH05-S01-U001
-
-### CS3-CH05-S01-U001 — Kural bazlı pozitif/negatif doğrulama kataloğunu dondur
-
-**Sonuç:** Ölçüm girdileri sonucu görmeden seçilir ve hangi CWE altkümesinin desteklendiği açıktır.
-
-**Kabul:**
-
-- Her desteklenecek kural için güvenli/buggy fixture kimliği ve beklenen bulgu kayıtlıdır.
-- Yeni çekirdek testleri corpus dışında bırakılarak başarı şişirilmez; eski source/corpus floor'ları düşürülmez.
-- Unknown/unsupported örnekler false negative veya clean ile karıştırılmaz.
-
-**Test bütçesi:** T1
-**Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** tests/cwe_corpus/*, scripts/cwe_quality.py, docs/CWE_SCOPE.md, docs/quality_protocol.md
-**Bağımlılıklar:** Yok
+## FRONT — CS3-CH05-S01-U002
 
 ### CS3-CH05-S01-U002 — Mevcut supported aileleri yeni motor üzerinde yeniden doğrula
 

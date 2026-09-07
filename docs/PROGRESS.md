@@ -2,6 +2,20 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH05-S01-U001 — Kural bazlı pozitif/negatif doğrulama kataloğunu dondur
+
+- Commit: `c828fa467ca2f530549cfa4bfa69645672ced5d6`
+- Dal: `agent/cs3-ch05-s01-u001-quality-catalog`
+- Implementer: `root-cs3-ch05-s01-u001-20260907`
+- Bağımsız denetçi: `independent-cs3-ch05-s01-u001-c828fa4-20260907`
+- İnceleme SHA-256: `d36e73b8d3f841d6bf0c315d33b84d84cc034ecfa4ab98390ff3f7ce454a629d`
+- Tarih: 2026-09-07T08:07:13.329902+00:00
+- Sonuç: Ölçüm girdileri sonucu görmeden seçilir ve hangi CWE altkümesinin desteklendiği açıktır.
+- focused-tests: PASS; SHA-256 `97c6606021017075bc03beb5dd66b76b07959a44500c274c5b1585309fc828ca`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S01-U001/qualify.sh c828fa467ca2f530549cfa4bfa69645672ced5d6`
+- cli-smoke: PASS; SHA-256 `878efc007d93e9fc8f1b4dd93106dfb915fa0a13b3f79717c85f40c2a0aecf01`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S01-U001/qualify.sh c828fa467ca2f530549cfa4bfa69645672ced5d6`
+- queue-check: PASS; SHA-256 `8623e28833b949b88a8b490355cb03e3c533a83a74898e947b41f5c801edc441`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S01-U001/qualify.sh c828fa467ca2f530549cfa4bfa69645672ced5d6`
+- cli-smoke-raw-report: PASS; SHA-256 `dab820e365109e577ef7fa645a94a15c7cd2ed3db92ccab59eae5c3dcfd54005`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S01-U001/qualify.sh c828fa467ca2f530549cfa4bfa69645672ced5d6`
+
 ## CS3-CH04-S03-U001 — Windows fixture taşınabilirliğini gerçek hosted kapılarla doğrula
 
 - Commit: `8db304359bc1e3c3273430d140cd72d6e6582335`
