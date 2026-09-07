@@ -148,7 +148,35 @@ TEST_F(AnalysisCacheTest, CheckpointSnapshotBindsPendingHeaderAndSidecarWithoutP
     const auto initial = executeAnalysisWorker(tool.string(), request, {}, nullptr, nullptr, nullptr, true);
     ASSERT_TRUE(initial.valid) << initial.reason << initial.detail;
     EXPECT_TRUE(initial.response.diagnostics.empty());
-    ASSERT_TRUE(reusableWorkerResponse(request, initial.response));
+    // Only inspect already-returned evidence if the original admission fails.
+    // Do not retry admission, runtime observation, or summary-file operations.
+    const auto admissionContext = [&] {
+        const auto& response = initial.response;
+        const auto& coverage = response.coverage;
+        InputIdentity identity;
+        const bool decoded = decodeInputIdentity(response.input_witness, identity);
+        std::ostringstream context;
+        context << "record_inputs=" << request.record_inputs
+                << " runtime_bytes=" << response.runtime_digest.size()
+                << " runtime_hex=" << (response.runtime_digest.size() == 64 &&
+                    response.runtime_digest.find_first_not_of("0123456789abcdef") == std::string::npos)
+                << " expected_commands=" << request.commands.size()
+                << " coverage_status=" << static_cast<int>(coverage.status)
+                << " commands=" << coverage.commands
+                << " analyzed=" << coverage.analyzed_commands
+                << " failed=" << coverage.failed_commands
+                << " skipped=" << coverage.skipped_commands
+                << " recovery=" << coverage.recovery_commands
+                << " gaps=" << response.gaps.size()
+                << " diagnostics=" << response.diagnostics.size()
+                << " witness_bytes=" << response.input_witness.size()
+                << " witness_decoded=" << decoded
+                << " witness_context=" << (decoded && identity.context == response.request_digest)
+                << " witness_source=" << (decoded && identity.hasBuffer(request.source))
+                << " summary_bytes=" << response.global_summaries.size();
+        return context.str();
+    };
+    ASSERT_TRUE(reusableWorkerResponse(request, initial.response)) << admissionContext();
     const auto packet = encodeWorkerResponse(initial.response);
     EXPECT_EQ(processUnitEvidenceStore().entries(), 0u);
     const auto resume = executeAnalysisWorker(tool.string(), request, {}, nullptr, nullptr, &packet, true);
