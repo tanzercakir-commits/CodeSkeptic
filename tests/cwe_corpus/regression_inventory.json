@@ -124,7 +124,7 @@
     },
     {
       "path": "tests/AnalysisCoordinatorTest.cpp",
-      "sha256": "9466d4a34c2c37d95e16e26f559ebd5c305765ddea84cd20af93306d0fac9c09"
+      "sha256": "0cf13f656b3efbc24bfae20f5b6d5ff04b4dfa640b7298655c90f74b59dbc60b"
     },
     {
       "path": "tests/AnalysisResultTest.cpp",
