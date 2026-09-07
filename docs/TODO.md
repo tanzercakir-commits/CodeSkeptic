@@ -18,7 +18,7 @@ Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter aç
 
 **Test bütçesi:** T2
 **Kontroller:** linux-suite, relevant-corpus, queue-check, windows-hosted
-**Kapsam:** tests/stress_corpus/*, fuzz/*, scripts/test_resilience.sh, docs/quality_results.md, tests/AnalysisCoordinatorTest.cpp, tests/ResourceBudgetTest.cpp, tests/cwe_corpus/catalog.json, tests/cwe_corpus/regression_inventory.json, CMakeLists.txt, src/analyzer/AnalysisCoordinator.cpp
+**Kapsam:** tests/stress_corpus/*, fuzz/*, scripts/test_resilience.sh, docs/quality_results.md, tests/AnalysisCoordinatorTest.cpp, tests/ResourceBudgetTest.cpp, tests/cwe_corpus/catalog.json, tests/cwe_corpus/regression_inventory.json, CMakeLists.txt, src/analyzer/AnalysisCoordinator.cpp, src/analyzer/RuntimeIdentity.cpp, src/analyzer/RuntimeIdentity.h, tests/UnitEvidenceStoreTest.cpp
 **Bağımlılıklar:** Yok
 
 ### CS3-CH05-S02-U002 — Gerçek proje ve performans kabulünü ölç
