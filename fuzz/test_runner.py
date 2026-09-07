@@ -128,7 +128,7 @@ class RunnerTest(unittest.TestCase):
         self.assertIn(state, ('Z', 'X'))
 
     def test_every_source_test_identity_is_required(self):
-        for profile, count in (('asan', 58), ('ubsan', 82), ('native', 1)):
+        for profile, count in (('asan', 58), ('ubsan', 83), ('native', 1)):
             names = runner.source_tests(profile)
             self.assertEqual(len(names), count)
             runner.validate_discovery(names, names)
@@ -141,7 +141,10 @@ class RunnerTest(unittest.TestCase):
     def test_partition_preserves_all_identities_and_only_reviewed_overlap(self):
         lanes = {p: set(names) for p, names in runner.source_manifest().items()}
         self.assertEqual(set(lanes), {'asan', 'ubsan', 'native'})
-        self.assertEqual(len(set.union(*lanes.values())), 124)
+        self.assertEqual(len(set.union(*lanes.values())), 125)
+        diagnostic = 'AnalysisCacheTest.WorkerProofRejectionReportsOnlyBoundedCategoryAndKeepsFreshResult'
+        self.assertIn(diagnostic, lanes['ubsan'])
+        self.assertNotIn(diagnostic, lanes['asan'] | lanes['native'])
         self.assertEqual(len(lanes['asan'] & lanes['ubsan']), 17)
         self.assertEqual(lanes['native'], {runner.NATIVE_TEST})
         self.assertFalse(lanes['native'] & (lanes['asan'] | lanes['ubsan']))

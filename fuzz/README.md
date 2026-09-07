@@ -28,8 +28,9 @@ FD-exhaustion case is mandatory in a native lane: its intentional zero-descripto
 limit conflicts with sanitizer runtime operations in both instrumented builds.
 No suppression is installed; none of these test bodies or assertions changes.
 
-The closed source-declared assignment requires 58 ASan+UBSan tests, 82 UBSan
-tests and one native test. All 124 distinct original identities remain; 17
+The closed source-declared assignment requires 58 ASan+UBSan tests, 83 UBSan
+tests and one native test. Its 125 distinct identities retain all 124 original
+tests and add the worker-proof rejection diagnostic regression to UBSan; 17
 disk-store tests deliberately appear in both sanitizer lanes. The parser-only
 `SidecarTest.ParseText_EntriesAndIssues` stays in ASan. All other sidecar cases
 are individually named in the UBSan assignment; a changed set requires review.

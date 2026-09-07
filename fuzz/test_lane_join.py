@@ -72,10 +72,10 @@ class LaneJoinTest(unittest.TestCase):
         with mock.patch.object(runner, 'checkout', return_value=self.tree):
             return verify_lanes.verify(self.lanes if lanes is None else lanes, self.revision, self.root/'joined.json')
 
-    def test_complete_fixture_union_is_124_not_the_sum(self):
+    def test_complete_fixture_union_is_125_not_the_sum(self):
         result = self.verify()
         self.assertTrue(result['passed'])
-        self.assertEqual(result['distinct_tests'], 124)
+        self.assertEqual(result['distinct_tests'], 125)
         self.assertEqual(result['lane_manifest'], self.manifest)
 
     def test_missing_lane_or_failed_lane_cannot_join(self):
