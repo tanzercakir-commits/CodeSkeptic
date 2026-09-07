@@ -33,6 +33,7 @@ class LaneJoinTest(unittest.TestCase):
             objects = {output: 'c'*64 for _, output in runner.compilation_manifest(tracked, with_seeds=profile != 'native')}
             result = dict(schema='codeskeptic-resilience/v2', passed=True, profile=profile,
                 source_revision=self.revision, source_tree=self.tree, lane_manifest=self.manifest,
+                build_directory='/fixture/build', execution_directory=str(directory),
                 expected_tests=names, selected_tests=names, version=self.version, checks={},
                 binary_sha256={name: 'd'*64 for name in executables+['runtime1', 'runtime2']},
                 object_sha256=objects, compile_commands_sha256='e'*64, repository_compilation_commands=len(objects))
@@ -57,7 +58,9 @@ class LaneJoinTest(unittest.TestCase):
 
     def raw(self, profile, label, stdout, **changes):
         path = self.lanes[profile] / (label+'.json')
-        value = dict(reason='', returncode=0, stdout=stdout, stderr='', elapsed_seconds=.01)
+        spec = runner.execution_specs(profile, Path('/fixture/build'), self.manifest[profile])[label]
+        value = dict(spec, cwd=str(self.lanes[profile]), reason='', returncode=0,
+                     stdout=stdout, stderr='', elapsed_seconds=.01)
         value.update(changes)
         path.write_text(json.dumps(value))
         self.records[profile]['checks'][label] = {'evidence_sha256': runner.sha(path), 'elapsed_seconds': .01}
@@ -117,6 +120,44 @@ class LaneJoinTest(unittest.TestCase):
     def test_native_lane_with_sanitizer_symbols_is_rejected(self):
         self.raw('native', 'instrumentation-tests-__asan_init', '0000 <__asan_init>:\n'); self.flush('native')
         with self.assertRaises(ValueError): self.verify()
+
+    def reject_envelope_mutation(self, changes=None, missing=None):
+        path = self.lanes['native'] / 'suite.json'
+        original = path.read_text()
+        observed = json.loads(original)
+        observed.update(changes or {})
+        if missing is not None: observed.pop(missing, None)
+        path.write_text(json.dumps(observed))
+        self.records['native']['checks']['suite']['evidence_sha256'] = runner.sha(path)
+        self.flush('native')
+        try:
+            with self.assertRaises(ValueError): self.verify()
+        finally:
+            path.write_text(original)
+            self.records['native']['checks']['suite']['evidence_sha256'] = runner.sha(path)
+            self.flush('native')
+            (self.root/'joined.json').unlink(missing_ok=True)
+
+    def test_missing_execution_envelope_cannot_qualify(self):
+        for field in ('command', 'cwd', 'timeout_seconds', 'output_limit_bytes_per_stream',
+                      'sanitizer_options', 'elapsed_seconds', 'reason', 'returncode'):
+            with self.subTest(field=field): self.reject_envelope_mutation(missing=field)
+
+    def test_foreign_command_filter_or_directory_cannot_qualify(self):
+        for changes in ({'command': ['/other/tests', '--gtest_filter='+runner.NATIVE_TEST]},
+                        {'command': ['/fixture/build/tests/codeskeptic_tests', '--gtest_filter=Other.Test']},
+                        {'cwd': '/other/evidence'}):
+            with self.subTest(changes=changes): self.reject_envelope_mutation(changes)
+
+    def test_invalid_budget_and_malformed_execution_fields_cannot_qualify(self):
+        for changes in ({'timeout_seconds': 0}, {'timeout_seconds': 900},
+                        {'output_limit_bytes_per_stream': 99999999}, {'returncode': False},
+                        {'reason': False}, {'elapsed_seconds': float('nan')},
+                        {'elapsed_seconds': -1}, {'elapsed_seconds': 1000}):
+            with self.subTest(changes=changes): self.reject_envelope_mutation(changes)
+
+    def test_changed_sanitizer_options_cannot_qualify(self):
+        self.reject_envelope_mutation({'sanitizer_options': {'UBSAN_OPTIONS': 'halt_on_error=0'}})
 
 
 if __name__ == '__main__':

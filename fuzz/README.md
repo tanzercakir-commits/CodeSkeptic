@@ -108,6 +108,10 @@ quiet-descendant cleanup, plus forged/missing success-record negatives.
 The combined gate is mandatory: it checks all three exact-source receipts,
 closed identity assignments, complete build manifests and raw evidence hashes,
 then rechecks discovery, actual execution, instrumentation and mutation results.
+Each captured command is bound to its exact executable, filter/arguments,
+working directory, sanitizer options and fixed timeout/output budget. Typed exit
+and finite elapsed records must agree with the per-check receipt; output alone
+cannot substitute for the required execution envelope.
 A missing lane, wrong revision, skipped test or incomplete native execution
 cannot become combined success. This join is not proof of the separate full
 Linux, corpus or hosted Windows requirements and is not a signed attestation.

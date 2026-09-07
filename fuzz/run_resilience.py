@@ -52,6 +52,8 @@ def capture(command, cwd, timeout, env=None, limit=2 * 1024 * 1024):
     require(math.isfinite(timeout) and 0 < timeout <= 900 and type(limit) is int and 0 < limit <= 8 * 1024 * 1024,
             'invalid supervision budget')
     result = {'command': command, 'timeout_seconds': timeout, 'output_limit_bytes_per_stream': limit,
+              'cwd': str(cwd), 'sanitizer_options': {key: (os.environ if env is None else env).get(key, '')
+                       for key in ('ASAN_OPTIONS', 'UBSAN_OPTIONS')},
               'reason': '', 'returncode': None, 'stdout': '', 'stderr': ''}
     started = time.monotonic()
     data = {'stdout': bytearray(), 'stderr': bytearray()}
@@ -198,6 +200,53 @@ def source_manifest(root=ROOT):
 def source_tests(profile, root=ROOT):
     return source_manifest(root)[profile]
 
+def execution_specs(profile, build, names):
+    binaries = {name: build / relative for name, relative in {
+        'analyzer': 'src/codeskeptic', 'tests': 'tests/codeskeptic_tests',
+        'worker': 'tests/codeskeptic_worker_fixture', 'resource': 'tests/codeskeptic_resource_fixture',
+        'cache': 'tests/codeskeptic_cache_fixture', 'corpus': 'src/codeskeptic_corpus_inputs',
+        'seeds': 'fuzz/codeskeptic_resilience'}.items() if name != 'seeds' or profile != 'native'}
+    options = {'UBSAN_OPTIONS': 'halt_on_error=1:print_stacktrace=1',
+               'ASAN_OPTIONS': 'halt_on_error=1:abort_on_error=1:detect_leaks=1' if profile == 'asan' else ''}
+    specs = {}
+    def add(label, command, timeout, selected_options=options):
+        specs[label] = {'command': command, 'timeout_seconds': timeout,
+                        'output_limit_bytes_per_stream': 2 * 1024 * 1024, 'sanitizer_options': selected_options}
+    targets = ['codeskeptic_tests'] + ([] if profile == 'native' else ['codeskeptic_resilience'])
+    add('build-current', ['ninja', '-C', str(build), '-n'] + targets, 30)
+    add('version', [str(binaries['analyzer']), '--version'], 10)
+    for name, binary in binaries.items():
+        for symbol in ('__asan_init', '__ubsan_handle_add_overflow_abort'):
+            add('instrumentation-' + name + '-' + symbol,
+                ['objdump', '-d', '--disassemble=' + symbol, str(binary)], 30)
+    expression = '--gtest_filter=' + ':'.join(names)
+    add('test-discovery', [str(binaries['tests']), expression, '--gtest_list_tests'], 30)
+    add('suite', [str(binaries['tests']), expression], {'asan': 300, 'ubsan': 900, 'native': 60}[profile])
+    if profile == 'asan':
+        for target in ('contract', 'worker', 'identity'):
+            add('seeds-' + target, [str(binaries['seeds']), '--target', target,
+                '--seed', str(SEED), '--iterations', str(ITERATIONS)], 60,
+                dict(options, ASAN_OPTIONS=options['ASAN_OPTIONS'] + ':hard_rss_limit_mb=1024'))
+    return specs
+
+def validate_envelope(observed, expected, directory):
+    require(isinstance(observed, dict) and set(observed) == set(expected) |
+            {'cwd', 'reason', 'returncode', 'stdout', 'stderr', 'elapsed_seconds'},
+            'missing or unexpected execution-envelope field')
+    require(all(observed[key] == value for key, value in expected.items())
+            and observed['cwd'] == str(directory), 'command, directory, options or budget mismatch')
+    require(type(observed['returncode']) is int and observed['returncode'] == 0
+            and type(observed['reason']) is str and observed['reason'] == ''
+            and type(observed['timeout_seconds']) is int
+            and type(observed['output_limit_bytes_per_stream']) is int, 'malformed success envelope')
+    elapsed = observed['elapsed_seconds']
+    require(type(elapsed) in (int, float) and math.isfinite(elapsed)
+            and 0 <= elapsed <= expected['timeout_seconds'] + 5, 'invalid elapsed time')
+    # capture bounds raw bytes. Decoding cannot produce more characters than
+    # input bytes; allow five seconds only for post-exit group cleanup/accounting.
+    require(all(isinstance(observed[key], str) and len(observed[key]) <= expected['output_limit_bytes_per_stream']
+                for key in ('stdout', 'stderr')), 'invalid captured output')
+
 def validate_discovery(names, expected):
     require(Counter(names) == Counter(expected), 'source/discovered test identity mismatch')
 
@@ -282,17 +331,20 @@ def run(profile, build, revision, out):
     expected_tests = manifest[profile]
     out.mkdir()
     result = {'schema': 'codeskeptic-resilience/v2', 'profile': profile, 'source_revision': revision, 'source_tree': tree,
+              'build_directory': str(build), 'execution_directory': str(out),
               'binary_sha256': hashes, 'compile_commands_sha256': sha(build / 'compile_commands.json'),
               'repository_compilation_commands': len(selected), 'prebuilt_compiler_libraries_instrumented': False,
               'object_sha256': objects, 'expected_tests': expected_tests, 'lane_manifest': manifest,
               'checks': {}, 'passed': False}
-    env = dict(os.environ, UBSAN_OPTIONS='halt_on_error=1:print_stacktrace=1')
+    specs = execution_specs(profile, build, expected_tests)
+    env = dict(os.environ, UBSAN_OPTIONS='halt_on_error=1:print_stacktrace=1', ASAN_OPTIONS='')
     if profile == 'asan':
         env['ASAN_OPTIONS'] = 'halt_on_error=1:abort_on_error=1:detect_leaks=1'
     def execute(label, command, timeout, environment=env):
         observed = capture(command, out, timeout, environment)
         save(out / (label + '.json'), observed)
         successful(observed)
+        validate_envelope(observed, specs[label], out)
         result['checks'][label] = {'evidence_sha256': sha(out / (label + '.json')),
                                    'elapsed_seconds': observed['elapsed_seconds']}
         return observed

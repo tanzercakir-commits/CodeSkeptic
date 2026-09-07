@@ -34,6 +34,11 @@ def verify(lanes, revision, out):
                        and result['source_tree'] == tree, 'failed or mismatched lane')
         runner.require(result['lane_manifest'] == manifest and result['expected_tests'] == manifest[profile]
                        and sorted(result['selected_tests']) == manifest[profile], 'lane identity assignment mismatch')
+        for key in ('build_directory', 'execution_directory'):
+            value = result.get(key)
+            runner.require(isinstance(value, str) and Path(value).is_absolute()
+                           and str(Path(value)) == value and '..' not in Path(value).parts, 'invalid execution path')
+        specs = runner.execution_specs(profile, Path(result['build_directory']), manifest[profile])
         executables = ['analyzer', 'tests', 'worker', 'resource', 'cache', 'corpus']
         if profile != 'native': executables.append('seeds')
         objects = {output for _, output in runner.compilation_manifest(tracked, with_seeds=profile != 'native')}
@@ -47,10 +52,14 @@ def verify(lanes, revision, out):
         labels = {'build-current', 'version', 'test-discovery', 'suite'}
         labels.update('instrumentation-' + name + '-' + symbol for name in executables for symbol in symbols)
         if profile == 'asan': labels.update('seeds-' + target for target in ('contract', 'worker', 'identity'))
-        runner.require(set(result['checks']) == labels, 'missing or unexpected lane check')
+        runner.require(set(result['checks']) == labels == set(specs), 'missing or unexpected lane check')
         raw = {}
         for label in sorted(labels):
             raw[label] = read(directory / (label + '.json'), result['checks'][label]['evidence_sha256'])
+            runner.validate_envelope(raw[label], specs[label], result['execution_directory'])
+            runner.require(type(result['checks'][label]['elapsed_seconds']) in (int, float)
+                           and result['checks'][label]['elapsed_seconds'] == raw[label]['elapsed_seconds'],
+                           'inconsistent elapsed record')
             runner.successful(raw[label])
         current = raw['build-current']['stdout']
         runner.require(current.splitlines()[-1:] == ['ninja: no work to do.']
