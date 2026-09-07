@@ -94,6 +94,23 @@ class RunnerTest(unittest.TestCase):
         self.assertEqual(len(result['stdout']), 32)
         with self.assertRaises(ValueError): runner.successful(result)
 
+    def test_byte_envelope_preserves_actual_invalid_utf8_without_relaxing_caps(self):
+        for payload in (b'abc', '\u2603'.encode('utf-8'), bytes([255, 254, 253]), '\ufffd'.encode('utf-8')):
+            with self.subTest(payload_length=len(payload)):
+                command = [sys.executable, '-c', 'import sys; sys.stdout.buffer.write(bytes('+repr(list(payload))+'))']
+                result = runner.capture(command, self.root, 5, limit=3)
+                runner.successful(result)
+                spec = {key: result[key] for key in ('command', 'timeout_seconds',
+                        'output_limit_bytes_per_stream', 'sanitizer_options')}
+                runner.validate_envelope(result, spec, self.root)
+                if payload == bytes([255, 254, 253]):
+                    self.assertEqual(runner.base64.b64decode(result['stdout_raw_base64']), payload)
+                    self.assertEqual(result['stdout'], '\ufffd' * 3)
+                else:
+                    self.assertIsNone(result['stdout_raw_base64'])
+                with self.assertRaises(ValueError):
+                    runner.validate_envelope(dict(result, stdout='\u2603'*3, stdout_raw_base64=None), spec, self.root)
+
     def test_completed_parent_cannot_leave_a_quiet_owned_child_running(self):
         script = ('import subprocess,sys; p=subprocess.Popen([sys.executable,"-c","import time; time.sleep(10)"],'
                   'stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL); print(p.pid)')

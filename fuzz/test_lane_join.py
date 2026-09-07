@@ -60,7 +60,7 @@ class LaneJoinTest(unittest.TestCase):
         path = self.lanes[profile] / (label+'.json')
         spec = runner.execution_specs(profile, Path('/fixture/build'), self.manifest[profile])[label]
         value = dict(spec, cwd=str(self.lanes[profile]), reason='', returncode=0,
-                     stdout=stdout, stderr='', elapsed_seconds=.01)
+                     stdout=stdout, stderr='', stdout_raw_base64=None, stderr_raw_base64=None, elapsed_seconds=.01)
         value.update(changes)
         path.write_text(json.dumps(value))
         self.records[profile]['checks'][label] = {'evidence_sha256': runner.sha(path), 'elapsed_seconds': .01}
@@ -140,7 +140,8 @@ class LaneJoinTest(unittest.TestCase):
 
     def test_missing_execution_envelope_cannot_qualify(self):
         for field in ('command', 'cwd', 'timeout_seconds', 'output_limit_bytes_per_stream',
-                      'sanitizer_options', 'elapsed_seconds', 'reason', 'returncode'):
+                      'sanitizer_options', 'elapsed_seconds', 'reason', 'returncode',
+                      'stdout_raw_base64', 'stderr_raw_base64'):
             with self.subTest(field=field): self.reject_envelope_mutation(missing=field)
 
     def test_foreign_command_filter_or_directory_cannot_qualify(self):
@@ -158,6 +159,17 @@ class LaneJoinTest(unittest.TestCase):
 
     def test_changed_sanitizer_options_cannot_qualify(self):
         self.reject_envelope_mutation({'sanitizer_options': {'UBSAN_OPTIONS': 'halt_on_error=0'}})
+
+    def test_multibyte_output_over_byte_budget_cannot_qualify(self):
+        original = json.loads((self.lanes['native']/'suite.json').read_text())
+        text = '\u2603' * (original['output_limit_bytes_per_stream'] // 3 + 1) + '\n' + original['stdout']
+        self.assertLess(len(text), original['output_limit_bytes_per_stream'])
+        self.assertGreater(len(text.encode('utf-8')), original['output_limit_bytes_per_stream'])
+        self.reject_envelope_mutation({'stdout': text})
+
+    def test_forged_or_invalid_lossless_output_cannot_qualify(self):
+        for value in ('!', runner.base64.b64encode(b'other output').decode('ascii')):
+            with self.subTest(value=value): self.reject_envelope_mutation({'stdout_raw_base64': value})
 
 
 if __name__ == '__main__':

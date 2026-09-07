@@ -112,6 +112,10 @@ Each captured command is bound to its exact executable, filter/arguments,
 working directory, sanitizer options and fixed timeout/output budget. Typed exit
 and finite elapsed records must agree with the per-check receipt; output alone
 cannot substitute for the required execution envelope.
+The output cap counts original bytes. Valid UTF-8 is checked by its exact byte
+encoding; replacement-decoded output additionally preserves and validates its
+original bytes, so invalid UTF-8 is not confused with a genuine replacement
+character or used to admit oversized output.
 A missing lane, wrong revision, skipped test or incomplete native execution
 cannot become combined success. This join is not proof of the separate full
 Linux, corpus or hosted Windows requirements and is not a signed attestation.

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Bounded Linux sanitizer gate, with strict execution/evidence validation."""
 import argparse
+import base64
+import binascii
 from collections import Counter
 import fnmatch
 import hashlib
@@ -105,7 +107,13 @@ def capture(command, cwd, timeout, env=None, limit=2 * 1024 * 1024):
             result['returncode'] = process.returncode
             for name in data:
                 getattr(process, name).close()
-        result.update({name: value.decode('utf-8', errors='replace') for name, value in data.items()})
+        for name, value in data.items():
+            decoded = value.decode('utf-8', errors='replace')
+            result[name] = decoded
+            # Ordinary UTF-8 is already lossless. Preserve original bytes only
+            # where replacement decoding would otherwise erase their identity.
+            result[name + '_raw_base64'] = (None if decoded.encode('utf-8') == value
+                else base64.b64encode(value).decode('ascii'))
         result['elapsed_seconds'] = round(time.monotonic() - started, 6)
     return result
 
@@ -231,7 +239,8 @@ def execution_specs(profile, build, names):
 
 def validate_envelope(observed, expected, directory):
     require(isinstance(observed, dict) and set(observed) == set(expected) |
-            {'cwd', 'reason', 'returncode', 'stdout', 'stderr', 'elapsed_seconds'},
+            {'cwd', 'reason', 'returncode', 'stdout', 'stderr', 'stdout_raw_base64',
+             'stderr_raw_base64', 'elapsed_seconds'},
             'missing or unexpected execution-envelope field')
     require(all(observed[key] == value for key, value in expected.items())
             and observed['cwd'] == str(directory), 'command, directory, options or budget mismatch')
@@ -242,10 +251,24 @@ def validate_envelope(observed, expected, directory):
     elapsed = observed['elapsed_seconds']
     require(type(elapsed) in (int, float) and math.isfinite(elapsed)
             and 0 <= elapsed <= expected['timeout_seconds'] + 5, 'invalid elapsed time')
-    # capture bounds raw bytes. Decoding cannot produce more characters than
-    # input bytes; allow five seconds only for post-exit group cleanup/accounting.
-    require(all(isinstance(observed[key], str) and len(observed[key]) <= expected['output_limit_bytes_per_stream']
-                for key in ('stdout', 'stderr')), 'invalid captured output')
+    # Five seconds above is only post-exit cleanup/accounting. Output limits
+    # always count original bytes, not decoded characters or replacement bytes.
+    limit = expected['output_limit_bytes_per_stream']
+    for key in ('stdout', 'stderr'):
+        decoded, encoded = observed[key], observed[key + '_raw_base64']
+        require(isinstance(decoded, str) and len(decoded) <= limit, 'invalid captured output')
+        if encoded is None:
+            raw = decoded.encode('utf-8')
+        else:
+            require(isinstance(encoded, str) and len(encoded) <= 4 * ((limit + 2) // 3),
+                    'invalid lossless output size')
+            try:
+                raw = base64.b64decode(encoded, validate=True)
+            except (ValueError, binascii.Error) as error:
+                raise ValueError('invalid lossless output encoding') from error
+            require(raw.decode('utf-8', errors='replace') == decoded and decoded.encode('utf-8') != raw,
+                    'lossless bytes and replacement text disagree')
+        require(len(raw) <= limit, 'captured byte budget exceeded')
 
 def validate_discovery(names, expected):
     require(Counter(names) == Counter(expected), 'source/discovered test identity mismatch')
