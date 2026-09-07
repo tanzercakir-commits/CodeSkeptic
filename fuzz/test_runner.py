@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Supervisor/report regressions, including actual owned-process failures."""
-import copy
 import json
 import os
 from pathlib import Path
 import signal
 import sys
 import tempfile
+import time
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -101,7 +101,13 @@ class RunnerTest(unittest.TestCase):
         try:
             status = Path('/proc') / str(child) / 'stat'
             # An already-killed orphan may await init's reap, but cannot run.
-            self.assertTrue(not status.exists() or status.read_text().split()[2] in ('Z', 'X'))
+            until = time.monotonic() + 1
+            while True:
+                try: state = status.read_text().split()[2]
+                except FileNotFoundError: state = 'X'
+                if state in ('Z', 'X') or time.monotonic() >= until: break
+                time.sleep(.01)
+            self.assertIn(state, ('Z', 'X'))
         finally:
             try: os.kill(child, signal.SIGKILL)
             except ProcessLookupError: pass

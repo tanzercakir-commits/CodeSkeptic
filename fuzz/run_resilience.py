@@ -68,21 +68,28 @@ def capture(command, cwd, timeout, env=None, limit=2 * 1024 * 1024):
                     if len(chunk) > available:
                         result['reason'] = 'output_limit'
                         break
-            if not result['reason']:
-                try:
-                    process.wait(timeout=max(.001, timeout - (time.monotonic() - started)))
-                except subprocess.TimeoutExpired:
+            while not result['reason']:
+                # Keep the exact parent waitable until group cleanup. Reaping
+                # it early permits a successful quiet parent to leave children
+                # running, and releases its PID before the final killpg.
+                state = os.waitid(os.P_PID, process.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+                if state is not None:
+                    break
+                if time.monotonic() - started >= timeout:
                     result['reason'] = 'timeout'
+                    break
+                time.sleep(.01)
     except OSError as error:
         result['reason'] = 'launch_or_capture_error'
         data['stderr'].extend(str(error).encode()[:limit])
     finally:
         if process is not None:
-            if result['reason'] or process.poll() is None:
-                try:
-                    os.killpg(process.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
+            # Parent PID is still owned/unreaped: also stop descendants that
+            # closed their inherited pipes before their parent returned zero.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
             process.wait()
             result['returncode'] = process.returncode
             for name in data:
@@ -177,7 +184,7 @@ def run(profile, build, revision, out):
     out.mkdir()
     result = {'schema': 'codeskeptic-resilience/v1', 'profile': profile, 'source_revision': revision, 'source_tree': tree,
               'binary_sha256': hashes, 'compile_commands_sha256': sha(build / 'compile_commands.json'),
-              'instrumented_repository_commands': len(selected), 'third_party_libraries_instrumented': False,
+              'instrumented_repository_commands': len(selected), 'prebuilt_compiler_libraries_instrumented': False,
               'checks': {}, 'passed': False}
     env = dict(os.environ, UBSAN_OPTIONS='halt_on_error=1:print_stacktrace=1')
     if profile == 'asan':
@@ -190,6 +197,10 @@ def run(profile, build, revision, out):
                                    'elapsed_seconds': observed['elapsed_seconds']}
         return observed
     try:
+        for name, binary in binaries.items():
+            symbols = execute('instrumentation-' + name, ['nm', '--defined-only', str(binary)], 30)['stdout']
+            require(bool(re.search(r'\b__asan_init\b', symbols)) == (profile == 'asan'), 'ASan binary profile mismatch')
+            require(re.search(r'\b__ubsan_handle_[A-Za-z0-9_]+_abort\b', symbols), 'missing nonrecovering UBSan runtime')
         version = execute('version', [str(binaries['analyzer']), '--version'], 10)['stdout'].strip().removeprefix('CodeSkeptic ')
         require(re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+-dev\+g' + revision[:12], version), 'binary/source mismatch')
         result['version'] = version
