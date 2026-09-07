@@ -18,7 +18,7 @@ Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter aç
 
 **Test bütçesi:** T2
 **Kontroller:** linux-suite, relevant-corpus, windows-hosted, queue-check
-**Kapsam:** tests/AnalysisCoordinatorTest.cpp, tests/BoundsRuleTest.cpp, tests/SuppressionFilterTest.cpp, tests/BaselineTest.cpp, src/source_manager/InputIdentity.cpp, tests/SourceManagerTest.cpp, tests/UnitEvidenceStoreTest.cpp, tests/ConfigTest.cpp
+**Kapsam:** tests/AnalysisCoordinatorTest.cpp, tests/BoundsRuleTest.cpp, tests/SuppressionFilterTest.cpp, tests/BaselineTest.cpp, src/source_manager/InputIdentity.cpp, tests/SourceManagerTest.cpp, tests/UnitEvidenceStoreTest.cpp, tests/ConfigTest.cpp, src/rules/FdResourceRule.cpp, tests/FdResourceRuleTest.cpp, src/analyzer/RuntimeIdentity.cpp
 **Bağımlılıklar:** CS3-CH04-S02-U003
 
 ## Sonraki chapter kuyruğu — henüz yürütülemez

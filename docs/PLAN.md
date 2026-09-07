@@ -1,6 +1,6 @@
 # CodeSkeptic — CWE Ürün Planı
 
-Sürüm: 44. Eski planın devamı değil; main tabanlı yeni program.
+Sürüm: 45. Eski planın devamı değil; main tabanlı yeni program.
 
 PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.
 
@@ -588,7 +588,7 @@ PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. G
 
 **Test bütçesi:** T2
 **Kontroller:** linux-suite, relevant-corpus, windows-hosted, queue-check
-**Kapsam:** tests/AnalysisCoordinatorTest.cpp, tests/BoundsRuleTest.cpp, tests/SuppressionFilterTest.cpp, tests/BaselineTest.cpp, src/source_manager/InputIdentity.cpp, tests/SourceManagerTest.cpp, tests/UnitEvidenceStoreTest.cpp, tests/ConfigTest.cpp
+**Kapsam:** tests/AnalysisCoordinatorTest.cpp, tests/BoundsRuleTest.cpp, tests/SuppressionFilterTest.cpp, tests/BaselineTest.cpp, src/source_manager/InputIdentity.cpp, tests/SourceManagerTest.cpp, tests/UnitEvidenceStoreTest.cpp, tests/ConfigTest.cpp, src/rules/FdResourceRule.cpp, tests/FdResourceRuleTest.cpp, src/analyzer/RuntimeIdentity.cpp
 **Bağımlılıklar:** CS3-CH04-S02-U003
 
 ## CH05 — Toplu doğrulama ve endüstriyel kabul
