@@ -2,6 +2,21 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH05-S01-U003 — Yeni experimental CWE ailelerinin destek kararını kanıtla
+
+- Commit: `b32cdd162fc1a8b7e5e4a60ed18762b7bfe54dee`
+- Dal: `agent/cs3-ch05-s01-u003-experimental-qualification`
+- Implementer: `root-cs3-ch05-s01-u003-20260907`
+- Bağımsız denetçi: `independent-cs3-ch05-s01-u003-b32cdd1-20260907`
+- İnceleme SHA-256: `2b2dd8f058732b7dbdfb2b490099119fa6e902b60686d07c025e86b27f9c8bf5`
+- Tarih: 2026-09-07T09:53:26.975014+00:00
+- Sonuç: Ölçülen altküme dışında destek veya blocking terfisi yapılmaz.
+- linux-suite: PASS; SHA-256 `63a6b2ddea78f0a8769c8d9b87ea43e164b09798623ed6163231c9d46a8667e9`; `bash scripts/local_test.sh full && python3 -B tests/cwe_corpus/test_catalog.py`
+- relevant-corpus: PASS; SHA-256 `f1322fdecee15479b776ed5b3168885a547f63495f9d1b413d830a0e6a29578b`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S01-U003/qualify.sh 157724b079803c2fbe28d1de8e2c1032eb8f703f`
+- queue-check: PASS; SHA-256 `536b4f929fd1a17dbd1f8ef3c25d8e764a4de1c037da95340e6d673b99111036`; `python3 -B scripts/project_queue.py check && python3 -B scripts/project_queue.py guard --base HEAD^ && python3 -B scripts/cwe_quality.py check && bash scripts/check_docs_sync.sh && python3 -B scripts/check_capabilities_sync.py && git diff --check && git status --short --branch && git rev-parse HEAD main`
+- execution-integrity: PASS; SHA-256 `fae150c66ade621ad4f3a770efbe737c68299cf2de71fc23b0af01b9c983f553`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S01-U003/verify_evidence.py`
+- artifact-equivalence: PASS; SHA-256 `f615a62d89b93e2326badf2eaa938dedefd4fcac5e012a450b32cfa0a320c162`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S01-U003/verify_qualified_transition.py b32cdd162fc1a8b7e5e4a60ed18762b7bfe54dee`
+
 ## CS3-CH05-S01-U002 — Mevcut supported aileleri yeni motor üzerinde yeniden doğrula
 
 - Commit: `0b9442ac7e6da39f986ef9a76ed2c12cfb89d2f6`

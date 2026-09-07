@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH05-S01-U003
-
-### CS3-CH05-S01-U003 — Yeni experimental CWE ailelerinin destek kararını kanıtla
-
-**Sonuç:** Ölçülen altküme dışında destek veya blocking terfisi yapılmaz.
-
-**Kabul:**
-
-- Her yeni kuralın pozitif/negatif ve sınır fixture'ları ayrı raporlanır.
-- Declared supported altkümesinde precision en az %90, addressable recall en az %70 ve deterministic safe fixture'larda sıfır FP gerekir; daha sıkı mevcut floor korunur.
-- Başaramayan kural experimental/report-only kalır; teslim kapsamından çıkarma veya daha düşük hedef ayrıca kullanıcı kararı gerektirir.
-
-**Test bütçesi:** T2
-**Kontroller:** linux-suite, relevant-corpus, queue-check
-**Kapsam:** src/core/RuleCapabilities.def, scripts/cwe_quality.py, tests/cwe_corpus/*, docs/CWE_SCOPE.md, docs/capabilities.md, docs/quality_results.md, README.md, scripts/check_capabilities_sync.py, tests/CapabilitiesTest.cpp, tests/CapabilitiesCliTest.py
-**Bağımlılıklar:** CS3-CH05-S01-U002
+## FRONT — CS3-CH05-S02-U001
 
 ### CS3-CH05-S02-U001 — Sınırlı sanitizer/fuzz ve bozuk girdi kabulünü tamamla
 
