@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH05-S01-U002
-
-### CS3-CH05-S01-U002 — Mevcut supported aileleri yeni motor üzerinde yeniden doğrula
-
-**Sonuç:** Memory/lifetime/null/arithmetic/resource ailelerinin ölçümü mevcut executable'a bağlıdır.
-
-**Kabul:**
-
-- Tam Linux suite ve ilgili checksummed corpus çalışır; eski receipt'ler PASS yerine kullanılmaz.
-- Mevcut Juliet ve corpus floor'larının hiçbiri düşürülmez; her yeni bulgu fixture ile açıklanır.
-- Clean corpus'ta yeni yanlış pozitif veya sessiz bulgu kaybı çözülmeden iş kapanmaz.
-
-**Test bütçesi:** T2
-**Kontroller:** linux-suite, relevant-corpus, queue-check
-**Kapsam:** tests/cwe_corpus/*, scripts/cwe_quality.py, docs/quality_results.md, src/rules/*, tests/*Rule*Test.cpp
-**Bağımlılıklar:** CS3-CH05-S01-U001
+## FRONT — CS3-CH05-S01-U003
 
 ### CS3-CH05-S01-U003 — Yeni experimental CWE ailelerinin destek kararını kanıtla
 

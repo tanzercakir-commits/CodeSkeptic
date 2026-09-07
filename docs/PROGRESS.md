@@ -2,6 +2,20 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH05-S01-U002 — Mevcut supported aileleri yeni motor üzerinde yeniden doğrula
+
+- Commit: `0b9442ac7e6da39f986ef9a76ed2c12cfb89d2f6`
+- Dal: `agent/cs3-ch05-s01-u002-supported-qualification`
+- Implementer: `root-cs3-ch05-s01-u002-20260907`
+- Bağımsız denetçi: `independent-cs3-ch05-s01-u002-0b9442a-20260907`
+- İnceleme SHA-256: `76d5882ac5c8973b5e0964765a26ac8863a85b6074e9807f491890e7327fc26e`
+- Tarih: 2026-09-07T09:17:58.481294+00:00
+- Sonuç: Memory/lifetime/null/arithmetic/resource ailelerinin ölçümü mevcut executable'a bağlıdır.
+- linux-suite: PASS; SHA-256 `265fdb23c762d406e56687ddb75ec4c74e900a1746d87b184e6d443d37fcc32f`; `bash scripts/local_test.sh full && python3 -B tests/cwe_corpus/test_catalog.py`
+- relevant-corpus: PASS; SHA-256 `972480e2555b94ebba8f8b202dafc8022c0646a85df0d1f404376b85cfa690ca`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S01-U002/finish_checks.sh`
+- queue-check: PASS; SHA-256 `7b3f0c998166b05989bcfb85ef9526c731ca8fb64f38da6d9ee6d41f3041de0f`; `python3 -B scripts/project_queue.py check && python3 -B scripts/project_queue.py guard --base HEAD^ && python3 -B scripts/cwe_quality.py check && bash scripts/check_docs_sync.sh && python3 -B scripts/check_capabilities_sync.py && git diff --check && git status --short --branch && git rev-parse HEAD main`
+- artifact-equivalence: PASS; SHA-256 `3a36f7b84bea45c71a77132c1d3166dd0769ea3f2793ce1930dc94151fc2b196`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S01-U002/verify_qualified_transition.py`
+
 ## CS3-CH05-S01-U001 — Kural bazlı pozitif/negatif doğrulama kataloğunu dondur
 
 - Commit: `c828fa467ca2f530549cfa4bfa69645672ced5d6`
