@@ -33,6 +33,7 @@ class CatalogTest(unittest.TestCase):
             paths = {row["path"] for row in self.inventory["inputs"]}
             paths.update(row["path"] for row in self.catalog["cases"])
             paths.update((quality.CATALOG, quality.INVENTORY))
+            paths.add("tests/cwe_corpus/test_catalog.py")
             for name in paths:
                 destination = root / name
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -147,10 +148,11 @@ class CatalogTest(unittest.TestCase):
                 self.validate(root)
 
     def test_new_corpus_source_cannot_be_silently_omitted(self):
-        with self.copied_root() as root:
-            (root / "tests/cwe_corpus/omitted.cpp").write_text("int f(){return 0;}\n", encoding="utf-8")
-            with self.assertRaisesRegex(ValueError, "unlisted/missing corpus"):
-                self.validate(root)
+        for extension in (".cpp", ".cc", ".cxx", ".c", ".C", ".h", ".txt"):
+            with self.subTest(extension=extension), self.copied_root() as root:
+                (root / ("tests/cwe_corpus/omitted" + extension)).write_text("int f(){return 0;}\n", encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "unlisted/missing corpus"):
+                    self.validate(root)
 
     def test_fixture_byte_drift_rejected(self):
         with self.copied_root() as root:

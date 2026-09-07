@@ -177,8 +177,15 @@ def validate(root, catalog, inventory):
         paths.append(case["path"])
         roles[rule].add(role)
     require(len(ids) == len(set(ids)) and len(paths) == len(set(paths)), "duplicate fixture")
-    actual = {p.relative_to(root).as_posix() for p in (root / "tests/cwe_corpus").rglob("*.cpp")}
-    require(actual == set(paths), "unlisted/missing corpus source")
+    # Close the entire input namespace, not only the current .cpp suffix.
+    # Otherwise a new .cc/.cxx/.c file (or an unbound included header) can be
+    # omitted from both this profile and the protected pre-existing test tree.
+    expected_files = set(paths) | {CATALOG, INVENTORY, "tests/cwe_corpus/test_catalog.py"}
+    actual = {p.relative_to(root).as_posix() for p in (root / "tests/cwe_corpus").rglob("*")
+              if p.is_file() or p.is_symlink()}
+    require(actual == expected_files, "unlisted/missing corpus file")
+    for name in expected_files:
+        safe_file(root, name)
     require(all({"buggy", "safe"} <= value for value in roles.values()), "rule lacks positive/negative pair")
     return {"catalog_sha256": digest_file(root, CATALOG), "cases": len(ids),
             "roles": dict(sorted(Counter(c["role"] for c in catalog["cases"]).items())),
