@@ -293,3 +293,218 @@ On a clean matching build, run `python3 -B scripts/cwe_quality.py run --binary
 experimental`; use a different fresh directory for `--tier supported`.
 The parent must exist. Neither command refreshes expectations, promotes a family
 or replaces the full suite, independent audit and exact-head FIFO POP.
+
+## 3. Bounded resilience — CS3-CH05-S02-U001
+
+Measured source: `5651192dc150f0ea51c0e07f81d42f494b4087d1`;
+tree: `f59b93f0a4b91e9cb9eb0e8756798398f62ea480`;
+version: `0.4.9-dev+g5651192dc150`.
+Ordinary analyzer SHA-256:
+`f1192a7a05d3a065e60bac26e88cd09cadf90d4998cdf425e521881499b7fc18`;
+ordinary test executable SHA-256:
+`bb93f91c2e3ae4f635579d0eb7d519803760c9cd66713be9848bb13b06310891`.
+
+The measurements below belong to this source and these artifacts, not to a
+later documentation-only results commit. Closure additionally requires an
+independent exact-head review of that transition, unchanged executable/input
+bytes and the guarded FIFO POP. This section supersedes earlier sections'
+pending-resilience snapshot without rewriting their historical observations.
+It is not release publication or main integration.
+
+### 3.1 Required Linux lanes and deterministic boundary checks
+
+The optional resilience target links the real repository core. Fixed mutation
+recipes exercise contract/sidecar text parsing, worker codecs and identity
+decoders in-process. They do not analyze mutated C/C++ source, launch workers,
+operate on decoded filesystem paths or invoke MCP tools. This is bounded,
+deterministic robustness testing, not coverage-guided fuzzing, an accuracy
+sample or all-CWE assurance.
+
+All three required source-declared lanes actually passed, with no skipped test:
+
+| Lane | Executed tests | Suite deadline | Elapsed |
+| --- | ---: | ---: | ---: |
+| ASan + UBSan | 58 | 300 s | 5.128717 s |
+| UBSan only | 83 | 900 s | 594.647242 s |
+| Native FD-exhaustion boundary | 1 | 60 s | 0.017311 s |
+
+Their mandatory combined gate reconciled 125 distinct identities and 17
+intentional overlaps. Independent review verified discovery versus execution,
+all 55 raw command envelopes, instrumentation requirements, 110/110/109 object
+manifests and 9/9/8 binary identities respectively. ASan's 120-step build, 14
+instrumentation records and 21 execution envelopes were separately inspected.
+The three ASan mutation targets completed 13,588 executions:
+
+| Target | Seeds / strict prefixes | Executions | Accepted / rejected decoder results | Boundary checks |
+| --- | ---: | ---: | ---: | ---: |
+| Contract | 16 / 348 | 4460 | 522 / 3938 | 27 |
+| Worker | 5 / 488 | 4589 | 86 / 9092 | 1 |
+| Identity | 6 / 437 | 4539 | 307 / 8771 | 1 |
+
+Worker and identity exercise two decoders per execution; their result counts
+are not additional inputs. Rejection remains transactional and accepted values
+retain round-trip/determinism checks. No sanitizer diagnostics or nonzero
+execution exits occurred in the successful lane records. Combined receipt
+SHA-256: `5a39ad2fdf473547d33aaf642138be8a1336c2de05e4737989c5aca4d03c65cb`.
+
+Imported LLVM/Clang libraries are not retroactively instrumented. AST and normal
+worker execution are not claimed under ASan: the production address-space cap
+remains unchanged. Coordinator/cache/checkpoint/resource integration, including
+ten AST-sidecar cases, belongs to the UBSan lane. The original intentional
+zero-descriptor regression is mandatory in the native lane and full ordinary
+suite, not falsely labeled sanitizer-covered. Prior unsuccessful instrumentation
+combinations remain failed; no suppression, assertion deletion or production
+budget relaxation obtains PASS.
+
+The fixed seed is 20260907, with 4,096 mutations per target after initial seeds
+and strict prefixes. Mutation buffers are bounded to 64 KiB; deterministic
+boundary assertions are separate. Each driver has a cooperative 30-second loop,
+hard 60-second process-group deadline, 1 GiB ASan hard RSS limit and 2 MiB output
+limit per stream. Individual parser calls have no separate hard timer.
+
+Containerized C++ builds, tests and scans use the already-cached offline image,
+2 CPUs, 6 GiB, 256 PIDs and 1 GiB temporary space. The wrapper bounds configure
+and qualification invocations to 900 seconds and sanitizer builds to 1,800
+seconds, plus 15 seconds termination grace. Cleanup is best effort, not an
+attestation. Host Python checks described below are outside those container caps.
+
+### 3.2 Full ordinary suite and unchanged quality floors
+
+The normal Linux build passed all 1,583 CTest tests in 310.78 seconds and all
+1,568 single-process tests in 453.675 seconds, without skips. Independent review
+reconciled actual identities, parameterized names and interleaved PASS markers
+with discovery. The native FD regression passed separately and in both modes.
+Each full-suite invocation had a 900-second limit plus 15-second termination
+grace and the container limits above. Additional catalog, resilience-runner and
+lane-join Python checks passed 48/18/13 tests respectively on the host, outside
+those container limits. Nested CTest Python checks had no skips.
+
+All 52 frozen CWE cases produced complete one-source/one-command reports:
+25 supported cases yielded 13 TP and 27 experimental cases yielded 12 TP,
+with zero FP/FN in this fixed sample. The 22 safe cases remained clean; three
+unknown and three unsupported cases remain unscored, not proven safe. No
+experimental promotion or broader market accuracy is inferred.
+
+All seven stress profiles retained their expected results, including intentional
+template-depth refusal with incomplete coverage and exit 2. Stress reports are
+retained as embedded JSON; original temporary report-byte hashes cannot be
+independently reconstructed from that representation.
+
+Four real-world profiles over **two** projects retained exact semantic finding
+multisets and byte-identical whole-program summaries against frozen references:
+
+| Project | Plain / whole-program findings | Coverage |
+| --- | ---: | --- |
+| cJSON | 54 / 57 | 34/76 TUs analyzed, 42 skipped; explicitly partial |
+| tinyxml2 | 9 / 12 | 3/3 TUs analyzed |
+
+All 497 frozen file hashes matched; this is not 497 analyzed translation units
+or four distinct projects. Independent review inspected raw reports, execution
+envelopes, binary/version identity and comparisons without rerunning workloads.
+Isolated CWE seeds, source regressions, mutation tests, real-world profiles and
+Juliet retain separate denominators. No fixture expectation, floor, pin or tier
+was changed.
+
+### 3.3 Retained failures, timing and controlled successor freeze
+
+Historical c395 Windows run `34098971513` remains a failed single-process run.
+The survivor fixture deadline changed from 300 ms to 5,000 ms. Expected survivor
+findings, incomplete exit 2, the fixture-configured 512 MiB worker limit and
+all original assertions remain. The separate 150 ms sleeping-child kill/reap
+regression and production enforcement/defaults of 2,048 MiB and 120,000 ms are
+unchanged; the fixture limit is not the production default.
+
+The controlled timing comparison belongs to source
+`08e73e4bba6eb05d79c7037657342a112bd54a00`, not the measured source above.
+Delay/deadline pairs of 0/5,000, 600/300 and 600/5,000 ms against a 30-second
+sleeper reproduced the old fixture-budget failure and satisfied the corrected
+survivor oracle. All three analyzer reports remained incomplete with exit 2;
+only the old-budget oracle failed. Helpers, actual reports and direct-child
+lifecycle markers were independently inspected. This applies to the unchanged
+no-cache/no-checkpoint path, not proof of the original Windows scheduler's
+precise cause or a new timing experiment at the current SHA.
+
+Older hosted Linux runs `34142358094` (08e73e4) and `34151922600` (d547) remain
+failed. Only the latter contains confirmed `runtime_before:deadline` evidence:
+optional reuse proof was refused while fresh analysis stayed complete. It is
+not a worker-execution timeout or false-clean verdict. The operation consuming
+the observation budget remains unproven; no deadline-fix claim is made.
+
+The current failure-only diagnostic adds bounded fixed stage/counter/wall/thread
+CPU metadata. Stage denotes the detection point, not proven cost origin.
+Identity proofs, reason/digest semantics, cancellation checks and the five-second
+observation budget remain unchanged. Safe negatives, fresh-result validity,
+success/non-recorded silence and rejection predicates retain executed tests.
+
+Only justified protected test changes entered independently reviewed successor
+freezes before measurement. The final freeze changed two source-test hashes and
+their inventory/catalog link, not CWE fixtures or expected findings:
+
+| Protected input | Current SHA-256 |
+| --- | --- |
+| `tests/AnalysisCoordinatorTest.cpp` | `8112dc369e06d00a9f4be40a3d243ab69cc50a24cc9f8a5d466be9d827ff08f1` |
+| `tests/UnitEvidenceStoreTest.cpp` | `15c144e701a75c556b07c844e5819f97360a5478266730f2165fbef1599bfde5` |
+| `tests/cwe_corpus/regression_inventory.json` | `2d39b4f324b151f012585e50c175af3f2186c4d1b3ba3dc4868d7c1228425c75` |
+| `tests/cwe_corpus/catalog.json` | `4ed2c19615b70b41fa41413ba4269b20ab84000103fa2517964e7c02a69ac048` |
+
+All 124 protected input hashes and 52 fixture hashes passed their current
+integrity checks. Earlier freeze digests and unsuccessful results remain in
+history, not silently replaced by this successful measurement.
+
+### 3.4 Fresh hosted execution, not release publication
+
+All runs below are attempt 1 at measured source `5651192dc150`, independently
+reviewed from actual checkout, step, test and retained artifact evidence:
+
+- Linux `34157079481`: 1,583 CTest passes in 462.97 seconds and 1,568
+  single-process passes in 382.435 seconds, no skips. The previously failing
+  checkpoint passed in both modes (14.89/11.769 seconds). Smoke retained its
+  expected finding exit. Self-scan covered all 56 production C++ files with
+  zero findings and no incomplete coverage. Corpus pins stayed at 54/9 findings
+  with the cJSON partial and tinyxml2 complete coverage above. The thesis gate
+  retained zero safe-file FP, 9/15 buggy files detected and 11 findings; misses
+  are not converted to successes.
+- Windows `34157079471`: 1,525 CTest passes/one skip in 100.11 seconds and
+  1,519 single-process passes/one skip in 34.841 seconds. The survivor test
+  passed in 5.63/5.623 seconds, and the unchanged 150 ms regression passed in
+  0.17/0.165 seconds. Native/directory probes retained finding exits. Both
+  packaging paths and the masked-7-Zip fallback ran; hidden-LLVM relocation
+  produced three findings with complete coverage and exit 1. Unreadable-directory
+  and nested Python POSIX-only 5/2/8 skips remain exclusions, not PASS. Package
+  ZIP bytes were not retained in the diagnostic capture; full logs supplement
+  its tails. Template-depth refusal remains incomplete with exit 2.
+- Juliet `34157079464`: six unchanged floors passed over 2,398 sampled files,
+  with 640 rule-matched TP findings, 14 FP and 1,763 missed files. The 27
+  known-lax exclusions remain. Weekly Abseil and branch-publication steps did
+  not execute. Version/cache-key identity is not cryptographic suite pinning;
+  suite bytes and dashboard ZIP were not captured for independent hashing.
+- FIFO `34157079465`: 64 queue and six automation tests passed without skips;
+  38 completed/eight remaining records were preserved before this unit's POP.
+
+These hosted results are not executions of a later prose commit. Main remains
+`7dfd37596414c9512316093ff4fb6b039673f55f`; feature-branch synchronization is not
+a merge, signed release or general deployment.
+
+### 3.5 Evidence and reproduction
+
+Durable raw evidence is under user-state
+`codeskeptic/cwe-restart-evidence/CS3-CH05-S02-U001/`, with current measurements
+under the full measured source SHA. Earlier failed runs and controlled timing
+evidence remain separate. Key relative paths and SHA-256 digests:
+
+| Evidence | SHA-256 |
+| --- | --- |
+| `asan/results.json` | `d1d5e561311705106c997da9df2afa4e634028e77814b03c880d5b4e4ba8d5b3` |
+| `ubsan/results.json` | `23c7a47f24ce13fda81f28b0ffca29fbc89f088c85980fb4ef3e57f72d19f0e5` |
+| `native/results.json` | `8f0a4863262180618b05cc26603c12258945a289d06f0f801adab734a63aea9e` |
+| `normal/linux-suite.log` | `4e03d501ef3559ec6305c13511af54224e20305f329eef8b3818a476ef859d8f` |
+| `normal/supported/results.json` | `9b375fa76b948d1841bb651f6331325ddaefc3215a8bd4e20960340f3acc3073` |
+| `normal/experimental/results.json` | `38ca110f8797f97ae858a285a0aa735b605d1c57a17129dcff6764b6f503edb3` |
+| `normal/stress.json` | `a37775f4bcf4f21a91dc16764d2b8014aeb89f54dcca62a5417a4c1e0986e527` |
+| `realworld/results.json` | `6dfd236e381df9ab130998ef625fd57bea96968abf888f51ae60d15ea336d260` |
+
+Use the explicit profiles and mandatory join in [the resilience
+protocol](../fuzz/README.md), followed by the full ordinary Linux, frozen quality
+tiers, stress, real-world and actual hosted gates. One profile or input-integrity
+success cannot finalize the task; independent exact-head review and the guarded
+FIFO POP remain mandatory.
