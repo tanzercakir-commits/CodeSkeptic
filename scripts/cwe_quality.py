@@ -331,16 +331,17 @@ def scan_case(binary, case, source, directory, capabilities, version, timeout):
     return row
 
 
-def run_catalog(root, binary, output, revision, timeout=20):
-    """Supported lane only. Selection is frozen before any analyzer execution."""
+def run_catalog(root, binary, output, revision, timeout=20, tier="supported"):
+    """Select a complete frozen tier, never a result-dependent rule subset."""
     require(type(revision) is str and re.fullmatch(r"[0-9a-f]{40}", revision), "exact source revision required")
     require(math.isfinite(timeout) and 0 < timeout <= 60, "invalid timeout")
+    require(type(tier) is str and tier in ("supported", "experimental"), "invalid measurement tier")
     catalog, inventory = read_json(root, CATALOG), read_json(root, INVENTORY)
     integrity = validate(root, catalog, inventory)
     tree = source_checkout(root, revision)
     capabilities = registry(root)
-    selected = [case for case in catalog["cases"] if capabilities[case["rule"]]["tier"] == "supported"]
-    require(bool(selected), "empty supported selection")
+    selected = [case for case in catalog["cases"] if capabilities[case["rule"]]["tier"] == tier]
+    require(bool(selected), "empty tier selection")
     require(not binary.is_symlink() and binary.is_file(), "binary must be a regular non-symlink file")
     binary = binary.resolve(strict=True)
     # Refuse existing output even when empty. Parent resolution disallows hidden
@@ -348,7 +349,7 @@ def run_catalog(root, binary, output, revision, timeout=20):
     require(output.is_absolute() and output.parent.resolve(strict=True) == output.parent, "unsafe output parent")
     output.mkdir()
     result = {"schema": "codeskeptic-cwe-measurement/v1", "source_revision": revision,
-              "source_tree": tree, "profile": catalog["profile"], "tier": "supported", "input_integrity": integrity,
+              "source_tree": tree, "profile": catalog["profile"], "tier": tier, "input_integrity": integrity,
               "binary": str(binary), "binary_sha256": file_sha(binary), "cases": [],
               "measurement_complete": False, "regression_passed": False,
               "full_product_qualification": False}
@@ -424,12 +425,13 @@ def main():
     parser.add_argument("--out", type=Path)
     parser.add_argument("--revision")
     parser.add_argument("--timeout", type=float, default=20)
+    parser.add_argument("--tier", choices=("supported", "experimental"), default="supported")
     args = parser.parse_args()
     try:
         if args.command == "run":
             require(args.binary is not None and args.out is not None and args.revision is not None,
                     "run requires --binary, --out and --revision")
-            result = run_catalog(ROOT, args.binary, args.out, args.revision, args.timeout)
+            result = run_catalog(ROOT, args.binary, args.out, args.revision, args.timeout, args.tier)
             print(json.dumps({k: v for k, v in result.items() if k in
                               ("measurement_complete", "regression_passed", "rules", "error")}, sort_keys=True))
             return 0 if result["regression_passed"] else 1

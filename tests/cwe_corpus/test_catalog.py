@@ -250,6 +250,21 @@ class MeasurementTest(unittest.TestCase):
         self.case.update(role="safe", expected_diagnostics=[])
         self.assertEqual(self.measure()["fp"], 2)
 
+    def test_experimental_findings_are_measured_despite_exit_zero(self):
+        self.capability["tier"] = "experimental"
+        self.report.update(exit_code=0, status="report-only",
+                           finding_counts={"total": 2, "blocking": 0, "report_only": 2})
+        for diagnostic in self.report["diagnostics"]:
+            diagnostic.update(capability_tier="experimental", blocks_verdict=False)
+        self.assertEqual(self.measure()["tp"], 2)
+
+    def test_experimental_blocking_verdict_is_rejected(self):
+        self.capability["tier"] = "experimental"
+        for diagnostic in self.report["diagnostics"]:
+            diagnostic["capability_tier"] = "experimental"
+        with self.assertRaisesRegex(ValueError, "tier mismatch"):
+            self.measure()
+
     def test_unknown_and_unsupported_unscored_with_raw_observations(self):
         for role in ("unknown", "unsupported"):
             self.case.update(role=role, expected_diagnostics=None)
@@ -394,6 +409,12 @@ class MeasurementTest(unittest.TestCase):
             self.assertEqual(original, (output / "results.json").read_bytes())
 
     def test_runner_frozen_selection_and_capability_schema(self):
+        self.runner_selection("supported", 7, 25)
+
+    def test_runner_selects_all_five_experimental_cwe_families(self):
+        self.runner_selection("experimental", 5, 27)
+
+    def runner_selection(self, tier, rule_count, case_count):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             binary = directory / "binary"
@@ -414,12 +435,21 @@ class MeasurementTest(unittest.TestCase):
             with patch.object(quality.stress, "run_process", side_effect=processes), \
                     patch.object(quality, "source_checkout", return_value="b" * 40), \
                     patch.object(quality, "scan_case", side_effect=scan) as scanner:
-                result = quality.run_catalog(ROOT, binary, directory / "run", "a" * 40)
+                result = quality.run_catalog(ROOT, binary, directory / "run", "a" * 40, tier=tier)
             self.assertNotIn("error", result)
             self.assertTrue(result["regression_passed"])
             self.assertFalse(result["full_product_qualification"])
-            self.assertEqual(len(result["rules"]), 7)
+            self.assertEqual(result["tier"], tier)
+            self.assertEqual(len(result["rules"]), rule_count)
+            self.assertEqual(len(result["cases"]), case_count)
             self.assertEqual(len(result["cases"]), scanner.call_count - 1)
+
+    def test_arbitrary_rule_or_tier_subset_not_selectable(self):
+        with patch.object(quality.stress, "run_process") as process:
+            for tier in ("", "bounds", "all", ["supported"], None):
+                with self.subTest(tier=tier), self.assertRaises(ValueError):
+                    quality.run_catalog(ROOT, Path("/absent"), Path("/absent"), "a" * 40, tier=tier)
+            process.assert_not_called()
 
     def test_invalid_timeout_and_revision_fail_before_execution(self):
         with patch.object(quality.stress, "run_process") as process:
