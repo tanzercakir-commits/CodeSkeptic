@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Validate the pre-measurement CWE catalog. No scans, refresh, or promotion.
+"""Validate frozen CWE inputs or measure their isolated-rule regression profile.
 
-This is an input-integrity gate, never a product quality verdict. The later
-qualification units execute the frozen cases AND the complete source suite.
+Check never scans. Run never refreshes expectations or promotes a rule; full
+source and inherited external gates remain separate mandatory evidence lanes.
 """
 import argparse
 from collections import Counter
@@ -12,6 +12,9 @@ import math
 from pathlib import Path, PurePosixPath
 import re
 import sys
+import time
+
+import run_stress_matrix as stress
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = "tests/cwe_corpus/catalog.json"
@@ -192,11 +195,224 @@ def validate(root, catalog, inventory):
             "rules": len(wanted), "protected_inputs": len(names), "quality_measured": False}
 
 
+def measure_report(report, case, source, exit_code, version, capability):
+    """Reject untrustworthy evidence before scoring exact finding multisets."""
+    stress.validate_report(report, source, exit_code)
+    require(report.get("schema") == "codeskeptic-report/v1"
+            and report.get("tool_version") == version, "report schema/version mismatch")
+    require("baseline" in report and report["baseline"] is None
+            and report.get("suppressions") == [], "baseline/suppression active or missing")
+    require(report["complete"] is True, "incomplete measurement")
+    fingerprints = set()
+    for diag in report["diagnostics"]:
+        require(diag["rule_id"] == case["rule"], "rule isolation failed")
+        require(diag.get("capability_tier") == capability["tier"]
+                and diag["blocks_verdict"] is (capability["tier"] == "supported"), "diagnostic tier mismatch")
+        require(all(type(diag.get(k)) is int and diag[k] > 0 for k in ("line", "column"))
+                and nonempty(diag.get("message")) and nonempty(diag.get("function")), "diagnostic location/message")
+        fingerprint = diag.get("fingerprint")
+        require(type(fingerprint) is str and re.fullmatch(r"csf1-[0-9a-f]{16}", fingerprint)
+                and fingerprint not in fingerprints, "invalid/duplicate fingerprint")
+        fingerprints.add(fingerprint)
+        metadata = diag.get("rule_metadata")
+        require(type(metadata) is dict and metadata.get("cwe_mapping") == "mapped", "missing CWE metadata")
+        cwes = metadata.get("cwes")
+        require(type(cwes) is list and bool(cwes)
+                and all(type(cwe) is dict and type(cwe.get("id")) is int
+                        and cwe["id"] in capability["cwes"] for cwe in cwes)
+                and len({cwe["id"] for cwe in cwes}) == len(cwes), "invalid finding CWE")
+    if case["role"] in ("unknown", "unsupported"):
+        require(case["expected_diagnostics"] is None, "unscored expectation changed")
+        return None
+    expected = Counter(tuple(d) for d in case["expected_diagnostics"])
+    observed = Counter((d["rule_id"], d["function"]) for d in report["diagnostics"])
+    return {"tp": sum((expected & observed).values()), "fp": sum((observed - expected).values()),
+            "fn": sum((expected - observed).values()), "expected": sum(expected.values()),
+            "observed": sum(observed.values())}
+
+
+def summarize(selected, rows):
+    require(bool(selected) and len(rows) == len(selected)
+            and Counter(row["id"] for row in rows) == Counter(case["id"] for case in selected)
+            and len({row["id"] for row in rows}) == len(rows), "missing/extra/duplicate measurement row")
+    by_id = {row["id"]: row for row in rows}
+    result = {}
+    for rule in sorted({case["rule"] for case in selected}):
+        cases = [case for case in selected if case["rule"] == rule]
+        complete = all(by_id[case["id"]]["coverage_complete"] is True for case in cases)
+        metric = {key: 0 for key in ("tp", "fp", "fn", "expected", "observed")} if complete else None
+        safe_fp = 0 if complete else None
+        if complete:
+            for case in cases:
+                row_metric = by_id[case["id"]]["metrics"]
+                if case["role"] in ("buggy", "safe"):
+                    require(type(row_metric) is dict, "missing scored metrics")
+                    for key in metric:
+                        metric[key] += row_metric[key]
+                    if case["role"] == "safe":
+                        safe_fp += row_metric["fp"]
+                else:
+                    require(row_metric is None, "unscored row entered metrics")
+        result[rule] = {"cases": len(cases), "roles": dict(sorted(Counter(c["role"] for c in cases).items())),
+                        "measurement_complete": complete, "metrics": metric, "safe_fp": safe_fp,
+                        "precision": metric["tp"] / (metric["tp"] + metric["fp"])
+                        if metric and metric["tp"] + metric["fp"] else None,
+                        "addressable_recall": metric["tp"] / metric["expected"]
+                        if metric and metric["expected"] else None}
+    return result
+
+
+def file_sha(path):
+    with path.open("rb") as stream:
+        digest = hashlib.sha256()
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+        return digest.hexdigest()
+
+
+def save_json(path, value):
+    # Fresh files only. Failure evidence cannot be overwritten by a retry.
+    with path.open("x", encoding="utf-8") as stream:
+        stream.write(json.dumps(value, sort_keys=True, indent=2, allow_nan=False) + "\n")
+
+
+def checked_process(command, directory, timeout):
+    result = stress.run_process(command, directory, timeout)
+    require(not result["reason"] and not result.get("stdout_truncated")
+            and not result.get("stderr_truncated"), "process failed or output truncated: " + str(result))
+    return result
+
+
+def scan_case(binary, case, source, directory, capabilities, version, timeout):
+    directory.mkdir()
+    entry = {"directory": str(directory), "file": str(source),
+             "arguments": ["clang++", *case["compile_flags"], "-c", str(source)]}
+    save_json(directory / "compile_commands.json", [entry])
+    command = [str(binary), "--source", str(source), "--build-path", str(directory),
+               "--json", str(directory / "report.json"), "--lang", "en", "--severity", "info",
+               "--no-analysis-cache",
+               "--disable-rule", ",".join(sorted(set(capabilities) - {case["rule"]}))]
+    if case["untrusted_sources"]:
+        command += ["--untrusted-int-sources", ",".join(case["untrusted_sources"])]
+    row = {"id": case["id"], "source": str(source), "source_sha256": file_sha(source),
+           "command": command, "compile_command": entry, "timeout_seconds": timeout,
+           "coverage_complete": False, "metrics": None}
+    row["process"] = stress.run_process(command, directory, timeout)
+    try:
+        process = row["process"]
+        require(not process["reason"] and not process.get("stdout_truncated")
+                and not process.get("stderr_truncated"), "process failure/truncated output")
+        report = read_json(directory, "report.json")
+        row["report_sha256"] = digest_file(directory, "report.json")
+        row["metrics"] = measure_report(report, case, source, process["returncode"], version,
+                                        capabilities[case["rule"]])
+        require(row["source_sha256"] == file_sha(source), "source changed during scan")
+        row["coverage_complete"] = True
+    except (OSError, ValueError, TypeError, KeyError, RecursionError) as error:
+        row.update(error=str(error), metrics=None)
+    save_json(directory / "execution.json", row)
+    return row
+
+
+def run_catalog(root, binary, output, revision, timeout=20):
+    """Supported lane only. Selection is frozen before any analyzer execution."""
+    require(type(revision) is str and re.fullmatch(r"[0-9a-f]{40}", revision), "exact source revision required")
+    require(math.isfinite(timeout) and 0 < timeout <= 60, "invalid timeout")
+    catalog, inventory = read_json(root, CATALOG), read_json(root, INVENTORY)
+    integrity = validate(root, catalog, inventory)
+    capabilities = registry(root)
+    selected = [case for case in catalog["cases"] if capabilities[case["rule"]]["tier"] == "supported"]
+    require(bool(selected), "empty supported selection")
+    require(not binary.is_symlink() and binary.is_file(), "binary must be a regular non-symlink file")
+    binary = binary.resolve(strict=True)
+    # Refuse existing output even when empty. Parent resolution disallows hidden
+    # symlink redirection; the caller owns the evidence parent directory.
+    require(output.is_absolute() and output.parent.resolve(strict=True) == output.parent, "unsafe output parent")
+    output.mkdir()
+    result = {"schema": "codeskeptic-cwe-measurement/v1", "source_revision": revision,
+              "profile": catalog["profile"], "tier": "supported", "input_integrity": integrity,
+              "binary": str(binary), "binary_sha256": file_sha(binary), "cases": [],
+              "measurement_complete": False, "regression_passed": False,
+              "full_product_qualification": False}
+    started = time.monotonic()
+    try:
+        version_run = checked_process([str(binary), "--version"], output, 10)
+        result["version_process"] = version_run
+        require(version_run["returncode"] == 0, "version command failed")
+        version = version_run["stdout"].strip().removeprefix("CodeSkeptic ")
+        require(re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+-dev\+g" + revision[:12], version), "binary source version mismatch")
+        result["tool_version"] = version
+        discovery = checked_process([str(binary), "--capabilities", "--json"], output, 10)
+        result["capabilities_process"] = discovery
+        require(discovery["returncode"] == 0, "capabilities command failed")
+        actual = json.loads(discovery["stdout"], object_pairs_hook=unique,
+                            parse_constant=stress.invalid_constant, parse_float=stress.finite_float)
+        require(type(actual.get("schema_version")) is int and actual["schema_version"] == 2
+                and actual.get("product") == "CodeSkeptic" and actual.get("version") == version,
+                "capability identity mismatch")
+        rules = actual.get("rule_capabilities")
+        require(type(rules) is list and len(rules) == len(capabilities)
+                and {r["id"] for r in rules} == set(capabilities), "capability set mismatch")
+        for row in rules:
+            expected = capabilities[row["id"]]
+            require(row["tier"] == expected["tier"]
+                    and type(row.get("potential_cwes")) is list
+                    and all(type(cwe) is dict and type(cwe.get("id")) is int for cwe in row["potential_cwes"])
+                    and [cwe["id"] for cwe in row["potential_cwes"]] == expected["cwes"]
+                    and type(row.get("default_enabled")) is bool
+                    and row["default_enabled"] == (row["id"] != "assumption")
+                    and type(row.get("quality_gated")) is bool
+                    and row["quality_gated"] == (expected["tier"] == "supported")
+                    and type(row["blocks_verdict"]) is bool
+                    and row["blocks_verdict"] == (expected["tier"] == "supported"), "capability registry mismatch")
+        # Analyzed by the same embedded frontend with the exact fixture flags.
+        # No target override: verify the real default ABI before measurement.
+        probe = output / "profile.cpp"
+        with probe.open("x", encoding="utf-8") as stream:
+            stream.write('#if !defined(__linux__) || !defined(__x86_64__) || __clang_major__ != 20\n'
+                         '#error wrong frontend or platform\n#endif\n'
+                         'static_assert(__cplusplus == 201703L, "wrong language mode");\n'
+                         'static_assert(sizeof(void*) == 8 && sizeof(__SIZE_TYPE__) == 8, "wrong ABI");\n'
+                         'int f(){return 0;}\n')
+        probe_case = {"id": "profile", "rule": "null-deref", "role": "safe",
+                      "expected_diagnostics": [], "compile_flags": ["-std=c++17"], "untrusted_sources": []}
+        result["profile_probe"] = scan_case(binary, probe_case, probe, output / "profile", capabilities, version, timeout)
+        require(result["profile_probe"]["coverage_complete"]
+                and result["profile_probe"]["metrics"]["observed"] == 0, "frontend/profile probe failed")
+        for case in selected:
+            require(time.monotonic() - started < 240, "overall measurement time budget exceeded")
+            result["cases"].append(scan_case(binary, case, safe_file(root, case["path"]),
+                                             output / case["id"], capabilities, version, timeout))
+        result["rules"] = summarize(selected, result["cases"])
+        require(validate(root, read_json(root, CATALOG), read_json(root, INVENTORY)) == integrity,
+                "input integrity changed during measurement")
+        require(file_sha(binary) == result["binary_sha256"], "binary changed during measurement")
+        result["measurement_complete"] = all(r["measurement_complete"] for r in result["rules"].values())
+        result["regression_passed"] = result["measurement_complete"] and all(
+            r["metrics"]["fp"] == r["metrics"]["fn"] == 0 for r in result["rules"].values())
+    except (OSError, ValueError, TypeError, KeyError, RecursionError) as error:
+        result["error"] = str(error)
+    result["elapsed_seconds"] = round(time.monotonic() - started, 6)
+    save_json(output / "results.json", result)
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("check",))
-    parser.parse_args()
+    parser.add_argument("command", choices=("check", "run"))
+    parser.add_argument("--binary", type=Path)
+    parser.add_argument("--out", type=Path)
+    parser.add_argument("--revision")
+    parser.add_argument("--timeout", type=float, default=20)
+    args = parser.parse_args()
     try:
+        if args.command == "run":
+            require(args.binary is not None and args.out is not None and args.revision is not None,
+                    "run requires --binary, --out and --revision")
+            result = run_catalog(ROOT, args.binary, args.out, args.revision, args.timeout)
+            print(json.dumps({k: v for k, v in result.items() if k in
+                              ("measurement_complete", "regression_passed", "rules", "error")}, sort_keys=True))
+            return 0 if result["regression_passed"] else 1
         result = validate(ROOT, read_json(ROOT, CATALOG), read_json(ROOT, INVENTORY))
     except (OSError, ValueError, TypeError, KeyError) as error:
         print("CWE_CATALOG_FAIL: " + str(error), file=sys.stderr)

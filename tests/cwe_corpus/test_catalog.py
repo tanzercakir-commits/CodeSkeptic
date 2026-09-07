@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""Input-integrity regressions only; no analyzer or quality measurement."""
+"""Catalog and measurement regressions; synthetic reports are never product evidence."""
 import copy
 from contextlib import contextmanager
 import importlib.util
+import json
 from pathlib import Path
 import shutil
+import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts"))
 spec = importlib.util.spec_from_file_location("cwe_quality", ROOT / "scripts/cwe_quality.py")
 quality = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(quality)
@@ -185,6 +189,235 @@ class CatalogTest(unittest.TestCase):
                 stream.write(b"\n")
             with self.assertRaisesRegex(ValueError, "inventory digest"):
                 self.validate(root)
+
+
+class MeasurementTest(unittest.TestCase):
+    def setUp(self):
+        self.source = Path("/frozen/case.cpp")
+        self.version = "0.4.9-dev+g" + "a" * 12
+        self.case = {"id": "case", "rule": "resource-leak", "role": "buggy",
+                     "expected_diagnostics": [["resource-leak", "f"]] * 2}
+        self.capability = {"tier": "supported", "cwes": [401, 772, 775]}
+        self.report = {
+            "schema": "codeskeptic-report/v1", "tool": "CodeSkeptic",
+            "tool_version": self.version, "exit_code": 1, "complete": True,
+            "status": "findings", "baseline": None, "suppressions": [],
+            "coverage": {
+                "schema": "codeskeptic-source-coverage/v1", "complete": True,
+                "accept_partial_coverage": False, "analyze_broken_tus": False,
+                "attempted_tus": 1, "analyzed_tus": 1, "skipped_tus": 0,
+                "broken_tus": 0, "failed_tus": 0, "recovery_tus": 0,
+                "attempted_commands": 1, "analyzed_commands": 1,
+                "skipped_commands": 0, "failed_commands": 0, "incomplete_functions": 0,
+                "sources": [{"file": str(self.source), "status": "analyzed", "reason": "analyzed",
+                             "commands": 1, "analyzed_commands": 1, "skipped_commands": 0,
+                             "failed_commands": 0, "recovery_commands": 0,
+                             "prepass": {"status": "not_requested", "reason": "", "recovery_commands": 0}}]},
+            "evidence": {flag: False for flag in quality.stress.EVIDENCE_FLAGS},
+            "diagnostics": [], "total": 0, "finding_counts": {},
+        }
+        self.diagnostics(2)
+
+    def diagnostics(self, count):
+        self.report["diagnostics"] = [{"file": str(self.source), "line": 2 + i, "column": 1,
+            "function": "f", "rule_id": "resource-leak", "blocks_verdict": True,
+            "capability_tier": "supported", "fingerprint": "csf1-" + format(i, "016x"),
+            "severity": "error", "message": "Resource leak", "notes": [],
+            "rule_metadata": {"cwe_mapping": "mapped", "cwes": [{"id": 772}]}}
+            for i in range(count)]
+        self.report.update(total=count, exit_code=int(count > 0), status="findings" if count else "clean",
+                           finding_counts={"total": count, "blocking": count, "report_only": 0})
+
+    def measure(self):
+        return quality.measure_report(self.report, self.case, self.source,
+                                      self.report["exit_code"], self.version, self.capability)
+
+    def test_exact_multiplicity_and_order(self):
+        expected = {"tp": 2, "fp": 0, "fn": 0, "expected": 2, "observed": 2}
+        self.assertEqual(self.measure(), expected)
+        self.report["diagnostics"].reverse()
+        self.assertEqual(self.measure(), expected)
+
+    def test_missing_finding_is_fn_extra_finding_is_fp(self):
+        for count, tp, fp, fn in ((0, 0, 0, 2), (1, 1, 0, 1), (3, 2, 1, 0)):
+            with self.subTest(count=count):
+                self.diagnostics(count)
+                self.assertEqual(self.measure(), {"tp": tp, "fp": fp, "fn": fn,
+                                                  "expected": 2, "observed": count})
+
+    def test_safe_fp_is_not_filtered(self):
+        self.case.update(role="safe", expected_diagnostics=[])
+        self.assertEqual(self.measure()["fp"], 2)
+
+    def test_unknown_and_unsupported_unscored_with_raw_observations(self):
+        for role in ("unknown", "unsupported"):
+            self.case.update(role=role, expected_diagnostics=None)
+            self.assertIsNone(self.measure())
+            self.assertEqual(self.report["total"], 2)
+
+    def test_wrong_function_is_both_fp_and_fn(self):
+        self.report["diagnostics"][0]["function"] = "other"
+        self.assertEqual(self.measure(), {"tp": 1, "fp": 1, "fn": 1, "expected": 2, "observed": 2})
+
+    def test_envelope_inconsistencies_are_not_scored(self):
+        for key, value in (("schema", "other"), ("tool_version", "wrong"), ("total", True),
+                           ("complete", False), ("baseline", {}), ("suppressions", [{}]),
+                           ("exit_code", 2), ("status", "clean")):
+            with self.subTest(key=key):
+                before = copy.deepcopy(self.report)
+                self.report[key] = value
+                with self.assertRaises(ValueError):
+                    self.measure()
+                self.report = before
+
+    def test_missing_envelope_fields_not_defaulted_to_clean(self):
+        for key in ("baseline", "suppressions", "schema", "tool_version", "coverage", "evidence"):
+            with self.subTest(key=key):
+                before = copy.deepcopy(self.report)
+                del self.report[key]
+                with self.assertRaises(ValueError):
+                    self.measure()
+                self.report = before
+
+    def test_coverage_and_failure_evidence_rejected(self):
+        for key, value in (("analyzed_tus", True), ("analyzed_tus", 0),
+                           ("accept_partial_coverage", True), ("incomplete_functions", 1)):
+            with self.subTest(key=key):
+                before = copy.deepcopy(self.report)
+                self.report["coverage"][key] = value
+                with self.assertRaises(ValueError):
+                    self.measure()
+                self.report = before
+        self.report["evidence"]["no_rules"] = True
+        with self.assertRaises(ValueError):
+            self.measure()
+
+    def test_wrong_source_rule_tier_cwe_and_duplicate_fingerprint_rejected(self):
+        for key, value in (("file", "/other.cpp"), ("rule_id", "memory-leak"),
+                           ("capability_tier", "experimental"), ("line", True),
+                           ("fingerprint", "bad"), ("rule_metadata", {"cwe_mapping": "mapped", "cwes": [{"id": 999}]})):
+            with self.subTest(key=key):
+                before = copy.deepcopy(self.report)
+                self.report["diagnostics"][0][key] = value
+                with self.assertRaises(ValueError):
+                    self.measure()
+                self.report = before
+        self.report["diagnostics"][1]["fingerprint"] = self.report["diagnostics"][0]["fingerprint"]
+        with self.assertRaises(ValueError):
+            self.measure()
+
+    def test_aggregate_requires_every_selected_row_once(self):
+        row = {"id": "case", "coverage_complete": True, "metrics": self.measure()}
+        for rows in ([], [row, row], [dict(row, id="other")]):
+            with self.subTest(rows=rows), self.assertRaises(ValueError):
+                quality.summarize([self.case], rows)
+        with self.assertRaises(ValueError):
+            quality.summarize([], [])
+
+    def test_infrastructure_failure_nulls_rule_metrics(self):
+        row = {"id": "case", "coverage_complete": False, "metrics": None}
+        result = quality.summarize([self.case], [row])["resource-leak"]
+        self.assertFalse(result["measurement_complete"])
+        self.assertIsNone(result["metrics"])
+        self.assertIsNone(result["precision"])
+        self.assertIsNone(result["addressable_recall"])
+
+    def test_aggregate_denominators_are_per_rule(self):
+        rows = [{"id": "case", "coverage_complete": True, "metrics": self.measure()}]
+        result = quality.summarize([self.case], rows)["resource-leak"]
+        self.assertEqual(result["metrics"]["tp"], 2)
+        self.assertEqual(result["precision"], 1.0)
+        self.assertEqual(result["addressable_recall"], 1.0)
+
+    def test_scan_retains_real_exit_and_uses_explicit_isolation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            source = directory / "input.cpp"
+            source.write_text("int f(){return 0;}\n", encoding="utf-8")
+            self.case.update(compile_flags=["-std=c++17"], untrusted_sources=["read_size"])
+            self.report["coverage"]["sources"][0]["file"] = str(source)
+            for diag in self.report["diagnostics"]:
+                diag["file"] = str(source)
+            def process(command, cwd, timeout):
+                quality.save_json(cwd / "report.json", self.report)
+                self.assertEqual(command[command.index("--disable-rule") + 1], "null-deref")
+                self.assertIn("--no-analysis-cache", command)
+                self.assertIn("--untrusted-int-sources", command)
+                return {"returncode": 1, "reason": "", "stdout": "", "stderr": ""}
+            with patch.object(quality.stress, "run_process", side_effect=process):
+                result = quality.scan_case(Path("/binary"), self.case, source, directory / "run",
+                    {"resource-leak": self.capability, "null-deref": {}}, self.version, 20)
+            self.assertTrue(result["coverage_complete"])
+            self.assertEqual(result["metrics"]["tp"], 2)
+            self.assertEqual(result["process"]["returncode"], 1)
+
+    def test_scan_timeout_missing_report_and_truncation_never_clean(self):
+        for process in ({"returncode": -9, "reason": "timeout"},
+                        {"returncode": 0, "reason": "", "stdout_truncated": True},
+                        {"returncode": 0, "reason": ""}):
+            with self.subTest(process=process), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                source = directory / "input.cpp"
+                source.write_text("int f(){return 0;}\n", encoding="utf-8")
+                self.case.update(compile_flags=["-std=c++17"], untrusted_sources=[])
+                with patch.object(quality.stress, "run_process", return_value=process):
+                    result = quality.scan_case(Path("/binary"), self.case, source, directory / "run",
+                        {"resource-leak": self.capability}, self.version, 20)
+                self.assertFalse(result["coverage_complete"])
+                self.assertIsNone(result["metrics"])
+                self.assertTrue((directory / "run/execution.json").is_file())
+
+    def test_runner_identity_failure_preserves_evidence_and_refuses_overwrite(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            binary = directory / "binary"
+            binary.write_bytes(b"synthetic, never executed")
+            output = directory / "run"
+            process = {"returncode": 0, "reason": "", "stdout": "CodeSkeptic wrong\n", "stderr": ""}
+            with patch.object(quality.stress, "run_process", return_value=process):
+                result = quality.run_catalog(ROOT, binary, output, "a" * 40)
+            self.assertFalse(result["measurement_complete"])
+            self.assertIn("version mismatch", result["error"])
+            original = (output / "results.json").read_bytes()
+            with self.assertRaises(FileExistsError):
+                quality.run_catalog(ROOT, binary, output, "a" * 40)
+            self.assertEqual(original, (output / "results.json").read_bytes())
+
+    def test_runner_frozen_selection_and_capability_schema(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            binary = directory / "binary"
+            binary.write_bytes(b"synthetic, never executed")
+            capabilities = quality.registry(ROOT)
+            discovery = {"schema_version": 2, "product": "CodeSkeptic", "version": self.version,
+                "rule_capabilities": [{"id": name, "tier": row["tier"],
+                    "default_enabled": name != "assumption", "quality_gated": row["tier"] == "supported",
+                    "blocks_verdict": row["tier"] == "supported",
+                    "potential_cwes": [{"id": cwe, "name": "CWE-" + str(cwe)} for cwe in row["cwes"]]}
+                    for name, row in capabilities.items()]}
+            processes = [{"returncode": 0, "reason": "", "stdout": "CodeSkeptic " + self.version, "stderr": ""},
+                         {"returncode": 0, "reason": "", "stdout": json.dumps(discovery), "stderr": ""}]
+            def scan(binary, case, source, output, capabilities, version, timeout):
+                expected = case["expected_diagnostics"]
+                return {"id": case["id"], "coverage_complete": True, "metrics": None if expected is None else
+                        {"tp": len(expected), "fp": 0, "fn": 0, "expected": len(expected), "observed": len(expected)}}
+            with patch.object(quality.stress, "run_process", side_effect=processes), \
+                    patch.object(quality, "scan_case", side_effect=scan) as scanner:
+                result = quality.run_catalog(ROOT, binary, directory / "run", "a" * 40)
+            self.assertNotIn("error", result)
+            self.assertTrue(result["regression_passed"])
+            self.assertFalse(result["full_product_qualification"])
+            self.assertEqual(len(result["rules"]), 7)
+            self.assertEqual(len(result["cases"]), scanner.call_count - 1)
+
+    def test_invalid_timeout_and_revision_fail_before_execution(self):
+        with patch.object(quality.stress, "run_process") as process:
+            for timeout in (0, -1, 61, float("inf"), float("nan")):
+                with self.subTest(timeout=timeout), self.assertRaises(ValueError):
+                    quality.run_catalog(ROOT, Path("/absent"), Path("/absent"), "a" * 40, timeout)
+            with self.assertRaises(ValueError):
+                quality.run_catalog(ROOT, Path("/absent"), Path("/absent"), "short")
+            process.assert_not_called()
 
 
 if __name__ == "__main__":
