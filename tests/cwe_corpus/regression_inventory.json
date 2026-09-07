@@ -124,7 +124,7 @@
     },
     {
       "path": "tests/AnalysisCoordinatorTest.cpp",
-      "sha256": "3bee327e667d88055006770c460819e0b07b2fe0828d10051f332b593093f973"
+      "sha256": "8112dc369e06d00a9f4be40a3d243ab69cc50a24cc9f8a5d466be9d827ff08f1"
     },
     {
       "path": "tests/AnalysisResultTest.cpp",
@@ -356,7 +356,7 @@
     },
     {
       "path": "tests/UnitEvidenceStoreTest.cpp",
-      "sha256": "6a8b835bb1c030f9fd577dc3500a4da9f7d3530a466058c6581874f7adffe0a9"
+      "sha256": "15c144e701a75c556b07c844e5819f97360a5478266730f2165fbef1599bfde5"
     },
     {
       "path": "tests/VerdictIntegrityTest.cpp",
