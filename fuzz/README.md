@@ -70,7 +70,14 @@ python3 -B fuzz/test_runner.py
 Output parents must exist; outputs cannot be inside the checkout or overwrite
 previous evidence. Missing binaries, instrumentation, source identity, selected
 tests, output records, actual process success or sanitizer failures reject the
-gate. Zero tests/skips and incomplete output never become PASS. The supervisor
+gate. All tracked production/root test translation units and the explicit private
+fixture objects must match a closed source/target compilation manifest. Every
+object and binary is digest-bound; Ninja must report no pending build work.
+Source-declared test identities, with only two explicit Linux-inactive cases,
+must match full discovery and execution. Required families cannot disappear.
+Metadata, objects, binaries and source identity are rechecked after measurement.
+These are reproducible local build checks, not a signed producer attestation.
+Zero tests/skips and incomplete output never become PASS. The supervisor
 tests include real timeout, output overflow, nonzero/missing executables and
 quiet-descendant cleanup, plus forged/missing success-record negatives.
 

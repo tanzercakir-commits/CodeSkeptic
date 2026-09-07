@@ -8,6 +8,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import run_resilience as runner
@@ -98,23 +99,72 @@ class RunnerTest(unittest.TestCase):
                   'stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL); print(p.pid)')
         result = runner.capture([sys.executable, '-c', script], self.root, 5)
         child = int(result['stdout'])
-        try:
-            status = Path('/proc') / str(child) / 'stat'
-            # An already-killed orphan may await init's reap, but cannot run.
-            until = time.monotonic() + 1
-            while True:
-                try: state = status.read_text().split()[2]
-                except FileNotFoundError: state = 'X'
-                if state in ('Z', 'X') or time.monotonic() >= until: break
-                time.sleep(.01)
-            self.assertIn(state, ('Z', 'X'))
-        finally:
-            try: os.kill(child, signal.SIGKILL)
-            except ProcessLookupError: pass
+        status = Path('/proc') / str(child) / 'stat'
+        # An already-killed orphan may await init's reap, but cannot run.
+        # Never signal this bare PID after its owning parent has been reaped.
+        until = time.monotonic() + 1
+        while True:
+            try: state = status.read_text().split()[2]
+            except FileNotFoundError: state = 'X'
+            if state in ('Z', 'X') or time.monotonic() >= until: break
+            time.sleep(.01)
+        self.assertIn(state, ('Z', 'X'))
+
+    def test_every_source_test_identity_is_required(self):
+        for profile, count in (('asan', 69), ('ubsan', 72)):
+            names = runner.source_tests(profile)
+            self.assertEqual(len(names), count)
+            runner.validate_discovery(names, names)
+            for changed in (names[1:], names + names[:1], names[:-1] + ['Other.Test'], []):
+                with self.assertRaises(ValueError): runner.validate_discovery(changed, names)
+            for expression in runner.FILTERS[profile].split(':'):
+                reduced = [name for name in names if not runner.fnmatch.fnmatchcase(name, expression)]
+                with self.assertRaises(ValueError): runner.validate_discovery(reduced, names)
+
+    def test_compilation_requires_every_source_target_and_no_disabled_flags(self):
+        paths = ['src/contracts/ContractParser.cpp', 'src/analyzer/WorkerProtocol.cpp',
+                 'tests/WorkerProtocolTest.cpp', 'tests/ResourceBudgetTest.cpp',
+                 'tests/UnitEvidenceStoreTest.cpp', 'fuzz/ResilienceSeeds.cpp']
+        expected = runner.compilation_manifest(paths)
+        rows = [{'file': source, 'output': output, 'directory': str(self.root), 'arguments':
+                 ['clang++', '-fsanitize=undefined', '-fno-sanitize-recover=all', '-o', output, '-c', source]}
+                for source, output in sorted(expected)]
+        runner.compilation_rows(rows, expected, 'ubsan', self.root)
+        for position in range(len(rows)):
+            with self.assertRaises(ValueError): runner.compilation_rows(rows[:position]+rows[position+1:], expected, 'ubsan', self.root)
+        for changed in (rows + rows[:1], [dict(rows[0], output='wrong')] + rows[1:]):
+            with self.assertRaises(ValueError): runner.compilation_rows(changed, expected, 'ubsan', self.root)
+        for flag in ('-fno-sanitize=undefined', '-fsanitize=none', '-fsanitize-recover=all'):
+            changed = [dict(rows[0], arguments=rows[0]['arguments'] + [flag])] + rows[1:]
+            with self.assertRaises(ValueError): runner.compilation_rows(changed, expected, 'ubsan', self.root)
 
     def test_invalid_limits_refuse_before_launch(self):
         for timeout in (0, -1, 901, float('nan'), float('inf')):
             with self.assertRaises(ValueError): runner.capture(['/missing'], self.root, timeout)
+
+    def test_reduced_compile_and_test_sets_cannot_manufacture_profile_pass(self):
+        # Reproduce the original false-PASS at the actual run() boundary:
+        # only the two formerly required compile rows and one discovered test.
+        build = self.root / 'build'; build.mkdir()
+        for relative in ('src/codeskeptic', 'tests/codeskeptic_tests', 'fuzz/codeskeptic_resilience'):
+            path = build / relative; path.parent.mkdir(exist_ok=True); path.write_text('binary fixture')
+        commands = [{'file': str(runner.ROOT / path), 'command':
+                     'clang++ -fsanitize=undefined -fno-sanitize-recover=all'}
+                    for path in ('src/analyzer/WorkerProtocol.cpp', 'fuzz/ResilienceSeeds.cpp')]
+        (build / 'compile_commands.json').write_text(json.dumps(commands))
+        def observed(command, *args, **kwargs):
+            if command[0] == 'nm': text = '0000 T __ubsan_handle_add_overflow_abort\n'
+            elif '--version' in command: text = 'CodeSkeptic ' + self.version + '\n'
+            elif '--gtest_list_tests' in command: text = 'ResourceBudgetTest.\n  OnlyOne\n'
+            else: text = ('[ RUN      ] ResourceBudgetTest.OnlyOne\n'
+                          '[       OK ] ResourceBudgetTest.OnlyOne (0 ms)\n[  PASSED  ] 1 tests.\n')
+            return dict(command=command, reason='', returncode=0, stdout=text, stderr='', elapsed_seconds=.01)
+        with mock.patch.object(runner, 'checkout', return_value='a'*40), mock.patch.object(runner, 'capture', side_effect=observed):
+            try:
+                result = runner.run('ubsan', build, '0123456789ab'+'0'*28, self.root / 'evidence')
+            except ValueError:
+                return  # Strict preflight refusal is also a correct failure.
+        self.assertFalse(result['passed'], 'missing instrumented inputs and required test families became PASS')
 
 if __name__ == '__main__':
     unittest.main()
