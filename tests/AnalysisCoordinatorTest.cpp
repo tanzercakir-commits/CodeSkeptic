@@ -1277,8 +1277,12 @@ TEST_F(AnalysisCoordinatorTest, ResourceFailurePreservesSurvivorsAndCannotBeAcce
         file("b-budget-" + failure + ".cpp", "int failed(){ return 0; }\n");
         file("c-good.cpp", "int after(){ int* p=nullptr; return *p; }\n");
         database();
+        // This correctness test gives all three children the same deadline,
+        // including process startup. 300ms also timed out a healthy survivor
+        // in the retained Windows run. Keep 5s below the fixture's
+        // 30s sleep. The independent 150ms timeout/kill/reap regression remains.
         const auto result = scan(CODESKEPTIC_RESOURCE_FIXTURE_PATH,
-            {"--worker-timeout-ms", failure == "sleep" ? "300" : "5000", "--worker-memory-mb", "512",
+            {"--worker-timeout-ms", "5000", "--worker-memory-mb", "512",
              "--accept-partial-coverage", "--analyze-broken-tus"});
         EXPECT_EQ(result.result.exitCode(), 2);
         EXPECT_FALSE(result.result.complete());

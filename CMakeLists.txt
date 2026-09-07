@@ -75,3 +75,9 @@ if(CODESKEPTIC_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
+# Explicit qualification only; ordinary product/test builds stay unchanged.
+option(CODESKEPTIC_BUILD_RESILIENCE "Build bounded in-process mutation driver" OFF)
+if(CODESKEPTIC_BUILD_RESILIENCE)
+    add_subdirectory(fuzz)
+endif()

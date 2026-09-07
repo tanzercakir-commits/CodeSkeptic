@@ -1,0 +1,2 @@
+add_executable(codeskeptic_resilience ResilienceSeeds.cpp)
+target_link_libraries(codeskeptic_resilience PRIVATE codeskeptic_core)
