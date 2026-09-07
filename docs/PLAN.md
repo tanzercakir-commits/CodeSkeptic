@@ -1,6 +1,6 @@
 # CodeSkeptic — CWE Ürün Planı
 
-Sürüm: 47. Eski planın devamı değil; main tabanlı yeni program.
+Sürüm: 48. Eski planın devamı değil; main tabanlı yeni program.
 
 PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.
 
@@ -656,7 +656,7 @@ PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. G
 
 **Test bütçesi:** T2
 **Kontroller:** linux-suite, relevant-corpus, queue-check, windows-hosted
-**Kapsam:** tests/stress_corpus/*, fuzz/*, scripts/test_resilience.sh, docs/quality_results.md, tests/AnalysisCoordinatorTest.cpp, tests/ResourceBudgetTest.cpp, tests/cwe_corpus/catalog.json, tests/cwe_corpus/regression_inventory.json, CMakeLists.txt
+**Kapsam:** tests/stress_corpus/*, fuzz/*, scripts/test_resilience.sh, docs/quality_results.md, tests/AnalysisCoordinatorTest.cpp, tests/ResourceBudgetTest.cpp, tests/cwe_corpus/catalog.json, tests/cwe_corpus/regression_inventory.json, CMakeLists.txt, src/analyzer/AnalysisCoordinator.cpp
 **Bağımlılıklar:** Yok
 
 #### CS3-CH05-S02-U002 — Gerçek proje ve performans kabulünü ölç
