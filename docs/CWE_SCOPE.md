@@ -38,3 +38,26 @@ piyasa genellemesi gibi sunulmaz. Ölçüt sağlanmazsa özellik experimental ka
 Global interprocedural pointer çözümü, tüm C++ standardı, yeni diller, SaaS/GUI,
 sertifikasyon ve ölçülmemiş performans vaatleri bu programın dışında. Yeni
 gereksinimler gerekçeli plan amendment ile eklenir, sessiz kapsam büyümesi olmaz.
+
+## CH05 — ölçüm öncesi katalog
+
+`tests/cwe_corpus/catalog.json` bütün 12 CWE ailesi için kaynak üzerinden seçilmiş
+52 örneği sabitler: 24 hatalı, 22 ilgili kural açısından güvenli, 3 unknown ve
+3 unsupported. Rationale, kaynak regresyonu, compiler/source ayarı, dosya SHA-256
+ve beklenen kural/fonksiyon çokluğu her örnekte açıkça kayıtlıdır. Bu katalog
+henüz bir kalite ölçümü veya terfi kararı değildir; 7 supported / 8 experimental
+public capability düzeni değişmez. Assumption/contract/policy CWE ailesi değildir,
+ancak mevcut kaynak ve dış kontrol görevlerinden çıkarılmaz.
+
+Yeni çekirdeğin signed64 çıkarma, uint64 allocation toplamı, checked-add
+status/output kimliği, implicit narrowing, copy source/offset, scalar CFG,
+accept/pipe ve dar RAII/fdopendir davranışları katalogda temsil edilir. Tüm
+96 eski test dosyası ve 28 registry/build/runner/pin/workflow girdisi ayrıca
+hash ile bağlanmıştır. Küçük örnekler zor alias/mutation/worker/cache testlerinin
+yerine geçmez. Dosya sayısı çalıştırılmış test veya bağımsız ölçüm sayısı değildir.
+
+`docs/quality_protocol.md` iki farklı “sessiz” sonucu ayırır: kanıtlı safe negatif
+ve model/kaynak sınırı nedeniyle unknown/unsupported. İkinciler clean/TN veya
+addressable FN diye sayılmaz; bilinen kapsam dışı kusur da güvenli ilan edilmez.
+Katalog kontrolü `python3 -B scripts/cwe_quality.py check` ile yapılır. Kaynak
+ve gerçek corpus ölçümü sonraki FIFO ünitelerinin işidir; eşikler/pinler korunur.

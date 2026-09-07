@@ -1,0 +1,1022 @@
+{
+  "schema": "codeskeptic-cwe-catalog/v1",
+  "selection_base": "005b1264618dcf84aa20a5685efd9c03a26bd67f",
+  "profile": "linux-x86_64-clang20-cxx17-isolated-rule",
+  "inventory_sha256": "799484c95b33b9f0692e10d3e1e7a965e145df015c1dc3f27f54c153897955e9",
+  "rules": {
+    "alloc-size-overflow": {
+      "tier_at_selection": "experimental",
+      "cwes": [
+        131
+      ],
+      "subset": "Declared untrusted integer origins feeding native allocation sizes; constant uint64 arithmetic and exact checked-add status/output identity.",
+      "limitations": [
+        "Unknown runtime addends and opaque mutations are not safe negatives.",
+        "No claim of complete taint tracking or all allocators."
+      ]
+    },
+    "bounds": {
+      "tier_at_selection": "experimental",
+      "cwes": [
+        120,
+        125,
+        787,
+        823
+      ],
+      "subset": "Known object capacities, native copy source/destination byte sizes and representable constant offsets.",
+      "limitations": [
+        "Unknown extents/offsets, flexible tails and noncanonical signatures are not covered.",
+        "One-past formation alone is not a read/write finding."
+      ]
+    },
+    "div-by-zero": {
+      "tier_at_selection": "supported",
+      "cwes": [
+        369
+      ],
+      "subset": "Proven zero values and supported local/interprocedural propagation.",
+      "limitations": [
+        "Unknown parameters and unresolved function-pointer flow are not complete zero/nonzero proofs."
+      ]
+    },
+    "double-free": {
+      "tier_at_selection": "supported",
+      "cwes": [
+        415,
+        675
+      ],
+      "subset": "Repeated release of a tracked allocation/resource.",
+      "limitations": [
+        "Opaque alias and unmodeled custom release behavior are not universally resolved."
+      ]
+    },
+    "int-overflow": {
+      "tier_at_selection": "supported",
+      "cwes": [
+        190,
+        191,
+        681
+      ],
+      "subset": "Modeled signed arithmetic including signed64 subtraction and destination-range evidence.",
+      "limitations": [
+        "Unknown operands, unsigned wrap and arbitrary explicit casts are not all diagnosed."
+      ]
+    },
+    "memory-leak": {
+      "tier_at_selection": "supported",
+      "cwes": [
+        401,
+        772,
+        775
+      ],
+      "subset": "Local pointer acquisitions, supported releases and modeled ownership paths.",
+      "limitations": [
+        "General global/cross-TU alias escape analysis is not complete; inherited known misses remain in Juliet."
+      ]
+    },
+    "null-deref": {
+      "tier_at_selection": "supported",
+      "cwes": [
+        476
+      ],
+      "subset": "Proven null and modeled maybe-null values at dereferences.",
+      "limitations": [
+        "Unknown pointer and caller states are not universal nonnull proofs."
+      ]
+    },
+    "resource-leak": {
+      "tier_at_selection": "supported",
+      "cwes": [
+        401,
+        772,
+        775
+      ],
+      "subset": "Native descriptor/stream acquisitions, pipe outputs, accept return ownership, exact local RAII and success-conditional fdopendir.",
+      "limitations": [
+        "RAII is restricted to proven one-field owner bodies; arbitrary constructors and destructors are not ownership proofs.",
+        "Unavailable or indirect transfer destinations and unsupported aliases conservatively retain obligations."
+      ]
+    },
+    "sign-conversion": {
+      "tier_at_selection": "experimental",
+      "cwes": [
+        195,
+        681
+      ],
+      "subset": "Declared signed input conversion plus proven implicit narrowing reaching native memory sinks.",
+      "limitations": [
+        "Explicit narrowing, unknown ranges, enum/volatile/dependent storage and non-memory consumers are not this subset.",
+        "An allocation-only sink is not a general sign-conversion defect claim."
+      ]
+    },
+    "uninit-ptr": {
+      "tier_at_selection": "experimental",
+      "cwes": [
+        824
+      ],
+      "subset": "Automatic pointer initialization before dereference.",
+      "limitations": [
+        "Unknown pointer provenance and general interprocedural aliasing are not universal safety proofs."
+      ]
+    },
+    "uninit-scalar": {
+      "tier_at_selection": "experimental",
+      "cwes": [
+        457
+      ],
+      "subset": "Automatic integer/bool reads with straight-line and supported CFG joins.",
+      "limitations": [
+        "Float, array, aggregate, enum, volatile storage and unsupported sequencing/EH remain outside the subset.",
+        "Unknown external writes are not initialization or defect proofs."
+      ]
+    },
+    "use-after-free": {
+      "tier_at_selection": "supported",
+      "cwes": [
+        416,
+        672
+      ],
+      "subset": "Uses after a tracked allocation/resource release.",
+      "limitations": [
+        "General concurrent and opaque interprocedural lifetimes are outside the guarantee."
+      ]
+    }
+  },
+  "excluded_capabilities": {
+    "assumption": "Opt-in inferred assumptions have no CWE family; full existing assumption tests remain mandatory.",
+    "contract": "Contract processing has no CWE family; existing contract and real-world gates are preserved.",
+    "policy": "Project policy has no CWE family; existing policy and dogfood checks remain mandatory."
+  },
+  "cases": [
+    {
+      "id": "uninit-ptr-dereference",
+      "rule": "uninit-ptr",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/uninit-ptr-dereference.cpp",
+      "sha256": "4eef773e287450db588cfdaeda45c496365bf821d82bc9978cf47b27d0bcfb33",
+      "expected_diagnostics": [
+        [
+          "uninit-ptr",
+          "f"
+        ]
+      ],
+      "rationale": "Automatic pointer is read before assignment.",
+      "origin": "tests/UninitPointerRuleExTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "uninit-ptr-initialized",
+      "rule": "uninit-ptr",
+      "role": "safe",
+      "path": "tests/cwe_corpus/uninit-ptr-initialized.cpp",
+      "sha256": "958f92d6bbca7a40f4dc54a0606a0db8a11eb7d8c54e33390ef28f9483a2f1d9",
+      "expected_diagnostics": [],
+      "rationale": "Pointer has a live initialized pointee.",
+      "origin": "tests/UninitPointerRuleExTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "uninit-scalar-read",
+      "rule": "uninit-scalar",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/uninit-scalar-read.cpp",
+      "sha256": "1889cb14ece91946dee2ae49af1aac446f30e7dac201ea575cb1d6073ec54055",
+      "expected_diagnostics": [
+        [
+          "uninit-scalar",
+          "f"
+        ]
+      ],
+      "rationale": "Automatic integer value is read before initialization.",
+      "origin": "tests/UninitScalarRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "uninit-scalar-initialized",
+      "rule": "uninit-scalar",
+      "role": "safe",
+      "path": "tests/cwe_corpus/uninit-scalar-initialized.cpp",
+      "sha256": "bc7664163628c7fa1bc3d664e34325f1b7d61f7c322f67479a1d3784d2976d6d",
+      "expected_diagnostics": [],
+      "rationale": "Value initialized before return.",
+      "origin": "tests/UninitScalarRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "memory-leak-new",
+      "rule": "memory-leak",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/memory-leak-new.cpp",
+      "sha256": "46663a619367a8306da7dc9f96f215ca00aea87752ea7e96a02c2e79ffb2dba5",
+      "expected_diagnostics": [
+        [
+          "memory-leak",
+          "f"
+        ]
+      ],
+      "rationale": "Acquired allocation is neither released nor transferred.",
+      "origin": "tests/MemoryLeakRuleExTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "memory-leak-delete",
+      "rule": "memory-leak",
+      "role": "safe",
+      "path": "tests/cwe_corpus/memory-leak-delete.cpp",
+      "sha256": "77acb95cc313d6173dd4f343393d95d9dc4c13029ae9908364fbb485e845c7fc",
+      "expected_diagnostics": [],
+      "rationale": "One release of the acquired allocation.",
+      "origin": "tests/MemoryLeakRuleExTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "double-free-repeated",
+      "rule": "double-free",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/double-free-repeated.cpp",
+      "sha256": "adc15e93fb0cc0edcd3705c45f72eb5c48d023dab80089ec5012e7d082f82a88",
+      "expected_diagnostics": [
+        [
+          "double-free",
+          "f"
+        ]
+      ],
+      "rationale": "The same allocation is released twice.",
+      "origin": "tests/MemoryLeakRuleExTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "double-free-once",
+      "rule": "double-free",
+      "role": "safe",
+      "path": "tests/cwe_corpus/double-free-once.cpp",
+      "sha256": "77acb95cc313d6173dd4f343393d95d9dc4c13029ae9908364fbb485e845c7fc",
+      "expected_diagnostics": [],
+      "rationale": "Exactly one release.",
+      "origin": "tests/MemoryLeakRuleExTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "use-after-free-dereference",
+      "rule": "use-after-free",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/use-after-free-dereference.cpp",
+      "sha256": "be3f7a9a89afcf73b1798410282c5ea7470fe4314ddf6349e0e906fd9d079c0c",
+      "expected_diagnostics": [
+        [
+          "use-after-free",
+          "f"
+        ]
+      ],
+      "rationale": "Read follows release of the exact allocation.",
+      "origin": "tests/MemoryLeakRuleExTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "use-after-free-before-release",
+      "rule": "use-after-free",
+      "role": "safe",
+      "path": "tests/cwe_corpus/use-after-free-before-release.cpp",
+      "sha256": "1f47e71fa2cf40b2cae55ae708392dddef8c2388fb9853f5566eba311c7f7ab2",
+      "expected_diagnostics": [],
+      "rationale": "Only an independent scalar copy survives release.",
+      "origin": "tests/MemoryLeakRuleExTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "resource-leak-open",
+      "rule": "resource-leak",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/resource-leak-open.cpp",
+      "sha256": "5527ae5c1d18d2f2647d7e26473085ba0094fb0b3af637113c9623bc4b807321",
+      "expected_diagnostics": [
+        [
+          "resource-leak",
+          "f"
+        ]
+      ],
+      "rationale": "Successful acquisition path has no close.",
+      "origin": "tests/FdResourceRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "resource-leak-close",
+      "rule": "resource-leak",
+      "role": "safe",
+      "path": "tests/cwe_corpus/resource-leak-close.cpp",
+      "sha256": "679024456f69038c25dbaef9b0ce40b1a52e3ad85dafb51df4c1407883ad23f1",
+      "expected_diagnostics": [],
+      "rationale": "Each successful acquisition is closed.",
+      "origin": "tests/FdResourceRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "div-by-zero-zero",
+      "rule": "div-by-zero",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/div-by-zero-zero.cpp",
+      "sha256": "659a26c6815c0424a64e3dc703433e54f8fcaaff815942fd08ad511d784114db",
+      "expected_diagnostics": [
+        [
+          "div-by-zero",
+          "f"
+        ]
+      ],
+      "rationale": "Divisor is exactly zero.",
+      "origin": "tests/DivByZeroRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "div-by-zero-nonzero",
+      "rule": "div-by-zero",
+      "role": "safe",
+      "path": "tests/cwe_corpus/div-by-zero-nonzero.cpp",
+      "sha256": "cfd4d8036ef17706583e36091ef35e48ef67677a11fd85c054d0f6025ce515d1",
+      "expected_diagnostics": [],
+      "rationale": "Divisor is provably nonzero.",
+      "origin": "tests/DivByZeroRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "null-deref-null",
+      "rule": "null-deref",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/null-deref-null.cpp",
+      "sha256": "f37a9dca7d5ab5eb69057c9fc80e612db5ee0448a64e50d88c59a7d40fd7249f",
+      "expected_diagnostics": [
+        [
+          "null-deref",
+          "f"
+        ]
+      ],
+      "rationale": "Pointer is exactly null.",
+      "origin": "tests/NullDerefRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "null-deref-live-object",
+      "rule": "null-deref",
+      "role": "safe",
+      "path": "tests/cwe_corpus/null-deref-live-object.cpp",
+      "sha256": "89adadf6b7b5e7a3c0011bda2303eff0c61d81039b2de8878dc5ecb16c275737",
+      "expected_diagnostics": [],
+      "rationale": "Address refers to a live automatic object.",
+      "origin": "tests/NullDerefRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "bounds-one-past-read",
+      "rule": "bounds",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/bounds-one-past-read.cpp",
+      "sha256": "5e5a7446803e6a5f5b4a7181a00b01cfeeb22cb2e67779974bfb35325943fa90",
+      "expected_diagnostics": [
+        [
+          "bounds",
+          "f"
+        ]
+      ],
+      "rationale": "Index two reads one past a two-element object.",
+      "origin": "tests/BoundsRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "bounds-last-element",
+      "rule": "bounds",
+      "role": "safe",
+      "path": "tests/cwe_corpus/bounds-last-element.cpp",
+      "sha256": "42445fa5e21ab1d98c806fe5a4cef06ad3dd81dd3a4d12301817da0e2bb81a9a",
+      "expected_diagnostics": [],
+      "rationale": "Last valid element is within the object.",
+      "origin": "tests/BoundsRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "int-overflow-signed64-underflow",
+      "rule": "int-overflow",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/int-overflow-signed64-underflow.cpp",
+      "sha256": "417a25a77ac8cadc86435ac5f7b8e9fbc97ad058631a36394feb3bd20ca7b299",
+      "expected_diagnostics": [
+        [
+          "int-overflow",
+          "f"
+        ]
+      ],
+      "rationale": "Mathematical subtraction is below signed64 minimum.",
+      "origin": "tests/IntOverflowRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "int-overflow-signed64-fit",
+      "rule": "int-overflow",
+      "role": "safe",
+      "path": "tests/cwe_corpus/int-overflow-signed64-fit.cpp",
+      "sha256": "b4de5da77a1df6854d8a93353de96f519faa24758a88620a591e0c9cc6a07c7f",
+      "expected_diagnostics": [],
+      "rationale": "MIN minus negative one is representable.",
+      "origin": "tests/IntOverflowRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "int-overflow-signed64-overflow",
+      "rule": "int-overflow",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/int-overflow-signed64-overflow.cpp",
+      "sha256": "dcbf9ea996f36e9be0ecdf47a8efe289ae2e38b8f2f9f8f8e76087e67e59fe6b",
+      "expected_diagnostics": [
+        [
+          "int-overflow",
+          "f"
+        ]
+      ],
+      "rationale": "Mathematical subtraction is above signed64 maximum.",
+      "origin": "tests/IntOverflowRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "int-overflow-minimum-rhs-fit",
+      "rule": "int-overflow",
+      "role": "safe",
+      "path": "tests/cwe_corpus/int-overflow-minimum-rhs-fit.cpp",
+      "sha256": "8340887be5f509d7a810fb022a7bed92ba4a2d6af6e3b262277d47dd2a9554f5",
+      "expected_diagnostics": [],
+      "rationale": "Minus one minus MIN equals MAX; negating MIN is not a valid implementation shortcut.",
+      "origin": "tests/IntOverflowRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "sign-conversion-negative-source",
+      "rule": "sign-conversion",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/sign-conversion-negative-source.cpp",
+      "sha256": "aef82ff1224c257a3aaa0cad5e873c33a6bd585e8f7b8f2d7994b597ba67b6e9",
+      "expected_diagnostics": [
+        [
+          "sign-conversion",
+          "f"
+        ]
+      ],
+      "rationale": "Declared untrusted signed source can become a large unsigned value.",
+      "origin": "tests/SignConversionRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": [
+        "read_value"
+      ]
+    },
+    {
+      "id": "sign-conversion-nonnegative-source",
+      "rule": "sign-conversion",
+      "role": "safe",
+      "path": "tests/cwe_corpus/sign-conversion-nonnegative-source.cpp",
+      "sha256": "c9864bb5d62a90a5ec06ed5bd4aac1762590425e2929c1f6cbc21d342dd49dae",
+      "expected_diagnostics": [],
+      "rationale": "Negative source values are rejected before conversion.",
+      "origin": "tests/SignConversionRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": [
+        "read_value"
+      ]
+    },
+    {
+      "id": "sign-conversion-lossy-index",
+      "rule": "sign-conversion",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/sign-conversion-lossy-index.cpp",
+      "sha256": "e7d746d8d31bde0fa2ef51067306e7660800550eb78643e002d6d611953a7ad2",
+      "expected_diagnostics": [
+        [
+          "sign-conversion",
+          "f"
+        ]
+      ],
+      "rationale": "Proven lossy implicit narrowing reaches a native memory index.",
+      "origin": "tests/SignConversionRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "sign-conversion-fit-index",
+      "rule": "sign-conversion",
+      "role": "safe",
+      "path": "tests/cwe_corpus/sign-conversion-fit-index.cpp",
+      "sha256": "d2ce604f4156a1a9ff1e8cf5533b4e473cbf11964a0b2b5841b67bfd5d84c48c",
+      "expected_diagnostics": [],
+      "rationale": "Narrowing itself is lossless; this is not an unknown-buffer bounds guarantee.",
+      "origin": "tests/SignConversionRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "alloc-size-overflow-uint64-add",
+      "rule": "alloc-size-overflow",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/alloc-size-overflow-uint64-add.cpp",
+      "sha256": "4fa5c9eb81ccd92908514d495295f375020bb89c89d05dd596ff8c08ae2c80d7",
+      "expected_diagnostics": [
+        [
+          "alloc-size-overflow",
+          "f"
+        ]
+      ],
+      "rationale": "Declared full-width unsigned source plus constant may wrap before allocation.",
+      "origin": "tests/AllocSizeOverflowRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": [
+        "read_size"
+      ]
+    },
+    {
+      "id": "alloc-size-overflow-uint64-guard",
+      "rule": "alloc-size-overflow",
+      "role": "safe",
+      "path": "tests/cwe_corpus/alloc-size-overflow-uint64-guard.cpp",
+      "sha256": "8439ba5610088fdb0742d0da5a252379bad75e0c063096324a61d19858e25420",
+      "expected_diagnostics": [],
+      "rationale": "Exact SIZE_MAX-minus-addend guard excludes wrap.",
+      "origin": "tests/AllocSizeOverflowRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": [
+        "read_size"
+      ]
+    },
+    {
+      "id": "alloc-size-overflow-weak-guard",
+      "rule": "alloc-size-overflow",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/alloc-size-overflow-weak-guard.cpp",
+      "sha256": "103df93d14fcfa6aa5b4831b09176a840aaca77908d24623f6d7baa1cd07b694",
+      "expected_diagnostics": [
+        [
+          "alloc-size-overflow",
+          "f"
+        ]
+      ],
+      "rationale": "One-too-weak guard leaves a wrapping input.",
+      "origin": "tests/AllocSizeOverflowRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": [
+        "read_size"
+      ]
+    },
+    {
+      "id": "alloc-size-overflow-checked-add-ignored",
+      "rule": "alloc-size-overflow",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/alloc-size-overflow-checked-add-ignored.cpp",
+      "sha256": "7125c16f9d341a771996402d3b8adf55eb7ef592f96a284a73b3371c7d3fb7ca",
+      "expected_diagnostics": [
+        [
+          "alloc-size-overflow",
+          "f"
+        ]
+      ],
+      "rationale": "Overflow status is ignored and wrapped output reaches allocation.",
+      "origin": "tests/AllocSizeOverflowRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": [
+        "read_size"
+      ]
+    },
+    {
+      "id": "alloc-size-overflow-checked-add-guard",
+      "rule": "alloc-size-overflow",
+      "role": "safe",
+      "path": "tests/cwe_corpus/alloc-size-overflow-checked-add-guard.cpp",
+      "sha256": "ccab1840c163e0b71e67de245b9c55b7789f94b18647ad9ebe277a0cfb25288e",
+      "expected_diagnostics": [],
+      "rationale": "Only the successful exact checked operation supplies allocation size.",
+      "origin": "tests/AllocSizeOverflowRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": [
+        "read_size"
+      ]
+    },
+    {
+      "id": "alloc-size-overflow-checked-add-stale-status",
+      "rule": "alloc-size-overflow",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/alloc-size-overflow-checked-add-stale-status.cpp",
+      "sha256": "9ced853c18e30265c1f03848a81df15bebb40e50cd71bc96daf4d9d79cf37990",
+      "expected_diagnostics": [
+        [
+          "alloc-size-overflow",
+          "f"
+        ]
+      ],
+      "rationale": "Reassigned status cannot prove that the checked operation succeeded.",
+      "origin": "tests/AllocSizeOverflowRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": [
+        "read_size"
+      ]
+    },
+    {
+      "id": "bounds-copy-source",
+      "rule": "bounds",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/bounds-copy-source.cpp",
+      "sha256": "984ac701ede036a4ec1d106f341c34265c79934e29c15d646593976a3f878498",
+      "expected_diagnostics": [
+        [
+          "bounds",
+          "f"
+        ]
+      ],
+      "rationale": "Destination fits but source read exceeds its independent capacity.",
+      "origin": "tests/BoundsRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "bounds-copy-fit",
+      "rule": "bounds",
+      "role": "safe",
+      "path": "tests/cwe_corpus/bounds-copy-fit.cpp",
+      "sha256": "4c1a42ef17587d7757cdd986c076632cf35450e117ce4123d54eabe1f13fe77f",
+      "expected_diagnostics": [],
+      "rationale": "Both independent capacities fit the exact byte length.",
+      "origin": "tests/BoundsRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "bounds-offset-read",
+      "rule": "bounds",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/bounds-offset-read.cpp",
+      "sha256": "0ebe14cb2aa2dd9b41858705d9b04dd35fe3c0f239c1846e76a5e325532d37da",
+      "expected_diagnostics": [
+        [
+          "bounds",
+          "f"
+        ]
+      ],
+      "rationale": "Offset leaves only one source byte for a two-byte read.",
+      "origin": "tests/BoundsRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "bounds-offset-fit",
+      "rule": "bounds",
+      "role": "safe",
+      "path": "tests/cwe_corpus/bounds-offset-fit.cpp",
+      "sha256": "f12c5ffdfaafa56e237a67de90d24d09e9da59050519750e29a0db2923f56932",
+      "expected_diagnostics": [],
+      "rationale": "Exact remaining capacity after constant offset.",
+      "origin": "tests/BoundsRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "resource-leak-accept",
+      "rule": "resource-leak",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/resource-leak-accept.cpp",
+      "sha256": "81e2b4212d7b84d2f66278edb02edada2b5b711f85d8c2abf352810b6f2ee364",
+      "expected_diagnostics": [
+        [
+          "resource-leak",
+          "f"
+        ]
+      ],
+      "rationale": "Returned accepted descriptor is owned; listener remains borrowed.",
+      "origin": "tests/FdResourceRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "resource-leak-accept-close",
+      "rule": "resource-leak",
+      "role": "safe",
+      "path": "tests/cwe_corpus/resource-leak-accept-close.cpp",
+      "sha256": "d5f52537a968d74cd0ae65644bf3d20cb626e582f1459701778314e810dbad35",
+      "expected_diagnostics": [],
+      "rationale": "Accepted descriptor is closed without claiming ownership of listener.",
+      "origin": "tests/FdResourceRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "resource-leak-pipe-endpoints",
+      "rule": "resource-leak",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/resource-leak-pipe-endpoints.cpp",
+      "sha256": "1fa4348e37001289ed18c276a6cae91ccf2ff1a0344bd13d744111cecf99bff9",
+      "expected_diagnostics": [
+        [
+          "resource-leak",
+          "f"
+        ],
+        [
+          "resource-leak",
+          "f"
+        ]
+      ],
+      "rationale": "Success creates two independently unreleased endpoints.",
+      "origin": "tests/FdResourceRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "resource-leak-pipe-close",
+      "rule": "resource-leak",
+      "role": "safe",
+      "path": "tests/cwe_corpus/resource-leak-pipe-close.cpp",
+      "sha256": "b780859a86c9ec2377443724916148a56ad7cc3c1e6e190e17ef360fcb666a20",
+      "expected_diagnostics": [],
+      "rationale": "Both successful pipe outputs are closed.",
+      "origin": "tests/FdResourceRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "resource-leak-raii-unrelated",
+      "rule": "resource-leak",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/resource-leak-raii-unrelated.cpp",
+      "sha256": "17ffe84d2f8caeb8c9ef62078aac9cdd226b6dc5c00b6d37f39b1dbce421a7e2",
+      "expected_diagnostics": [
+        [
+          "resource-leak",
+          "f"
+        ]
+      ],
+      "rationale": "Proven owner cleanup cannot hide the unrelated same-function acquisition.",
+      "origin": "tests/FdResourceRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "resource-leak-raii-close",
+      "rule": "resource-leak",
+      "role": "safe",
+      "path": "tests/cwe_corpus/resource-leak-raii-close.cpp",
+      "sha256": "bea8716f6903b652fbe55f1e15f4ff4be88eaf9b3330f58256dd08771cd6b146",
+      "expected_diagnostics": [],
+      "rationale": "One-field local owner has exact matching unconditional cleanup semantics.",
+      "origin": "tests/FdResourceRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "resource-leak-fdopendir-failure",
+      "rule": "resource-leak",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/resource-leak-fdopendir-failure.cpp",
+      "sha256": "ae46ba0bd694d09b66d9d38585161e0128a962aad33ed5dd93e9f585a7983c43",
+      "expected_diagnostics": [
+        [
+          "resource-leak",
+          "f"
+        ]
+      ],
+      "rationale": "Failed fdopendir leaves the raw FD owned by the caller.",
+      "origin": "tests/FdResourceRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "resource-leak-fdopendir-cleanup",
+      "rule": "resource-leak",
+      "role": "safe",
+      "path": "tests/cwe_corpus/resource-leak-fdopendir-cleanup.cpp",
+      "sha256": "513e05221a20acd130f78b46a2303744f4222a4fada3eb91210708b0b8b53381",
+      "expected_diagnostics": [],
+      "rationale": "Failure closes raw FD; success closes stream.",
+      "origin": "tests/FdResourceRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "uninit-scalar-cfg-join",
+      "rule": "uninit-scalar",
+      "role": "buggy",
+      "path": "tests/cwe_corpus/uninit-scalar-cfg-join.cpp",
+      "sha256": "85b720049c58c68fe97df78544645546be0b0fe8cca8c3a9debc1ae835b9ec58",
+      "expected_diagnostics": [
+        [
+          "uninit-scalar",
+          "f"
+        ]
+      ],
+      "rationale": "One reachable branch leaves the automatic integer uninitialized.",
+      "origin": "tests/UninitScalarRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "uninit-scalar-cfg-both",
+      "rule": "uninit-scalar",
+      "role": "safe",
+      "path": "tests/cwe_corpus/uninit-scalar-cfg-both.cpp",
+      "sha256": "f708ec7d3d3d43fd5d92bb1306f054cf262692f73ec5128fb69859f5d4a52493",
+      "expected_diagnostics": [],
+      "rationale": "All reaching branches initialize the scalar.",
+      "origin": "tests/UninitScalarRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "uninit-scalar-unknown-external-write",
+      "rule": "uninit-scalar",
+      "role": "unknown",
+      "path": "tests/cwe_corpus/uninit-scalar-unknown-external-write.cpp",
+      "sha256": "f3dfc4f9596747312cea4c10428a160aa73bc0f52d47b723b37ca6b869cc216b",
+      "expected_diagnostics": null,
+      "rationale": "Unavailable writer may or may not initialize; no clean or FN label.",
+      "origin": "tests/UninitScalarRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "uninit-scalar-unsupported-float",
+      "rule": "uninit-scalar",
+      "role": "unsupported",
+      "path": "tests/cwe_corpus/uninit-scalar-unsupported-float.cpp",
+      "sha256": "0ac83fb5b4683480eb26e8e8f1b29062ab379f6c24c7ddc69c493d1e91d586a4",
+      "expected_diagnostics": null,
+      "rationale": "Known uninitialized read, but float storage is explicitly outside this rule's integer/bool subset. Keep as unscored known defect, never clean.",
+      "origin": "tests/UninitScalarRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "bounds-unknown-extent",
+      "rule": "bounds",
+      "role": "unknown",
+      "path": "tests/cwe_corpus/bounds-unknown-extent.cpp",
+      "sha256": "d94a6384696292a0684ac6ebfb30c30c4424d514736597c7889c034fd84ff20a",
+      "expected_diagnostics": null,
+      "rationale": "Neither object extent nor caller index is known; absence is not safety.",
+      "origin": "tests/BoundsRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "sign-conversion-unsupported-explicit-narrowing",
+      "rule": "sign-conversion",
+      "role": "unsupported",
+      "path": "tests/cwe_corpus/sign-conversion-unsupported-explicit-narrowing.cpp",
+      "sha256": "b3d7ed4db5a14cf0576944f645ddbc9c35dca772aa790b62dd8c2c9bc234bcda",
+      "expected_diagnostics": null,
+      "rationale": "Lossy explicit narrowing is deferred by this implicit-narrowing contract; not a safe control.",
+      "origin": "tests/SignConversionRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    },
+    {
+      "id": "alloc-size-overflow-unknown-addend",
+      "rule": "alloc-size-overflow",
+      "role": "unsupported",
+      "path": "tests/cwe_corpus/alloc-size-overflow-unknown-addend.cpp",
+      "sha256": "53910e5824dd385e860a8ac79f52cecfb919c88d8641091aaa67ae5f11641396",
+      "expected_diagnostics": null,
+      "rationale": "Two runtime operands are outside this frozen constant-addend subset; possible wrap is not relabeled clean.",
+      "origin": "tests/AllocSizeOverflowRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": [
+        "read_size"
+      ]
+    },
+    {
+      "id": "int-overflow-unknown-operands",
+      "rule": "int-overflow",
+      "role": "unknown",
+      "path": "tests/cwe_corpus/int-overflow-unknown-operands.cpp",
+      "sha256": "4445908ba03578a4a5646bb68e3626081534f5494253871b383e999f4582aed8",
+      "expected_diagnostics": null,
+      "rationale": "Unconstrained ordinary operands do not establish a definite overflow or safety.",
+      "origin": "tests/IntOverflowRuleTest.cpp",
+      "compile_flags": [
+        "-std=c++17"
+      ],
+      "untrusted_sources": []
+    }
+  ]
+}
