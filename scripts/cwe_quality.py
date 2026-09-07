@@ -11,6 +11,7 @@ import json
 import math
 from pathlib import Path, PurePosixPath
 import re
+import subprocess
 import sys
 import time
 
@@ -203,7 +204,7 @@ def measure_report(report, case, source, exit_code, version, capability):
     require("baseline" in report and report["baseline"] is None
             and report.get("suppressions") == [], "baseline/suppression active or missing")
     require(report["complete"] is True, "incomplete measurement")
-    fingerprints = set()
+    identities = set()
     for diag in report["diagnostics"]:
         require(diag["rule_id"] == case["rule"], "rule isolation failed")
         require(diag.get("capability_tier") == capability["tier"]
@@ -211,9 +212,13 @@ def measure_report(report, case, source, exit_code, version, capability):
         require(all(type(diag.get(k)) is int and diag[k] > 0 for k in ("line", "column"))
                 and nonempty(diag.get("message")) and nonempty(diag.get("function")), "diagnostic location/message")
         fingerprint = diag.get("fingerprint")
-        require(type(fingerprint) is str and re.fullmatch(r"csf1-[0-9a-f]{16}", fingerprint)
-                and fingerprint not in fingerprints, "invalid/duplicate fingerprint")
-        fingerprints.add(fingerprint)
+        require(type(fingerprint) is str and re.fullmatch(r"csf1-[0-9a-f]{16}", fingerprint), "invalid fingerprint")
+        # csf1 binds a rule/function/source LINE, not a unique finding. Both
+        # endpoints of a pipe can correctly share it; preserve multiplicity.
+        identity = json.dumps({key: diag.get(key) for key in
+                               ("rule_id", "file", "line", "column", "function", "message", "notes")}, sort_keys=True)
+        require(identity not in identities, "identical duplicate diagnostic")
+        identities.add(identity)
         metadata = diag.get("rule_metadata")
         require(type(metadata) is dict and metadata.get("cwe_mapping") == "mapped", "missing CWE metadata")
         cwes = metadata.get("cwes")
@@ -283,7 +288,19 @@ def checked_process(command, directory, timeout):
     return result
 
 
+def source_checkout(root, revision):
+    identity = subprocess.run(['git', '-C', str(root), 'rev-parse', '--show-toplevel', 'HEAD', 'HEAD^{tree}'],
+                              capture_output=True, text=True, timeout=10, check=True).stdout.splitlines()
+    require(len(identity) == 3 and Path(identity[0]).resolve() == root.resolve()
+            and identity[1] == revision and re.fullmatch(r"[0-9a-f]{40}", identity[2]), "checkout identity mismatch")
+    status = subprocess.run(['git', '-C', str(root), 'status', '--porcelain', '--untracked-files=all'],
+                            capture_output=True, text=True, timeout=10, check=True)
+    require(not status.stdout.strip(), "dirty checkout cannot be qualified")
+    return identity[2]
+
+
 def scan_case(binary, case, source, directory, capabilities, version, timeout):
+    require(file_sha(source) == case["sha256"], "frozen fixture digest mismatch")
     directory.mkdir()
     entry = {"directory": str(directory), "file": str(source),
              "arguments": ["clang++", *case["compile_flags"], "-c", str(source)]}
@@ -306,7 +323,7 @@ def scan_case(binary, case, source, directory, capabilities, version, timeout):
         row["report_sha256"] = digest_file(directory, "report.json")
         row["metrics"] = measure_report(report, case, source, process["returncode"], version,
                                         capabilities[case["rule"]])
-        require(row["source_sha256"] == file_sha(source), "source changed during scan")
+        require(row["source_sha256"] == file_sha(source) == case["sha256"], "source changed during scan")
         row["coverage_complete"] = True
     except (OSError, ValueError, TypeError, KeyError, RecursionError) as error:
         row.update(error=str(error), metrics=None)
@@ -320,6 +337,7 @@ def run_catalog(root, binary, output, revision, timeout=20):
     require(math.isfinite(timeout) and 0 < timeout <= 60, "invalid timeout")
     catalog, inventory = read_json(root, CATALOG), read_json(root, INVENTORY)
     integrity = validate(root, catalog, inventory)
+    tree = source_checkout(root, revision)
     capabilities = registry(root)
     selected = [case for case in catalog["cases"] if capabilities[case["rule"]]["tier"] == "supported"]
     require(bool(selected), "empty supported selection")
@@ -330,7 +348,7 @@ def run_catalog(root, binary, output, revision, timeout=20):
     require(output.is_absolute() and output.parent.resolve(strict=True) == output.parent, "unsafe output parent")
     output.mkdir()
     result = {"schema": "codeskeptic-cwe-measurement/v1", "source_revision": revision,
-              "profile": catalog["profile"], "tier": "supported", "input_integrity": integrity,
+              "source_tree": tree, "profile": catalog["profile"], "tier": "supported", "input_integrity": integrity,
               "binary": str(binary), "binary_sha256": file_sha(binary), "cases": [],
               "measurement_complete": False, "regression_passed": False,
               "full_product_qualification": False}
@@ -347,7 +365,7 @@ def run_catalog(root, binary, output, revision, timeout=20):
         require(discovery["returncode"] == 0, "capabilities command failed")
         actual = json.loads(discovery["stdout"], object_pairs_hook=unique,
                             parse_constant=stress.invalid_constant, parse_float=stress.finite_float)
-        require(type(actual.get("schema_version")) is int and actual["schema_version"] == 2
+        require(type(actual) is dict and type(actual.get("schema_version")) is int and actual["schema_version"] == 2
                 and actual.get("product") == "CodeSkeptic" and actual.get("version") == version,
                 "capability identity mismatch")
         rules = actual.get("rule_capabilities")
@@ -375,7 +393,8 @@ def run_catalog(root, binary, output, revision, timeout=20):
                          'static_assert(sizeof(void*) == 8 && sizeof(__SIZE_TYPE__) == 8, "wrong ABI");\n'
                          'int f(){return 0;}\n')
         probe_case = {"id": "profile", "rule": "null-deref", "role": "safe",
-                      "expected_diagnostics": [], "compile_flags": ["-std=c++17"], "untrusted_sources": []}
+                      "expected_diagnostics": [], "compile_flags": ["-std=c++17"], "untrusted_sources": [],
+                      "sha256": file_sha(probe)}
         result["profile_probe"] = scan_case(binary, probe_case, probe, output / "profile", capabilities, version, timeout)
         require(result["profile_probe"]["coverage_complete"]
                 and result["profile_probe"]["metrics"]["observed"] == 0, "frontend/profile probe failed")
@@ -387,10 +406,11 @@ def run_catalog(root, binary, output, revision, timeout=20):
         require(validate(root, read_json(root, CATALOG), read_json(root, INVENTORY)) == integrity,
                 "input integrity changed during measurement")
         require(file_sha(binary) == result["binary_sha256"], "binary changed during measurement")
+        require(source_checkout(root, revision) == tree, "checkout changed during measurement")
         result["measurement_complete"] = all(r["measurement_complete"] for r in result["rules"].values())
         result["regression_passed"] = result["measurement_complete"] and all(
             r["metrics"]["fp"] == r["metrics"]["fn"] == 0 for r in result["rules"].values())
-    except (OSError, ValueError, TypeError, KeyError, RecursionError) as error:
+    except (OSError, ValueError, TypeError, KeyError, RecursionError, subprocess.SubprocessError) as error:
         result["error"] = str(error)
     result["elapsed_seconds"] = round(time.monotonic() - started, 6)
     save_json(output / "results.json", result)
@@ -414,7 +434,7 @@ def main():
                               ("measurement_complete", "regression_passed", "rules", "error")}, sort_keys=True))
             return 0 if result["regression_passed"] else 1
         result = validate(ROOT, read_json(ROOT, CATALOG), read_json(ROOT, INVENTORY))
-    except (OSError, ValueError, TypeError, KeyError) as error:
+    except (OSError, ValueError, TypeError, KeyError, subprocess.SubprocessError) as error:
         print("CWE_CATALOG_FAIL: " + str(error), file=sys.stderr)
         return 2
     print(json.dumps(result, sort_keys=True))

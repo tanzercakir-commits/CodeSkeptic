@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import shutil
 import sys
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -292,7 +293,7 @@ class MeasurementTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.measure()
 
-    def test_wrong_source_rule_tier_cwe_and_duplicate_fingerprint_rejected(self):
+    def test_wrong_source_rule_tier_cwe_and_identical_duplicate_rejected(self):
         for key, value in (("file", "/other.cpp"), ("rule_id", "memory-leak"),
                            ("capability_tier", "experimental"), ("line", True),
                            ("fingerprint", "bad"), ("rule_metadata", {"cwe_mapping": "mapped", "cwes": [{"id": 999}]})):
@@ -302,9 +303,15 @@ class MeasurementTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self.measure()
                 self.report = before
-        self.report["diagnostics"][1]["fingerprint"] = self.report["diagnostics"][0]["fingerprint"]
+        self.report["diagnostics"][1] = copy.deepcopy(self.report["diagnostics"][0])
         with self.assertRaises(ValueError):
             self.measure()
+
+    def test_distinct_pipe_findings_can_share_the_line_fingerprint(self):
+        self.report["diagnostics"][1].update(
+            fingerprint=self.report["diagnostics"][0]["fingerprint"], line=2,
+            message="Resource leak: second pipe endpoint")
+        self.assertEqual(self.measure()["tp"], 2)
 
     def test_aggregate_requires_every_selected_row_once(self):
         row = {"id": "case", "coverage_complete": True, "metrics": self.measure()}
@@ -334,7 +341,8 @@ class MeasurementTest(unittest.TestCase):
             directory = Path(temporary)
             source = directory / "input.cpp"
             source.write_text("int f(){return 0;}\n", encoding="utf-8")
-            self.case.update(compile_flags=["-std=c++17"], untrusted_sources=["read_size"])
+            self.case.update(compile_flags=["-std=c++17"], untrusted_sources=["read_size"],
+                             sha256=quality.file_sha(source))
             self.report["coverage"]["sources"][0]["file"] = str(source)
             for diag in self.report["diagnostics"]:
                 diag["file"] = str(source)
@@ -359,7 +367,7 @@ class MeasurementTest(unittest.TestCase):
                 directory = Path(temporary)
                 source = directory / "input.cpp"
                 source.write_text("int f(){return 0;}\n", encoding="utf-8")
-                self.case.update(compile_flags=["-std=c++17"], untrusted_sources=[])
+                self.case.update(compile_flags=["-std=c++17"], untrusted_sources=[], sha256=quality.file_sha(source))
                 with patch.object(quality.stress, "run_process", return_value=process):
                     result = quality.scan_case(Path("/binary"), self.case, source, directory / "run",
                         {"resource-leak": self.capability}, self.version, 20)
@@ -374,13 +382,15 @@ class MeasurementTest(unittest.TestCase):
             binary.write_bytes(b"synthetic, never executed")
             output = directory / "run"
             process = {"returncode": 0, "reason": "", "stdout": "CodeSkeptic wrong\n", "stderr": ""}
-            with patch.object(quality.stress, "run_process", return_value=process):
+            with patch.object(quality.stress, "run_process", return_value=process), \
+                    patch.object(quality, "source_checkout", return_value="b" * 40):
                 result = quality.run_catalog(ROOT, binary, output, "a" * 40)
             self.assertFalse(result["measurement_complete"])
             self.assertIn("version mismatch", result["error"])
             original = (output / "results.json").read_bytes()
-            with self.assertRaises(FileExistsError):
-                quality.run_catalog(ROOT, binary, output, "a" * 40)
+            with patch.object(quality, "source_checkout", return_value="b" * 40):
+                with self.assertRaises(FileExistsError):
+                    quality.run_catalog(ROOT, binary, output, "a" * 40)
             self.assertEqual(original, (output / "results.json").read_bytes())
 
     def test_runner_frozen_selection_and_capability_schema(self):
@@ -402,6 +412,7 @@ class MeasurementTest(unittest.TestCase):
                 return {"id": case["id"], "coverage_complete": True, "metrics": None if expected is None else
                         {"tp": len(expected), "fp": 0, "fn": 0, "expected": len(expected), "observed": len(expected)}}
             with patch.object(quality.stress, "run_process", side_effect=processes), \
+                    patch.object(quality, "source_checkout", return_value="b" * 40), \
                     patch.object(quality, "scan_case", side_effect=scan) as scanner:
                 result = quality.run_catalog(ROOT, binary, directory / "run", "a" * 40)
             self.assertNotIn("error", result)
@@ -418,6 +429,33 @@ class MeasurementTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 quality.run_catalog(ROOT, Path("/absent"), Path("/absent"), "short")
             process.assert_not_called()
+
+    def test_nonfrozen_fixture_is_rejected_before_analyzer_execution(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            source = directory / "input.cpp"
+            source.write_text("int f(){return 0;}\n", encoding="utf-8")
+            self.case.update(compile_flags=["-std=c++17"], untrusted_sources=[], sha256="0" * 64)
+            with patch.object(quality.stress, "run_process") as process:
+                with self.assertRaisesRegex(ValueError, "frozen fixture"):
+                    quality.scan_case(Path("/binary"), self.case, source, directory / "run",
+                                      {"resource-leak": self.capability}, self.version, 20)
+                process.assert_not_called()
+
+    def test_full_checkout_revision_not_only_twelve_character_prefix(self):
+        actual = "a" * 40
+        wrong = "a" * 12 + "b" * 28
+        identity = subprocess.CompletedProcess([], 0, str(ROOT) + "\n" + actual + "\n" + "c" * 40 + "\n", "")
+        with patch.object(quality.subprocess, "run", return_value=identity):
+            with self.assertRaisesRegex(ValueError, "checkout identity"):
+                quality.source_checkout(ROOT, wrong)
+
+    def test_dirty_checkout_not_a_qualified_source_tree(self):
+        identity = subprocess.CompletedProcess([], 0, str(ROOT) + "\n" + "a" * 40 + "\n" + "c" * 40 + "\n", "")
+        dirty = subprocess.CompletedProcess([], 0, " M src/changed.cpp\n", "")
+        with patch.object(quality.subprocess, "run", side_effect=[identity, dirty]):
+            with self.assertRaisesRegex(ValueError, "dirty checkout"):
+                quality.source_checkout(ROOT, "a" * 40)
 
 
 if __name__ == "__main__":
