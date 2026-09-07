@@ -32,6 +32,26 @@ DiagnosticList runFdRule(const std::string& body) {
     return runRule(rule, std::string(kPosixDecls) + body);
 }
 
+const char* kProvenFdOwner = R"(
+    struct FdOwner {
+        int fd;
+        explicit FdOwner(int value) : fd(value) {}
+        ~FdOwner() { if (fd >= 0) ::close(fd); }
+        FdOwner(const FdOwner&) = delete;
+        FdOwner& operator=(const FdOwner&) = delete;
+    };
+)";
+
+const char* kDirectoryOwner = R"(
+    struct Directory;
+    extern Directory* fdopendir(int);
+    extern int closedir(Directory*);
+    struct DirectoryOwner {
+        Directory* ptr;
+        ~DirectoryOwner() { ::closedir(ptr); }
+    };
+)";
+
 void expectSingleResourceLeak(const DiagnosticList& results) {
     ASSERT_EQ(results.size(), 1u);
     EXPECT_EQ(results[0].rule_id, "resource-leak");
@@ -76,6 +96,271 @@ TEST(FdResourceRuleTest, CloseReleasesDescriptor) {
         void f(const char* p) { int fd = open(p, 0); close(fd); }
     )");
     EXPECT_TRUE(results.empty());
+}
+
+TEST(FdResourceRuleTest, ProvenLocalRaiiClosesOnNormalAndEarlyExit) {
+    for (const auto* tail : {"", "if (stop) return;", "if (stop) throw 7;"}) {
+        SCOPED_TRACE(tail);
+        EXPECT_TRUE(runFdRule(std::string(kProvenFdOwner) +
+            "void f(bool stop) { FdOwner owned(open(\"input\",0));" + tail + "}").empty());
+    }
+}
+
+TEST(FdResourceRuleTest, ProvenLocalRaiiPreservesSameFunctionUnrelatedLeak) {
+    const auto results = runFdRule(std::string(kProvenFdOwner) + R"(
+        void f() { FdOwner owned(open("input",0));
+            int unrelated_leak = open("other",0); (void)unrelated_leak; }
+    )");
+    expectSingleResourceLeak(results);
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_NE(results[0].message.find("unrelated_leak"), std::string::npos);
+}
+
+TEST(FdResourceRuleTest, UnprovenRaiiDoesNotConsumeDescriptors) {
+    for (const auto* owner : {
+        "struct Owner { explicit Owner(int) {} };",
+        "struct Owner { int fd; explicit Owner(int v):fd(v){} ~Owner(){} };",
+        "struct Owner { int fd; int other=-1; explicit Owner(int v):fd(v){} ~Owner(){close(other);} };",
+        "extern bool cleanup; struct Owner {int fd; explicit Owner(int v):fd(v){} ~Owner(){if(cleanup)close(fd);} };",
+        "struct Owner {int fd; explicit Owner(int v):fd(v){throw 7;} ~Owner(){close(fd);} };",
+        "struct Owner {int fd; explicit Owner(int v):fd(v){} int close(int){return 0;} ~Owner(){close(fd);} };"
+    }) {
+        SCOPED_TRACE(owner);
+        expectSingleResourceLeak(runFdRule(std::string(owner) +
+            "void f(){Owner owned(open(\"input\",0));}"));
+    }
+}
+
+TEST(FdResourceRuleTest, ProvenRaiiDetachRequiresActualReturn) {
+    EXPECT_TRUE(runFdRule(std::string(kProvenFdOwner) + R"(
+        int f(){FdOwner owned(open("input",0));int result=owned.fd;owned.fd=-1;return result;}
+    )").empty());
+    expectSingleResourceLeak(runFdRule(std::string(kProvenFdOwner) + R"(
+        void f(){FdOwner owned(open("input",0));owned.fd=-1;}
+    )"));
+    expectSingleResourceLeak(runFdRule(std::string(kProvenFdOwner) + R"(
+        void f(){FdOwner owned(open("input",0));int saved=owned.fd;owned.fd=-1;(void)saved;}
+    )"));
+}
+
+TEST(FdResourceRuleTest, ProvenRaiiReplacementDoesNotHideDisplacedOrigin) {
+    EXPECT_TRUE(runFdRule(std::string(kProvenFdOwner) + R"(
+        void f(){FdOwner owned(open("first",0));int next=open("next",0);close(owned.fd);owned.fd=next;}
+    )").empty());
+    expectSingleResourceLeak(runFdRule(std::string(kProvenFdOwner) + R"(
+        void f(){FdOwner owned(open("first",0));owned.fd=open("next",0);}
+    )"));
+    EXPECT_TRUE(runFdRule(std::string(kProvenFdOwner) + R"(
+        int f(int n){FdOwner owned(open("root",0));
+            for(int i=0;i<n;++i){int next=openat(owned.fd,"child",0);
+                close(owned.fd);owned.fd=next;}
+            int result=owned.fd;owned.fd=-1;return result;}
+    )").empty());
+}
+
+TEST(FdResourceRuleTest, ProvenRaiiAmbiguousFieldDoesNotHideLostOrigin) {
+    expectSingleResourceLeak(runFdRule(std::string(kProvenFdOwner) + R"(
+        void f(bool detach){FdOwner owned(open("input",0));if(detach)owned.fd=-1;}
+    )"));
+    expectSingleResourceLeak(runFdRule(std::string(kProvenFdOwner) + R"(
+        void f(bool replace){FdOwner owned(open("input",0));if(replace)owned.fd=123;}
+    )"));
+}
+
+TEST(FdResourceRuleTest, ProvenRaiiRepeatedAcquisitionKeepsDistinctLiveGenerations) {
+    for (const auto* body : {
+        "owned.fd=next;",
+        "close(owned.fd);owned.fd=-1;if(i==0)owned.fd=next;"
+    }) {
+        SCOPED_TRACE(body);
+        expectSingleResourceLeak(runFdRule(std::string(kProvenFdOwner) +
+            "void f(){FdOwner owned(-1);for(int i=0;i<3;++i){int next=open(\"input\",0);" +
+            body + "}}"));
+    }
+    EXPECT_TRUE(runFdRule(std::string(kProvenFdOwner) + R"(
+        int f(int n){FdOwner owned(open("root",0));for(int i=0;i<n;++i){
+            int next=openat(owned.fd,"child",0);
+            if(next<0)next=openat(owned.fd,"retry",0);
+            if(next<0)return -1;
+            close(owned.fd);owned.fd=next;}
+            int result=owned.fd;owned.fd=-1;return result;}
+    )").empty());
+    expectSingleResourceLeak(runFdRule(std::string(kProvenFdOwner) + R"(
+        void f(){FdOwner owned(-1);for(int i=0;i<3;++i){int next=open("input",0);
+            if(next<0){owned.fd=-1;return;}close(owned.fd);owned.fd=next;}}
+    )"));
+}
+
+TEST(FdResourceRuleTest, ProvenRaiiJoinsNeedPerOriginHolderProof) {
+    EXPECT_TRUE(runFdRule(std::string(kProvenFdOwner) + R"(
+        void f(bool choose){FdOwner owned(-1);if(choose)owned.fd=open("input",0);}
+    )").empty());
+    EXPECT_TRUE(runFdRule(std::string(kProvenFdOwner) + R"(
+        void f(bool choose){int fd=open("input",0);FdOwner owned(-1);
+            if(choose)owned.fd=fd;else close(fd);}
+    )").empty());
+    EXPECT_EQ(runFdRule(std::string(kProvenFdOwner) + R"(
+        void f(bool choose){int first=open("first",0);int second=open("second",0);
+            FdOwner owned(-1);if(choose)owned.fd=first;else owned.fd=second;}
+    )").size(),2u);
+}
+
+TEST(FdResourceRuleTest, ProvenRaiiMutableAliasesCannotRetainStaleHolderProof) {
+    expectSingleResourceLeak(runFdRule(std::string(kProvenFdOwner) + R"(
+        void clear(int* p){*p=-1;}
+        void f(){FdOwner first(open("input",0));int saved=first.fd;first.fd=-1;
+            int* alias=&saved;clear(alias);FdOwner second(saved);}
+    )"));
+    expectSingleResourceLeak(runFdRule(std::string(kDirectoryOwner) + R"(
+        void clear(Directory** p){*p=nullptr;}
+        void f(){int fd=open("input",0);Directory* stream=fdopendir(fd);
+            if(!stream){close(fd);return;}Directory** alias=&stream;clear(alias);closedir(stream);}
+    )"));
+}
+
+TEST(FdResourceRuleTest, ProvenRaiiCastedAndConstructorAliasesInvalidateProof) {
+    for (const auto* mutation : {
+        "unsigned char* bytes=reinterpret_cast<unsigned char*>(&saved);clear_bytes(bytes);",
+        "ClearPointer clear(&saved);",
+        "ClearReference clear(saved);",
+        "const int& alias=saved;const_cast<int&>(alias)=-1;"
+    }) {
+        SCOPED_TRACE(mutation);
+        expectSingleResourceLeak(runFdRule(std::string(kProvenFdOwner) + R"(
+            void clear_bytes(unsigned char* p){for(unsigned i=0;i<sizeof(int);++i)p[i]=255;}
+            struct ClearPointer{explicit ClearPointer(int* p){*p=-1;}};
+            struct ClearReference{explicit ClearReference(int& p){p=-1;}};
+            void f(){FdOwner first(open("input",0));int saved=first.fd;first.fd=-1;
+        )" + mutation + "FdOwner second(saved);}"));
+    }
+}
+
+TEST(FdResourceRuleTest, FdopendirEarlyAddressExposureCannotReacquireStaleProof) {
+    expectSingleResourceLeak(runFdRule(std::string(kDirectoryOwner) + R"(
+        void clear(Directory** p){*p=nullptr;}
+        void f(){Directory* stream=nullptr;Directory** alias=&stream;
+            int fd=open("input",0);stream=fdopendir(fd);
+            if(!stream){close(fd);return;}clear(alias);closedir(stream);}
+    )"));
+    expectSingleResourceLeak(runFdRule(std::string(kProvenFdOwner) + R"(
+        void clear(int* p){*p=-1;}
+        void f(){int saved=-1;int* alias=&saved;saved=open("input",0);
+            clear(alias);FdOwner owner(saved);}
+    )"));
+}
+
+TEST(FdResourceRuleTest, ProvenRaiiMutatedNegativeWitnessCannotEraseLiveDescriptor) {
+    expectSingleResourceLeak(runFdRule(std::string(kProvenFdOwner) + R"(
+        void set(int* p,int value){*p=value;}
+        void f(){FdOwner owner(open("input",0));int saved=owner.fd;owner.fd=-1;
+            int negative=-1;set(&negative,saved);if(saved==negative)return;close(saved);}
+    )"));
+}
+
+TEST(FdResourceRuleTest, ProvenRaiiOpaqueAssemblyOutputCannotRetainHolderProof) {
+    expectSingleResourceLeak(runFdRule(std::string(kProvenFdOwner) + R"(
+        void f(){FdOwner first(open("input",0));int saved=first.fd;first.fd=-1;
+            asm("movl $-1, %0" : "=r"(saved));FdOwner second(saved);}
+    )"));
+}
+
+TEST(FdResourceRuleTest, ProvenRaiiReferenceCaptureCannotRetainHolderProof) {
+    expectSingleResourceLeak(runFdRule(std::string(kProvenFdOwner) + R"(
+        void f(){FdOwner first(open("input",0));int saved=first.fd;first.fd=-1;
+            auto mutate=[&saved]{saved=-1;};mutate();FdOwner second(saved);}
+    )"));
+    EXPECT_TRUE(runFdRule(std::string(kProvenFdOwner) + R"(
+        void f(){FdOwner first(open("input",0));int saved=first.fd;first.fd=-1;
+            auto mutate=[saved]()mutable{saved=-1;};mutate();FdOwner second(saved);}
+    )").empty());
+}
+
+TEST(FdResourceRuleTest, ProvenRaiiRequiresDescriptorPreservingValueCopies) {
+    for (const auto* value : {"unsigned char narrowed=fd; FdOwner owner(narrowed);",
+                              "FdOwner owner(static_cast<unsigned char>(fd));"}) {
+        SCOPED_TRACE(value);
+        expectSingleResourceLeak(runFdRule(std::string(kProvenFdOwner) +
+            "void f(){int fd=open(\"input\",0);" + value + "}"));
+    }
+}
+
+TEST(FdResourceRuleTest, ProvenRaiiCaughtThrowMustNotReleaseOuterOwnerEarly) {
+    expectSingleResourceLeak(runFdRule(std::string(kProvenFdOwner) + R"(
+        void f(){FdOwner owner(open("input",0));try{throw 7;}catch(...){owner.fd=-1;}}
+    )"));
+}
+
+TEST(FdResourceRuleTest, ProvenRaiiNegativeSelectedHandleCannotEraseUnselectedObligations) {
+    EXPECT_EQ(runFdRule(std::string(kProvenFdOwner) + R"(
+        void f(bool choose){int first=open("first",0);int second=open("second",0);
+            int selected;if(choose)selected=first;else selected=second;
+            FdOwner owner(-1);owner.fd=selected;
+            if(selected>=0)__builtin_trap();}
+    )").size(),2u);
+    EXPECT_EQ(runFdRule(std::string(kProvenFdOwner) + R"(
+        void f(bool choose){int first=open("first",0);int second=open("second",0);
+            int selected;if(choose)selected=first;else selected=second;
+            FdOwner owner(-1);owner.fd=selected;int negative=-1;
+            if(selected!=negative)__builtin_trap();}
+    )").size(),2u);
+}
+
+TEST(FdResourceRuleTest, FdopendirSuccessfulStreamAndFailedRawFdBothRequireCleanup) {
+    for (const auto* cleanup : {"closedir(stream);", "DirectoryOwner owner{stream};"}) {
+        SCOPED_TRACE(cleanup);
+        EXPECT_TRUE(runFdRule(std::string(kDirectoryOwner) +
+            "void f(){int fd=open(\"input\",0);Directory* stream=fdopendir(fd);"
+            "if(!stream){close(fd);return;}" + cleanup + "}").empty());
+        expectSingleResourceLeak(runFdRule(std::string(kDirectoryOwner) +
+            "void f(){int fd=open(\"input\",0);Directory* stream=fdopendir(fd);"
+            "if(!stream)return;" + cleanup + "}"));
+    }
+    expectSingleResourceLeak(runFdRule(std::string(kDirectoryOwner) + R"(
+        void f(){int fd=open("input",0);Directory* stream=fdopendir(fd);
+            if(!stream){close(fd);return;}(void)stream;}
+    )"));
+}
+
+TEST(FdResourceRuleTest, FdopendirRaiiPreservesSameFunctionUnrelatedLeak) {
+    const auto results=runFdRule(std::string(kDirectoryOwner) + R"(
+        void f(){int fd=open("input",0);Directory* stream=fdopendir(fd);
+            if(!stream){close(fd);return;}DirectoryOwner owner{stream};
+            int unrelated_leak=open("other",0);(void)unrelated_leak;}
+    )");
+    expectSingleResourceLeak(results);
+    ASSERT_EQ(results.size(),1u);
+    EXPECT_NE(results[0].message.find("unrelated_leak"),std::string::npos);
+}
+
+TEST(FdResourceRuleTest, FdopendirBindingCannotBeRedirectedByReassignment) {
+    expectSingleResourceLeak(runFdRule(std::string(kDirectoryOwner) + R"(
+        void f(Directory* other){int fd=open("input",0);Directory* stream=fdopendir(fd);
+            if(!stream){close(fd);return;}stream=other;closedir(stream);}
+    )"));
+    const auto results=runFdRule(std::string(kDirectoryOwner) + R"(
+        void f(){int fd=open("first",0);Directory* stream=fdopendir(fd);
+            if(!stream){close(fd);return;}fd=open("second",0);closedir(stream);}
+    )");
+    expectSingleResourceLeak(results);
+}
+
+TEST(FdResourceRuleTest, FdopendirUnprovenAggregateAndLookalikesKeepObligation) {
+    for (const auto* owner : {
+        "struct Owner {Directory* ptr; ~Owner(){} };",
+        "extern bool cleanup; struct Owner {Directory* ptr; ~Owner(){if(cleanup)closedir(ptr);} };",
+        "struct Owner {Directory* ptr; int closedir(Directory*){return 0;} ~Owner(){closedir(ptr);} };"
+    }) {
+        SCOPED_TRACE(owner);
+        expectSingleResourceLeak(runFdRule(std::string(kDirectoryOwner) + owner + R"(
+            void f(){int fd=open("input",0);Directory* stream=fdopendir(fd);
+                if(!stream){close(fd);return;}Owner owner{stream};}
+        )"));
+    }
+    expectSingleResourceLeak(runFdRule(std::string(kDirectoryOwner) + R"(
+        namespace fake {extern Directory* fdopendir(int);}
+        void f(){int fd=open("input",0);Directory* stream=fake::fdopendir(fd);
+            if(!stream){close(fd);return;}closedir(stream);}
+    )"));
 }
 
 TEST(FdResourceRuleTest, PipePairHasTwoIndependentOwnershipObligations) {

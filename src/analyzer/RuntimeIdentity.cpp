@@ -88,7 +88,7 @@ std::string readProc(const std::string& path, std::size_t limit, const Budget& b
     return result;
 }
 std::uint64_t startupCutoff(const Budget& budget) {
-    const auto process = readProc("/proc/self/stat", 65536, budget);
+    const auto process = readProc("/proc/self/stat", 65536, budget); // codeskeptic-disable-line policy -- Linux kernel process-start interface, not an installation path.
     const auto close = process.rfind(')');
     require(close != std::string::npos, "runtime_process_stat_invalid");
     std::istringstream fields(process.substr(close + 1));
@@ -98,7 +98,7 @@ std::uint64_t startupCutoff(const Budget& budget) {
     const auto ticks = number(token);
     const auto frequency = ::sysconf(_SC_CLK_TCK);
     require(frequency > 0, "runtime_clock_frequency_unavailable");
-    std::istringstream system(readProc("/proc/stat", kMapsLimit, budget));
+    std::istringstream system(readProc("/proc/stat", kMapsLimit, budget)); // codeskeptic-disable-line policy -- Linux kernel boot-time interface, not an installation path.
     std::string line;
     std::uint64_t boot = 0;
     while (std::getline(system, line)) if (line.rfind("btime ", 0) == 0) {
@@ -144,10 +144,10 @@ std::string hashMapping(const RuntimeMapping& mapping, std::uint64_t cutoff,
             [&](const auto& range) { return range.first <= phdr && phdr < range.second; }),
             "runtime_mapping_replaced");
         std::array<char, 4097> target{};
-        const auto length = ::readlink("/proc/self/exe", target.data(), target.size());
+        const auto length = ::readlink("/proc/self/exe", target.data(), target.size()); // codeskeptic-disable-line policy -- Kernel executable identity handle, not a machine-specific path.
         require(length > 0 && static_cast<std::size_t>(length) < target.size() &&
                 std::string(target.data(), length) == mapping.path, "runtime_mapping_replaced");
-        executable = std::make_unique<Descriptor>("/proc/self/exe");
+        executable = std::make_unique<Descriptor>("/proc/self/exe"); // codeskeptic-disable-line policy -- Independently bind the kernel executable handle; no install-path assumption.
         struct stat actual{};
         require(::fstat(executable->get(), &actual) == 0 && actual.st_dev == before.st_dev &&
                 actual.st_ino == before.st_ino && actual.st_ino == mapping.inode &&
@@ -241,7 +241,7 @@ RuntimeIdentity observeRuntimeIdentity(const std::function<bool()>& cancelled) {
     try {
         Budget budget{cancelled};
         const auto cutoff = startupCutoff(budget);
-        const auto maps = readProc("/proc/self/maps", kMapsLimit, budget);
+        const auto maps = readProc("/proc/self/maps", kMapsLimit, budget); // codeskeptic-disable-line policy -- Linux kernel mapped-module inventory, not an installation path.
         std::vector<RuntimeMapping> modules;
         std::string error;
         require(parseRuntimeMappings(maps, modules, error), error.c_str());
@@ -266,7 +266,7 @@ RuntimeIdentity observeRuntimeIdentity(const std::function<bool()>& cancelled) {
         // Comparing parsed file identities avoids harmless stack/heap/ASLR map
         // changes while refusing modules added, removed, or replaced mid-capture.
         std::vector<RuntimeMapping> after;
-        require(parseRuntimeMappings(readProc("/proc/self/maps", kMapsLimit, budget), after, error), error.c_str());
+        require(parseRuntimeMappings(readProc("/proc/self/maps", kMapsLimit, budget), after, error), error.c_str()); // codeskeptic-disable-line policy -- Recheck the same kernel mapping inventory for mid-capture changes.
         require(after.size() == modules.size(), "runtime_mapping_set_changed");
         for (std::size_t i = 0; i < modules.size(); ++i)
             require(std::tie(after[i].path, after[i].device_major, after[i].device_minor, after[i].inode) ==

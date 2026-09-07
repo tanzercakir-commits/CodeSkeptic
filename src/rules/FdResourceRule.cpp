@@ -10,6 +10,7 @@
 #include <clang/AST/Attr.h>
 #include <clang/AST/Decl.h>
 #include <clang/AST/Expr.h>
+#include <clang/AST/ExprCXX.h>
 #include <clang/AST/ParentMapContext.h>
 #include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/AST/Stmt.h>
@@ -37,21 +38,32 @@ struct Origin {
     Origin(const CallExpr* value = nullptr, unsigned slot = 0) : call(value), output(slot) {}
     explicit operator bool() const { return call != nullptr; }
     const CallExpr* operator->() const { return call; }
-    bool operator==(const Origin& other) const { return call == other.call && output == other.output; }
+    bool operator==(const Origin& other) const {
+        return call == other.call && output == other.output;
+    }
     bool operator<(const Origin& other) const {
-        return call == other.call ? output < other.output : std::less<const CallExpr*>{}(call, other.call);
+        if (call != other.call) return std::less<const CallExpr*>{}(call, other.call);
+        return output < other.output;
     }
 };
 
 struct Slot {
     const VarDecl* variable = nullptr;
     long long index = -1; // -1 is the scalar variable itself.
-    Slot(const VarDecl* var = nullptr, long long element = -1) : variable(var), index(element) {}
-    explicit operator bool() const { return variable != nullptr; }
-    bool operator==(const Slot& other) const { return variable == other.variable && index == other.index; }
+    const FieldDecl* field = nullptr;
+    const CallExpr* expression = nullptr; // The current evaluated acquisition value.
+    Slot(const VarDecl* var = nullptr, long long element = -1, const FieldDecl* member = nullptr)
+        : variable(var), index(element), field(member) {}
+    static Slot acquired(const CallExpr* call) { Slot slot; slot.expression = call; return slot; }
+    explicit operator bool() const { return variable != nullptr || expression != nullptr; }
+    bool operator==(const Slot& other) const {
+        return variable == other.variable && index == other.index && field == other.field &&
+            expression == other.expression;
+    }
     bool operator<(const Slot& other) const {
-        return variable == other.variable ? index < other.index :
-            std::less<const VarDecl*>{}(variable, other.variable);
+        if (expression != other.expression) return std::less<const CallExpr*>{}(expression, other.expression);
+        if (variable != other.variable) return std::less<const VarDecl*>{}(variable, other.variable);
+        return index == other.index ? std::less<const FieldDecl*>{}(field, other.field) : index < other.index;
     }
 };
 
@@ -89,6 +101,25 @@ struct PipeStatus {
     }
 };
 
+struct DirectoryStream {
+    const CallExpr* acquisition = nullptr;
+    bool nonnull = false;
+    bool operator==(const DirectoryStream& other) const {
+        return acquisition == other.acquisition && nonnull == other.nonnull;
+    }
+};
+
+using HolderSet = std::set<Slot>;
+using LiveInstances = std::set<HolderSet>;
+
+// A set describes the proven aliases of ONE possible live instance. Union
+// preserves alternatives and simultaneously live instances at loop joins;
+// no relative allocation-age alignment is assumed. An empty set is a lost
+// instance, never dischargeable by a later unrelated close.
+void boundInstances(LiveInstances& instances) {
+    if (instances.size() > 64) instances = LiveInstances{HolderSet{}};
+}
+
 struct State {
     std::map<Origin, ResourceLife> resources;
     std::map<Slot, Binding> bindings;
@@ -98,6 +129,13 @@ struct State {
     std::set<const VarDecl*> definitelyNegative;
     std::map<const VarDecl*, const VarDecl*> valueCopies;
     std::map<Origin, std::set<const VarDecl*>> negativeWitnesses;
+    std::map<const VarDecl*, const FieldDecl*> ownerFields;
+    std::map<Slot, DirectoryStream> streams;
+    std::set<Origin> managedSites;
+    std::map<Origin, LiveInstances> holders;
+    // Address/reference exposure can outlive the current value (or occur
+    // before acquisition). Such storage is never an authoritative holder.
+    std::set<Slot> exposedSlots;
 
     bool operator==(const State& other) const {
         return resources == other.resources && bindings == other.bindings &&
@@ -105,7 +143,9 @@ struct State {
                valueCopies == other.valueCopies &&
                negativeWitnesses == other.negativeWitnesses &&
                arrayPointers == other.arrayPointers && pipeStatuses == other.pipeStatuses &&
-               pipePrevious == other.pipePrevious;
+               pipePrevious == other.pipePrevious && ownerFields == other.ownerFields &&
+               streams == other.streams && managedSites == other.managedSites && holders == other.holders &&
+               exposedSlots == other.exposedSlots;
     }
     bool operator!=(const State& other) const { return !(*this == other); }
 };
@@ -129,6 +169,28 @@ State mergeStates(const State& a, const State& b) {
     for (Origin origin : origins)
         out.resources[origin] =
             mergeLife(resourceLife(a, origin), resourceLife(b, origin));
+
+    out.managedSites = a.managedSites;
+    out.managedSites.insert(b.managedSites.begin(), b.managedSites.end());
+    out.exposedSlots = a.exposedSlots;
+    out.exposedSlots.insert(b.exposedSlots.begin(), b.exposedSlots.end());
+    for (const auto& [var, field] : a.ownerFields) {
+        const auto found = b.ownerFields.find(var);
+        if (found != b.ownerFields.end() && found->second == field) out.ownerFields[var] = field;
+    }
+    for (const auto& [slot, stream] : a.streams) {
+        const auto found = b.streams.find(slot);
+        if (found != b.streams.end() && found->second.acquisition == stream.acquisition)
+            out.streams[slot] = {stream.acquisition, stream.nonnull && found->second.nonnull};
+    }
+    for (Origin origin : origins) {
+        const auto ai = a.holders.find(origin), bi = b.holders.find(origin);
+        auto& instances = out.holders[origin];
+        if (ai != a.holders.end()) instances.insert(ai->second.begin(), ai->second.end());
+        if (bi != b.holders.end()) instances.insert(bi->second.begin(), bi->second.end());
+        boundInstances(instances);
+        if (out.managedSites.count(origin) && !instances.empty()) out.resources[origin] = ResourceLife::Open;
+    }
 
     std::set<Slot> vars;
     for (const auto& [var, binding] : a.bindings) {
@@ -398,6 +460,13 @@ Slot valueSlot(const Expr* expr, const State& state, unsigned depth) {
         return found == state.arrayPointers.end() ? Slot{} : pointedValueSlot(found->second);
     }
     expr = expr->IgnoreParenImpCasts();
+    if (const auto* member = dyn_cast<MemberExpr>(expr); member && !member->isArrow()) {
+        const auto* object = asVar(member->getBase());
+        const auto found = state.ownerFields.find(object);
+        if (found != state.ownerFields.end() && found->second == member->getMemberDecl())
+            return {object, -1, found->second};
+        return {};
+    }
     if (const auto* assignment = dyn_cast<BinaryOperator>(expr);
         assignment && assignment->getOpcode() == BO_Assign && isInt(assignment->getType()))
         return valueSlot(assignment->getLHS(), state, depth + 1);
@@ -513,6 +582,15 @@ void forgetValue(const VarDecl* var, State& state) {
     }
 }
 
+void forgetOwnershipWitness(const VarDecl* var, State& state) {
+    // Mere exposure makes ownership witnesses unsafe, but does not mutate a
+    // pipe status. Its established const-borrow/alias contract stays separate.
+    const auto found = state.pipeStatuses.find(var);
+    const auto status = found == state.pipeStatuses.end() ? PipeStatus{} : found->second;
+    forgetValue(var, state);
+    if (status) state.pipeStatuses[var] = status;
+}
+
 void rememberValueCopy(const VarDecl* target, const VarDecl* source,
                        State& state) {
     const bool negative = source &&
@@ -558,6 +636,290 @@ Binding bindingFor(const Expr* expr, const State& state) {
     if (!var) return Binding{{}, true};
     auto it = state.bindings.find(var);
     return it == state.bindings.end() ? Binding{{}, true} : it->second;
+}
+
+bool managed(Origin origin, const State& state) {
+    return state.managedSites.count(origin) != 0;
+}
+
+Slot holderSlot(const Expr* expression, const State& state, ASTContext& context) {
+    while (expression) {
+        expression = expression->IgnoreParens();
+        const auto* cast = dyn_cast<CastExpr>(expression);
+        if (!cast) break;
+        const bool preserving = cast->getCastKind() == CK_NoOp ||
+            cast->getCastKind() == CK_LValueToRValue ||
+            (cast->getCastKind() == CK_IntegralCast &&
+             codeskeptic::fdTypePreservesDescriptor(cast->getType(), context) &&
+             codeskeptic::fdTypePreservesDescriptor(cast->getSubExpr()->getType(), context));
+        if (!preserving) return {};
+        expression = cast->getSubExpr();
+    }
+    if (Origin origin = acquisition(expression)) return Slot::acquired(origin.call);
+    return valueSlot(expression, state);
+}
+
+void forgetHolder(Slot slot, State& state) {
+    if (!slot) return;
+    for (auto& [origin, instances] : state.holders) {
+        (void)origin;
+        LiveInstances changed;
+        for (auto aliases : instances) { aliases.erase(slot); changed.insert(std::move(aliases)); }
+        instances = std::move(changed);
+    }
+    state.streams.erase(slot);
+}
+
+void bindValue(Slot target, const Binding& binding, Slot source, State& state,
+               bool fresh = false) {
+    if (fresh && binding.origins.size() == 1)
+        source = Slot::acquired(binding.origins.begin()->call);
+    if (target.variable) {
+        const auto type = target.field ? target.field->getType() : target.variable->getType();
+        if (!type->isPointerType() && !codeskeptic::fdTypePreservesDescriptor(type, target.variable->getASTContext()))
+            source = {};
+    }
+    for (auto& [origin, instances] : state.holders) {
+        (void)origin;
+        LiveInstances changed;
+        for (auto aliases : instances) {
+            const bool copied = source && aliases.count(source);
+            aliases.erase(target);
+            if (copied && !state.exposedSlots.count(target)) aliases.insert(target);
+            changed.insert(std::move(aliases));
+        }
+        instances = std::move(changed);
+    }
+    state.streams.erase(target);
+    state.bindings[target] = binding;
+}
+
+void bindExpression(Slot target, const Expr* expression, State& state) {
+    if (Origin origin = acquisition(expression))
+        bindValue(target, Binding{{origin}, false}, {}, state, true);
+    else
+        bindValue(target, bindingFor(expression, state), holderSlot(expression, state, target.variable->getASTContext()), state);
+}
+
+void disposeHolder(Slot slot, ResourceLife disposition, State& state) {
+    if (!slot) return;
+    for (auto& [origin, instances] : state.holders) {
+        bool consumed = false;
+        for (auto it = instances.begin(); it != instances.end();) {
+            if (it->count(slot)) { it = instances.erase(it); consumed = true; }
+            else ++it;
+        }
+        if (consumed)
+            state.resources[origin] = instances.empty() ? disposition : ResourceLife::Open;
+    }
+}
+
+void acquireInstance(Origin origin, State& state) {
+    const Slot value = Slot::acquired(origin.call);
+    forgetHolder(value, state); // The previous evaluation is NOT the new value.
+    auto& instances = state.holders[origin];
+    instances.insert(HolderSet{value});
+    boundInstances(instances);
+    state.resources[origin] = ResourceLife::Open;
+}
+
+void markManaged(Origin origin, State& state) {
+    state.managedSites.insert(origin);
+    const auto found = state.holders.find(origin);
+    if (found != state.holders.end() && !found->second.empty()) state.resources[origin] = ResourceLife::Open;
+}
+
+void exposeValue(Slot slot, State& state) {
+    if (!slot) return;
+    state.exposedSlots.insert(slot);
+    forgetHolder(slot, state);
+    if (slot.variable && !slot.field && slot.index == -1) forgetOwnershipWitness(slot.variable, state);
+}
+
+bool nativeUnary(const CallExpr* call, llvm::StringRef name) {
+    const auto* function = call ? call->getDirectCallee() : nullptr;
+    return function && calleeName(call) == name && !function->hasBody() &&
+        !function->isVariadic() && function->getNumParams() == 1 && call->getNumArgs() == 1;
+}
+
+bool nativeClose(const CallExpr* call) {
+    return nativeUnary(call, "close") && isInt(call->getDirectCallee()->getReturnType()) &&
+        isInt(call->getDirectCallee()->getParamDecl(0)->getType());
+}
+
+bool opaqueDirectory(QualType type) {
+    if (!type->isPointerType()) return false;
+    const auto* record = type->getPointeeType()->getAsRecordDecl();
+    return record && !record->getDefinition();
+}
+
+bool nativeFdopendir(const CallExpr* call) {
+    return nativeUnary(call, "fdopendir") &&
+        isInt(call->getDirectCallee()->getParamDecl(0)->getType()) &&
+        opaqueDirectory(call->getDirectCallee()->getReturnType());
+}
+
+bool nativeClosedir(const CallExpr* call, QualType streamType, ASTContext& context) {
+    return nativeUnary(call, "closedir") && isInt(call->getDirectCallee()->getReturnType()) &&
+        opaqueDirectory(streamType) && context.hasSameType(
+            call->getDirectCallee()->getParamDecl(0)->getType().getUnqualifiedType(),
+            streamType.getUnqualifiedType());
+}
+
+const Expr* plainExpression(const Expr* expression) {
+    if (!expression) return nullptr;
+    expression = expression->IgnoreParenImpCasts();
+    if (const auto* cleanups = dyn_cast<ExprWithCleanups>(expression))
+        return plainExpression(cleanups->getSubExpr());
+    return expression;
+}
+
+const Stmt* singleStatement(const Stmt* statement) {
+    if (const auto* body = dyn_cast_or_null<CompoundStmt>(statement))
+        return body->size() == 1 ? singleStatement(*body->body_begin()) : nullptr;
+    return statement;
+}
+
+bool thisField(const Expr* expression, const FieldDecl* field) {
+    const auto* member = dyn_cast_or_null<MemberExpr>(plainExpression(expression));
+    return member && member->getMemberDecl() == field &&
+        isa<CXXThisExpr>(member->getBase()->IgnoreParenImpCasts());
+}
+
+const FieldDecl* cleanupField(const CXXRecordDecl* record, ASTContext& context) {
+    if (!record || !record->hasDefinition()) return nullptr;
+    record = record->getDefinition();
+    if (record->getNumBases() || record->isUnion() || record->field_empty()) return nullptr;
+    auto fields = record->field_begin();
+    const auto* field = *fields++;
+    if (fields != record->field_end() || field->isBitField() ||
+        field->getType().isVolatileQualified()) return nullptr;
+    const bool descriptor = isInt(field->getType());
+    if (!descriptor && !opaqueDirectory(field->getType())) return nullptr;
+    const auto* destructor = record->getDestructor();
+    if (!destructor || !destructor->hasBody()) return nullptr;
+    const Stmt* cleanup = singleStatement(destructor->getBody());
+    if (const auto* condition = dyn_cast_or_null<IfStmt>(cleanup)) {
+        if (!descriptor || condition->getElse() || condition->getInit() ||
+            condition->getConditionVariable()) return nullptr;
+        const auto* comparison = dyn_cast<BinaryOperator>(plainExpression(condition->getCond()));
+        const auto* zero = comparison ? dyn_cast<IntegerLiteral>(plainExpression(comparison->getRHS())) : nullptr;
+        if (!comparison || comparison->getOpcode() != BO_GE || !zero ||
+            zero->getValue() != 0 || !thisField(comparison->getLHS(), field)) return nullptr;
+        cleanup = singleStatement(condition->getThen());
+    }
+    const auto* call = dyn_cast_or_null<CallExpr>(cleanup);
+    if (!call || !(descriptor ? nativeClose(call) : nativeClosedir(call, field->getType(), context)) ||
+        !thisField(call->getArg(0), field)) return nullptr;
+    return field;
+}
+
+// A value read or a direct field assignment is understood. Object copies,
+// address/reference exposure and other mutations are deliberately not proof.
+class OwnerExposure : public RecursiveASTVisitor<OwnerExposure> {
+public:
+    OwnerExposure(const VarDecl* object, const FieldDecl* field, ASTContext& context)
+        : object_(object), field_(field), context_(context) {}
+    bool safe = true;
+    bool VisitDeclRefExpr(DeclRefExpr* reference) {
+        if (reference->getDecl() != object_) return true;
+        const auto parents = context_.getParents(*reference);
+        const auto* member = parents.size() == 1 ? parents[0].get<MemberExpr>() : nullptr;
+        if (!member || member->getMemberDecl() != field_ || member->isArrow()) {
+            safe = false; return true;
+        }
+        const Stmt* current = member;
+        for (unsigned depth = 0; depth != 16; ++depth) {
+            const auto above = context_.getParents(*current);
+            if (above.size() != 1) break;
+            if (const auto* paren = above[0].get<ParenExpr>()) { current = paren; continue; }
+            if (const auto* cast = above[0].get<ImplicitCastExpr>(); cast && cast->getCastKind() == CK_LValueToRValue)
+                return true;
+            if (const auto* assignment = above[0].get<BinaryOperator>(); assignment &&
+                assignment->getOpcode() == BO_Assign && assignment->getLHS() == current)
+                return true;
+            break;
+        }
+        safe = false;
+        return true;
+    }
+private:
+    const VarDecl* object_;
+    const FieldDecl* field_;
+    ASTContext& context_;
+};
+
+const FieldDecl* localOwnerField(const VarDecl* variable, ASTContext& context) {
+    if (!variable || !variable->hasLocalStorage() || !variable->hasInit()) return nullptr;
+    const auto* field = cleanupField(variable->getType()->getAsCXXRecordDecl(), context);
+    if (!field) return nullptr;
+    const auto* function = dyn_cast<FunctionDecl>(variable->getDeclContext());
+    if (!function || !function->hasBody()) return nullptr;
+    OwnerExposure exposure(variable, field, context);
+    exposure.TraverseStmt(function->getBody());
+    return exposure.safe ? field : nullptr;
+}
+
+const Expr* adoptedValue(const VarDecl* variable, const FieldDecl* field) {
+    const auto* expression = plainExpression(variable->getInit());
+    if (const auto* construction = dyn_cast_or_null<CXXConstructExpr>(expression)) {
+        const auto* constructor = construction->getConstructor();
+        const auto* body = dyn_cast_or_null<CompoundStmt>(constructor->getBody());
+        if (!isInt(field->getType()) || constructor->isCopyOrMoveConstructor() ||
+            constructor->getNumParams() != 1 || construction->getNumArgs() != 1 ||
+            constructor->getNumCtorInitializers() != 1 || !body || !body->body_empty()) return nullptr;
+        const auto* initializer = *constructor->init_begin();
+        const auto* parameter = dyn_cast_or_null<DeclRefExpr>(plainExpression(initializer->getInit()));
+        if (!initializer->isMemberInitializer() || initializer->getMember() != field ||
+            !parameter || parameter->getDecl() != constructor->getParamDecl(0) ||
+            !isInt(constructor->getParamDecl(0)->getType())) return nullptr;
+        return construction->getArg(0);
+    }
+    const auto* list = dyn_cast_or_null<InitListExpr>(expression);
+    if (list && opaqueDirectory(field->getType()) && list->getNumInits() == 1)
+        return list->getInit(0);
+    return nullptr;
+}
+
+void bindStream(Slot target, const Expr* expression, State& state) {
+    const auto* call = dyn_cast_or_null<CallExpr>(plainExpression(expression));
+    if (nativeFdopendir(call)) {
+        bindExpression(target, call->getArg(0), state);
+        for (Origin origin : state.bindings[target].origins) markManaged(origin, state);
+        state.streams[target] = {call, false};
+    } else {
+        const Slot source = valueSlot(expression, state);
+        const auto found = state.streams.find(source);
+        const auto stream = found == state.streams.end() ? DirectoryStream{} : found->second;
+        bindExpression(target, expression, state);
+        if (stream.acquisition) state.streams[target] = stream;
+    }
+}
+
+void destroyLocalOwner(const VarDecl* variable, State& state) {
+    const auto owner = state.ownerFields.find(variable);
+    if (owner == state.ownerFields.end()) return;
+    const Slot field{owner->first, -1, owner->second};
+    const auto stream = state.streams.find(field);
+    if (isInt(owner->second->getType()) || (stream != state.streams.end() && stream->second.nonnull))
+        disposeHolder(field, ResourceLife::Closed, state);
+    forgetHolder(field, state);
+    state.ownerFields.erase(variable);
+}
+
+bool throwLeavesFunction(const Stmt* statement, ASTContext& context) {
+    // Clang may connect an explicit throw directly to EXIT, omitting its
+    // automatic destructors. Only a throw with no enclosing handler is proven
+    // to leave all currently active locals. A throw caught in this function
+    // must NOT release an owner that can subsequently be detached in a catch.
+    for (unsigned depth = 0; statement && depth != 128; ++depth) {
+        const auto parents = context.getParents(*statement);
+        if (parents.size() != 1) return false;
+        if (parents[0].get<FunctionDecl>()) return true;
+        statement = parents[0].get<Stmt>();
+        if (isa_and_nonnull<CXXTryStmt>(statement) || isa_and_nonnull<LambdaExpr>(statement)) return false;
+    }
+    return false;
 }
 
 void acquirePipe(const CallExpr* call, State& state) {
@@ -606,7 +968,7 @@ void pipeFailed(const CallExpr* call, State& state) {
 
 void escape(const Binding& binding, State& state) {
     for (Origin origin : binding.origins)
-        state.resources[origin] = ResourceLife::Escaped;
+        if (!managed(origin, state)) state.resources[origin] = ResourceLife::Escaped;
 }
 
 void returnOwnership(const Binding& binding, State& state) {
@@ -615,6 +977,7 @@ void returnOwnership(const Binding& binding, State& state) {
         return;
     }
     const Origin origin = *binding.origins.begin();
+    if (managed(origin, state)) return; // Requires a path-conditioned holder proof.
     // Returning the -1 failure sentinel does not transfer a resource.
     if (resourceLife(state, origin) != ResourceLife::None)
         state.resources[origin] = ResourceLife::Returned;
@@ -628,7 +991,8 @@ void release(const Binding& binding, State& state) {
         escape(binding, state);
         return;
     }
-    state.resources[*binding.origins.begin()] = ResourceLife::Closed;
+    if (!managed(*binding.origins.begin(), state))
+        state.resources[*binding.origins.begin()] = ResourceLife::Closed;
 }
 
 unsigned fdCallParamOffset(const CallExpr* call) {
@@ -775,7 +1139,10 @@ void discardImpossibleEquality(const VarDecl* resourceVar,
                                State& state) {
     auto binding = state.bindings.find(resourceVar);
     if (binding == state.bindings.end()) return;
+    if (state.definitelyNegative.count(negativeVar) && !state.exposedSlots.count(Slot{negativeVar}))
+        disposeHolder(resourceVar, ResourceLife::None, state);
     for (Origin origin : binding->second.origins) {
+        if (managed(origin, state)) continue;
         const auto witnesses = state.negativeWitnesses.find(origin);
         if (state.definitelyNegative.count(negativeVar) != 0 ||
             (witnesses != state.negativeWitnesses.end() &&
@@ -790,6 +1157,7 @@ struct ResourceInventory : RecursiveASTVisitor<ResourceInventory> {
     std::vector<Origin> origins;
     std::map<Origin, std::string> names;
     std::set<const Stmt*> returnedValues;
+    std::map<const VarDecl*, const FieldDecl*> owners;
     unsigned integerVariables = 0;
 
     bool carriesDescriptor(QualType type) const {
@@ -833,7 +1201,10 @@ struct ResourceInventory : RecursiveASTVisitor<ResourceInventory> {
     }
 
     bool VisitVarDecl(VarDecl* var) {
-        if (isFdIntegerType(var->getType()) || var->getType()->isPointerType() || localFdArray(var)) ++integerVariables;
+        if (isFdIntegerType(var->getType()) || var->getType()->isPointerType() ||
+            var->getType()->isRecordType() || localFdArray(var)) ++integerVariables;
+        if (const auto* field = localOwnerField(var, context); field && adoptedValue(var, field))
+            owners[var] = field;
         if (!var->hasInit()) return true;
         if (Origin origin = acquisition(var->getInit()))
             names.emplace(origin, var->getNameAsString());
@@ -857,16 +1228,17 @@ public:
     using State = ::State;
 
     FdAnalysis(std::vector<Origin> origins, unsigned integerVariables,
-               std::set<const Stmt*> returnedValues)
+               std::set<const Stmt*> returnedValues,
+               std::map<const VarDecl*, const FieldDecl*> owners)
         : origins_(std::move(origins)),
           integerVariables_(integerVariables),
-          returnedValues_(std::move(returnedValues)) {}
+          returnedValues_(std::move(returnedValues)), owners_(std::move(owners)) {}
 
     State initialState() const { return {}; }
 
     unsigned latticeHeight() const {
-        return static_cast<unsigned>(origins_.size()) * 8 +
-               integerVariables_ * 8 + 32;
+        return static_cast<unsigned>(origins_.size()) * 32 +
+               integerVariables_ * 16 + 64;
     }
 
     State merge(const State& a, const State& b) const {
@@ -876,18 +1248,29 @@ public:
     void widen(State&) const {}
 
     State transfer(const Stmt* stmt, const State& in,
-                   ASTContext&) const {
+                   ASTContext& context) const {
         State out = in;
+        // An escaped address may be retained elsewhere, including by an
+        // earlier constructor. Do not trust an old negative witness across
+        // another call merely because that address is absent from its args.
+        if (isa<CallExpr>(stmt) || isa<CXXConstructExpr>(stmt)) {
+            for (Slot slot : out.exposedSlots)
+                if (slot.variable && !slot.field && slot.index == -1) forgetOwnershipWitness(slot.variable, out);
+        }
         auto finish = [&]() {
             // A selected return value executes in its own CFG arm BEFORE
             // the arms join. Transferring at the final ReturnStmt loses that
             // association; escaping both arms there would hide real leaks.
             if (returnedValues_.count(stmt)) {
                 const auto* value = dyn_cast<Expr>(stmt);
-                if (Origin origin = acquisition(value))
-                    out.resources[origin] = ResourceLife::Returned;
-                else
+                if (Origin origin = acquisition(value)) {
+                    disposeHolder(Slot::acquired(origin.call), ResourceLife::Returned, out);
+                    if (!managed(origin, out)) out.resources[origin] = ResourceLife::Returned;
+                }
+                else {
+                    disposeHolder(holderSlot(value, out, context), ResourceLife::Returned, out);
                     returnOwnership(bindingFor(value, out), out);
+                }
             }
             return out;
         };
@@ -896,6 +1279,7 @@ public:
             if (delta && *delta == 0) return;
             const auto* var = asVar(target);
             if (var && var->getType()->isPointerType()) {
+                forgetHolder(var, out);
                 auto found = out.arrayPointers.find(var);
                 if (found == out.arrayPointers.end()) return;
                 if (!delta || (*delta > 0 && found->second.index > std::numeric_limits<long long>::max() - *delta) ||
@@ -905,6 +1289,7 @@ public:
             }
             const Slot slot = valueSlot(target, out);
             if (!slot) return;
+            forgetHolder(slot, out);
             out.bindings[slot] = Binding{{}, true};
             if (slot.index == -1) forgetValue(slot.variable, out);
         };
@@ -914,19 +1299,67 @@ public:
             return finish();
         }
 
+        if (const auto* address = dyn_cast<UnaryOperator>(stmt); address && address->getOpcode() == UO_AddrOf) {
+            const Slot exposed = valueSlot(address->getSubExpr(), out);
+            exposeValue(exposed, out);
+        }
+
+        if (const auto* construction = dyn_cast<CXXConstructExpr>(stmt)) {
+            const auto* constructor = construction->getConstructor();
+            for (unsigned i = 0; i < construction->getNumArgs() && i < constructor->getNumParams(); ++i)
+                if (constructor->getParamDecl(i)->getType()->isReferenceType())
+                    exposeValue(valueSlot(construction->getArg(i), out), out);
+        }
+
+        if (const auto* closure = dyn_cast<LambdaExpr>(stmt)) {
+            for (const auto& capture : closure->captures())
+                if (capture.capturesVariable() && capture.getCaptureKind() == LCK_ByRef)
+                    exposeValue(Slot{dyn_cast<VarDecl>(capture.getCapturedVar())}, out);
+        }
+
+        if (const auto* assembly = dyn_cast<GCCAsmStmt>(stmt)) {
+            for (unsigned i = 0; i < assembly->getNumOutputs(); ++i) {
+                const Slot output = valueSlot(assembly->getOutputExpr(i), out);
+                forgetHolder(output, out);
+                if (output.variable && !output.field && output.index == -1) forgetValue(output.variable, out);
+            }
+        }
+
+        if (isa<CXXThrowExpr>(stmt) && throwLeavesFunction(stmt, context)) {
+            const auto owners = out.ownerFields;
+            for (const auto& [variable, field] : owners) {
+                (void)field;
+                destroyLocalOwner(variable, out);
+            }
+            return finish();
+        }
+
         if (const auto* declaration = dyn_cast<DeclStmt>(stmt)) {
             for (const Decl* decl : declaration->decls()) {
                 const auto* var = dyn_cast<VarDecl>(decl);
                 if (!var) continue;
+                const auto owner = owners_.find(var);
+                if (owner != owners_.end()) {
+                    const auto* field = owner->second;
+                    out.ownerFields[var] = field;
+                    const Slot slot{var, -1, field};
+                    const Expr* value = adoptedValue(var, field);
+                    if (field->getType()->isPointerType()) bindStream(slot, value, out);
+                    else bindExpression(slot, value, out);
+                    for (Origin origin : out.bindings[slot].origins) markManaged(origin, out);
+                    continue;
+                }
                 if (var && var->hasInit() && var->getType()->isReferenceType() &&
                     var->getType()->getPointeeType()->isIntegerType()) {
                     Slot value = valueSlot(var->getInit(), out);
+                    exposeValue(value, out);
                     if (value.index == -1) value.index = 0;
                     if (pointedValueSlot(value)) out.arrayPointers[var] = value;
                     else out.arrayPointers.erase(var);
                     continue;
                 }
                 if (var && var->hasInit() && var->getType()->isPointerType()) {
+                    bindStream(var, var->getInit(), out);
                     Slot pointer = pointerSlot(var->getInit(), out);
                     if (pointer) out.arrayPointers[var] = pointer;
                     else out.arrayPointers.erase(var);
@@ -945,7 +1378,7 @@ public:
                     rememberNegativeWitnesses(origin, var, out);
                     forgetValue(var, out);
                     out.resources[origin] = ResourceLife::Open;
-                    out.bindings[var] = Binding{{origin}, false};
+                    bindExpression(var, init, out);
                 } else {
                     const Binding binding = bindingFor(init, out);
                     const auto status = pipeStatus(init, out);
@@ -954,7 +1387,7 @@ public:
                     if (const auto constant = integerConstant(init);
                         constant && *constant < 0)
                         out.definitelyNegative.insert(var);
-                    out.bindings[var] = binding;
+                    bindValue(var, binding, holderSlot(init, out, context), out);
                     if (status) out.pipeStatuses[var] = status;
                 }
             }
@@ -973,6 +1406,12 @@ public:
             }
             const Expr* rhs = assignment->getRHS();
             const Slot cell = valueSlot(assignment->getLHS(), out);
+            if (cell.field) {
+                if (cell.field->getType()->isPointerType()) bindStream(cell, rhs, out);
+                else bindExpression(cell, rhs, out);
+                for (Origin origin : out.bindings[cell].origins) markManaged(origin, out);
+                return finish();
+            }
             const VarDecl* target = cell && cell.index == -1 ? cell.variable : asVar(assignment->getLHS());
             if (cell && cell.index >= 0) {
                 if (Origin origin = acquisition(rhs)) {
@@ -982,6 +1421,7 @@ public:
                 return finish();
             }
             if (target && target->getType()->isPointerType()) {
+                bindStream(target, rhs, out);
                 Slot pointer = pointerSlot(rhs, out);
                 if (pointer) out.arrayPointers[target] = pointer;
                 else out.arrayPointers.erase(target);
@@ -992,7 +1432,7 @@ public:
                     rememberNegativeWitnesses(origin, target, out);
                     forgetValue(target, out);
                     out.resources[origin] = ResourceLife::Open;
-                    out.bindings[target] = Binding{{origin}, false};
+                    bindExpression(target, rhs, out);
                 } else {
                     const Binding binding = bindingFor(rhs, out);
                     const auto status = pipeStatus(rhs, out);
@@ -1001,7 +1441,7 @@ public:
                     if (const auto constant = integerConstant(rhs);
                         constant && *constant < 0)
                         out.definitelyNegative.insert(target);
-                    out.bindings[target] = binding;
+                    bindValue(target, binding, holderSlot(rhs, out, context), out);
                     if (status) out.pipeStatuses[target] = status;
                 }
             } else if (Origin origin = acquisition(rhs)) {
@@ -1017,10 +1457,22 @@ public:
             if (isPipeCall(call)) {
                 acquirePipe(call, out);
             } else if (name == "close" && call->getNumArgs() >= 1) {
+                if (nativeClose(call))
+                    disposeHolder(holderSlot(call->getArg(0), out, context), ResourceLife::Closed, out);
                 applyOwnershipToExpr(
                     call->getArg(0),
                     codeskeptic::SummaryRegistry::ParamOwnership::Consumed,
                     out);
+            } else if (nativeFdopendir(call)) {
+                const Binding input = acquisition(call->getArg(0)) ?
+                    Binding{{acquisition(call->getArg(0))}, false} : bindingFor(call->getArg(0), out);
+                for (Origin origin : input.origins) markManaged(origin, out);
+            } else if (call->getNumArgs() == 1 && nativeClosedir(call, call->getArg(0)->getType(), context)) {
+                const Slot slot = valueSlot(call->getArg(0), out);
+                const auto stream = out.streams.find(slot);
+                if (stream != out.streams.end() && stream->second.nonnull &&
+                    nativeClosedir(call, stream->second.acquisition->getType(), context))
+                    disposeHolder(slot, ResourceLife::Closed, out);
             } else {
                 // A mutable address argument can overwrite a saved pipe status.
                 // A later comparison of that variable must not erase ownership
@@ -1032,6 +1484,7 @@ public:
                         const QualType formal = callee->getParamDecl(i)->getType();
                         if (formal->isReferenceType() && !formal->getPointeeType().isConstQualified()) {
                             const Slot value = valueSlot(arg, out);
+                            exposeValue(value, out);
                             if (value && value.index == -1) out.pipeStatuses.erase(value.variable);
                         }
                     }
@@ -1040,16 +1493,18 @@ public:
                     const auto* address = dyn_cast<UnaryOperator>(arg->IgnoreParenImpCasts());
                     if (address && address->getOpcode() == UO_AddrOf) {
                         const auto* var = asVar(address->getSubExpr());
+                        forgetHolder(var, out);
                         out.pipeStatuses.erase(var);
                         // &reference exposes the referent, not a reseatable
                         // pointer variable. Preserve its storage identity.
                         if (var && var->getType()->isPointerType()) out.arrayPointers.erase(var);
                     }
+                    if (pointed) forgetHolder(pointed, out);
                     if (pointed && pointed.index == -1) out.pipeStatuses.erase(pointed.variable);
                 }
                 applyModeledCallEffects(call, out);
                 if (isAcquisitionCall(call))
-                    out.resources[call] = ResourceLife::Open;
+                    acquireInstance(call, out);
             }
             // shutdown intentionally has no ownership effect: POSIX still
             // requires close() to release the descriptor itself.
@@ -1057,19 +1512,48 @@ public:
         return finish();
     }
 
+    State transferElement(const CFGElement& element, const State& input, ASTContext&) const {
+        const auto destructor = element.getAs<CFGAutomaticObjDtor>();
+        if (!destructor) return input;
+        State out = input;
+        destroyLocalOwner(destructor->getVarDecl(), out);
+        return out;
+    }
+
     void refineOnEdge(const Stmt* condition, bool isTrueBranch,
-                      State& state, ASTContext&) const {
+                      State& state, ASTContext& context) const {
         const auto* expr = dyn_cast_or_null<Expr>(condition);
+        const Expr* pointer = expr ? expr->IgnoreParenImpCasts() : nullptr;
+        bool nonnull = isTrueBranch;
+        while (const auto* negate = dyn_cast_or_null<UnaryOperator>(pointer)) {
+            if (negate->getOpcode() != UO_LNot) break;
+            pointer = negate->getSubExpr()->IgnoreParenImpCasts();
+            nonnull = !nonnull;
+        }
+        if (const auto* comparison = dyn_cast_or_null<BinaryOperator>(pointer)) {
+            if (comparison->getOpcode() == BO_EQ || comparison->getOpcode() == BO_NE) {
+                const Expr* candidate = comparison->getLHS();
+                const Expr* zero = comparison->getRHS();
+                if (!candidate->getType()->isPointerType()) std::swap(candidate, zero);
+                if (zero->isNullPointerConstant(context, Expr::NPC_ValueDependentIsNotNull)) {
+                    pointer = candidate->IgnoreParenImpCasts();
+                    if (comparison->getOpcode() == BO_EQ) nonnull = !nonnull;
+                }
+            }
+        }
+        const auto directory = state.streams.find(valueSlot(pointer, state));
+        if (directory != state.streams.end()) directory->second.nonnull = nonnull;
         const auto pipeFailure = pipeFailureEdge(expr, state);
         if (pipeFailure.first && pipeFailure.second == isTrueBranch)
             pipeFailed(pipeFailure.first, state);
         if (auto failure = failureEdge(expr);
             failure && failure->trueBranch == isTrueBranch) {
             markNegativeEquivalents(failure->var, state);
+            disposeHolder(failure->var, ResourceLife::None, state);
             auto binding = state.bindings.find(failure->var);
             if (binding != state.bindings.end())
                 for (Origin origin : binding->second.origins)
-                    state.resources[origin] = ResourceLife::None;
+                    if (!managed(origin, state)) state.resources[origin] = ResourceLife::None;
         }
 
         if (auto equality = equalityEdge(expr);
@@ -1085,6 +1569,7 @@ private:
     std::vector<Origin> origins_;
     unsigned integerVariables_;
     std::set<const Stmt*> returnedValues_;
+    std::map<const VarDecl*, const FieldDecl*> owners_;
 };
 
 void reportLeaks(const FunctionDecl* function,
@@ -1129,7 +1614,7 @@ void analyzeFunction(const FunctionDecl* function,
 
     FdAnalysis analysis(
         inventory.origins,
-        inventory.integerVariables + function->getNumParams(), inventory.returnedValues);
+        inventory.integerVariables + function->getNumParams(), inventory.returnedValues, inventory.owners);
     auto dataflow = codeskeptic::runDataflow(function, context, analysis);
     if (!dataflow.converged)
         codeskeptic::CoverageReport::instance().recordDataflowFailure(
