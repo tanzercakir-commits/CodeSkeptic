@@ -8,19 +8,37 @@ sample. No measured success is claimed by adding this harness.
 
 Configure `CODESKEPTIC_BUILD_RESILIENCE=ON` explicitly to build
 `codeskeptic_resilience` against the real `codeskeptic_core`. The default is OFF.
-Use separate ASan+UBSan and UBSan-only build directories; never change the
+Use separate ASan+UBSan, UBSan-only and normal build directories; never change the
 normal build's instrumentation in place. Supply matching compile/link flags
 at configure time (`-fsanitize=address,undefined` or `-fsanitize=undefined`,
-`-fno-sanitize-recover=all`, `-fno-omit-frame-pointer`, `-O1`, `-g`). Keep the
+`-fno-sanitize-recover=all`, `-fno-omit-frame-pointer`, `-O1`, `-g`). The native
+lane uses the unchanged ordinary build, without sanitizer flags or the optional
+mutation executable. Keep the
 cached compiler/dependencies and disconnected acquisition policy. Imported
 LLVM/Clang libraries are not retroactively instrumented.
 
 ASan cannot be a valid normal-worker profile with the production POSIX
 address-space cap. Do not relax that cap to obtain a pass. ASan covers the
-contract/sidecar, MCP envelope, worker-codec, input identity and disk-store
-in-process slices. UBSan covers actual coordinator/resource/cache/checkpoint
-integration with unchanged production limits. Normal full Linux, existing
-stress profiles and required hosted Windows gates remain separate requirements.
+contract/sidecar text parser, MCP envelope, worker-codec, input identity and
+disk-store in-process slices. UBSan covers actual coordinator/resource/cache/
+checkpoint integration and the ten sidecar tests that initialize Clang, with
+unchanged production limits. The mixed prebuilt LLVM allocator instrumentation
+diagnosis does not qualify AST execution under ASan. The exact unchanged
+FD-exhaustion case is mandatory in a native lane: its intentional zero-descriptor
+limit conflicts with sanitizer runtime operations in both instrumented builds.
+No suppression is installed; none of these test bodies or assertions changes.
+
+The closed source-declared assignment requires 58 ASan+UBSan tests, 82 UBSan
+tests and one native test. All 124 distinct original identities remain; 17
+disk-store tests deliberately appear in both sanitizer lanes. The parser-only
+`SidecarTest.ParseText_EntriesAndIssues` stays in ASan. All other sidecar cases
+are individually named in the UBSan assignment; a changed set requires review.
+The native case is
+`InputIdentityTest.TransientOpenFailureCannotBecomeReusableStatusOnlyEvidence`.
+It has no sanitizer coverage and must also execute in the full normal suite.
+Normal full Linux, existing stress profiles and required hosted Windows gates
+remain separate requirements. Original failed profiles remain failed; a new
+lane assignment requires fresh complete measurements, not relabelled old runs.
 
 ## Frozen mutation recipes
 
@@ -64,11 +82,17 @@ bash scripts/test_resilience.sh --profile asan --build /absolute/asan-build \
   --revision FULL_SHA --out /absolute/new-evidence-directory
 bash scripts/test_resilience.sh --profile ubsan --build /absolute/ubsan-build \
   --revision FULL_SHA --out /absolute/different-evidence-directory
+bash scripts/test_resilience.sh --profile native --build /absolute/normal-build \
+  --revision FULL_SHA --out /absolute/native-evidence-directory
+python3 -B fuzz/verify_lanes.py --revision FULL_SHA \
+  --asan /absolute/new-evidence-directory --ubsan /absolute/different-evidence-directory \
+  --native /absolute/native-evidence-directory --out /absolute/new-combined-evidence.json
 python3 -B fuzz/test_runner.py
+python3 -B fuzz/test_lane_join.py
 ```
 
 Output parents must exist; outputs cannot be inside the checkout or overwrite
-previous evidence. Missing binaries, instrumentation, source identity, selected
+previous evidence. Missing binaries, required instrumentation (or native absence), source identity, selected
 tests, output records, actual process success or sanitizer failures reject the
 gate. All tracked production/root test translation units and the explicit private
 fixture objects must match a closed source/target compilation manifest. Every
@@ -80,6 +104,13 @@ These are reproducible local build checks, not a signed producer attestation.
 Zero tests/skips and incomplete output never become PASS. The supervisor
 tests include real timeout, output overflow, nonzero/missing executables and
 quiet-descendant cleanup, plus forged/missing success-record negatives.
+
+The combined gate is mandatory: it checks all three exact-source receipts,
+closed identity assignments, complete build manifests and raw evidence hashes,
+then rechecks discovery, actual execution, instrumentation and mutation results.
+A missing lane, wrong revision, skipped test or incomplete native execution
+cannot become combined success. This join is not proof of the separate full
+Linux, corpus or hosted Windows requirements and is not a signed attestation.
 
 Protected CMake/test-input changes require the active task's independent
 old/new digest review and controlled inventory/catalog successor freeze before

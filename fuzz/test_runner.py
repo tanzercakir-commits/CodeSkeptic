@@ -111,15 +111,49 @@ class RunnerTest(unittest.TestCase):
         self.assertIn(state, ('Z', 'X'))
 
     def test_every_source_test_identity_is_required(self):
-        for profile, count in (('asan', 69), ('ubsan', 72)):
+        for profile, count in (('asan', 58), ('ubsan', 82), ('native', 1)):
             names = runner.source_tests(profile)
             self.assertEqual(len(names), count)
             runner.validate_discovery(names, names)
             for changed in (names[1:], names + names[:1], names[:-1] + ['Other.Test'], []):
                 with self.assertRaises(ValueError): runner.validate_discovery(changed, names)
-            for expression in runner.FILTERS[profile].split(':'):
+            for expression in runner.FILTERS.get(profile, runner.NATIVE_TEST).split(':'):
                 reduced = [name for name in names if not runner.fnmatch.fnmatchcase(name, expression)]
                 with self.assertRaises(ValueError): runner.validate_discovery(reduced, names)
+
+    def test_partition_preserves_all_identities_and_only_reviewed_overlap(self):
+        lanes = {p: set(names) for p, names in runner.source_manifest().items()}
+        self.assertEqual(set(lanes), {'asan', 'ubsan', 'native'})
+        self.assertEqual(len(set.union(*lanes.values())), 124)
+        self.assertEqual(len(lanes['asan'] & lanes['ubsan']), 17)
+        self.assertEqual(lanes['native'], {runner.NATIVE_TEST})
+        self.assertFalse(lanes['native'] & (lanes['asan'] | lanes['ubsan']))
+        self.assertEqual(lanes['asan'] & runner.AST_TESTS, set())
+        self.assertTrue(runner.AST_TESTS <= lanes['ubsan'])
+        self.assertIn('SidecarTest.ParseText_EntriesAndIssues', lanes['asan'])
+        with mock.patch.object(runner, 'AST_TESTS', runner.AST_TESTS - {next(iter(runner.AST_TESTS))}):
+            with self.assertRaises(ValueError): runner.source_manifest()
+
+    def test_one_native_test_requires_actual_single_test_completion(self):
+        name = runner.NATIVE_TEST
+        good = dict(reason='', returncode=0, stderr='', stdout=
+                    '[ RUN      ] '+name+'\n[       OK ] '+name+' (0 ms)\n[  PASSED  ] 1 test.\n')
+        runner.suite_result(good, [name])
+        for text in ('[  PASSED  ] 1 test.\n', good['stdout'].replace('[       OK ]', '[  SKIPPED ]'),
+                     good['stdout'].replace(name, 'Another.Test')):
+            with self.assertRaises(ValueError): runner.suite_result(dict(good, stdout=text), [name])
+
+    def test_native_compilation_cannot_hide_instrumentation(self):
+        paths = ['src/analyzer/WorkerProtocol.cpp', 'tests/WorkerProtocolTest.cpp',
+                 'tests/ResourceBudgetTest.cpp', 'tests/UnitEvidenceStoreTest.cpp', 'fuzz/ResilienceSeeds.cpp']
+        expected = runner.compilation_manifest(paths, with_seeds=False)
+        self.assertFalse(any('ResilienceSeeds' in output for _, output in expected))
+        rows = [{'file': source, 'output': output, 'directory': str(self.root),
+                 'arguments': ['clang++', '-o', output, '-c', source]} for source, output in sorted(expected)]
+        runner.compilation_rows(rows, expected, 'native', self.root)
+        for flag in ('-fsanitize=undefined', '-fsanitize=address,undefined', '-fno-sanitize=all'):
+            changed = [dict(rows[0], arguments=rows[0]['arguments'] + [flag])] + rows[1:]
+            with self.assertRaises(ValueError): runner.compilation_rows(changed, expected, 'native', self.root)
 
     def test_compilation_requires_every_source_target_and_no_disabled_flags(self):
         paths = ['src/contracts/ContractParser.cpp', 'src/analyzer/WorkerProtocol.cpp',

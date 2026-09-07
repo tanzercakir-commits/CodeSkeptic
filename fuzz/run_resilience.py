@@ -24,6 +24,14 @@ FILTERS = {
             'InputIdentityTest.*:InputCommandIdentityTest.*:RuntimeIdentityTest.*:DiskEvidenceStoreTest.*',
     'ubsan': 'AnalysisCoordinatorTest.*:AnalysisCacheTest.*:ResourceBudgetTest.*:DiskEvidenceStoreTest.*',
 }
+NATIVE_TEST = 'InputIdentityTest.TransientOpenFailureCannotBecomeReusableStatusOnlyEvidence'
+AST_TESTS = frozenset('SidecarTest.' + name for name in (
+    'RequiresFromSidecar_CallSiteViolation', 'RequiresFromSidecar_SeedsCalleeBody',
+    'MalformedFileDoesNotPublishEarlierGuarantees', 'QualifiedAndUnmatchedAnchorsPreserveValidGuarantees',
+    'RejectionReportsEveryIssueOnceAtAbsoluteLine', 'TextAndFileLimitsAreInclusiveAndDoNotPublishGuarantees',
+    'EnsuresFromSidecar_ViolationPointsAtCskFile', 'ArityAnchor_Binds',
+    'MalformedLines_AreContractSyntaxErrors', 'NoSidecarFile_NoEffect'))
+PROFILES = ('asan', 'ubsan', 'native')
 
 def require(value, message):
     if not value:
@@ -151,10 +159,11 @@ def suite_result(result, names):
     ran = re.findall(r'^\[ RUN      \] (\S+)\s*$', text, re.M)
     passed = re.findall(r'\[       OK \] (\S+) \([0-9]+ ms\)\s*$', text, re.M)
     require(Counter(ran) == Counter(passed) == Counter(names), 'discovered/run/pass test mismatch')
-    require('[  PASSED  ] ' + str(len(names)) + ' tests.' in text, 'missing suite completion')
+    completion = str(len(names)) + (' test.' if len(names) == 1 else ' tests.')
+    require('[  PASSED  ] ' + completion in text, 'missing suite completion')
     require(not re.search(r'\[  (FAILED|SKIPPED)  \]', text), 'failed or skipped selected test')
 
-def source_tests(profile, root=ROOT):
+def source_manifest(root=ROOT):
     # This explicit Linux profile uses ordinary TEST/TEST_F declarations only.
     # Unknown conditional/macro changes fail by discovery mismatch, not by
     # silently reducing the source contract to whatever the binary contains.
@@ -165,18 +174,34 @@ def source_tests(profile, root=ROOT):
         declared.extend(suite + '.' + name for suite, name in re.findall(
             r'^TEST(?:_F)?\(\s*(\w+)\s*,\s*(\w+)\s*\)', path.read_text(), re.M))
     require(all(declared.count(name) == 1 for name in inactive), 'Linux inactive declarations changed')
-    expected = []
-    for expression in FILTERS[profile].split(':'):
-        matched = [name for name in declared if name not in inactive and fnmatch.fnmatchcase(name, expression)]
-        require(matched, 'required source test family missing: ' + expression)
-        expected.extend(matched)
-    require(len(expected) == len(set(expected)), 'duplicate source-selected tests')
-    return sorted(expected)
+    original = {}
+    for profile, expressions in FILTERS.items():
+        expected = []
+        for expression in expressions.split(':'):
+            matched = [name for name in declared if name not in inactive and fnmatch.fnmatchcase(name, expression)]
+            require(matched, 'required source test family missing: ' + expression)
+            expected.extend(matched)
+        require(len(expected) == len(set(expected)), 'duplicate source-selected tests')
+        original[profile] = set(expected)
+    sidecars = {name for name in declared if name.startswith('SidecarTest.')}
+    require(sidecars == AST_TESTS | {'SidecarTest.ParseText_EntriesAndIssues'},
+            'sidecar lane assignment needs explicit source review')
+    require(NATIVE_TEST in original['asan'] and AST_TESTS <= original['asan']
+            and not (AST_TESTS | {NATIVE_TEST}) & original['ubsan'], 'invalid lane reassignment')
+    lanes = {'asan': original['asan'] - AST_TESTS - {NATIVE_TEST},
+             'ubsan': original['ubsan'] | AST_TESTS, 'native': {NATIVE_TEST}}
+    require(set.union(*lanes.values()) == set.union(*original.values()), 'unassigned source test')
+    require(lanes['asan'] & lanes['ubsan'] == original['asan'] & original['ubsan'],
+            'original intentional sanitizer overlap changed')
+    return {profile: sorted(names) for profile, names in lanes.items()}
+
+def source_tests(profile, root=ROOT):
+    return source_manifest(root)[profile]
 
 def validate_discovery(names, expected):
     require(Counter(names) == Counter(expected), 'source/discovered test identity mismatch')
 
-def compilation_manifest(paths, root=ROOT):
+def compilation_manifest(paths, root=ROOT, with_seeds=True):
     expected = set()
     for name in paths:
         path = Path(name)
@@ -187,6 +212,7 @@ def compilation_manifest(paths, root=ROOT):
         elif name.startswith('tests/') and len(path.parts) == 2:
             output = 'tests/CMakeFiles/codeskeptic_tests.dir/' + path.name + '.o'
         elif name == 'fuzz/ResilienceSeeds.cpp':
+            if not with_seeds: continue
             output = 'fuzz/CMakeFiles/codeskeptic_resilience.dir/ResilienceSeeds.cpp.o'
         elif name == 'scripts/corpus_compile_commands.cpp':
             output = 'src/CMakeFiles/codeskeptic_corpus_inputs.dir/__/scripts/corpus_compile_commands.cpp.o'
@@ -199,8 +225,9 @@ def compilation_manifest(paths, root=ROOT):
                   else 'codeskeptic_' + target + '_fixture')
         require('tests/' + source in paths, 'required fixture source missing')
         expected.add((str(root / 'tests' / source), 'tests/CMakeFiles/' + target + '.dir/' + source + '.o'))
-    require(len(expected) > 5 and (str(root / 'fuzz/ResilienceSeeds.cpp'),
-            'fuzz/CMakeFiles/codeskeptic_resilience.dir/ResilienceSeeds.cpp.o') in expected,
+    seed_object = (str(root / 'fuzz/ResilienceSeeds.cpp'),
+                   'fuzz/CMakeFiles/codeskeptic_resilience.dir/ResilienceSeeds.cpp.o')
+    require(len(expected) > 5 and (seed_object in expected) == with_seeds,
             'incomplete source compilation manifest')
     return expected
 
@@ -208,14 +235,15 @@ def compilation_rows(commands, expected, profile, build, root=ROOT):
     selected = [row for row in commands if row['file'].startswith(str(root) + '/')]
     require(Counter((row['file'], row.get('output')) for row in selected) == Counter(expected),
             'source/target compilation manifest mismatch')
-    flags = '-fsanitize=address,undefined' if profile == 'asan' else '-fsanitize=undefined'
+    flags = {'asan': ['-fsanitize=address,undefined'], 'ubsan': ['-fsanitize=undefined'], 'native': []}[profile]
     for row in selected:
         arguments = row.get('arguments') or shlex.split(row['command'])
         require(row['directory'] == str(build) and arguments.count('-o') == arguments.count('-c') == 1
                 and arguments[arguments.index('-o') + 1] == row['output']
                 and arguments[arguments.index('-c') + 1] == row['file'], 'compilation path mismatch')
-        require([arg for arg in arguments if arg.startswith('-fsanitize=')] == [flags]
-                and '-fno-sanitize-recover=all' in arguments, 'uninstrumented repository compilation')
+        require([arg for arg in arguments if arg.startswith('-fsanitize=')] == flags
+                and (profile == 'native' or '-fno-sanitize-recover=all' in arguments),
+                'repository compilation profile mismatch')
         require(not any(arg.startswith(('-fno-sanitize=', '-fsanitize-recover=')) for arg in arguments),
                 'disabled or recovering instrumentation')
     return selected
@@ -243,18 +271,20 @@ def run(profile, build, revision, out):
                 'corpus': build / 'src/codeskeptic_corpus_inputs',
                 'runtime1': build / 'tests/runtime-fixture-1/libcodeskeptic_runtime_fixture.so',
                 'runtime2': build / 'tests/runtime-fixture-2/libcodeskeptic_runtime_fixture.so'}
+    if profile == 'native': del binaries['seeds']
     hashes = {name: sha(path) for name, path in binaries.items()}
     commands = json.loads((build / 'compile_commands.json').read_text())
     tracked = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT, timeout=10).decode().split('\0')
-    expected = compilation_manifest(tracked)
+    expected = compilation_manifest(tracked, with_seeds=profile != 'native')
     selected = compilation_rows(commands, expected, profile, build)
     objects = {output: sha(build / output) for _, output in sorted(expected)}
-    expected_tests = source_tests(profile)
+    manifest = source_manifest()
+    expected_tests = manifest[profile]
     out.mkdir()
-    result = {'schema': 'codeskeptic-resilience/v1', 'profile': profile, 'source_revision': revision, 'source_tree': tree,
+    result = {'schema': 'codeskeptic-resilience/v2', 'profile': profile, 'source_revision': revision, 'source_tree': tree,
               'binary_sha256': hashes, 'compile_commands_sha256': sha(build / 'compile_commands.json'),
-              'instrumented_repository_commands': len(selected), 'prebuilt_compiler_libraries_instrumented': False,
-              'object_sha256': objects, 'expected_tests': expected_tests,
+              'repository_compilation_commands': len(selected), 'prebuilt_compiler_libraries_instrumented': False,
+              'object_sha256': objects, 'expected_tests': expected_tests, 'lane_manifest': manifest,
               'checks': {}, 'passed': False}
     env = dict(os.environ, UBSAN_OPTIONS='halt_on_error=1:print_stacktrace=1')
     if profile == 'asan':
@@ -267,16 +297,18 @@ def run(profile, build, revision, out):
                                    'elapsed_seconds': observed['elapsed_seconds']}
         return observed
     try:
-        current_build = execute('build-current', ['ninja', '-C', str(build), '-n',
-                                'codeskeptic_resilience', 'codeskeptic_tests'], 30)['stdout']
+        targets = ['codeskeptic_tests'] + ([] if profile == 'native' else ['codeskeptic_resilience'])
+        current_build = execute('build-current', ['ninja', '-C', str(build), '-n'] + targets, 30)['stdout']
         require(current_build.splitlines()[-1:] == ['ninja: no work to do.']
                 and not re.search(r'^\[[0-9]+/', current_build, re.M), 'build is stale or incomplete')
         for name in ('analyzer', 'tests', 'seeds', 'worker', 'resource', 'cache', 'corpus'):
+            if name not in binaries: continue
             for symbol in ('__asan_init', '__ubsan_handle_add_overflow_abort'):
                 symbols = execute('instrumentation-' + name + '-' + symbol,
                                   ['objdump', '-d', '--disassemble=' + symbol, str(binaries[name])], 30)['stdout']
                 defined = bool(re.search(r'^[0-9a-f]+ <' + symbol + r'>:$', symbols, re.M))
-                require(defined == (profile == 'asan' or symbol != '__asan_init'), 'binary sanitizer profile mismatch')
+                instrumented = profile == 'asan' or (profile == 'ubsan' and symbol != '__asan_init')
+                require(defined == instrumented, 'binary sanitizer profile mismatch')
         version = execute('version', [str(binaries['analyzer']), '--version'], 10)['stdout'].strip().removeprefix('CodeSkeptic ')
         require(re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+-dev\+g' + revision[:12], version), 'binary/source mismatch')
         result['version'] = version
@@ -286,12 +318,13 @@ def run(profile, build, revision, out):
                 observed = execute('seeds-' + target, [str(binaries['seeds']), '--target', target,
                                    '--seed', str(SEED), '--iterations', str(ITERATIONS)], 60, seeded_env)
                 result['checks']['seeds-' + target]['summary'] = seed_result(observed, target, version)
-        expression = '--gtest_filter=' + FILTERS[profile]
+        expression = '--gtest_filter=' + ':'.join(expected_tests)
         listed = execute('test-discovery', [str(binaries['tests']), expression, '--gtest_list_tests'], 30)
         names = discovered_tests(listed['stdout'])
         validate_discovery(names, expected_tests)
         result['selected_tests'] = names
-        actual = execute('suite', [str(binaries['tests']), expression], 300 if profile == 'asan' else 900)
+        actual = execute('suite', [str(binaries['tests']), expression],
+                         {'asan': 300, 'ubsan': 900, 'native': 60}[profile])
         suite_result(actual, names)
         require(checkout(revision) == tree and {name: sha(path) for name, path in binaries.items()} == hashes,
                 'source or binaries changed during qualification')
@@ -306,7 +339,7 @@ def run(profile, build, revision, out):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--profile', required=True, choices=tuple(FILTERS))
+    parser.add_argument('--profile', required=True, choices=PROFILES)
     parser.add_argument('--build', required=True, type=Path)
     parser.add_argument('--revision', required=True)
     parser.add_argument('--out', required=True, type=Path)
