@@ -1,5 +1,6 @@
 #include "analyzer/AnalysisCoordinator.h"
 #include "analyzer/AnalysisState.h"
+#include "analyzer/RuntimeIdentity.h"
 #include "core/Capabilities.h"
 #include "analyzer/BuiltinRules.h"
 #include "analyzer/StaticAnalyzer.h"
@@ -14,6 +15,7 @@
 #include "engine/FunctionSummary.h"
 #include <array>
 #include <optional>
+#include <regex>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -129,16 +131,25 @@ protected:
 };
 
 #ifdef __linux__
-std::string workerReuseRejectionCategory(const std::string& detail) {
-    // Extract only a recognized fixed category, never arbitrary child stderr.
+std::string workerReuseRejectionContext(const std::string& detail) {
+    // Extract only a recognized category and bounded numeric metadata, never
+    // arbitrary child stderr. Stages identify detection points, not cost causes.
+    static const std::regex metadata_pattern(
+        R"(;observe_stage=(starting|startup|maps_before|kernel|platform_arguments|module_identity|module_read|module_hash|module_validation|maps_after|manifest|unknown);modules_completed=[0-9]{1,20};module_read_bytes=[0-9]{1,20};module_hashed_bytes=[0-9]{1,20};wall_us=[0-9]{1,20};thread_cpu_us=(unavailable|[0-9]{1,20}))");
     for (const auto* category : {
             "runtime_before:deadline", "runtime_before:module_cutoff", "runtime_before:mapping_changed",
             "runtime_before:platform_unqualified", "runtime_before:cancelled", "runtime_before:other",
             "input:current_rejected", "runtime_after:deadline", "runtime_after:module_cutoff",
             "runtime_after:mapping_changed", "runtime_after:platform_unqualified",
             "runtime_after:cancelled", "runtime_after:other", "runtime_after:digest_changed"}) {
-        const auto line = std::string("codeskeptic-reuse-unavailable:") + category + "\n";
-        if (detail.find(line) != std::string::npos) return category;
+        const auto prefix = std::string("codeskeptic-reuse-unavailable:") + category;
+        const auto begin = detail.find(prefix);
+        if (begin == std::string::npos) continue;
+        const auto suffix_begin = begin + prefix.size();
+        const auto end = detail.find('\n', suffix_begin);
+        if (end == std::string::npos || end - suffix_begin > 320) continue;
+        const auto suffix = detail.substr(suffix_begin, end - suffix_begin);
+        if (suffix.empty() || std::regex_match(suffix, metadata_pattern)) return std::string(category) + suffix;
     }
     return "unavailable";
 }
@@ -188,7 +199,7 @@ TEST_F(AnalysisCacheTest, CheckpointSnapshotBindsPendingHeaderAndSidecarWithoutP
                 << " witness_context=" << (decoded && identity.context == response.request_digest)
                 << " witness_source=" << (decoded && identity.hasBuffer(request.source))
                 << " summary_bytes=" << response.global_summaries.size()
-                << " worker_reuse=" << workerReuseRejectionCategory(initial.detail);
+                << " worker_reuse=" << workerReuseRejectionContext(initial.detail);
         return context.str();
     };
     ASSERT_TRUE(reusableWorkerResponse(request, initial.response)) << admissionContext();
@@ -214,6 +225,16 @@ TEST_F(AnalysisCacheTest, CheckpointSnapshotBindsPendingHeaderAndSidecarWithoutP
 }
 
 TEST_F(AnalysisCacheTest, WorkerProofRejectionReportsOnlyBoundedCategoryAndKeepsFreshResult) {
+    const std::string prefix = "codeskeptic-reuse-unavailable:runtime_before:deadline";
+    RuntimeObservationFailure sample;
+    sample.detection_stage = RuntimeObservationStage::ModuleRead;
+    sample.module_read_bytes = sample.module_hashed_bytes = 65536;
+    const auto metadata = formatRuntimeObservationFailure(sample);
+    EXPECT_EQ(workerReuseRejectionContext(prefix + metadata + "\n"), "runtime_before:deadline" + metadata);
+    EXPECT_EQ(workerReuseRejectionContext(prefix + ";unrecognized=discarded\n"), "unavailable");
+    EXPECT_EQ(workerReuseRejectionContext(prefix + metadata + ";extra=1\n"), "unavailable");
+    EXPECT_EQ(workerReuseRejectionContext(prefix + metadata), "unavailable");
+    EXPECT_EQ(workerReuseRejectionContext(prefix + std::string(321, '0') + "\n"), "unavailable");
     const auto source = file("volatile-snapshot.cpp",
         "const char *time_value=__TIME__;\nint result(){return 42;}\n");
     WorkerRequest request;
@@ -231,7 +252,7 @@ TEST_F(AnalysisCacheTest, WorkerProofRejectionReportsOnlyBoundedCategoryAndKeeps
     EXPECT_TRUE(rejected.response.input_witness.empty());
     EXPECT_TRUE(rejected.response.runtime_digest.empty());
     EXPECT_FALSE(reusableWorkerResponse(request, rejected.response));
-    const auto category = workerReuseRejectionCategory(rejected.detail);
+    const auto category = workerReuseRejectionContext(rejected.detail);
     ASSERT_NE(category, "unavailable") << "detail_bytes=" << rejected.detail.size();
     EXPECT_EQ(rejected.detail, std::string("codeskeptic-reuse-unavailable:") + category + "\n");
     EXPECT_EQ(processUnitEvidenceStore().entries(), 0u);

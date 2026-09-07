@@ -20,6 +20,7 @@
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 #include <sys/utsname.h>
+#include <time.h>
 #include <unistd.h>
 #endif
 
@@ -45,6 +46,36 @@ void bind(std::string& output, const std::string& value) {
 }
 
 #ifdef __linux__
+std::optional<std::uint64_t> threadCpuMicros() noexcept {
+    struct timespec value{};
+    const int saved_errno = errno;
+    const auto result = ::clock_gettime(CLOCK_THREAD_CPUTIME_ID, &value);
+    errno = saved_errno;
+    if (result != 0 || value.tv_sec < 0 || value.tv_nsec < 0 || value.tv_nsec >= 1000000000)
+        return {};
+    const auto seconds = static_cast<std::uint64_t>(value.tv_sec);
+    if (seconds > (std::numeric_limits<std::uint64_t>::max() - 999999) / 1000000) return {};
+    return seconds * 1000000 + static_cast<std::uint64_t>(value.tv_nsec) / 1000;
+}
+struct ObservationMeasurement {
+    RuntimeObservationFailure value;
+    std::optional<std::chrono::steady_clock::time_point> start;
+    std::optional<std::uint64_t> cpu_start;
+    void begin(std::chrono::steady_clock::time_point budget_start) noexcept {
+        start = budget_start;
+        cpu_start = threadCpuMicros();
+    }
+    std::optional<RuntimeObservationFailure> finish() noexcept {
+        if (!start) return {}; // Budget construction failed: no invented timing.
+        const auto cpu_end = threadCpuMicros();
+        const auto wall = std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::steady_clock::now() - *start).count();
+        if (wall < 0) return {};
+        value.wall_us = static_cast<std::uint64_t>(wall);
+        if (cpu_start && cpu_end && *cpu_end >= *cpu_start) value.thread_cpu_us = *cpu_end - *cpu_start;
+        return value;
+    }
+};
 class Descriptor {
 public:
     explicit Descriptor(const std::string& path)
@@ -60,6 +91,7 @@ private:
 };
 struct Budget {
     std::function<bool()> cancelled;
+    ObservationMeasurement& observation;
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
     void check() const {
         require(!(cancelled && cancelled()), "runtime_validation_cancelled");
@@ -164,12 +196,17 @@ std::string hashMapping(const RuntimeMapping& mapping, std::uint64_t cutoff,
     std::uint64_t consumed = 0;
     const auto actual_descriptor = executable ? executable->get() : descriptor.get();
     for (;;) {
+        budget.observation.value.detection_stage = RuntimeObservationStage::ModuleRead;
         const auto count = readChunk(actual_descriptor, chunk.data(), chunk.size(), budget);
+        budget.observation.value.module_read_bytes += count;
         if (!count) break;
         require(count <= size - consumed, "runtime_file_grew");
         consumed += count;
+        budget.observation.value.detection_stage = RuntimeObservationStage::ModuleHash;
         hash.update(llvm::StringRef(chunk.data(), count));
+        budget.observation.value.module_hashed_bytes += count;
     }
+    budget.observation.value.detection_stage = RuntimeObservationStage::ModuleValidation;
     require(consumed == size && ::fstat(actual_descriptor, &after) == 0 && metadata(before) == metadata(after),
             "runtime_changed_during_hash");
     const auto digest = hash.final();
@@ -238,13 +275,18 @@ bool runtimeIdentitySupported() {
 }
 RuntimeIdentity observeRuntimeIdentity(const std::function<bool()>& cancelled) {
 #ifdef __linux__
+    ObservationMeasurement observation;
     try {
-        Budget budget{cancelled};
+        Budget budget{cancelled, observation};
+        observation.begin(budget.start);
+        observation.value.detection_stage = RuntimeObservationStage::Startup;
         const auto cutoff = startupCutoff(budget);
+        observation.value.detection_stage = RuntimeObservationStage::MapsBefore;
         const auto maps = readProc("/proc/self/maps", kMapsLimit, budget); // codeskeptic-disable-line policy -- Linux kernel mapped-module inventory, not an installation path.
         std::vector<RuntimeMapping> modules;
         std::string error;
         require(parseRuntimeMappings(maps, modules, error), error.c_str());
+        observation.value.detection_stage = RuntimeObservationStage::Kernel;
         struct utsname kernel{};
         require(::uname(&kernel) == 0, "runtime_kernel_identity_unavailable");
         std::string manifest = "codeskeptic-linux-runtime/v1";
@@ -252,6 +294,7 @@ RuntimeIdentity observeRuntimeIdentity(const std::function<bool()>& cancelled) {
         // Resource-dir selection probes the relocatable installation using
         // native filesystem APIs outside Clang's observed VFS. Bind the actual
         // process-frozen choice used by this worker's ordinary frontend too.
+        observation.value.detection_stage = RuntimeObservationStage::PlatformArguments;
         budget.check();
         const auto arguments = platformExtraArgs();
         budget.check();
@@ -259,12 +302,15 @@ RuntimeIdentity observeRuntimeIdentity(const std::function<bool()>& cancelled) {
         for (const auto& argument : arguments) bind(manifest, argument);
         std::uint64_t total = 0;
         for (const auto& module : modules) {
+            observation.value.detection_stage = RuntimeObservationStage::ModuleIdentity;
             budget.check();
             bind(manifest, module.path);
             bind(manifest, hashMapping(module, cutoff, total, budget));
+            ++observation.value.modules_completed;
         }
         // Comparing parsed file identities avoids harmless stack/heap/ASLR map
         // changes while refusing modules added, removed, or replaced mid-capture.
+        observation.value.detection_stage = RuntimeObservationStage::MapsAfter;
         std::vector<RuntimeMapping> after;
         require(parseRuntimeMappings(readProc("/proc/self/maps", kMapsLimit, budget), after, error), error.c_str()); // codeskeptic-disable-line policy -- Recheck the same kernel mapping inventory for mid-capture changes.
         require(after.size() == modules.size(), "runtime_mapping_set_changed");
@@ -272,12 +318,38 @@ RuntimeIdentity observeRuntimeIdentity(const std::function<bool()>& cancelled) {
             require(std::tie(after[i].path, after[i].device_major, after[i].device_minor, after[i].inode) ==
                     std::tie(modules[i].path, modules[i].device_major, modules[i].device_minor, modules[i].inode),
                     "runtime_mapping_set_changed");
+        observation.value.detection_stage = RuntimeObservationStage::Manifest;
         budget.check();
-        return {inputDigest(manifest), {}};
-    } catch (const std::exception& failure) { return {{}, failure.what()}; }
+        return {inputDigest(manifest), {}, {}};
+    } catch (const std::exception& failure) { return {{}, failure.what(), observation.finish()}; }
 #else
     (void)cancelled;
-    return {{}, "runtime_profile_unqualified"};
+    return {{}, "runtime_profile_unqualified", {}};
 #endif
+}
+
+std::string formatRuntimeObservationFailure(const RuntimeObservationFailure& failure) {
+    const auto stage = [](RuntimeObservationStage value) {
+        switch (value) {
+        case RuntimeObservationStage::Starting: return "starting";
+        case RuntimeObservationStage::Startup: return "startup";
+        case RuntimeObservationStage::MapsBefore: return "maps_before";
+        case RuntimeObservationStage::Kernel: return "kernel";
+        case RuntimeObservationStage::PlatformArguments: return "platform_arguments";
+        case RuntimeObservationStage::ModuleIdentity: return "module_identity";
+        case RuntimeObservationStage::ModuleRead: return "module_read";
+        case RuntimeObservationStage::ModuleHash: return "module_hash";
+        case RuntimeObservationStage::ModuleValidation: return "module_validation";
+        case RuntimeObservationStage::MapsAfter: return "maps_after";
+        case RuntimeObservationStage::Manifest: return "manifest";
+        }
+        return "unknown";
+    };
+    return std::string(";observe_stage=") + stage(failure.detection_stage) +
+        ";modules_completed=" + std::to_string(failure.modules_completed) +
+        ";module_read_bytes=" + std::to_string(failure.module_read_bytes) +
+        ";module_hashed_bytes=" + std::to_string(failure.module_hashed_bytes) +
+        ";wall_us=" + std::to_string(failure.wall_us) +
+        ";thread_cpu_us=" + (failure.thread_cpu_us ? std::to_string(*failure.thread_cpu_us) : "unavailable");
 }
 } // namespace codeskeptic

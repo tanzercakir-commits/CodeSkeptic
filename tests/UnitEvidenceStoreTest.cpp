@@ -89,6 +89,7 @@ int main(int argc, char** argv) {
 #include "analyzer/RuntimeIdentity.h"
 #include "analyzer/WorkerProtocol.h"
 #include <gtest/gtest.h>
+#include <limits>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -891,20 +892,51 @@ TEST(RuntimeIdentityTest, AmbiguousOrUnsupportedMappingsRefuseTransactionally) {
 }
 
 TEST(RuntimeIdentityTest, ActualRuntimeIsStableOrExplicitlyUnsupportedAndCancellationRefuses) {
+    RuntimeObservationFailure sample;
+    EXPECT_EQ(formatRuntimeObservationFailure(sample),
+        ";observe_stage=starting;modules_completed=0;module_read_bytes=0;module_hashed_bytes=0"
+        ";wall_us=0;thread_cpu_us=unavailable");
+    sample.thread_cpu_us = 0;
+    EXPECT_NE(formatRuntimeObservationFailure(sample).find(";thread_cpu_us=0"), std::string::npos);
+    sample.detection_stage = static_cast<RuntimeObservationStage>(255);
+    sample.modules_completed = sample.module_read_bytes = sample.module_hashed_bytes = sample.wall_us =
+        std::numeric_limits<std::uint64_t>::max();
+    sample.thread_cpu_us = std::numeric_limits<std::uint64_t>::max();
+    const auto bounded = formatRuntimeObservationFailure(sample);
+    EXPECT_EQ(bounded.find(";observe_stage=unknown;"), 0u);
+    EXPECT_LE(bounded.size(), 320u);
+    EXPECT_EQ(bounded.find_first_of("\r\n"), std::string::npos);
+
     const auto first = observeRuntimeIdentity();
     if (!runtimeIdentitySupported()) {
         EXPECT_FALSE(first);
         EXPECT_EQ(first.reason, "runtime_profile_unqualified");
+        EXPECT_FALSE(first.observation_failure);
         return;
     }
     ASSERT_TRUE(first) << first.reason;
+    EXPECT_FALSE(first.observation_failure);
     const auto second = observeRuntimeIdentity();
     ASSERT_TRUE(second) << second.reason;
+    EXPECT_FALSE(second.observation_failure);
     EXPECT_EQ(first.digest.size(), 64u);
     EXPECT_EQ(second.digest, first.digest);
-    const auto cancelled = observeRuntimeIdentity([] { return true; });
+    unsigned cancellation_checks = 0;
+    const auto cancelled = observeRuntimeIdentity([&] { ++cancellation_checks; return true; });
+    EXPECT_EQ(cancellation_checks, 1u);
     EXPECT_FALSE(cancelled);
     EXPECT_EQ(cancelled.reason, "runtime_validation_cancelled");
+    EXPECT_TRUE(cancelled.digest.empty());
+    ASSERT_TRUE(cancelled.observation_failure);
+    const auto& observed = *cancelled.observation_failure;
+    EXPECT_EQ(observed.detection_stage, RuntimeObservationStage::Startup);
+    EXPECT_EQ(observed.modules_completed, 0u);
+    EXPECT_EQ(observed.module_read_bytes, 0u);
+    EXPECT_EQ(observed.module_hashed_bytes, 0u);
+    const auto cancelled_metadata = formatRuntimeObservationFailure(observed);
+    EXPECT_LE(cancelled_metadata.size(), 320u);
+    EXPECT_NE(cancelled_metadata.find(";wall_us="), std::string::npos);
+    EXPECT_NE(cancelled_metadata.find(";thread_cpu_us="), std::string::npos);
 }
 
 TEST_F(InputIdentityTest, CandidateTransportDoesNotCountAsConfirmedReuse) {

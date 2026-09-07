@@ -459,6 +459,7 @@ int runAnalysisWorker(const std::string& request_path, const std::string& respon
         // only the final fresh-proof rejection, never an intermediate miss.
         const char* rejected_stage = nullptr;
         const char* rejected_category = nullptr;
+        std::optional<RuntimeObservationFailure> rejected_observation;
         const auto runtimeCategory = [](const RuntimeIdentity& identity) {
             // Exception text is not diagnostic authority: map fixed reasons
             // to bounded categories and never expose paths or raw text.
@@ -475,6 +476,7 @@ int runAnalysisWorker(const std::string& request_path, const std::string& respon
             if (!runtime_before) {
                 rejected_stage = "runtime_before";
                 rejected_category = runtimeCategory(runtime_before);
+                rejected_observation = runtime_before.observation_failure;
             } else if (!source.inputIdentity().matchesCurrent()) {
                 rejected_stage = "input";
                 rejected_category = "current_rejected";
@@ -483,6 +485,7 @@ int runAnalysisWorker(const std::string& request_path, const std::string& respon
                 if (!runtime_after) {
                     rejected_stage = "runtime_after";
                     rejected_category = runtimeCategory(runtime_after);
+                    rejected_observation = runtime_after.observation_failure;
                 } else if (runtime_after.digest != runtime_before.digest) {
                     rejected_stage = "runtime_after";
                     rejected_category = "digest_changed";
@@ -492,8 +495,18 @@ int runAnalysisWorker(const std::string& request_path, const std::string& respon
                 }
             }
         }
-        if (rejected_stage)
-            std::cerr << "codeskeptic-reuse-unavailable:" << rejected_stage << ':' << rejected_category << '\n';
+        if (rejected_stage) {
+            std::string rejected_metadata;
+            if (rejected_observation) {
+                try { rejected_metadata = formatRuntimeObservationFailure(*rejected_observation); }
+                catch (const std::exception&) {
+                    // Optional formatting must not invalidate fresh analysis.
+                    rejected_metadata.clear();
+                }
+            }
+            std::cerr << "codeskeptic-reuse-unavailable:" << rejected_stage << ':' << rejected_category
+                      << rejected_metadata << '\n';
+        }
         check(writeWorkerPacket(response_path, encodeWorkerResponse(response), error), error);
         return 0; // Transport succeeded; source coverage may still describe failure.
     } catch (const std::bad_alloc&) {
