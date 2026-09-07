@@ -117,7 +117,11 @@ using LiveInstances = std::set<HolderSet>;
 // no relative allocation-age alignment is assumed. An empty set is a lost
 // instance, never dischargeable by a later unrelated close.
 void boundInstances(LiveInstances& instances) {
-    if (instances.size() > 64) instances = LiveInstances{HolderSet{}};
+    // A lost obligation is an absorbing top: permitting new groups beside it
+    // would make capped joins order-dependent and allow collapse/regrowth in
+    // loops. No later exact holder can discharge that lost instance.
+    if (instances.size() > 64 || instances.count(HolderSet{}))
+        instances = LiveInstances{HolderSet{}};
 }
 
 struct State {
@@ -665,6 +669,7 @@ void forgetHolder(Slot slot, State& state) {
         (void)origin;
         LiveInstances changed;
         for (auto aliases : instances) { aliases.erase(slot); changed.insert(std::move(aliases)); }
+        boundInstances(changed);
         instances = std::move(changed);
     }
     state.streams.erase(slot);
@@ -688,6 +693,7 @@ void bindValue(Slot target, const Binding& binding, Slot source, State& state,
             if (copied && !state.exposedSlots.count(target)) aliases.insert(target);
             changed.insert(std::move(aliases));
         }
+        boundInstances(changed);
         instances = std::move(changed);
     }
     state.streams.erase(target);
@@ -709,6 +715,7 @@ void disposeHolder(Slot slot, ResourceLife disposition, State& state) {
             if (it->count(slot)) { it = instances.erase(it); consumed = true; }
             else ++it;
         }
+        boundInstances(instances);
         if (consumed)
             state.resources[origin] = instances.empty() ? disposition : ResourceLife::Open;
     }
@@ -1012,6 +1019,7 @@ void applyOwnershipToExpr(
         ownership == ParamOwnership::Unknown)
         return;
     if (Origin origin = acquisition(expr)) {
+        if (managed(origin, state)) return; // Exact holder disposition only.
         state.resources[origin] =
             ownership == ParamOwnership::Consumed
                 ? ResourceLife::Closed : ResourceLife::Escaped;
@@ -1024,7 +1032,32 @@ void applyOwnershipToExpr(
         escape(binding, state);
 }
 
-void applyModeledCallEffects(const CallExpr* call, State& state) {
+bool provesPersistentFdStore(const FunctionDecl* function, ASTContext& context,
+                             unsigned depth = 0) {
+    if (!function || depth >= 16) return false;
+    function = function->getDefinition();
+    if (!function || isa<CXXMethodDecl>(function) || function->isVariadic() ||
+        function->getNumParams() != 1 || !function->getReturnType()->isVoidType()) return false;
+    const auto* parameter = function->getParamDecl(0);
+    if (!codeskeptic::fdTypePreservesDescriptor(parameter->getType(), context)) return false;
+    const auto* body = dyn_cast<CompoundStmt>(function->getBody());
+    if (!body || body->size() != 1) return false;
+    const State empty;
+    const Stmt* effect = *body->body_begin();
+    if (const auto* store = dyn_cast<BinaryOperator>(effect)) {
+        if (store->getOpcode() != BO_Assign ||
+            !(holderSlot(store->getRHS(), empty, context) == Slot{parameter})) return false;
+        const auto* target = asVar(store->getLHS());
+        return target && target->hasGlobalStorage() &&
+            codeskeptic::fdTypePreservesDescriptor(target->getType(), context);
+    }
+    const auto* forward = dyn_cast<CallExpr>(effect);
+    return forward && forward->getNumArgs() == 1 &&
+        holderSlot(forward->getArg(0), empty, context) == Slot{parameter} &&
+        provesPersistentFdStore(forward->getDirectCallee(), context, depth + 1);
+}
+
+void applyModeledCallEffects(const CallExpr* call, State& state, ASTContext& context) {
     const llvm::StringRef direct = calleeName(call);
     if (codeskeptic::isNativeFdAcquisition(call) || isPipeCall(call) || direct == "close" ||
         direct == "shutdown")
@@ -1033,12 +1066,29 @@ void applyModeledCallEffects(const CallExpr* call, State& state) {
         codeskeptic::SummaryRegistry::instance().lookup(call);
     if (!summary) return;
     const unsigned offset = fdCallParamOffset(call);
+    bool callerStorage = isa<CXXMemberCallExpr>(call) || offset != 0;
+    for (const Expr* argument : call->arguments())
+        callerStorage |= argument->isGLValue() || argument->getType()->isPointerType() ||
+            argument->getType()->isRecordType();
     for (unsigned argIndex = offset;
          argIndex < call->getNumArgs(); ++argIndex) {
         const Expr* arg = call->getArg(argIndex);
         if (!isFdIntegerType(arg->getType())) continue;
-        applyOwnershipToExpr(
-            arg, summary->paramOwnership(argIndex - offset), state);
+        const auto ownership = summary->paramOwnership(argIndex - offset);
+        using ParamOwnership = codeskeptic::SummaryRegistry::ParamOwnership;
+        // Proven summaries apply to this argument value, not every possible
+        // instance at its acquisition site. A transfer on one path must not
+        // dominate an outstanding obligation on another as opaque escape does.
+        // A stored-value summary does not identify its destination: set(&local,
+        // fd) transfers outside the callee, but not outside this caller. Without
+        // a destination relation, require a bounded body proof ending at direct
+        // persistent storage, including for shadow instances before adoption.
+        if (ownership == ParamOwnership::Consumed ||
+            (ownership == ParamOwnership::Transferred && !callerStorage &&
+             provesPersistentFdStore(call->getDirectCallee(), context)))
+            disposeHolder(holderSlot(arg, state, context), ownership == ParamOwnership::Consumed
+                ? ResourceLife::Closed : ResourceLife::Returned, state);
+        applyOwnershipToExpr(arg, ownership, state);
     }
 }
 
@@ -1304,6 +1354,9 @@ public:
             exposeValue(exposed, out);
         }
 
+        if (const auto* cast = dyn_cast<ExplicitCastExpr>(stmt); cast && cast->isGLValue())
+            exposeValue(valueSlot(cast->getSubExpr(), out), out);
+
         if (const auto* construction = dyn_cast<CXXConstructExpr>(stmt)) {
             const auto* constructor = construction->getConstructor();
             for (unsigned i = 0; i < construction->getNumArgs() && i < constructor->getNumParams(); ++i)
@@ -1312,9 +1365,14 @@ public:
         }
 
         if (const auto* closure = dyn_cast<LambdaExpr>(stmt)) {
-            for (const auto& capture : closure->captures())
-                if (capture.capturesVariable() && capture.getCaptureKind() == LCK_ByRef)
+            auto initializer = closure->capture_init_begin();
+            for (const auto& capture : closure->captures()) {
+                if (capture.capturesVariable() && capture.getCaptureKind() == LCK_ByRef) {
                     exposeValue(Slot{dyn_cast<VarDecl>(capture.getCapturedVar())}, out);
+                    exposeValue(valueSlot(*initializer, out), out);
+                }
+                ++initializer;
+            }
         }
 
         if (const auto* assembly = dyn_cast<GCCAsmStmt>(stmt)) {
@@ -1338,6 +1396,8 @@ public:
             for (const Decl* decl : declaration->decls()) {
                 const auto* var = dyn_cast<VarDecl>(decl);
                 if (!var) continue;
+                if (var->hasInit() && var->getType()->isReferenceType())
+                    exposeValue(valueSlot(var->getInit(), out), out);
                 const auto owner = owners_.find(var);
                 if (owner != owners_.end()) {
                     const auto* field = owner->second;
@@ -1480,12 +1540,16 @@ public:
                 const auto* callee = call->getDirectCallee();
                 for (unsigned i = 0; i < call->getNumArgs(); ++i) {
                     const Expr* arg = call->getArg(i);
+                    // Reference arguments remain glvalues after conversion,
+                    // including calls through pointers with no direct callee.
+                    if (arg->isGLValue()) exposeValue(valueSlot(arg, out), out);
                     if (callee && i < callee->getNumParams()) {
                         const QualType formal = callee->getParamDecl(i)->getType();
-                        if (formal->isReferenceType() && !formal->getPointeeType().isConstQualified()) {
+                        if (formal->isReferenceType()) {
                             const Slot value = valueSlot(arg, out);
                             exposeValue(value, out);
-                            if (value && value.index == -1) out.pipeStatuses.erase(value.variable);
+                            if (!formal->getPointeeType().isConstQualified() && value && value.index == -1)
+                                out.pipeStatuses.erase(value.variable);
                         }
                     }
                     if (!arg->getType()->isPointerType() || arg->getType()->getPointeeType().isConstQualified()) continue;
@@ -1502,7 +1566,7 @@ public:
                     if (pointed) forgetHolder(pointed, out);
                     if (pointed && pointed.index == -1) out.pipeStatuses.erase(pointed.variable);
                 }
-                applyModeledCallEffects(call, out);
+                applyModeledCallEffects(call, out, context);
                 if (isAcquisitionCall(call))
                     acquireInstance(call, out);
             }

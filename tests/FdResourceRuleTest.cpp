@@ -1,4 +1,5 @@
 #include "TestHelper.h"
+#include "engine/CoverageReport.h"
 #include "engine/FunctionSummary.h"
 #include "rules/FdResourceRule.h"
 
@@ -143,6 +144,103 @@ TEST(FdResourceRuleTest, ProvenRaiiDetachRequiresActualReturn) {
     )"));
 }
 
+TEST(FdResourceRuleTest, ProvenRaiiDetachHonorsProvenSummaryEffects) {
+    for (const auto* effect : {"release_chain(saved);", "keep_fd(saved);", "keep_chain(saved);"}) {
+        SCOPED_TRACE(effect);
+        EXPECT_TRUE(runFdRule(std::string(kProvenFdOwner) + R"(
+            void release_fd(int fd){close(fd);}
+            void release_chain(int fd){release_fd(fd);}
+            int retained; void keep_fd(int fd){retained=fd;}
+            void keep_chain(int fd){keep_fd(fd);}
+            void f(){FdOwner owner(open("input",0));int saved=owner.fd;owner.fd=-1;
+        )" + effect + "}").empty());
+    }
+}
+
+TEST(FdResourceRuleTest, ProvenRaiiSummaryEffectsPreserveOtherObligations) {
+    for (const auto* effect : {"release_chain(saved);", "keep_fd(saved);"}) {
+        SCOPED_TRACE(effect);
+        const auto results = runFdRule(std::string(kProvenFdOwner) + R"(
+            void release_fd(int fd){close(fd);}
+            void release_chain(int fd){release_fd(fd);}
+            int retained; void keep_fd(int fd){retained=fd;}
+            void f(){FdOwner owner(open("input",0));int saved=owner.fd;owner.fd=-1;
+        )" + effect + "int unrelated=open(\"other\",0);(void)unrelated;}");
+        expectSingleResourceLeak(results);
+        ASSERT_EQ(results.size(), 1u);
+        EXPECT_NE(results[0].message.find("unrelated"), std::string::npos);
+    }
+}
+
+TEST(FdResourceRuleTest, ProvenRaiiConditionalSummaryEffectsRetainObligations) {
+    for (const auto* effect : {"maybe_release(saved,yes);", "maybe_keep(saved,yes);",
+                              "if(yes)release_fd(saved);", "if(yes)keep_fd(saved);",
+                              "unknown(saved);", "release_fd((unsigned char)saved);"}) {
+        SCOPED_TRACE(effect);
+        expectSingleResourceLeak(runFdRule(std::string(kProvenFdOwner) + R"(
+            void release_fd(int fd){close(fd);}
+            int retained; void keep_fd(int fd){retained=fd;}
+            void maybe_release(int fd,bool yes){if(yes)close(fd);}
+            void maybe_keep(int fd,bool yes){if(yes)retained=fd;}
+            extern void unknown(int);
+            void f(bool yes){FdOwner owner(open("input",0));int saved=owner.fd;owner.fd=-1;
+        )" + effect + "}"));
+    }
+}
+
+TEST(FdResourceRuleTest, ProvenRaiiManyAliasAlternativesConvergeAndRetainLostOwner) {
+    // Seven independent optional copies produce more than the 64-group cap.
+    // The loop must preserve the lost obligation without cycling the cap.
+    std::string body = std::string(kProvenFdOwner) +
+        "void f(const bool* choices,int count){FdOwner owner(-1);"
+        "for(int iteration=0;iteration<count;++iteration){int fd=open(\"input\",0);";
+    for (int i = 0; i < 7; ++i) {
+        const auto index = std::to_string(i);
+        body += "int saved" + index + "=-1;if(choices[" + index + "])saved" + index + "=fd;";
+    }
+    body += "owner.fd=fd;owner.fd=-1;}}";
+    CoverageReport::instance().clear();
+    const auto results = runFdRule(body);
+    expectSingleResourceLeak(results);
+    EXPECT_TRUE(CoverageReport::instance().entries().empty());
+    CoverageReport::instance().clear();
+}
+
+TEST(FdResourceRuleTest, ProvenRaiiTransferSummaryCannotDischargeCallerLocalStorage) {
+    for (const auto* transfer : {"set_pointer(&local,saved);", "set_reference(local,saved);",
+                                "holder.set(saved);", "holder(saved);"}) {
+        SCOPED_TRACE(transfer);
+        expectSingleResourceLeak(runFdRule(std::string(kProvenFdOwner) + R"(
+            void set_pointer(int* target,int value){*target=value;}
+            void set_reference(int& target,int value){target=value;}
+            struct Holder {int fd=-1;void set(int value){fd=value;}
+                void operator()(int value){fd=value;}};
+            void f(){FdOwner owner(open("input",0));int saved=owner.fd;owner.fd=-1;
+                int local=-1;Holder holder;
+        )" + transfer + "}"));
+    }
+}
+
+TEST(FdResourceRuleTest, ProvenRaiiTransferRequiresPersistentDestinationThroughChain) {
+    for (const auto* transfer : {"hide(saved);", "indirect(saved);", "narrow(saved);"}) {
+        SCOPED_TRACE(transfer);
+        const std::string functions = R"(
+            void set(int* target,int value){*target=value;}
+            void hide(int value){int local=-1;set(&local,value);}
+            int* destination;void indirect(int value){*destination=value;}
+            unsigned char small;void narrow(int value){small=value;}
+        )";
+        expectSingleResourceLeak(runFdRule(std::string(kProvenFdOwner) + functions + R"(
+            void f(){FdOwner owner(open("input",0));int saved=owner.fd;owner.fd=-1;
+                int local=-1;destination=&local;
+        )" + transfer + "destination=nullptr;}"));
+        // The same weak transfer must not delete shadow holders before adoption.
+        expectSingleResourceLeak(runFdRule(std::string(kProvenFdOwner) + functions + R"(
+            void f(){int saved=open("input",0);int local=-1;destination=&local;
+        )" + transfer + "FdOwner owner(saved);owner.fd=-1;destination=nullptr;}"));
+    }
+}
+
 TEST(FdResourceRuleTest, ProvenRaiiReplacementDoesNotHideDisplacedOrigin) {
     EXPECT_TRUE(runFdRule(std::string(kProvenFdOwner) + R"(
         void f(){FdOwner owned(open("first",0));int next=open("next",0);close(owned.fd);owned.fd=next;}
@@ -273,6 +371,30 @@ TEST(FdResourceRuleTest, ProvenRaiiReferenceCaptureCannotRetainHolderProof) {
         void f(){FdOwner first(open("input",0));int saved=first.fd;first.fd=-1;
             auto mutate=[saved]()mutable{saved=-1;};mutate();FdOwner second(saved);}
     )").empty());
+}
+
+TEST(FdResourceRuleTest, ProvenRaiiAllReferenceFormsRevokeCleanupProof) {
+    for (const auto* mutation : {
+        "clear_const(saved);",
+        "auto mutate=[&alias=saved]{alias=-1;};mutate();",
+        "static_cast<int&>(saved)=-1;",
+        "const_cast<int&>(saved)=-1;"
+    }) {
+        SCOPED_TRACE(mutation);
+        expectSingleResourceLeak(runFdRule(std::string(kProvenFdOwner) + R"(
+            void clear_const(const int& value){const_cast<int&>(value)=-1;}
+            void f(){FdOwner first(open("input",0));int saved=first.fd;first.fd=-1;
+        )" + mutation + "FdOwner second(saved);}"));
+    }
+    expectSingleResourceLeak(runFdRule(std::string(kDirectoryOwner) + R"(
+        void f(){int fd=open("input",0);Directory* stream=fdopendir(fd);
+            if(!stream){close(fd);return;}Directory*& alias=stream;alias=nullptr;closedir(stream);}
+    )"));
+    expectSingleResourceLeak(runFdRule(std::string(kProvenFdOwner) + R"(
+        void clear(int& value){value=-1;}
+        void f(){FdOwner first(open("input",0));int saved=first.fd;first.fd=-1;
+            void(*action)(int&)=clear;action(saved);FdOwner second(saved);}
+    )"));
 }
 
 TEST(FdResourceRuleTest, ProvenRaiiRequiresDescriptorPreservingValueCopies) {
