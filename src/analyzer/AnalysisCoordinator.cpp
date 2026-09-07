@@ -455,13 +455,45 @@ int runAnalysisWorker(const std::string& request_path, const std::string& respon
         response.coverage = source.coverage().front();
         response.gaps = CoverageReport::instance().entries();
         check(exportWorkerSummaries(response.global_summaries, error), error);
-        if (request.record_inputs && runtime_before && source.inputIdentity().matchesCurrent()) {
-            const auto runtime_after = observeRuntimeIdentity();
-            if (runtime_after && runtime_after.digest == runtime_before.digest) {
-                response.input_witness = encodeInputIdentity(source.inputIdentity());
-                response.runtime_digest = runtime_before.digest;
+        // A rejected replay above may still yield reusable fresh work. Report
+        // only the final fresh-proof rejection, never an intermediate miss.
+        const char* rejected_stage = nullptr;
+        const char* rejected_category = nullptr;
+        const auto runtimeCategory = [](const RuntimeIdentity& identity) {
+            // Exception text is not diagnostic authority: map fixed reasons
+            // to bounded categories and never expose paths or raw text.
+            if (identity.reason == "runtime_validation_deadline") return "deadline";
+            if (identity.reason == "runtime_recent_or_changed_module") return "module_cutoff";
+            if (identity.reason == "runtime_mapping_set_changed" ||
+                identity.reason == "runtime_changed_during_hash" ||
+                identity.reason == "runtime_mapping_replaced") return "mapping_changed";
+            if (identity.reason == "runtime_profile_unqualified") return "platform_unqualified";
+            if (identity.reason == "runtime_validation_cancelled") return "cancelled";
+            return "other";
+        };
+        if (request.record_inputs) {
+            if (!runtime_before) {
+                rejected_stage = "runtime_before";
+                rejected_category = runtimeCategory(runtime_before);
+            } else if (!source.inputIdentity().matchesCurrent()) {
+                rejected_stage = "input";
+                rejected_category = "current_rejected";
+            } else {
+                const auto runtime_after = observeRuntimeIdentity();
+                if (!runtime_after) {
+                    rejected_stage = "runtime_after";
+                    rejected_category = runtimeCategory(runtime_after);
+                } else if (runtime_after.digest != runtime_before.digest) {
+                    rejected_stage = "runtime_after";
+                    rejected_category = "digest_changed";
+                } else {
+                    response.input_witness = encodeInputIdentity(source.inputIdentity());
+                    response.runtime_digest = runtime_before.digest;
+                }
             }
         }
+        if (rejected_stage)
+            std::cerr << "codeskeptic-reuse-unavailable:" << rejected_stage << ':' << rejected_category << '\n';
         check(writeWorkerPacket(response_path, encodeWorkerResponse(response), error), error);
         return 0; // Transport succeeded; source coverage may still describe failure.
     } catch (const std::bad_alloc&) {

@@ -129,6 +129,20 @@ protected:
 };
 
 #ifdef __linux__
+std::string workerReuseRejectionCategory(const std::string& detail) {
+    // Extract only a recognized fixed category, never arbitrary child stderr.
+    for (const auto* category : {
+            "runtime_before:deadline", "runtime_before:module_cutoff", "runtime_before:mapping_changed",
+            "runtime_before:platform_unqualified", "runtime_before:cancelled", "runtime_before:other",
+            "input:current_rejected", "runtime_after:deadline", "runtime_after:module_cutoff",
+            "runtime_after:mapping_changed", "runtime_after:platform_unqualified",
+            "runtime_after:cancelled", "runtime_after:other", "runtime_after:digest_changed"}) {
+        const auto line = std::string("codeskeptic-reuse-unavailable:") + category + "\n";
+        if (detail.find(line) != std::string::npos) return category;
+    }
+    return "unavailable";
+}
+
 TEST_F(AnalysisCacheTest, CheckpointSnapshotBindsPendingHeaderAndSidecarWithoutPublishingFindings) {
     const auto source = file("snapshot.cpp", "#include \"snapshot.h\"\nint finding(){int *p=nullptr; return *p;}\n");
     const auto header = root / "src/snapshot.h";
@@ -173,10 +187,12 @@ TEST_F(AnalysisCacheTest, CheckpointSnapshotBindsPendingHeaderAndSidecarWithoutP
                 << " witness_decoded=" << decoded
                 << " witness_context=" << (decoded && identity.context == response.request_digest)
                 << " witness_source=" << (decoded && identity.hasBuffer(request.source))
-                << " summary_bytes=" << response.global_summaries.size();
+                << " summary_bytes=" << response.global_summaries.size()
+                << " worker_reuse=" << workerReuseRejectionCategory(initial.detail);
         return context.str();
     };
     ASSERT_TRUE(reusableWorkerResponse(request, initial.response)) << admissionContext();
+    EXPECT_TRUE(initial.detail.empty());
     const auto packet = encodeWorkerResponse(initial.response);
     EXPECT_EQ(processUnitEvidenceStore().entries(), 0u);
     const auto resume = executeAnalysisWorker(tool.string(), request, {}, nullptr, nullptr, &packet, true);
@@ -195,6 +211,39 @@ TEST_F(AnalysisCacheTest, CheckpointSnapshotBindsPendingHeaderAndSidecarWithoutP
     const auto changed_header = executeAnalysisWorker(tool.string(), request, {}, nullptr, nullptr, &packet, true);
     EXPECT_FALSE(changed_header.valid);
     EXPECT_FALSE(changed_header.cache_hit);
+}
+
+TEST_F(AnalysisCacheTest, WorkerProofRejectionReportsOnlyBoundedCategoryAndKeepsFreshResult) {
+    const auto source = file("volatile-snapshot.cpp",
+        "const char *time_value=__TIME__;\nint result(){return 42;}\n");
+    WorkerRequest request;
+    request.source = source.string(); request.build_directory = root.string();
+    request.commands.emplace_back(root.string(), source.string(),
+        std::vector<std::string>{"clang++", "-std=c++17", "-c", source.string()}, "");
+    request.phase = WorkerPhase::Snapshot; request.record_inputs = true;
+    std::string error;
+    ASSERT_TRUE(exportWorkerSummaries(request.global_summaries, error));
+    const auto rejected = executeAnalysisWorker(CODESKEPTIC_BINARY_PATH, request, {}, nullptr, nullptr, nullptr, true);
+    ASSERT_TRUE(rejected.valid) << rejected.reason;
+    EXPECT_EQ(rejected.response.coverage.status, SourceStatus::Analyzed);
+    EXPECT_EQ(rejected.response.coverage.analyzed_commands, 1u);
+    EXPECT_TRUE(rejected.response.diagnostics.empty());
+    EXPECT_TRUE(rejected.response.input_witness.empty());
+    EXPECT_TRUE(rejected.response.runtime_digest.empty());
+    EXPECT_FALSE(reusableWorkerResponse(request, rejected.response));
+    const auto category = workerReuseRejectionCategory(rejected.detail);
+    ASSERT_NE(category, "unavailable") << "detail_bytes=" << rejected.detail.size();
+    EXPECT_EQ(rejected.detail, std::string("codeskeptic-reuse-unavailable:") + category + "\n");
+    EXPECT_EQ(processUnitEvidenceStore().entries(), 0u);
+
+    request.record_inputs = false;
+    const auto ordinary = executeAnalysisWorker(CODESKEPTIC_BINARY_PATH, request, {}, nullptr, nullptr, nullptr, true);
+    ASSERT_TRUE(ordinary.valid) << ordinary.reason;
+    EXPECT_TRUE(ordinary.detail.empty());
+    EXPECT_EQ(ordinary.response.coverage.status, SourceStatus::Analyzed);
+    EXPECT_EQ(ordinary.response.coverage.analyzed_commands, 1u);
+    EXPECT_TRUE(ordinary.response.diagnostics.empty());
+    EXPECT_EQ(processUnitEvidenceStore().entries(), 0u);
 }
 
 TEST_F(AnalysisCacheTest, CheckpointReplaysReportsAndRollingSummariesForBothExecutionModes) {
