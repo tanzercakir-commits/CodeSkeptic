@@ -2,6 +2,25 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH04-S03-U001 — Windows fixture taşınabilirliğini gerçek hosted kapılarla doğrula
+
+- Commit: `8db304359bc1e3c3273430d140cd72d6e6582335`
+- Dal: `agent/cs3-ch04-s03-u001-windows-portability`
+- Implementer: `root-cs3-ch04-s03-u001-20260907`
+- Bağımsız denetçi: `independent-cwe-ch04-s03-u001-product-8db3043-20260907`
+- İnceleme SHA-256: `924d735e8ca26119b00e1c59ade1cd1e1c05ccfb893cdd07d21918e6fc1c5133`
+- Tarih: 2026-09-07T07:40:25.897121+00:00
+- Sonuç: Windows testleri canonical path, size_t ve fiziksel kaynak byte sözleşmesini doğru sınar; mevcut ürün beklentileri ve hosted kapılar korunur.
+- linux-suite: PASS; SHA-256 `d808eff0668a56804a900de4382aa25afc7a4fa717102ae20a1d8b24962fd3ca`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S03-U001/qualify.sh 8db304359bc1e3c3273430d140cd72d6e6582335`
+- relevant-corpus: PASS; SHA-256 `2dcf072a96332c1e88df525c0df62d9e08482c71263df96e56a0aa37d70b1887`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S03-U001/qualify.sh 8db304359bc1e3c3273430d140cd72d6e6582335`
+- windows-hosted: PASS; SHA-256 `48efe3fd7460c2569ae3b87121a9ebdc5296e15a446e3622505fbe83f4009430`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S03-U001/collect_windows_8db3043.sh 34093437225 101651651464`
+- queue-check: PASS; SHA-256 `e162a2d111911bcffebfac439d198eef37eaf9ea2d16500c4c98549d43553e68`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S03-U001/qualify.sh 8db304359bc1e3c3273430d140cd72d6e6582335`
+- linux-hosted: PASS; SHA-256 `f70b25bca50b9d627eefef0bb0b3bed8659e86444f28ef508112f33157e13872`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S03-U001/collect_ci_8db3043.sh 34093437226 101651651388`
+- selfscan: PASS; SHA-256 `931e9fbc7de83d934b22960b2036fe193cb2602f75c0db145a9a1bd0560eb754`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S03-U001/selfscan_8db3043.sh`
+- ownership-cli: PASS; SHA-256 `021ef5c4a466d52f4a32f82cc18ad5d4f54c434e72eb7127bc4c58a3cc4f46f8`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH04-S03-U001/run_offline.sh bash /evidence/run_ownership_regressions.sh exact-8db3043`
+- fifo-hosted: PASS; SHA-256 `70f4fdf892d9f19df322de29ef3def69efea21d748ffbed8531001ea011f79e3`; `python3 -B scripts/project_queue.py guard --base HEAD^`
+- juliet-hosted: PASS; SHA-256 `cb7f99c96a38f038d838dc7433cda9c56c7b686aea3480cb78d5b3fec0da63ac`; `bash scripts/run_juliet.sh ./build/src/codeskeptic juliet-work 400`
+
 ## CS3-CH04-S02-U003 — Checkpoint yalnız aynı geçerli analizi sürdürsün
 
 - Commit: `8551582173200c13fbe6b935786b0c0ce141d6b3`
