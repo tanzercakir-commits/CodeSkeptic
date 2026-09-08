@@ -12,6 +12,13 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def source_row(path, status="analyzed"):
+    return {"file": str(path), "status": status, "reason": "" if status == "analyzed" else "synthetic",
+            "commands": 1, "analyzed_commands": int(status == "analyzed"),
+            "skipped_commands": int(status == "skipped"), "failed_commands": int(status == "failed"),
+            "recovery_commands": 0, "prepass": {"status": "not_requested", "reason": "", "recovery_commands": 0}}
+
+
 def step_script(name):
     text = (ROOT / "action.yml").read_text()
     marker = "    - name: " + name + "\n"
@@ -28,11 +35,8 @@ def clean_sarif(source):
                 "accept_partial_coverage": False, "analyze_broken_tus": False,
                 "attempted_tus": 1, "analyzed_tus": 1, "broken_tus": 0,
                 "skipped_tus": 0, "failed_tus": 0, "recovery_tus": 0,
-                "incomplete_functions": 0, "skipped_commands": 0, "failed_commands": 0,
-                "sources": [{"file": str(source), "status": "analyzed", "commands": 1,
-                             "analyzed_commands": 1, "skipped_commands": 0,
-                             "failed_commands": 0, "recovery_commands": 0,
-                             "prepass": {"recovery_commands": 0}}]}
+                "incomplete_functions": 0, "attempted_commands": 1, "analyzed_commands": 1,
+                "skipped_commands": 0, "failed_commands": 0, "sources": [source_row(source)]}
     report = {"schema": "codeskeptic-report/v1", "tool": "CodeSkeptic", "tool_version": "0.4.9-test",
               "complete": True, "exit_code": 0, "status": "clean", "total": 0,
               "finding_counts": {"total": 0, "blocking": 0, "report_only": 0}}
@@ -43,6 +47,8 @@ def clean_sarif(source):
             "properties": {"codeskeptic/report": report}, "results": [],
             "invocations": [{"executionSuccessful": True, "properties": {
                 "codeskeptic/status": "clean", "codeskeptic/exitCode": 0,
+                "codeskeptic/attemptedTUs": 1, "codeskeptic/analyzedTUs": 1,
+                "codeskeptic/brokenTUs": 0, "codeskeptic/incompleteFunctions": 0,
                 "codeskeptic/blockingFindings": 0, "codeskeptic/reportOnlyFindings": 0,
                 "codeskeptic/coverage": coverage}}]}]}
 
@@ -160,14 +166,17 @@ raise SystemExit(int(settings.get('FIXTURE_EXIT', '0')))
         properties.update({"codeskeptic/status": status, "codeskeptic/exitCode": code,
                            "codeskeptic/blockingFindings": blocking, "codeskeptic/reportOnlyFindings": report_only})
         for index in range(blocking + report_only):
-            run["results"].append({"ruleId": "test-rule", "message": {"text": "synthetic finding"},
+            run["results"].append({"ruleId": "test-rule", "level": "warning", "message": {"text": "synthetic finding"},
                                    "properties": {"codeskeptic/blocksVerdict": index < blocking}})
         if status in ("incomplete", "partial-accepted"):
             coverage.update(complete=False, attempted_tus=2, skipped_tus=1, broken_tus=1,
+                            attempted_commands=2, skipped_commands=1,
                             accept_partial_coverage=status == "partial-accepted")
-            coverage["sources"].append({"file": str(self.root / "skipped.cpp"), "status": "skipped"})
+            coverage["sources"].append(source_row(self.root / "skipped.cpp", "skipped"))
+            properties.update({"codeskeptic/attemptedTUs": 2, "codeskeptic/brokenTUs": 1})
         if status == "recovery-accepted":
             coverage.update(complete=False, recovery_tus=1, analyze_broken_tus=True)
+            coverage["sources"][0]["recovery_commands"] = 1
         self.fixture.write_text(json.dumps(data))
         return code
 
@@ -262,6 +271,129 @@ raise SystemExit(int(settings.get('FIXTURE_EXIT', '0')))
     def test_recovery_count_cannot_claim_full_coverage(self):
         self.mutate_report(lambda data: data["runs"][0]["invocations"][0]["properties"]["codeskeptic/coverage"].update(recovery_tus=1))
         self.assert_failed(self.run_action())
+
+    def change_coverage(self, function):
+        self.mutate_report(lambda data: function(data["runs"][0]["invocations"][0]["properties"]["codeskeptic/coverage"]))
+
+    def test_command_aggregate_must_match_sources(self):
+        self.change_coverage(lambda coverage: coverage.update(failed_commands=99))
+        self.assert_failed(self.run_action())
+
+    def test_command_aggregate_is_required(self):
+        self.change_coverage(lambda coverage: coverage.pop("attempted_commands"))
+        self.assert_failed(self.run_action())
+
+    def test_row_recovery_must_match_aggregate(self):
+        self.change_coverage(lambda coverage: coverage["sources"][0].update(recovery_commands=1))
+        self.assert_failed(self.run_action())
+
+    def test_prepass_recovery_must_match_aggregate(self):
+        self.change_coverage(lambda coverage: coverage["sources"][0]["prepass"].update(recovery_commands=1))
+        self.assert_failed(self.run_action())
+
+    def test_duplicated_invocation_counters_must_agree(self):
+        for key in ("attemptedTUs", "analyzedTUs", "brokenTUs", "incompleteFunctions"):
+            with self.subTest(key=key):
+                self.fixture.write_text(json.dumps(clean_sarif(self.source)))
+                self.mutate_report(lambda data: data["runs"][0]["invocations"][0]["properties"].update({"codeskeptic/" + key: 99}))
+                result = self.run_action()
+                # Clear only a wrongly published test report, so every subcase runs.
+                if self.sarif.exists():
+                    self.sarif.unlink()
+                self.assert_failed(result)
+
+    def test_results_must_be_array(self):
+        self.mutate_report(lambda data: data["runs"][0].update(results={}))
+        self.assert_failed(self.run_action())
+
+    def test_non_finite_json_cannot_be_published(self):
+        for value in ("NaN", "Infinity", "-Infinity", "1e999"):
+            with self.subTest(value=value):
+                text = json.dumps(clean_sarif(self.source))
+                self.fixture.write_text(text[:-1] + ', "extra": ' + value + '}')
+                result = self.run_action()
+                if self.sarif.exists():
+                    self.sarif.unlink()
+                self.assert_failed(result)
+
+    def test_native_finding_requires_message_text(self):
+        self.scenario("findings", blocking=1)
+        self.mutate_report(lambda data: data["runs"][0]["results"][0].update(message=[]))
+        self.assert_failed(self.run_action(FIXTURE_EXIT="1"))
+
+    def test_native_row_counters_are_typed(self):
+        self.change_coverage(lambda coverage: coverage["sources"][0].update(failed_commands=False))
+        self.assert_failed(self.run_action())
+
+    def test_prepass_recovery_positive_is_preserved(self):
+        self.scenario("recovery-accepted")
+        def prepass_only(coverage):
+            coverage["sources"][0]["recovery_commands"] = 0
+            coverage["sources"][0]["prepass"].update(status="analyzed", recovery_commands=1)
+        self.change_coverage(prepass_only)
+        result = self.run_action(INPUT_GATE="error")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("sarif-valid=true", self.output.read_text())
+
+    def test_command_failure_cannot_hide_under_analyzed_status(self):
+        def contradict(coverage):
+            coverage.update(analyzed_commands=0, failed_commands=1)
+            coverage["sources"][0].update(analyzed_commands=0, failed_commands=1)
+        self.change_coverage(contradict)
+        self.assert_failed(self.run_action())
+
+    def test_unrequested_prepass_cannot_carry_recovery(self):
+        self.scenario("recovery-accepted")
+        self.change_coverage(lambda coverage: coverage["sources"][0]["prepass"].update(recovery_commands=1))
+        self.assert_failed(self.run_action())
+
+    def test_prepass_recovery_cannot_exceed_commands(self):
+        self.scenario("recovery-accepted")
+        self.change_coverage(lambda coverage: coverage["sources"][0]["prepass"].update(status="analyzed", recovery_commands=2))
+        self.assert_failed(self.run_action())
+
+    def test_recovery_requires_explicit_opt_in(self):
+        self.scenario("recovery-accepted")
+        self.change_coverage(lambda coverage: coverage.update(analyze_broken_tus=False))
+        self.assert_failed(self.run_action())
+
+    def test_prepass_promoted_skipped_with_analyzed_commands_is_valid(self):
+        self.scenario("partial-accepted")
+        def promoted(coverage):
+            coverage.update(analyzed_commands=2, skipped_commands=0)
+            row = coverage["sources"][1]
+            row.update(reason="summary_prepass_skipped", analyzed_commands=1, skipped_commands=0)
+            row["prepass"].update(status="skipped", reason="parse_errors")
+        self.change_coverage(promoted)
+        result = self.run_action(INPUT_GATE="error")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("sarif-valid=true", self.output.read_text())
+
+    def test_native_failed_and_zero_command_reports_are_retained(self):
+        for zero_commands in (False, True):
+            with self.subTest(zero_commands=zero_commands):
+                data = clean_sarif(self.source)
+                run = data["runs"][0]
+                run["properties"]["codeskeptic/report"].update(status="failed", complete=False, exit_code=2)
+                invocation = run["invocations"][0]
+                invocation["executionSuccessful"] = False
+                properties = invocation["properties"]
+                properties.update({"codeskeptic/status": "failed", "codeskeptic/exitCode": 2, "codeskeptic/analyzedTUs": 0})
+                coverage = properties["codeskeptic/coverage"]
+                coverage.update(complete=False, analyzed_tus=0, failed_tus=1)
+                row = coverage["sources"][0]
+                row.update(status="failed", reason="summary_prepass_failed")
+                row["prepass"].update(status="failed", reason="synthetic failure")
+                if zero_commands:
+                    coverage.update(attempted_commands=0, analyzed_commands=0)
+                    row.update(commands=0, analyzed_commands=0, reason="missing_input")
+                    row["prepass"].update(status="not_requested", reason="")
+                self.fixture.write_text(json.dumps(data))
+                result = self.run_action(FIXTURE_EXIT="2")
+                self.assert_failed(result)
+                self.assertIn("sarif-valid=true", self.output.read_text())
+                self.sarif.unlink()
+                self.output.unlink()
 
 
 if __name__ == "__main__":
