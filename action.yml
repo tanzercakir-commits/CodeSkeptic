@@ -25,7 +25,7 @@ inputs:
   upload-sarif:
     description: "Upload the SARIF to GitHub code scanning (needs security-events: write)"
     required: false
-    default: "true"
+    default: "false"
   gate:
     description: >-
       report-only (default): supported findings inform without failing the job.
@@ -131,37 +131,11 @@ runs:
         INPUT_GATE: ${{ inputs.gate }}
         INPUT_EXTRA_ARGS: ${{ inputs.extra-args }}
       run: |
-        set -uo pipefail
-        args=( "$INPUT_PATH" --sarif "$INPUT_SARIF_PATH" )
-        if [ -n "$INPUT_BUILD_PATH" ]; then
-          args+=( --build-path "$INPUT_BUILD_PATH" )
-        fi
-        # Shell-style quoting plus environment-variable expansion, still
-        # strictly data-only: no eval, command substitution, or globbing.
-        parsed_args=$(mktemp "$RUNNER_TEMP/codeskeptic-args-XXXXXX")
-        trap 'rm -f "$parsed_args"' EXIT
-        if ! python3 "$GITHUB_ACTION_PATH/scripts/action_args.py" \
-             "$INPUT_EXTRA_ARGS" > "$parsed_args"; then
-          exit 2
-        fi
-        mapfile -d '' -t extra < "$parsed_args"
-        rm -f "$parsed_args"
-        trap - EXIT
-        code=0
-        codeskeptic "${args[@]}" "${extra[@]}" || code=$?
-        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
-        if [ "$code" -gt 1 ]; then
-          echo "::error::codeskeptic failed (exit $code)"; exit "$code"
-        fi
-        if [ "$code" -eq 1 ]; then
-          if [ "$INPUT_GATE" = "error" ]; then
-            echo "::error::CodeSkeptic reported supported findings (gate: error)"; exit 1
-          fi
-          echo "::notice::CodeSkeptic reported supported findings (gate: report-only — job stays green)"
-        fi
+        set -euo pipefail
+        python3 -B "$GITHUB_ACTION_PATH/scripts/action_run.py"
 
     - name: Upload SARIF to code scanning
-      if: ${{ inputs.upload-sarif == 'true' }}
+      if: ${{ always() && inputs.upload-sarif == 'true' && steps.analyze.outputs.sarif-valid == 'true' }}
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: ${{ inputs.sarif }}
