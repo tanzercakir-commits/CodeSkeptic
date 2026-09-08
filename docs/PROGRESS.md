@@ -2,6 +2,22 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH05-S02-U002 — Gerçek proje ve performans kabulünü ölç
+
+- Commit: `071dd559eac5c0944355215ce2dbf53c6daa97f0`
+- Dal: `agent/cs3-ch05-s02-u002-product-measurement`
+- Implementer: `root-cs3-ch05-s02-u002-20260908`
+- Bağımsız denetçi: `/root/ownership_model_verifier`
+- İnceleme SHA-256: `188c77e1452c035e5674ff98c57b27d63f08bfe66d660e3866d192a17f4432f8`
+- Tarih: 2026-09-08T06:34:19.869848+00:00
+- Sonuç: Sabit girdilerde kullanılabilirlik, latency ve false positive yükü ölçülür.
+- linux-suite: PASS; SHA-256 `b6e47e8322677c27a230df5abec0ebb8f5453cbf178e80dfb620b45f4e7c1557`; `bash scripts/local_test.sh full && python3 -B scripts/test_measure_product.py && python3 -B tests/cwe_corpus/test_catalog.py`
+- relevant-corpus: PASS; SHA-256 `da420d8b12c528243d04605b28ebcfe2f75b9f96d15f81d549438ee2f0f63a26`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S02-U002/offline_measurement.sh c4fa60864f2e5853581c2f8a0dd66a3fc967239b measure`
+- queue-check: PASS; SHA-256 `eaa549605cd43aeb27a9b55b398ae3ad3a2680311fdea7d06ef2b8d42bfbb240`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S02-U002/final_checks.sh`
+- evidence-continuity: PASS; SHA-256 `eaa549605cd43aeb27a9b55b398ae3ad3a2680311fdea7d06ef2b8d42bfbb240`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S02-U002/verify_measurement.py`
+- adjudication: PASS; SHA-256 `ebd3fec686cdb09cda893c66a3b05d094f9fab72566ab48a5a65bae73ddfd6a0`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S02-U002/verify_adjudication.py`
+- measurement-execution: PASS; SHA-256 `1edd74606eca843e4265490384312bdf50297a4fd24d4ad11956cf6a3cd78605`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S02-U002/offline_measurement.sh c4fa60864f2e5853581c2f8a0dd66a3fc967239b measure`
+
 ## CS3-CH05-S02-U001 — Sınırlı sanitizer/fuzz ve bozuk girdi kabulünü tamamla
 
 - Commit: `9a9ccdda5c44f0b0a7c02cede8334510fa8edac8`
