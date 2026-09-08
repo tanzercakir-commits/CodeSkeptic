@@ -190,3 +190,23 @@ değişmez. Yeni 0.90/0.70 ürün profili bunun yerine geçmez. Testlerdeki sent
 capability/terfi yalnız metadata transition positive kontrolüdür; detector uygulaması,
 ground truth veya ürün ölçümü değildir. Native testlerdeki mevcut 15/7 beklentilerini
 gelecekte değiştirmek ilgili gerçek kural/terfi görevlerinin ayrı source review işidir.
+
+## U003 seçim muhasebesi — henüz dondurulmamış hazırlık
+
+[Yeni sonuç kaydı](product-quality-results.md) gerçek hazırlık ile eksik değerlendirmeyi
+ayırır. Şu an yalnız üç upstream kaynak envanteri ve eski occurrence kayıtları doğrulandı;
+`scripts/product_profiles.json` DRAFT_NOT_FROZEN'dır. İlk yeni analyzer sonucu yoktur.
+
+Yakın kopya kuralının muhafazakâr uygulaması: semantik cluster global tek kota kredisi
+alır; bad/fixed çift üyeleri farklı hash/role diye iki bağımsız örnek sayılmaz.
+Zorunlu gerçek çiftler ayrıca supplemental değerlendirmede saklanır, bütün gözlemleri
+ve başarısızlıkları görünür kalır ve bağımsız kota-cohort sonucunu düzeltemez. Bu bir
+yeni görev kabulü değil, mevcut bağımsızlık şartını sayım şişirmeden uygulama tercihidir.
+Kaynak kökeni ve cluster/etiket gerekçesi bağımsız kaynak incelemesi ister; üç keyfi
+origin etiketi veya üç farklı repo adresi otomatik üç bağımsız köken değildir.
+
+Ön sayısal bütçeler sonuç kaydında ve LIMITS sözleşmesinde görünürdür; bu görevdeki
+gerçek freeze ve bağımsız kabulden sonra sonuçlara bakılarak değiştirilemez.
+Ortam kimlikleri ölçüm öncesi gerçekten yakalanıp karşılaştırılmalıdır; eski rolling
+hosted image gözlemi replay edilebilir sabit image diye sunulamaz. Eksik kaynak/etiket,
+güvenlik-fix incelemesi veya ortam kanıtı task/FIFO kapanışında atlanamaz.
