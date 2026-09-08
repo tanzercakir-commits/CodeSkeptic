@@ -1,6 +1,7 @@
 #include "analyzer/StaticAnalyzer.h"
 #include "analyzer/AnalysisState.h"
 #include "analyzer/AnalysisCoordinator.h"
+#include "analyzer/CheckpointTime.h"
 #include "source_manager/CompilationDatabaseDiscovery.h"
 
 #include "analyzer/Baseline.h"
@@ -112,7 +113,7 @@ std::string checkpointParentIdentity(const Config& config, const std::vector<Wor
         const auto digest = inputDigest(bytes);
         checkpointRequire(!expected || *expected == digest, "checkpoint_config_changed");
         checkpointField(identity, digest);
-        checkpointField(identity, std::to_string(std::filesystem::last_write_time(path).time_since_epoch().count()));
+        checkpointField(identity, checkpointTickIdentity(std::filesystem::last_write_time(path).time_since_epoch().count()));
     };
     for (const auto& input : config.configurationInputs()) file(input.first, &input.second);
     if (!database.empty()) file(database);
@@ -120,7 +121,7 @@ std::string checkpointParentIdentity(const Config& config, const std::vector<Wor
     if (!config.summaryIn().empty()) {
         file(config.summaryIn());
         for (const auto& request : requests)
-            checkpointField(identity, std::to_string(std::filesystem::last_write_time(request.source).time_since_epoch().count()));
+            checkpointField(identity, checkpointTickIdentity(std::filesystem::last_write_time(request.source).time_since_epoch().count()));
     }
     if (config.writeBaselinePath().empty() && !config.baselinePath().empty()) file(config.baselinePath());
     for (const auto& path : config.reportPaths()) {

@@ -237,7 +237,10 @@ independent audit; a self-authored helper result is not external qualification.
 
 Local `python3 -B scripts/test_platform_workflow.py` checks version preservation,
 candidate/tag boundaries, bounded archive handling and negative report/runner
-evidence. It does not run native Windows/macOS binaries. Existing frozen
+evidence. Its checkpoint-tick regression also compiles a small C++17 program
+with an already-installed wide-integer-capable compiler, covering signed minima
+and high bits without narrowing. No compiler is downloaded. This local check
+does not run native Windows/macOS binaries. Existing frozen
 `tests/WorkflowPolicyTest.py`, `tests/ReleaseWorkflowTest.py` and package/SBOM
 regressions remain unchanged. Until the hosted profile passes, the corresponding
 support entries stay pending rather than claiming platform compatibility.

@@ -8,6 +8,7 @@ import io
 import json
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import tempfile
 import tarfile
@@ -346,6 +347,65 @@ class NativeEvidenceTests(unittest.TestCase):
         self.assertFalse((output / "result.json").exists())
         self.assertEqual(json.loads((output / "scans/cpp-finding.command.json").read_bytes())["exit_code"], 7)
         self.assertTrue(list(output.glob("*.zip")))
+
+
+class CheckpointTimeTests(unittest.TestCase):
+    def test_native_and_wide_ticks_are_lossless(self):
+        compiler = "/usr/bin/c++" if Path("/usr/bin/c++").is_file() else shutil.which("c++")
+        self.assertIsNotNone(compiler, "a local C++17 compiler is required; no download is performed")
+        source = r'''
+#include "analyzer/CheckpointTime.h"
+#include <cstdint>
+#include <filesystem>
+#include <iostream>
+#include <limits>
+template<class T> void emit(T value) {
+    std::cout << codeskeptic::checkpointTickIdentity(value) << '\n';
+}
+int main() {
+    for (long long value = -257; value <= 257; ++value) {
+        if (codeskeptic::checkpointTickIdentity(value) != std::to_string(value)) return 1;
+    }
+    emit(0); emit(-1); emit(42); emit(-42);
+    emit(std::numeric_limits<std::int32_t>::min());
+    emit(std::numeric_limits<std::int32_t>::max());
+    emit(std::numeric_limits<std::int64_t>::min());
+    emit(std::numeric_limits<std::int64_t>::max());
+    emit(std::numeric_limits<std::uint64_t>::max());
+    using Rep = std::filesystem::file_time_type::duration::rep;
+    emit(Rep(0)); emit(Rep(-1));
+#if defined(__SIZEOF_INT128__)
+    using Wide = __int128_t;
+    const Wide high = Wide(1) << 100;
+    emit(high); emit(high + 42); emit(-high); emit(-high - 42);
+    emit(std::numeric_limits<Wide>::min()); emit(std::numeric_limits<Wide>::max());
+    emit(std::numeric_limits<__uint128_t>::max());
+#else
+    std::cout << "wide-representation-unavailable\n";
+#endif
+}
+'''
+        with tempfile.TemporaryDirectory(prefix="checkpoint time compiler fixture ") as temporary:
+            work = Path(temporary)
+            unit, binary = work / "ticks.cpp", work / "ticks"
+            unit.write_text(source)
+            result = subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror",
+                                     "-I", str(REPO / "src"), str(unit), "-o", str(binary)],
+                                    capture_output=True, text=True, timeout=45)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            executed = subprocess.run([str(binary)], capture_output=True, text=True, timeout=10)
+            self.assertEqual(executed.returncode, 0, executed.stderr)
+        expected = [0, -1, 42, -42, -(1 << 31), (1 << 31) - 1, -(1 << 63), (1 << 63) - 1,
+                    (1 << 64) - 1, 0, -1, 1 << 100, (1 << 100) + 42, -(1 << 100), -(1 << 100) - 42,
+                    -(1 << 127), (1 << 127) - 1, (1 << 128) - 1]
+        self.assertEqual(executed.stdout.splitlines(), [str(value) for value in expected],
+                         "this portability regression requires a compiler with wide integer support")
+
+    def test_both_checkpoint_paths_use_full_tick_encoder(self):
+        source = (REPO / "src/analyzer/StaticAnalyzer.cpp").read_text()
+        self.assertIn('#include "analyzer/CheckpointTime.h"', source)
+        self.assertEqual(source.count("checkpointTickIdentity(std::filesystem::last_write_time("), 2)
+        self.assertNotIn("std::to_string(std::filesystem::last_write_time(", source)
 
 
 class RoutingTests(unittest.TestCase):
