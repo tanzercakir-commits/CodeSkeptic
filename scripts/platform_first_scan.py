@@ -266,13 +266,13 @@ def execute(argv, cwd, environment, output, label, timeout=60):
     return result
 
 
-def validate_report(report, version, expected, language):
+def validate_report(report, version, expected, language, source):
     require(isinstance(report, dict) and report.get("schema") == "codeskeptic-report/v1"
             and report.get("tool") == "CodeSkeptic" and report.get("tool_version") == version,
             "native report identity mismatch")
     require(type(report.get("exit_code")) is int and report["exit_code"] == expected
             and report.get("complete") is (expected != 2)
-            and report.get("status") == {0: "clean", 1: "findings", 2: "incomplete"}[expected], "native report verdict mismatch")
+            and report.get("status") == {0: "clean", 1: "findings", 2: "failed"}[expected], "native report verdict mismatch")
     evidence = report.get("evidence")
     expected_flags = {"no_inputs", "no_rules", "tool_failed", "summary_load_failed", "summary_stale",
                       "summary_save_failed", "baseline_load_failed", "baseline_write_failed", "baseline_recorded", "report_write_failed"}
@@ -282,9 +282,32 @@ def validate_report(report, version, expected, language):
     coverage = report.get("coverage")
     require(isinstance(coverage, dict) and coverage.get("schema") == "codeskeptic-source-coverage/v1",
             "native coverage missing")
-    require(all(type(coverage.get(key)) is int for key in ("attempted_tus", "analyzed_tus", "broken_tus")), "native coverage counters must be integers")
-    require(coverage.get("attempted_tus") == 1 and coverage.get("analyzed_tus") == (0 if expected == 2 else 1)
-            and coverage.get("broken_tus") == (1 if expected == 2 else 0), "native coverage mismatch")
+    analyzed, skipped = (0, 1) if expected == 2 else (1, 0)
+    expected_counts = {"attempted_tus": 1, "analyzed_tus": analyzed, "broken_tus": skipped,
+                       "skipped_tus": skipped, "failed_tus": 0, "recovery_tus": 0,
+                       "attempted_commands": 1, "analyzed_commands": analyzed,
+                       "skipped_commands": skipped, "failed_commands": 0, "incomplete_functions": 0}
+    require(all(type(coverage.get(key)) is int and coverage[key] == value
+                for key, value in expected_counts.items()), "native coverage counters mismatch")
+    require(coverage.get("complete") is (expected != 2)
+            and coverage.get("accept_partial_coverage") is False
+            and coverage.get("analyze_broken_tus") is False, "native coverage acceptance mismatch")
+    expected_source = Path(source).resolve()
+    def same_source(value):
+        return isinstance(value, str) and Path(value).is_absolute() and Path(value).resolve() == expected_source
+    sources = coverage.get("sources")
+    require(isinstance(sources, list) and len(sources) == 1 and isinstance(sources[0], dict), "one native source row required")
+    row = sources[0]
+    require(same_source(row.get("file")) and row.get("status") == ("skipped" if skipped else "analyzed")
+            and row.get("reason") == ("broken_translation_unit" if skipped else "analyzed"), "native source identity/status mismatch")
+    command_counts = {"commands": 1, "analyzed_commands": analyzed, "skipped_commands": skipped,
+                      "failed_commands": 0, "recovery_commands": 0}
+    require(all(type(row.get(key)) is int and row[key] == value for key, value in command_counts.items()),
+            "native source commands mismatch")
+    prepass = row.get("prepass")
+    require(isinstance(prepass, dict) and prepass.get("status") == "not_requested"
+            and prepass.get("reason") == "" and type(prepass.get("recovery_commands")) is int
+            and prepass["recovery_commands"] == 0, "unexpected native prepass/recovery")
     counts = report.get("finding_counts")
     diagnostics = report.get("diagnostics")
     require(isinstance(counts, dict) and isinstance(diagnostics, list)
@@ -293,8 +316,12 @@ def validate_report(report, version, expected, language):
             and type(report.get("total")) is int and report["total"] == len(diagnostics)
             and counts["total"] == len(diagnostics)
             and counts["blocking"] + counts["report_only"] == counts["total"], "native finding counts mismatch")
+    require(all(isinstance(d, dict) and type(d.get("blocks_verdict")) is bool and same_source(d.get("file"))
+                for d in diagnostics), "native diagnostic source/blocking evidence mismatch")
+    require(sum(d["blocks_verdict"] for d in diagnostics) == counts["blocking"], "native blocking counts mismatch")
     if expected == 1:
-        require(counts.get("blocking", 0) >= 1 and any(isinstance(d, dict) and d.get("rule_id") == "null-deref" for d in diagnostics), "supported native finding missing")
+        require(counts["blocking"] >= 1 and any(d.get("rule_id") == "null-deref" and d["blocks_verdict"]
+                and d.get("capability_tier") == "supported" for d in diagnostics), "supported native finding missing")
     else:
         require(not diagnostics and counts.get("blocking") == 0 and counts.get("report_only") == 0, "unexpected native findings")
     return {"language": language, "exit_code": expected, "complete": expected != 2,
@@ -370,7 +397,7 @@ def qualify(args):
                     report_path = scans / (label + "-rapor-ç.json")
                     execution = execute([str(binary), str(source), "--build-path", str(fixture), "--lang", "en", "--json", str(report_path)], extraction, env, scans, label)
                     require(execution["exit_code"] == expected, "first-scan exit mismatch: " + label)
-                    report = validate_report(parse_json(read_regular(report_path)), args.version, expected, language)
+                    report = validate_report(parse_json(read_regular(report_path)), args.version, expected, language, source)
                     cases.append({"name": label, "input_sha256": file_hash(source), "database_sha256": file_hash(database),
                                   "report_sha256": file_hash(report_path), "execution": execution, "verdict": report})
             dependency_bytes = read_regular(package / "DEPENDENCIES.txt")

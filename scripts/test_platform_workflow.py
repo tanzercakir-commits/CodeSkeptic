@@ -64,13 +64,24 @@ class NativeEvidenceTests(unittest.TestCase):
         self.work = Path(self.temporary.name)
 
     @staticmethod
-    def report(code=0):
-        diagnostics = [{"rule_id": "null-deref"}] if code == 1 else []
+    def report(code=0, source="/native/güvenli_çalışma.c"):
+        analyzed, skipped = (0, 1) if code == 2 else (1, 0)
+        diagnostics = [{"rule_id": "null-deref", "blocks_verdict": True,
+                        "capability_tier": "supported", "file": source}] if code == 1 else []
         return {"schema": "codeskeptic-report/v1", "tool": "CodeSkeptic", "tool_version": "0.4.9-dev+g0123456789ab",
                 "exit_code": code, "complete": code != 2,
-                "status": {0: "clean", 1: "findings", 2: "incomplete"}[code],
+                "status": {0: "clean", 1: "findings", 2: "failed"}[code],
                 "coverage": {"schema": "codeskeptic-source-coverage/v1", "attempted_tus": 1,
-                             "analyzed_tus": 0 if code == 2 else 1, "broken_tus": 1 if code == 2 else 0},
+                             "analyzed_tus": analyzed, "broken_tus": skipped, "skipped_tus": skipped,
+                             "failed_tus": 0, "recovery_tus": 0, "attempted_commands": 1,
+                             "analyzed_commands": analyzed, "skipped_commands": skipped, "failed_commands": 0,
+                             "incomplete_functions": 0, "complete": code != 2,
+                             "accept_partial_coverage": False, "analyze_broken_tus": False,
+                             "sources": [{"file": source, "status": "skipped" if skipped else "analyzed",
+                                          "reason": "broken_translation_unit" if skipped else "analyzed",
+                                          "commands": 1, "analyzed_commands": analyzed, "skipped_commands": skipped,
+                                          "failed_commands": 0, "recovery_commands": 0,
+                                          "prepass": {"status": "not_requested", "reason": "", "recovery_commands": 0}}]},
                 "finding_counts": {"total": len(diagnostics), "blocking": len(diagnostics), "report_only": 0},
                 "total": len(diagnostics), "diagnostics": diagnostics,
                 "evidence": {"no_inputs": False, "no_rules": False, "tool_failed": False,
@@ -82,7 +93,7 @@ class NativeEvidenceTests(unittest.TestCase):
     def test_three_verdicts_preserved(self):
         for code in (0, 1, 2):
             with self.subTest(code=code):
-                result = native.validate_report(self.report(code), "0.4.9-dev+g0123456789ab", code, "c")
+                result = native.validate_report(self.report(code), "0.4.9-dev+g0123456789ab", code, "c", "/native/güvenli_çalışma.c")
                 self.assertEqual(result["exit_code"], code)
                 self.assertEqual(result["complete"], code != 2)
 
@@ -95,13 +106,34 @@ class NativeEvidenceTests(unittest.TestCase):
             report = self.report()
             change(report)
             with self.subTest(report=report), self.assertRaises(ValueError):
-                native.validate_report(report, "0.4.9-dev+g0123456789ab", 0, "c")
+                native.validate_report(report, "0.4.9-dev+g0123456789ab", 0, "c", "/native/güvenli_çalışma.c")
 
     def test_supported_finding_is_required(self):
         report = self.report(1)
-        report["diagnostics"] = [{"rule_id": "experimental-only"}]
+        report["diagnostics"][0]["rule_id"] = "experimental-only"
         with self.assertRaisesRegex(ValueError, "supported native finding"):
-            native.validate_report(report, "0.4.9-dev+g0123456789ab", 1, "cpp")
+            native.validate_report(report, "0.4.9-dev+g0123456789ab", 1, "cpp", "/native/güvenli_çalışma.c")
+
+    def test_native_profile_rejects_inconsistent_coverage(self):
+        changes = [lambda c: c.update(complete=False), lambda c: c.update(failed_tus=1),
+                   lambda c: c.update(accept_partial_coverage=True), lambda c: c.update(analyze_broken_tus=True),
+                   lambda c: c.update(recovery_tus=1), lambda c: c.update(attempted_commands=2),
+                   lambda c: c.update(analyzed_commands=True), lambda c: c.update(incomplete_functions=1),
+                   lambda c: c["sources"][0].update(status="failed"),
+                   lambda c: c["sources"][0].update(commands=2), lambda c: c["sources"][0].update(failed_commands=1),
+                   lambda c: c["sources"][0]["prepass"].update(recovery_commands=1),
+                   lambda c: c.update(sources=[])]
+        for index, change in enumerate(changes):
+            report = self.report()
+            change(report["coverage"])
+            with self.subTest(case=index), self.assertRaises(ValueError):
+                native.validate_report(report, "0.4.9-dev+g0123456789ab", 0, "c", "/native/güvenli_çalışma.c")
+
+    def test_nonblocking_null_diagnostic_cannot_prove_blocking(self):
+        report = self.report(1)
+        report["diagnostics"][0]["blocks_verdict"] = False
+        with self.assertRaises(ValueError):
+            native.validate_report(report, "0.4.9-dev+g0123456789ab", 1, "c", "/native/güvenli_çalışma.c")
 
     def test_boolean_counters_and_false_clean_evidence_rejected(self):
         for change in (lambda r: r["coverage"].update(attempted_tus=True),
@@ -111,7 +143,27 @@ class NativeEvidenceTests(unittest.TestCase):
             report = self.report()
             change(report)
             with self.subTest(report=report), self.assertRaises(ValueError):
-                native.validate_report(report, "0.4.9-dev+g0123456789ab", 0, "c")
+                native.validate_report(report, "0.4.9-dev+g0123456789ab", 0, "c", "/native/güvenli_çalışma.c")
+
+    def test_report_is_bound_to_exact_unicode_source(self):
+        source = self.work / "güvenli_çalışma.c"
+        source.write_text("int value(void) { return 42; }\n")
+        for code in (0, 1, 2):
+            report = self.report(code, str(source))
+            native.validate_report(report, "0.4.9-dev+g0123456789ab", code, "c", source)
+            report["coverage"]["sources"][0]["file"] = str(self.work / "other.c")
+            with self.assertRaisesRegex(ValueError, "source identity"):
+                native.validate_report(report, "0.4.9-dev+g0123456789ab", code, "c", source)
+        report = self.report(1, str(source))
+        report["diagnostics"][0]["file"] = str(self.work / "other.c")
+        with self.assertRaisesRegex(ValueError, "diagnostic source"):
+            native.validate_report(report, "0.4.9-dev+g0123456789ab", 1, "c", source)
+
+    def test_all_broken_profile_cannot_be_partial_incomplete(self):
+        report = self.report(2)
+        report["status"] = "incomplete"
+        with self.assertRaisesRegex(ValueError, "verdict mismatch"):
+            native.validate_report(report, "0.4.9-dev+g0123456789ab", 2, "c", "/native/güvenli_çalışma.c")
 
     def test_non_native_runner_rejected(self):
         with patch.object(native.platform, "system", return_value="Linux"), patch.object(native.platform, "machine", return_value="x86_64"):
@@ -253,7 +305,7 @@ class NativeEvidenceTests(unittest.TestCase):
                 data, code = native.canonical({"schema_version": 2, "product": "CodeSkeptic", "version": version}), 0
             else:
                 code = 0 if label.endswith("clean") else 1 if label.endswith("finding") else 2
-                report = self.report(code)
+                report = self.report(code, str(Path(argv[1]).resolve()))
                 report_path = Path(argv[-1])
                 report_path.write_bytes(native.canonical(report))
                 data = b"synthetic command, not native execution\n"
