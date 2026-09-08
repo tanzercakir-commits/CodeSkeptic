@@ -2,26 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH08-S01-U001
-
-### CS3-CH08-S01-U001 — Yeni ürün planını ve bitiş sözleşmesini FIFO'ya bağla
-
-**Sonuç:** Yeni ürün planı ayrı dosyadadır; eski 46 kayıt değişmeden kalır ve ürün tamamlanmasının teknik/yayın koşulları açıkça tanımlanır.
-
-**Kabul:**
-
-- docs/PRODUCT_COMPLETION_PLAN.md yalnız CH08+ ürün hedeflerini anlatır; tek yürütülebilir kuyruk BOOK/PLAN/TODO/PROGRESS'tir. Görev ID/kapsam/kabul eşleşmesi otomatik test edilir; ikinci elle tutulan TODO oluşturulmaz.
-- Önceki PLAN'ın 4fd4a21 exact içeriği tarihsel arşiv dosyasında korunur. Eski tamamlanmış kayıtlar ve kanıtlar byte/eşitlik denetiminden geçer; önceki yerel bitiş bir yayın başarısı olarak yeniden adlandırılmaz.
-- Sahibin piyasa açısından değerli CWE ekleme isteğiyle hedef mevcut 12 + yeni 4 CWE ailesi olmak üzere 16 supported/blocking ailedir; eski 5 experimental terfi ve yeni format-string/CWE-134, command-injection/CWE-78, sql-injection/CWE-89, path-traversal/CWE-22 aileleri zorunludur. Bounds ayrıca CWE-121/122 proven write alt türlerini ekler; toplam 19 public diagnostic/26 CWE-ID yalnız sınırları kanıtlanmış destek iddiasıdır. Üç project diagnostic report-only kalır; sınırsız taint/race/IDE/cloud kapsam dışıdır.
-- G1–G8 bitiş kapıları, sınırlı OS/SDK profilleri, yeni kalite eşikleri ve gerçek yayın zorunluluğu sonuçlardan önce kaydedilir. Main/tag/yayın/imza için plan onayı işlem yetkisi sayılmaz; eksik dış onay sonlandırmayı engeller.
-- 2025 MITRE Top 25/Top 10 KEV ve resmi CWE-134 gerekçesi kaynaklı piyasa-priority matrisi docs/market-cwe-priorities.md'de yer alır; bu öncelik vekilidir, satış/sertifika veya bütün Top25 kapsamı iddiası değildir.
-- Sekiz dosyalık aktivasyonun değiştirdiği tests/test_project_queue.py için exact eski/yeni kaynak farkına bağlı prospective inventory/catalog successor, eski snapshot/receipt silinmeden bağımsız doğrulanır. İlk normal görev bitiminde eski cwe_quality integrity de yeniden geçer; bu bir kalite eşiği/pin gevşetmesi değildir.
-- Korumalı inventory/catalog değişikliği yalnız bu task'ın gerçek kaynak/test/tier farkına bağlı, bağımsız sınıflandırmalı prospective successor'dır; eski snapshot/receipt/fixture anlamı ve daha sıkı floors korunur. Yeni frozen değerlendirme seti bu izinle düzenlenmez.
-
-**Test bütçesi:** T0
-**Kontroller:** plan-contract, queue-check
-**Kapsam:** docs/PRODUCT_COMPLETION_PLAN.md, docs/product-quality-contract.md, docs/archive/CWE_RESTART_PLAN_2026-09-08.md, scripts/product_completion_plan.py, scripts/test_product_completion_plan.py, README.md, RELEASE_NOTES.md, docs/release-checklist.md, tests/cwe_corpus/regression_inventory.json, tests/cwe_corpus/catalog.json, docs/market-cwe-priorities.md, docs/CWE_SCOPE.md
-**Bağımlılıklar:** CS3-CH07-S01-U002
+## FRONT — CS3-CH08-S01-U002
 
 ### CS3-CH08-S01-U002 — Katalog ve capability sözleşmesini eklemeli kanıt sürümlerine hazırla
 
