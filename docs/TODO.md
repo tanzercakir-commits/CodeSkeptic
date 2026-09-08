@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH06-S01-U001
-
-### CS3-CH06-S01-U001 — Linux kurulabilir artifact üret
-
-**Sonuç:** Temiz ortamda açılıp çalışan sürümlü Linux paketi üretilir.
-
-**Kabul:**
-
-- CLI ve bütün temel çıktı biçimleri kaynak build ile aynı normalize sonucu verir.
-- LLVM/runtime bağımlılıkları ve lisanslar eksiksizdir; geliştirme build'i release gibi adlandırılmaz.
-- Paket first-scan smoke'tan geçer; normal kullanım sudo gerektirmez.
-
-**Test bütçesi:** T3
-**Kontroller:** release-qualification, queue-check
-**Kapsam:** scripts/package_release.sh, CMakeLists.txt, src/CMakeLists.txt, docs/release-checklist.md, tests/PackageTest.py, scripts/test_package.py, scripts/package_linux.py
-**Bağımlılıklar:** Yok
+## FRONT — CS3-CH06-S01-U002
 
 ### CS3-CH06-S01-U002 — Container ve Action paketinde analiz paritesini doğrula
 

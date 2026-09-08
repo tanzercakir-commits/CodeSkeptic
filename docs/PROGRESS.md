@@ -2,6 +2,18 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH06-S01-U001 — Linux kurulabilir artifact üret
+
+- Commit: `00d8b2fb84e8d98b9258375b241fdf712b2f4854`
+- Dal: `agent/cs3-ch06-s01-u001-linux-package`
+- Implementer: `root-cs3-ch06-s01-u001-20260908`
+- Bağımsız denetçi: `/root/ownership_model_verifier`
+- İnceleme SHA-256: `787972bea8f66d4b0b922ea254f164ef1f57c70c5d65869017427521bfec0100`
+- Tarih: 2026-09-08T07:32:35.778941+00:00
+- Sonuç: Temiz ortamda açılıp çalışan sürümlü Linux paketi üretilir.
+- release-qualification: PASS; SHA-256 `d4f9812d5d30bcdadc97516a22d5deb1aa622c7fda20f2a9953e7c99ca3f2716`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH06-S01-U001/helpers/final-checks.sh`
+- queue-check: PASS; SHA-256 `147cf6ccf9423c0f166c7a28add116ff5ef81010b9b817ed58a9634244f2024a`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH06-S01-U001/helpers/final-checks.sh`
+
 ## CS3-CH05-S02-U002 — Gerçek proje ve performans kabulünü ölç
 
 - Commit: `071dd559eac5c0944355215ce2dbf53c6daa97f0`
