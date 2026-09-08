@@ -53,7 +53,72 @@ compile commands and any project dependencies; these are not bundled.
    feature-only publication. No hosted CI, release, signature, main merge or
    broader platform success is implied by local results.
 
-## Current evidence
+## Local qualification — 2026-09-08
 
-Qualification pending: the implementation and focused regressions are being
-prepared. No current artifact execution or new support claim is recorded yet.
+Measured source: `a23cf319264847c752a4fdc55ce2f3cadb196f78`;
+binary identity: `0.4.9-dev+ga23cf3192648`. The later documentation checkpoint
+does not rebuild or relabel this artifact. This is the existing unoptimized
+development CMake profile, not a performance-qualified production release.
+
+- Binary SHA-256: `5272baff931cae3dbd21c51409dd129a607df983a69e851b3f6cf57e5e845677`.
+- Archive: `codeskeptic-v0.4.9-dev+ga23cf3192648-linux-x86_64.tar.gz`.
+- Archive SHA-256: `25fca8890ddab665670ec2d68ac2df7534ed83f296edd07ebd585f7ce27b8416`.
+- Build/assembly image: `25640c190484acc04e0dab2c64f8683668ad33930a3670900ff407023efc7fc5`
+  (Ubuntu, LLVM/Clang 20.1.2). Clean runtime image:
+  `045183670ef29ce21bc22a8d4f62511ce472679ca8fc9774f04181f7f383ca62`
+  (Ubuntu 24.04.4, x86_64). Both were cached; no download or sudo was used.
+- Assembly and runtime: non-root, offline, read-only inputs/root filesystem,
+  zero kernel capability sets, 2 CPUs, 6 GiB memory, 256 PIDs, 1 GiB temporary
+  filesystem. Configured swap allowance is another 6 GiB, not a 6-GiB combined
+  memory-plus-swap bound. Both containers exited 0 and were removed successfully.
+
+The seven initial synthetic regressions failed against the former packager;
+all 21 expanded regressions passed locally and in the build image. Existing
+OutputParity CLI tests passed 5/5, FirstScan recipes 12/12 and ResourceDir tests
+9/9. FirstScan's binary-only installation test is **not** the isolation proof.
+All 124 protected quality inputs remain unchanged.
+
+Actual source-versus-package qualification ran 6 scenarios × 4 formats on each
+binary (48 runs): clean C/C++, blocking C/C++, report-only, incomplete,
+explicitly accepted partial coverage, and explicitly accepted recovery.
+All 24 comparisons preserve the complete structured report, exit, findings,
+coverage, completeness, version and capability discovery. Console and HTML
+visible findings, notes, CWE labels and verdicts also match; only the one
+HTML header's wall-clock generation minute is normalized. Dates inside finding
+messages are not changed. Existing format parsing is pinned to protected
+`tests/OutputParityCliTest.py` SHA-256
+`a49ee42d2b9b3cc880bf4ad8fb118e0b0d0953374579f182e8f089dd06559c7d`.
+
+The real runtime unpacked into a path with spaces, with no source/build mount,
+LLVM installation or Python. Both C and C++ fixtures include packaged
+`stddef.h`. Temporarily removing intrinsic headers makes the scan fail with
+exit 2; removing the package's LLVM makes the loader fail with exit 127.
+Both negatives only touch the disposable extraction and restore the files;
+the original archive is preserved. Final archive, expanded and restored-tree
+inventories and file hashes agree exactly. All 12 non-core DSOs resolve inside
+the package; host dependency rows reconcile with the complete actual loader
+closure. Equivalent loader `../` segments are normalized to exact package paths,
+not accepted by a loose substring match.
+
+The 13 component entries cover the intrinsic headers and 12 bundled libraries.
+A separate read-only check reconciles original installed owners/versions,
+every header and library byte, project LICENSE/README, distribution copyright
+notices and referenced common license texts. This evidence covers this actual
+dynamic-runtime artifact; it is not an audit of every possible static-link or
+third-party build configuration, or a substitute for the later SBOM unit.
+
+Raw local evidence lives under
+`/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH06-S01-U001/`:
+the `a23cf319264847c752a4fdc55ce2f3cadb196f78/` directory contains `build.log`,
+`assembly.log`, `runtime.log`, both raw scan matrices, container inspections and
+cleanup records, `origin-audit.log`, `reconciliation-final.log`, and artifacts.
+`helpers/` contains the bounded reproducing scripts and report reconciler.
+Earlier unsuccessful reconciler logs remain failures: they caught the generated
+HTML minute, equivalent loader paths and Podman's removed cidfile; no analyzer
+result, acceptance threshold or historical receipt was rewritten to hide them.
+
+This is local Ubuntu x86_64 artifact evidence only. It does not establish older
+glibc compatibility, all-Linux portability, another Python version, Docker/
+Action execution, Windows/macOS support, hosted CI, signature or publication.
+Final exact-head independent review and the FIFO ledger transition are required
+before this unit is complete.
