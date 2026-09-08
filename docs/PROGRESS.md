@@ -2,6 +2,18 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH07-S01-U001 — Release adayını kullanıcı iş akışlarıyla kabul et
+
+- Commit: `3012eabce97586e53362569a3f2ce61808f1a85f`
+- Dal: `agent/cs3-ch07-s01-u001-release-candidate`
+- Implementer: `/root`
+- Bağımsız denetçi: `/root/candidate_acceptance_verifier`
+- İnceleme SHA-256: `53eef36bee4a52bb8f74de73147e99852db7a355b9dc68035ebddd45bfb2e293`
+- Tarih: 2026-09-08T17:07:42.924381+00:00
+- Sonuç: Kurulum, ilk tarama, CI, triage ve destek belgeleri aynı ürünü anlatır.
+- release-qualification: PASS; SHA-256 `14b5bdba988c07af6c53e7e2ca431b96251fc9b42a302f2baf1142a6454e30f1`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH07-S01-U001/qualify-candidate.py 3012eabce97586e53362569a3f2ce61808f1a85f`
+- queue-check: PASS; SHA-256 `f2772c61e8bd3214b7fe4e0c70c7662ce5e435174d84d8f5586314c2e379ac0e`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH07-S01-U001/queue-doc-checks.sh 3012eabce97586e53362569a3f2ce61808f1a85f`
+
 ## CS3-CH06-S02-U002 — Desteklenen platform sözünü gerçek paket testine bağla
 
 - Commit: `85cbb8fbbc725dd0a0192dd83f0ac851d47c74be`
