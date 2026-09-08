@@ -1,6 +1,6 @@
 # CodeSkeptic — CWE Ürün Planı
 
-Sürüm: 50. Eski planın devamı değil; main tabanlı yeni program.
+Sürüm: 51. Eski planın devamı değil; main tabanlı yeni program.
 
 PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.
 
@@ -671,7 +671,7 @@ PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. G
 
 **Test bütçesi:** T2
 **Kontroller:** linux-suite, relevant-corpus, queue-check
-**Kapsam:** scripts/measure_product.py, docs/quality_results.md, docs/benchmarks.md, tests/ProductMeasurementTest.py
+**Kapsam:** scripts/measure_product.py, docs/quality_results.md, docs/benchmarks.md, tests/ProductMeasurementTest.py, scripts/test_measure_product.py
 **Bağımlılıklar:** Yok
 
 ## CH06 — Paketleme ve dağıtım
