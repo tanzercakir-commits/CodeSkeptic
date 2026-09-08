@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Synthetic manifest accounting checks; no sample or product quality claim."""
 import copy
+import hashlib
 import json
 from pathlib import Path
+import subprocess
+import sys
+import tempfile
 import unittest
 
 import product_profiles as profiles
@@ -260,6 +264,69 @@ class SourceProfileTests(unittest.TestCase):
         self.assertFalse(readiness["task_ready"])
         self.assertFalse(readiness["product_qualified"])
         self.assertIn("independent evaluation selection and source-label review missing", readiness["gaps"])
+
+    def test_historical_manifest_link_has_one_safe_path_and_digest(self):
+        for field, value in (("historical_index", "../measurement-index.json"),
+                             ("historical_index", "/tmp/measurement-index.json"),
+                             ("historical_index_sha256", ""),
+                             ("historical_index_sha256", "0" * 64),
+                             ("historical_index_sha256", True)):
+            manifest = copy.deepcopy(self.manifest)
+            manifest[field] = value
+            with self.subTest(field=field, value=value), self.assertRaises(ValueError):
+                profiles.source_metadata(manifest)
+
+    def test_historical_reader_checks_manifest_against_actual_bytes(self):
+        root = Path(__file__).resolve().parents[1]
+        index = profiles.linked_historical_index(self.manifest, root)
+        self.assertEqual(profiles.historical_summary(index)["counts"],
+                         {"FP": 47, "TP": 9, "unknown": 10})
+        manifest = copy.deepcopy(self.manifest)
+        manifest["historical_index_sha256"] = "e" * 64
+        with self.assertRaisesRegex(ValueError, "historical index digest mismatch"):
+            profiles.linked_historical_index(manifest, root)
+
+    def test_historical_reader_rejects_missing_changed_and_symlink_bytes(self):
+        root = Path(__file__).resolve().parents[1]
+        original = (root / self.manifest["historical_index"]).read_bytes()
+        self.assertEqual(hashlib.sha256(original).hexdigest(),
+                         self.manifest["historical_index_sha256"])
+        with tempfile.TemporaryDirectory(prefix="codeskeptic-profile-link-") as directory:
+            staged = Path(directory)
+            index = staged / self.manifest["historical_index"]
+            index.parent.mkdir(parents=True)
+            with self.assertRaises(ValueError):
+                profiles.linked_historical_index(self.manifest, staged)
+            # Same parsed data, different bytes: canonicalization must not hide drift.
+            index.write_bytes(original + b"\n")
+            with self.assertRaisesRegex(ValueError, "historical index digest mismatch"):
+                profiles.linked_historical_index(self.manifest, staged)
+            index.unlink()
+            index.symlink_to(root / self.manifest["historical_index"])
+            with self.assertRaises(ValueError):
+                profiles.linked_historical_index(self.manifest, staged)
+
+    def test_all_profile_cli_commands_reject_stale_link_before_other_work(self):
+        root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory(prefix="codeskeptic-profile-cli-link-") as directory:
+            staged = Path(directory)
+            manifest_path = staged / "scripts/product_profiles.json"
+            manifest_path.parent.mkdir(parents=True)
+            manifest = copy.deepcopy(self.manifest)
+            manifest["historical_index_sha256"] = "e" * 64
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            index_path = staged / manifest["historical_index"]
+            index_path.parent.mkdir(parents=True)
+            index_path.write_bytes((root / manifest["historical_index"]).read_bytes())
+            for command in ("historical-check", "sources-check", "readiness"):
+                with self.subTest(command=command):
+                    result = subprocess.run(
+                        [sys.executable, "-B", str(root / "scripts/product_profiles.py"),
+                         command, "--root", str(staged)],
+                        capture_output=True, text=True, timeout=10, check=False)
+                    self.assertEqual(result.returncode, 2)
+                    self.assertEqual(result.stdout, "")
+                    self.assertIn("historical index digest mismatch", result.stderr)
 
     def test_claimed_quota_count_or_frozen_status_cannot_bypass_missing_data(self):
         for field, value in (("independent_quota_examples", 1020), ("state", "FROZEN")):

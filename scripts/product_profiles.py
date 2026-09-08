@@ -246,6 +246,11 @@ def source_metadata(manifest):
     require(manifest["schema"] == "codeskeptic-product-profiles/v1"
             and manifest["selection_base"] == "de642695c96224ab11c5add000c7ad9c996d0a50"
             and nonempty(manifest["boundary"]), "profile source identity")
+    require(manifest["historical_index"] == "tests/product_corpus/historical/measurement-index.json"
+            and type(manifest["historical_index_sha256"]) is str
+            and SHA.fullmatch(manifest["historical_index_sha256"])
+            and manifest["historical_index_sha256"] != "0" * 64,
+            "historical index path/digest linkage")
     validate_limits(manifest["limits"])
     require(type(manifest["projects"]) is list and len(manifest["projects"]) == 3, "source projects")
     names, total = [], 0
@@ -314,6 +319,17 @@ def verify_sources(manifest):
     return {**result, "actual_source_bytes_verified": True}
 
 
+def linked_historical_index(manifest, root):
+    """Bind the selected index to its actual bytes, without new adjudication."""
+    source_metadata(manifest)
+    path = Path(root) / manifest["historical_index"]
+    require(file_sha(path) == manifest["historical_index_sha256"],
+            "historical index digest mismatch")
+    index = read_json(path)
+    historical_summary(index)
+    return index
+
+
 def draft_readiness(manifest):
     metadata = source_metadata(manifest)
     require(manifest["state"] == "DRAFT_NOT_FROZEN"
@@ -342,12 +358,15 @@ def main():
         if args.command == "limits":
             result = {"limits": validate_limits(LIMITS), "measured": False,
                       "boundary": "Prospective limits only; not environment realization, dataset freeze or product PASS."}
-        elif args.command == "historical-check":
-            index = read_json(args.root / "tests/product_corpus/historical/measurement-index.json")
-            result = verify_historical(index, args.root, args.historical_sources)
         else:
             manifest = read_json(args.root / "scripts/product_profiles.json")
-            result = verify_sources(manifest) if args.command == "sources-check" else draft_readiness(manifest)
+            index = linked_historical_index(manifest, args.root)
+            if args.command == "historical-check":
+                result = verify_historical(index, args.root, args.historical_sources)
+            elif args.command == "sources-check":
+                result = verify_sources(manifest)
+            else:
+                result = draft_readiness(manifest)
         print(canonical(result), end="")
         if args.command == "readiness" and not result["task_ready"]:
             return 2

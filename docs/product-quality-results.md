@@ -46,6 +46,25 @@ sonuç/başarısızlıkları görünür kalır, kota açığını veya kota-coho
 kapatamaz. Benzerlik taraması sadece adayları işaretleyebilir; hash veya bir
 cluster ID, bağımsızlık ve etiket doğruluğunun kendi başına kanıtı değildir.
 
+İncelenen iki LLVM adayının kaynak/uyarlama/lisans hashleri ve dar etiket gerekçeleri
+[`selection-record.json`](../tests/product_corpus/candidates/selection-record.json)
+içindedir. Ayrı read-only kaynak incelemesi receiver-after-delete adayının mevcut
+`MethodCallReceiver_AfterFree_StillUAF` eğitim örneğinin semantik tekrarı olduğunu
+saptadı: bağımsız kotadan dışlandı. Derived-return/matching-delete adayı yalnız
+memory-leak ailesi için safe etiket önerisidir; tam bağımlılık ve bağımsızlık
+incelemesi bitmediğinden kabul edilmedi. İkisi de analiz edilmedi ve **0/1020**
+sayısı değişmedi. GCC 16.1.1 ile C++17 syntax-only kontrolü ürün ölçümü değildir.
+
+Tarihsel indeksin manifestteki exact yol/hash bağı artık bütün profile CLI
+komutlarında gerçek byte'lara karşı sınanır. Eksik/değişmiş/symlink indeks ve
+geçersiz manifest bağı reddedilir; aynı JSON'a eklenen boş satır da hash farkıdır.
+Bu ret testleri ve kaynak hazırlık testleri başarılı olsa da U003 bitmiş değildir.
+
+Zorunlu dört yeni ailenin gerçek security-fix çiftlerini araştıran dış araç
+güvenlik engeli döndürdü; aynı istek başka araç veya ajan üzerinden tekrarlanmadı.
+Kaynak erişimi ve bağımsız inceleme tamamlanmadan bu zorunlu kabul karşılanamaz.
+Bu engel, başka bir FRONT'a geçme veya kabulü azaltma yetkisi değildir.
+
 ## Gerçek upstream yüzeyinin taslağı
 
 Yeni taslak native static/default-all CMake grafiğini seçer: cJSON'da utils ve

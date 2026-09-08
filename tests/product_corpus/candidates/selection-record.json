@@ -1,0 +1,83 @@
+{
+  "schema": "codeskeptic-product-candidate-selection/v1",
+  "state": "CANDIDATES_ONLY_NOT_FROZEN",
+  "accepted_independent_quota_examples": 0,
+  "boundary": "This records examined and excluded candidates, not an evaluation selection, addressability verdict, independent-origin certificate, or measured analyzer result.",
+  "origin": {
+    "id": "llvm-project-clang-analysis-tests",
+    "repository": "https://github.com/llvm/llvm-project",
+    "revision": "87f0227cb60147a26a1eeb4fb06e3b505e9c7261",
+    "tag": "llvmorg-20.1.8",
+    "path": "clang/test/Analysis/NewDelete-checker-test.cpp",
+    "sha256": "216dcfb722ca0653503b560545013ee6ce872937a8d43666d6b3c1384d2912d9",
+    "local_evidence": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/upstream-candidates/llvm-20.1.8/NewDelete-checker-test.cpp",
+    "license": {
+      "spdx": "Apache-2.0 WITH LLVM-exception",
+      "upstream_path": "LICENSE.TXT",
+      "preserved_path": "tests/product_corpus/licenses/LLVM.txt",
+      "sha256": "8d85c1057d742e597985c7d4e6320b015a9139385cff4cbae06ffc0ebe89afee",
+      "boundary": "Full upstream notice, including its legacy text, preserved byte-for-byte; this is provenance bookkeeping, not a legal opinion."
+    }
+  },
+  "review": {
+    "reviewer": "/root/terminal_restart_code_audit",
+    "role": "read-only source-semantic review",
+    "repository_head": "2f945d317f5f6fb649737a27fa683e39fe776736",
+    "candidate_state": "Two untracked files bound by the per-candidate hashes below; this is not an exact-clean-head unit receipt.",
+    "reviewed": ["extracted declarations and statements", "visible helper bodies", "allocation-failure caveats", "bounded search of existing local training patterns"],
+    "not_reviewed": ["complete original simulator-header equivalence", "global independence or originality", "actual analyzer addressability", "full evaluation admission", "license legal audit"],
+    "analyzer_run": false,
+    "measurement": false,
+    "unit_pass": false
+  },
+  "language_boundary": {
+    "language": "C++17",
+    "allocation": "Ordinary global new/delete; no replacement allocator is introduced. A throwing allocation creates no returned owned object. Receiver defect is on the successful-allocation path.",
+    "execution": "Fragments are translation units for analysis, not standalone executables. The receiver's method remains declaration-only; no invented body was added.",
+    "removed_harness": "Unrelated cases, test-driver directives and the simulator include were omitted. Retained statements match the indicated source ranges, but complete harness equivalence is not established.",
+    "native_profile": "NOT_FROZEN; local syntax-only GCC checking is not native product qualification."
+  },
+  "candidates": [
+    {
+      "id": "llvm-receiver-after-delete",
+      "path": "tests/product_corpus/candidates/llvm-receiver-after-delete.cpp",
+      "sha256": "82178ec79883292acfeb7b09b6e2e1273726418b94a474fe716bb1615fe8d209",
+      "upstream_lines": ["113-116", "160-164"],
+      "family": "use-after-free",
+      "cwe": 416,
+      "label_proposal": "buggy",
+      "function": "testUseThisAfterDelete",
+      "line": 15,
+      "rationale": "Deleting the successfully allocated object ends its lifetime before the subsequent non-static method invocation on the expired receiver. A missing method body does not validate that receiver. The null argument alone is not a null-dereference finding.",
+      "selection_decision": "EXCLUDED_FROM_INDEPENDENT_QUOTA_TRAINING_DUPLICATE",
+      "quota": false,
+      "duplicate_evidence": {
+        "path": "tests/MemoryLeakRuleExTest.cpp",
+        "test": "MethodCallReceiver_AfterFree_StillUAF",
+        "lines": "526-539",
+        "reason": "Existing allocate/delete/declaration-only member-call training pattern; names and the extra null argument do not establish independence."
+      },
+      "addressability": "NOT_MEASURED",
+      "future_boundary": "May only be considered as training-linked supplemental evidence, never as new independent quota on this selection."
+    },
+    {
+      "id": "llvm-derived-return-matching-delete",
+      "path": "tests/product_corpus/candidates/llvm-derived-return-matching-delete.cpp",
+      "sha256": "d5a3f2fe861ccce2f3d684e2b203f64cc66c1701443892b4f0def1005d53d0cc",
+      "upstream_lines": ["396-410"],
+      "family": "memory-leak",
+      "cwe": 401,
+      "label_proposal": "safe-for-target-family",
+      "function": "shouldNotReportLeak",
+      "line": null,
+      "rationale": "Visible allocate() creates exactly Derived. The Base-pointer return and downcast preserve that object's identity; matching delete releases it. Empty visible destructors introduce no owned resources. Ordinary allocation failure precedes a returned owned object.",
+      "selection_decision": "HELD_UNACCEPTED_DEPENDENCY_AND_INDEPENDENCE_REVIEW_PENDING",
+      "quota": false,
+      "duplicate_evidence": {
+        "reason": "Bounded local search found related owned-return and matching-delete coverage, not this exact derived-return/downcast combination. Absence of an exact match is not independence proof."
+      },
+      "addressability": "NOT_MEASURED",
+      "future_boundary": "Narrow source label proposal only; no all-rule safe claim, global semantic-cluster certification or accepted evaluation credit."
+    }
+  ]
+}
