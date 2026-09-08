@@ -6,6 +6,7 @@ no capabilities, bounded CPU/RAM/PIDs/tmp, and only a new report directory writa
 This does not publish an image or qualify the distinct networked source rebuild.
 """
 import argparse
+from contextlib import contextmanager
 import hashlib
 import json
 import os
@@ -44,6 +45,7 @@ def validate_runtime(container, image, fixture_root, output):
     require({"no-new-privileges", "label=disable"} <= set(host["SecurityOpt"]), "runtime security options missing")
     require(os.getuid() != 0 and container["Config"]["User"] == f"{os.getuid()}:{os.getgid()}", "runtime must use nonroot caller identity")
     tmp = set(host["Tmpfs"]["/tmp"].split(","))
+    require(set(host["Tmpfs"]) == {"/tmp"}, "unexpected runtime tmpfs mounts")
     require({"nosuid", "nodev", "noexec"} <= tmp and bool({"size=1g", "size=1073741824"} & tmp), "temporary filesystem is not bounded/restricted")
     binds = [entry for entry in container["Mounts"] if entry["Type"] == "bind"]
     expected = {str(fixture_root): (str(fixture_root), False), "/out": (str(output), True)}
@@ -57,6 +59,24 @@ def validate_runtime(container, image, fixture_root, output):
     variables = dict(entry.split("=", 1) for entry in container["Config"]["Env"])
     require(set(variables) <= {"PATH", "HOME", "TMPDIR", "LANG", "TERM", "container", "HOSTNAME"}, "unexpected runtime environment")
     require(variables["HOME"] == variables["TMPDIR"] == "/tmp", "runtime temporary home mismatch")
+
+
+@contextmanager
+def created_container(create, case, environment, output):
+    cid = None
+    try:
+        require(run(create, case / "create", environment, output) == 0, "container creation failed")
+        cid = identifier((case / "container-id").read_text())
+        yield cid
+    finally:
+        # A create timeout/nonzero exit can still leave a created container.
+        # The cidfile belongs to this fresh case directory, never a shared name.
+        cidfile = case / "container-id"
+        if cid is None and os.path.lexists(cidfile):
+            require(cidfile.is_file() and not cidfile.is_symlink() and cidfile.stat().st_size <= 80, "ambiguous owned container ID; inspect retained evidence")
+            cid = identifier(cidfile.read_text())
+        if cid is not None:
+            require(run(["podman", "rm", "--force", cid], case / "cleanup", environment, output) == 0, "owned container cleanup failed")
 
 
 def main():
@@ -127,10 +147,7 @@ def main():
                   "--workdir=/work", "--entrypoint=/bin/sh", image, "-eu", "-c",
                   'sha256sum /opt/codeskeptic/bin/codeskeptic; /opt/codeskeptic/bin/codeskeptic --version; exec /opt/codeskeptic/bin/codeskeptic "$@"', "--",
                   str(source), "--build-path", str(source), "--lang", "en", *extra, "--sarif", "/out/result.sarif"]
-        cid = None
-        try:
-            require(run(create, case / "create", environment, output) == 0, "container creation failed")
-            cid = identifier(cidfile.read_text())
+        with created_container(create, case, environment, output) as cid:
             require(run(["podman", "inspect", cid], case / "before", environment, output) == 0, "created container inspection failed")
             before = json.loads((case / "before/stdout").read_text())
             require(len(before) == 1 and identifier(before[0]["Id"]) == cid, "created container ID mismatch")
@@ -150,9 +167,6 @@ def main():
                     == json.loads((local / name / "action.sarif").read_text()), name + " container/CLI/Action full SARIF mismatch")
             records.append({"scenario": name, "container_id": cid, "exit_code": code,
                             "sarif_sha256": hashlib.sha256(report.read_bytes()).hexdigest(), "full_sarif_equal": True})
-        finally:
-            if cid is not None:
-                require(run(["podman", "rm", "--force", cid], case / "cleanup", environment, output) == 0, "owned container cleanup failed")
     write_json(output / "result.json", {"schema": "codeskeptic-artifact-container-parity/v1", "base_image": base, "image": image,
                                        "artifact_sha256": digest, "binary_sha256": binary_hash, "version": version,
                                        "dockerfile_sha256": hashlib.sha256((context / "Dockerfile").read_bytes()).hexdigest(),

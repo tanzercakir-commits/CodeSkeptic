@@ -11,6 +11,7 @@
 !scripts/
 !scripts/package_release.sh
 !scripts/package_linux.py
+!scripts/corpus_compile_commands.cpp
 # Only the isolated prepared-artifact context populates this directory.
 !package/
 !package/**

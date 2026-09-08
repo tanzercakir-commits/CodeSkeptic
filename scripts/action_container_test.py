@@ -3,10 +3,11 @@
 import copy
 import os
 from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
-from action_container import identifier, validate_runtime
+from action_container import created_container, identifier, validate_runtime
 from action_run import ActionError
 
 
@@ -95,6 +96,7 @@ class RuntimeGuardTests(unittest.TestCase):
                 with self.assertRaises(ActionError):
                     self.check(data)
 
+
     def test_host_secrets_and_header_overrides_are_rejected(self):
         for variable in ("GH_TOKEN=synthetic", "CPATH=/host", "LD_LIBRARY_PATH=/host"):
             with self.subTest(variable=variable):
@@ -102,6 +104,72 @@ class RuntimeGuardTests(unittest.TestCase):
                 data["Config"]["Env"].append(variable)
                 with self.assertRaises(ActionError):
                     self.check(data)
+
+    def test_extra_tmpfs_is_rejected_even_without_mounts_entry(self):
+        self.container["HostConfig"]["Tmpfs"]["/extra-writable"] = "rw,size=8g"
+        with self.assertRaises(ActionError):
+            self.check()
+
+
+class DockerContextTests(unittest.TestCase):
+    def test_default_build_context_includes_required_cmake_script_sources(self):
+        import re
+        root = Path(__file__).resolve().parents[1]
+        dependencies = re.findall(r'\.\./(scripts/[^\s)]+)', (root / "src/CMakeLists.txt").read_text())
+        self.assertIn("scripts/corpus_compile_commands.cpp", dependencies)
+        patterns = (root / ".dockerignore").read_text().splitlines()
+        for dependency in dependencies:
+            self.assertIn("!" + dependency, patterns)
+
+
+class LifecycleTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="container lifecycle ")
+        self.addCleanup(self.temp.cleanup)
+        self.case = Path(self.temp.name)
+        self.cid = "c" * 64
+
+    def test_create_failure_after_cid_is_cleaned_up(self):
+        for error in (1, RuntimeError("timeout"), OSError("process receipt write failed")):
+            with self.subTest(error=error):
+                calls = []
+                def fake_run(arguments, *unused):
+                    calls.append(arguments)
+                    if arguments[:2] == ["podman", "create"]:
+                        (self.case / "container-id").write_text(self.cid)
+                        if isinstance(error, Exception):
+                            raise error
+                        return error
+                    return 0
+                with patch("action_container.run", side_effect=fake_run):
+                    with self.assertRaises((ActionError, RuntimeError, OSError)):
+                        with created_container(["podman", "create"], self.case, {}, self.case):
+                            self.fail("failed create entered scan body")
+                self.assertIn(["podman", "rm", "--force", self.cid], calls)
+
+    def test_start_timeout_cleans_exact_owned_id(self):
+        (self.case / "container-id").write_text(self.cid)
+        with patch("action_container.run", return_value=0) as run:
+            with self.assertRaisesRegex(RuntimeError, "start timeout"):
+                with created_container(["podman", "create"], self.case, {}, self.case) as cid:
+                    self.assertEqual(cid, self.cid)
+                    raise RuntimeError("start timeout")
+        self.assertEqual(run.call_args_list[-1].args[0], ["podman", "rm", "--force", self.cid])
+
+    def test_cleanup_failure_remains_failure(self):
+        (self.case / "container-id").write_text(self.cid)
+        with patch("action_container.run", side_effect=[0, 1]):
+            with self.assertRaisesRegex(ActionError, "cleanup failed"):
+                with created_container(["podman", "create"], self.case, {}, self.case):
+                    pass
+
+    def test_ambiguous_id_never_triggers_broad_cleanup(self):
+        (self.case / "container-id").write_text("not-an-exact-id")
+        with patch("action_container.run", return_value=1) as run:
+            with self.assertRaises(ActionError):
+                with created_container(["podman", "create"], self.case, {}, self.case):
+                    pass
+        self.assertEqual(len(run.call_args_list), 1)
 
 
 if __name__ == "__main__":
