@@ -424,6 +424,12 @@ jobs:
     name: candidate-native (${{ matrix.target }})
     permissions:
       contents: read
+    # Match Git blobs byte-for-byte, including on Windows. Runtime-only Git
+    # configuration; no global or repository configuration file is changed.
+    env:
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: 'core.autocrlf'
+      GIT_CONFIG_VALUE_0: 'false'
     timeout-minutes: 90
     strategy:
       fail-fast: false

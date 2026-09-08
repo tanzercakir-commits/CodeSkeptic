@@ -402,6 +402,22 @@ class RoutingTests(unittest.TestCase):
         self.assertIn("${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}", upload["with"]["name"])
         self.assertEqual(upload["with"]["path"].splitlines(), ["${{ runner.temp }}/codeskeptic-platform/", "${{ runner.temp }}/codeskeptic-native-build/"])
 
+    def test_candidate_checkout_preserves_blob_line_endings(self):
+        environment = self.workflow["jobs"]["candidate-native"].get("env", {})
+        expected = {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "core.autocrlf", "GIT_CONFIG_VALUE_0": "false"}
+        self.assertEqual(environment, expected)
+        with tempfile.TemporaryDirectory(prefix="git config fixture ") as temporary:
+            config = Path(temporary) / "gitconfig"
+            config.write_text("[core]\n\tautocrlf = true\n")
+            env = {"PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": str(config), "GIT_CONFIG_NOSYSTEM": "1"}
+            before = subprocess.run(["git", "config", "--get", "--bool", "core.autocrlf"], cwd=temporary,
+                                    env=env, capture_output=True, text=True, timeout=10)
+            after = subprocess.run(["git", "config", "--get", "--bool", "core.autocrlf"], cwd=temporary,
+                                   env={**env, **environment}, capture_output=True, text=True, timeout=10)
+            self.assertEqual((before.returncode, before.stdout.strip()), (0, "true"))
+            self.assertEqual((after.returncode, after.stdout.strip()), (0, "false"))
+            self.assertEqual(config.read_text(), "[core]\n\tautocrlf = true\n")
+
     def test_bash_blocks_parse_and_llvm_restoration_is_explicit(self):
         for job in self.workflow["jobs"].values():
             for step in job["steps"]:
