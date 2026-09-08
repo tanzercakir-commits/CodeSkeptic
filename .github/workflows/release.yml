@@ -389,7 +389,7 @@ jobs:
           archives=(assets/codeskeptic-v*-linux-x86_64.tar.gz)
           test "${#archives[@]}" -eq 1
           python3 -B scripts/generate_sbom.py verify "${archives[0]}" assets \
-            --source-sha "$GITHUB_SHA" --version "${GITHUB_REF_NAME#v}"
+            --source-sha "$GITHUB_SHA" --version "${GITHUB_REF_NAME#v}" --pending-checksums
           (cd assets && sha256sum *.tar.gz *.zip *.sbom.json *.provenance.json) > sha256sums.txt
           cat sha256sums.txt
           gh release upload "$GITHUB_REF_NAME" sha256sums.txt --clobber

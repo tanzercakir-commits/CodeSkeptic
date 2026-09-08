@@ -23,6 +23,7 @@ REPO = Path(__file__).resolve().parents[1]
 MAX_DOCUMENT = 10 * 1024 * 1024
 HEX = re.compile(r"[0-9a-f]{64}")
 SOURCE = re.compile(r"[0-9a-f]{40}")
+TRUST = "Producer-supplied build records; no signature, SLSA attestation, verdict qualification or byte-reproducibility claim"
 
 
 class EvidenceError(ValueError):
@@ -292,7 +293,7 @@ def documents(root, version, archive_name, evidence, source, recipe):
                            {"name": "codeskeptic:inventory-profile", "value":
                             "Linux x86_64 packaged files and dpkg notices; static source dependencies and target-host versions not resolved"}]}
     provenance = {"schema": "codeskeptic-provenance/v1", "signed": False,
-                  "trust": "Producer-supplied build records; no signature, SLSA attestation, verdict qualification or byte-reproducibility claim",
+                  "trust": TRUST,
                   "artifact": {"name": archive_name, "sha256": evidence["archive_sha256"],
                                "binary_sha256": binary_hash}, "source": source,
                   "native_identity_report_sha256": evidence["report"]["sha256"],
@@ -355,7 +356,7 @@ def generate(archive, build_evidence, output, repo=REPO):
     return sbom, provenance
 
 
-def verify_sidecars(archive, directory, expected_source, expected_version, repo=REPO):
+def verify_sidecars(archive, directory, expected_source, expected_version, repo=REPO, pending_checksums=False):
     """Release aggregation check, not independent build/producer attestation."""
     archive, directory = Path(archive), Path(directory)
     provenance_name = archive.name + ".provenance.json"
@@ -368,6 +369,7 @@ def verify_sidecars(archive, directory, expected_source, expected_version, repo=
             "noncanonical sidecar")
     require(isinstance(provenance, dict) and provenance.get("schema") == "codeskeptic-provenance/v1"
             and provenance.get("signed") is False, "unknown or signed provenance claim")
+    require(provenance.get("trust") == TRUST, "unsupported provenance trust claim")
     fields(provenance, "schema signed trust artifact source native_identity_report_sha256 native_capabilities_sha256 recipe files licenses host_dependencies generator build_evidence_sha256 sbom", "provenance")
     for name in ("native_identity_report_sha256", "native_capabilities_sha256", "build_evidence_sha256"):
         digest(provenance[name])
@@ -420,6 +422,13 @@ def verify_sidecars(archive, directory, expected_source, expected_version, repo=
                     "capabilities": {"sha256": provenance.get("native_capabilities_sha256")}}
         regenerated, _ = documents(root, version, archive.name, evidence, source, provenance.get("recipe"))
         require(bom == regenerated, "SBOM content does not match archived inventory")
+    checksum_path = directory / "sha256sums.txt"
+    require(os.path.lexists(checksum_path) or pending_checksums,
+            "checksum companion missing; aggregation must explicitly use --pending-checksums")
+    if os.path.lexists(checksum_path):
+        expected_sums = (f"{artifact['sha256']}  {archive.name}\n"
+                         f"{sha(sbom_data)}  {sbom_name}\n{sha(provenance_data)}  {provenance_name}\n").encode()
+        require(read_regular(checksum_path) == expected_sums, "checksum companion mismatch")
     print("PROVENANCE_VERIFY_OK source=" + expected_source + " signed=false")
 
 
@@ -435,12 +444,15 @@ def main():
     verify.add_argument("sidecars", type=Path)
     verify.add_argument("--source-sha", required=True)
     verify.add_argument("--version", required=True)
+    verify.add_argument("--pending-checksums", action="store_true",
+                        help="allow absent checksum companion only while preparing combined release checksums")
     args = parser.parse_args()
     try:
         if args.mode == "generate":
             generate(args.archive, args.build_evidence, args.output)
         else:
-            verify_sidecars(args.archive, args.sidecars, args.source_sha, args.version)
+            verify_sidecars(args.archive, args.sidecars, args.source_sha, args.version,
+                            pending_checksums=args.pending_checksums)
     except (OSError, ValueError, RuntimeError, tarfile.TarError, subprocess.SubprocessError) as error:
         parser.exit(1, f"PROVENANCE_FAIL {error}\n")
 

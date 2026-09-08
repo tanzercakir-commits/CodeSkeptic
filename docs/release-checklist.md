@@ -172,8 +172,11 @@ are named after the full archive filename: `.sbom.json`, `.provenance.json`, plu
 archive and sidecars together; the checksum file can be checked in that combined
 directory. Existing outputs are never overwritten. A late I/O failure can leave
 partial owned evidence, but never prints `PROVENANCE_OK`; preserve it and retry
-in a fresh directory. Verification writes nothing and checks the archived bytes,
-not merely internally consistent JSON hashes.
+in a fresh directory. Verification does not modify supplied artifacts or sidecars;
+it uses temporary extraction files and checks the archived bytes, not merely
+internally consistent JSON hashes. The exact checksum companion is required.
+Only release aggregation may explicitly use `--pending-checksums` while preparing
+the combined checksum file; an existing inconsistent companion is never ignored.
 
 The SBOM uses [CycloneDX 1.6 JSON](https://github.com/CycloneDX/specification/blob/1.6/schema/bom-1.6.schema.json).
 It inventories bundled libraries and Clang headers by installed package/version,

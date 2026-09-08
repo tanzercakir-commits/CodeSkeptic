@@ -82,14 +82,15 @@ class ProvenanceTests(unittest.TestCase):
             with contextlib.redirect_stdout(io.StringIO()):
                 return sbom.generate(self.archive, self.manifest, self.output)
 
-    def verify(self):
+    def verify(self, pending_checksums=False):
         original_git = sbom.git
         def fixture_git(repo, *args):
             if args[0] == "show" and args[1].startswith("1" * 40 + ":scripts/"):
                 return (sbom.REPO / args[1].split(":", 1)[1]).read_bytes()
             return original_git(repo, *args)
         with patch.object(sbom, "git", side_effect=fixture_git), contextlib.redirect_stdout(io.StringIO()):
-            sbom.verify_sidecars(self.archive, self.output, self.source, self.version)
+            sbom.verify_sidecars(self.archive, self.output, self.source, self.version,
+                                pending_checksums=pending_checksums)
 
     def update_provenance(self, change):
         path = self.output / (self.archive.name + ".provenance.json")
@@ -173,6 +174,30 @@ class ProvenanceTests(unittest.TestCase):
                 self.update_provenance(change)
                 with self.assertRaisesRegex(ValueError, message):
                     self.verify()
+
+    def test_unverified_trust_claim_rejected(self):
+        self.pack()
+        self.run_generator()
+        self.update_provenance(lambda p: p.update(trust="Cryptographically authenticated independent producer attestation"))
+        with self.assertRaisesRegex(ValueError, "trust"):
+            self.verify()
+
+    def test_existing_checksum_companion_must_agree(self):
+        self.pack()
+        self.run_generator()
+        (self.output / "sha256sums.txt").write_bytes(b"inconsistent checksum companion\n")
+        with self.assertRaisesRegex(ValueError, "checksum companion"):
+            self.verify()
+        with self.assertRaisesRegex(ValueError, "checksum companion"):
+            self.verify(pending_checksums=True)
+
+    def test_missing_checksum_companion_needs_explicit_aggregation(self):
+        self.pack()
+        self.run_generator()
+        (self.output / "sha256sums.txt").unlink()
+        with self.assertRaisesRegex(ValueError, "checksum companion missing"):
+            self.verify()
+        self.verify(pending_checksums=True)
 
     def test_changed_archive_rejected(self):
         self.pack()
