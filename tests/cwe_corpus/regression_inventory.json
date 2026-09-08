@@ -1,5 +1,5 @@
 {
-  "schema": "codeskeptic-cwe-regression-inputs/v1",
+  "schema": "codeskeptic-cwe-regression-inputs/v2",
   "selection_base": "005b1264618dcf84aa20a5685efd9c03a26bd67f",
   "inputs": [
     {
@@ -31,6 +31,10 @@
       "sha256": "3e0daf49a3720d8898ff96edb39c65156cb96527ae4df67887113e150015628b"
     },
     {
+      "path": "scripts/check_capabilities_sync.py",
+      "sha256": "e87e74e11230a9099d52367893a0cabc6ca7d8c93f605a48046ce7dbab9b18f4"
+    },
+    {
       "path": "scripts/compare_measurements.py",
       "sha256": "bf9595ae70012dc0abc3c894dc3b897d91ffd8fdc72349135d703c06ef81afa3"
     },
@@ -41,6 +45,10 @@
     {
       "path": "scripts/corpus_expected.txt",
       "sha256": "bec581e0fa7e4583d2fe24cd11597aad2ddef1eeffd993c65e10f102f73a31e5"
+    },
+    {
+      "path": "scripts/cwe_quality.py",
+      "sha256": "c888bef1c2ebe1535a771758c2db58e18e1bafb3f7f06404c652104a02741108"
     },
     {
       "path": "scripts/juliet_eval.py",
@@ -369,6 +377,10 @@
     {
       "path": "tests/WorkflowPolicyTest.py",
       "sha256": "dd42a8b10b5a42ea1090bb6bb9b008e0308ee38821f9363f40fcb5b77abc5e41"
+    },
+    {
+      "path": "tests/cwe_corpus/test_catalog.py",
+      "sha256": "87a393cb204a13fc720e1e3995aaf633bf02400adc97e0e64036e4e883061870"
     },
     {
       "path": "tests/stress_corpus/README.md",
