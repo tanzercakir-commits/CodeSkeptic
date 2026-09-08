@@ -186,3 +186,47 @@ LF/CRLF regresyonlarıyla düzeltilir; belirsiz trailing-backslash/tab adları b
 regular-header altkümesine alınmaz. Harf büyüklüğü değişen aynı Windows yolu için
 ayrı duplicate RED'i de kapatıldı. Bu kaynak-format kanıtı kaybolan stdout'un
 yerine geçirilmez; yeni gerçek Windows gözlemi gereklidir.
+
+### Üç platformda başarılı gözlem, henüz ürün yeterliliği değil
+
+`b5579bc` parser düzeltmesi bağımsız kısmi incelemeden geçti: 129 test, ek 60
+writer-tabanlı dönüş kontrolü ve önceki Ubuntu/macOS metadata uyumluluğu doğrulandı.
+Üçüncü gerçek çalışma
+[`34288222384`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34288222384)
+aynı exact kaynakta Ubuntu, macOS ve Windows lane'lerinde **SUCCESS** döndü. Üç
+JSON/ZIP, run/job/log ve kaynak/attempt bağları saklandı; özet SHA-256
+`1e7c1e7ca8b504a963f731e11fc39997d383ffdec177051e3543ef1085765fc1`.
+Bağımsız kanıt incelemesi üç ZIP/API/upload bağını, 22 saklanan dosya hash'ini,
+exact kaynak kimliğini ve her lane'de geçen 39 testi doğruladı. Windows gözlemi
+VS 18.9.12112.369, MSVC 19.51.36256, Clang 20.1.8 ve SDK/UCRT 10.0.26100.0;
+188 C ve 427 C++ header kaydı içerir. MSVC toolset directory sürümü 14.51.36231,
+compiler sürümüyle aynı alan değildir. Driver hashleri c1/c1xx/c2/link/runtime DLL
+kapanımını kapsamaz; Linux shared-library bağımlılıkları da bu gözlemin dışındadır.
+
+Üçüncü Ubuntu image'ı `20260907.300.1`, OS kaydı 24.04.5 LTS olmuştur; önceki
+image/OS/os-release hash'iyle aynı değildir. Compiler/package/probe/header
+kayıtları aynı kalmıştır. macOS native kayıtları aynı kalmıştır. Rolling image
+etiketleri için immutable replay veya bütün ortamın değişmediği iddiası yoktur.
+Bu yalnız kurulu araç ve seçili header kimliklerinin toplanabildiğini gösterir.
+`native_qualified`, `product_qualified` ve `immutable_image` hâlâ false'tur.
+Önceki iki başarısız gözlem aynı sonuçla korunur; yeni başarı onların yerine geçmez.
+
+Ayrı genel Linux CI'ın `533cc11` çalışması
+[`34286875301`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34286875301)
+1583 testten birinde başarısızdır:
+`AnalysisCacheTest.CheckpointSnapshotBindsPendingHeaderAndSidecarWithoutPublishingFindings`.
+Salt-okunur teşhis ilk Snapshot reusable kanıtında `runtime_before:deadline`
+gösterir: 5,000,212 µs wall, 911,500 µs current-thread CPU; sekiz tamamlanan modül ve
+207,822,040 byte okunmuş/hashlenmiştir. Header/sidecar replay ve mutasyon kontrollerine
+ulaşılmamıştır. `module_read` sürenin dolduğunun fark edildiği aşamadır; wall/CPU
+farkının I/O veya scheduling'den kaynaklandığı kanıtlanmadı. Beş saniyelik bütçe ve
+reusable admission koşulları değiştirilmedi; bu keşif U003 içine cache düzeltmesi
+olarak alınmaz. Ham genel-CI paket özeti SHA-256
+`af2c996b00deb1580a9dd82eb1903710fe15ba32d7bf02b845aa52693df90d7b`.
+Otomatik push concurrency nedeniyle iptal olan eski genel CI run'ları da PASS
+değildir. `b5579bc` genel CI sonuçları metadata run'ından ayrı değerlendirilir.
+
+U003 hâlâ FRONT'tur. Üç gözlem 0/1020 bağımsız korpus açığını, dört yeni ailenin
+eksik gerçek security-fix çiftlerini, dondurulmamış native/API profilini veya
+korumalı inventory RED'ini kapatmaz. Plan, FIFO ve kalite eşikleri değişmedi;
+canonical completion receipt ya da POP oluşturulmadı.
