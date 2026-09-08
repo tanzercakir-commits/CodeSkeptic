@@ -2,6 +2,18 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH06-S01-U002 — Container ve Action paketinde analiz paritesini doğrula
+
+- Commit: `9070e9ba17c07f8c5438709675fb4c9d24da52c5`
+- Dal: `agent/cs3-ch06-s01-u002-container-action-parity`
+- Implementer: `root-cs3-ch06-s01-u002-20260908`
+- Bağımsız denetçi: `/root/gtest_measurement_verifier`
+- İnceleme SHA-256: `abb0a7eb9a9d6023fa869d718181530d3f546261280f2da79de67b559ecb7ef1`
+- Tarih: 2026-09-08T09:00:00.927929+00:00
+- Sonuç: Container/Action aynı binary sözleşmesiyle güvenilir sonucu taşır.
+- release-qualification: PASS; SHA-256 `6413057de1ac37f923dca4fee55f6d198dde49992417d696ee8dfde2ea746199`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH06-S01-U002/final-checks-9070e9b.sh`
+- queue-check: PASS; SHA-256 `5953e2d695d08915824b2ac11164b76d97b4cb6588c549e2348f179798925b17`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH06-S01-U002/final-checks-9070e9b.sh`
+
 ## CS3-CH06-S01-U001 — Linux kurulabilir artifact üret
 
 - Commit: `00d8b2fb84e8d98b9258375b241fdf712b2f4854`

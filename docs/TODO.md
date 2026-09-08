@@ -2,22 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH06-S01-U002
-
-### CS3-CH06-S01-U002 — Container ve Action paketinde analiz paritesini doğrula
-
-**Sonuç:** Container/Action aynı binary sözleşmesiyle güvenilir sonucu taşır.
-
-**Kabul:**
-
-- Kaynak kod/secret izinsiz dışarı gönderilmez; runtime varsayılan izinler minimaldir.
-- Aynı fixture için CLI/container/Action exit ve SARIF sonuçları eşittir.
-- Canlı destek iddiası yalnız gerçekten koşmuş platform/check kanıtına dayanır.
-
-**Test bütçesi:** T3
-**Kontroller:** release-qualification, queue-check
-**Kapsam:** Dockerfile, action.yml, scripts/action*, tests/ActionArgsTest.py, docs/integrations.md, .github/workflows/action-selftest.yml, .dockerignore
-**Bağımlılıklar:** CS3-CH06-S01-U001
+## FRONT — CS3-CH06-S02-U001
 
 ### CS3-CH06-S02-U001 — Sürüm, checksum, SBOM ve provenance üret
 
