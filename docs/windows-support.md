@@ -87,7 +87,7 @@ Stress depth-limit evidence remains exit 2/incomplete, not a clean result.
 
 All skips below are **unexecuted assertions**, never PASS:
 
-- Windows C++: `SourceManagerTest.FailedDirectoryScanNeverPublishesTraversedPrefix`;
+- Windows C++: `SourceManagerTargetTest.FailedDirectoryScanNeverPublishesTraversedPrefix`;
   the runner cannot enforce its unreadable-directory fixture.
 - Both platforms' four compilation-input filesystem cases:
   `test_mixed_source_encodings_preserve_every_requested_identity`,
