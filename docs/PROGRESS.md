@@ -2,6 +2,18 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH06-S02-U001 — Sürüm, checksum, SBOM ve provenance üret
+
+- Commit: `f0f348faa3944a3c152173f9ef027a81f90f6422`
+- Dal: `agent/cs3-ch06-s02-u001-artifact-provenance`
+- Implementer: `/root`
+- Bağımsız denetçi: `/root/gtest_measurement_verifier`
+- İnceleme SHA-256: `8c672e2dbaf4c78aabb521f65d1eef6c7df7e26dae249d9a0520dccbbae60a19`
+- Tarih: 2026-09-08T09:46:57.099872+00:00
+- Sonuç: Artifact hangi kaynak ve bağımlılıklardan üretildiğini kanıtlarıyla taşır.
+- release-qualification: PASS; SHA-256 `a32e6cefb3becf54372ffecbeb644ee0fdaee06c8d19301778fd8369c96ec4fb`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH06-S02-U001/final-checks-f0f348f.py`
+- queue-check: PASS; SHA-256 `d1f3a2ec568f533174767c705a4aea445886d55765752bd053109b6f96fdd45c`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH06-S02-U001/final-checks-f0f348f.py`
+
 ## CS3-CH06-S01-U002 — Container ve Action paketinde analiz paritesini doğrula
 
 - Commit: `9070e9ba17c07f8c5438709675fb4c9d24da52c5`
