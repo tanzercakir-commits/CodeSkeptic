@@ -124,3 +124,69 @@ label, rationale, expected multiplicity, flags, selection base, registry ve büt
 Hiçbir expected analyzer çıktısı ölçümden türetilmedi. Bağımsız in-memory successor integrity
 kontrolü 124 input / 12 aile / 52 case ve quality_measured=false döndürdü. Uygulanmış durumun
 check'i ve exact-head görev review'u ayrıca gerekir; bu kaynak sınıflandırması ürün PASS'i değildir.
+
+## U002 — Eklemeli katalog ve kanıt sürümleri
+
+Native capabilities API `schema_version=2`, report ve measurement v1 semantiği değişmez.
+Sürümlenen şey analyzer API değil, `catalog.json` / `regression_inventory.json` girdi
+sözleşmesidir. Gerçek seçili schema ve `evidence_version.id` katalogda okunur. Bir v2
+adayının hazırlanması, source review veya metadata integrity, ürün terfisi/yayın değildir.
+Bu görevde registry gerçekten 15 public diagnostic / 12 CWE ailesi olarak kalır.
+
+`snapshots/terminal-4fd4a21-{catalog,inventory,contract}.json` tam üç izinli metadata
+dosyasıdır. İlk ikisi terminal Git nesnelerinin byte-eşit kopyasıdır; üçüncüsü 15
+capability'nin tüm bool bayrakları, tier/CWE/açıklamaları, 52/124/96 eski sayımları ve
+beş sabit kalite/pin girdisinin SHA-256'sını taşır. Üç dosyanın digest'i validator'da
+sabitlenmiştir. U001'in ayrı ed163a7/f018bfc successor kimlikleri de burada korunur;
+U001 bytes'ı yanlışlıkla terminal diye etiketlenmez. Başka snapshot dosyası, symlink,
+değişmiş metadata veya omitted corpus dosyası kabul edilmez.
+
+`historical-identity` yalnız bu dondurulmuş metadata kimliğini doğrular ve
+`current_inputs_verified=false`, `quality_measured=false` döndürür. Eski ölçüm/receipt
+yalnız özgün source/binary/catalog/tier bağlamında geçerlidir; yeni HEAD'e bağlanamaz.
+Normal `check` v1 dahil her zaman gerçek mevcut dosya/hash/closure denetiminden geçer.
+Eski catalog'u yeni input ağacına vermek digest kontrolünü atlatmaz. Tarihsel replay için
+özgün Git checkout ve kendi hash'li araç/kanıtları korunur; identity-only modu tarama değildir.
+
+V2'nin content-addressed ID'si bütün catalog gövdesini, tam registry descriptor'larını,
+registry digest'ini, exact input path/fixture ID listelerini, önceki catalog/inventory/
+version kimliklerini ve source-review metadata'sını bağlar. Yalnız ID'nin kendisi ve
+review içindeki aynı payload digest alanı döngüyü önlemek için hash dışında kalır.
+Review; exact source-base/head, ayrı implementer/verifier, gerekçe, PASS ve boş bulgu
+listesi taşır. Alan tipi, digest veya kaynak kimliği değişirse eski version ID geçmez.
+Bu ortak kullanıcı hesabında prosedürel bağımsızlık ve Git geçmişi denetimidir;
+imza, kötü niyetli root'a dayanıklılık veya doğrulanmış uzak üretici attestation'ı değildir.
+Self-authored/rehashed review metadata bağımsız incelemenin yerine geçemez.
+
+İlk sequence yalnız U001'in tam ed163a7/f018bfc çiftini parent kabul eder; sonraki
+sequence önceki content-addressed version ve catalog/inventory digest'lerini belirtir.
+Her ileri successor kendi kaynak farkı ve gerçek bağımsız sınıflandırmasıyla hazırlanır;
+önceki kaynak/catalog/receipt Git ve kalıcı kanıtta korunur. Validator hash/shape kontrolü
+tek başına önceki Git kaydının veya review üreticisinin güvenilirliğini kanıtlamaz;
+actual ancestry/source değişikliği ayrıca exact-head bağımsız görev audit'inin kapısıdır.
+
+V2 envanteri eski 124 girdi kimliğini korur; cwe_quality.py,
+check_capabilities_sync.py ve test_catalog.py de doğrudan hash'lenir (ilk v2: 127 girdi).
+Tam test-tree closure korunur; ileride tests/product_corpus eklemek de yeni exact
+inventory/version ister. Eski dosya çıkarılamaz. Beş immutable base dosyası
+corpus_expected.txt, juliet_expected.txt, measurement_baseline.json,
+realworld_expected.txt ve realworld_manifest.json'dur; bunları birlikte rehash etmek
+eski pin veya floor azaltmayı meşrulaştıramaz. Diğer korumalı runner/workflow/test
+değişiklikleri yine task scope, source-derived bağımsız sınıflandırma, eski daha sıkı
+floor/başarısız kanıt koruması ve fresh qualification gerektirir.
+
+Eski 52 case'in tam kaydı ve sırası prefix olarak kalır: kaynak hash'i, role, expected
+multiplicity, flags, origin, rationale ve untrusted sources değişmez. Yeni case yalnız
+sonuna eklenir; her current CWE ailesinde buggy/safe çifti gerekir. Planlanmış dört yeni
+adı kaydetmek kurulu hale getirmez: version descriptor seti gerçek kaynak registry'siyle
+birebir aynı olmalıdır. İzinli büyüme o dört ID ve bounds için 121/122 ile sınırlıdır;
+supported eski aile demote edilemez, üç project diagnostic değişmeden report-only kalır.
+Native discovery bütün bool bayrakları dahil tam descriptor'a göre karşılaştırılır;
+aynı sayıda fake/duplicate/missing/ghost kayıt veya 1/true, float/int benzerliği ret alır.
+
+Ölçüm hâlâ tam seçili tier'ı çalıştırır; unknown/unsupported score dışıdır, aynı
+fingerprint'li farklı occurrence çokluğu korunur ve eski sıfır-FP/FN regression kapısı
+değişmez. Yeni 0.90/0.70 ürün profili bunun yerine geçmez. Testlerdeki sentetik 16'ncı
+capability/terfi yalnız metadata transition positive kontrolüdür; detector uygulaması,
+ground truth veya ürün ölçümü değildir. Native testlerdeki mevcut 15/7 beklentilerini
+gelecekte değiştirmek ilgili gerçek kural/terfi görevlerinin ayrı source review işidir.

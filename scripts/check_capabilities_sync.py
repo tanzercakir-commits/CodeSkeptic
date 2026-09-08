@@ -5,6 +5,8 @@ from pathlib import Path
 import re
 import sys
 
+import cwe_quality
+
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = ROOT / "src" / "core" / "RuleCapabilities.def"
 CAPABILITIES_CPP = ROOT / "src" / "core" / "Capabilities.cpp"
@@ -65,8 +67,14 @@ for line_no, raw in enumerate(REGISTRY.read_text(encoding="utf-8").splitlines(),
         fail(f"duplicate family CWE: {rule_id}")
     metadata[rule_id] = (", ".join(f"CWE-{value}" for value in ids) or "none", description)
 
-if len(entries) != 15:
-    fail(f"expected 15 public rule capabilities, got {len(entries)}")
+try:
+    declared = cwe_quality.registry(ROOT)
+except (OSError, ValueError, TypeError, KeyError) as error:
+    fail(f"unreviewed capability/catalog identity: {error}")
+expected_entries = {name: (row["tier"], row["default_enabled"], row["quality_gated"], row["blocks_verdict"])
+                    for name, row in declared.items()}
+if entries != expected_entries:
+    fail("public rule capabilities differ from the exact reviewed catalog version")
 
 used_cwes = {int(value.removeprefix("CWE-"))
              for ids, _ in metadata.values() if ids != "none"

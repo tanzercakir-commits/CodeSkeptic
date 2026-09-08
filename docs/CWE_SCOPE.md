@@ -29,6 +29,16 @@ tarihsel ölçümler aynı anlamla korunur; büyük korpus bunların yerine geç
 
 ## İlk perde — tarihsel uygulama ve ölçüm sınırı
 
+U002'de katalog/girdi sözleşmesi eklemeli kanıt sürümüne hazırlanır; bu başlık altındaki
+15 capability / 12 aile / 52 fixture / 124 input tarihsel snapshot'ı korunur.
+V2'nin tam kayıtlı seti kaynak registry'si, bool bayrakları ve envanterle birebir
+eşleşir; üç validator/test girdisi de bağlanır (ilk v2 toplam 127). Sabit 15 kontrolü
+gevşek >=15 kontrolüyle değiştirilmez. Registry bu görevde gerçekten hâlâ 15'tir;
+16 aile ürün hedefidir, kurulu yeni kural veya terfi değildir. [Sürüm protokolü](product-quality-contract.md#u002--eklemeli-katalog-ve-kanıt-sürümleri)
+eski receipt'leri, 52 tam case sözleşmesini, tüm daha sıkı kalite tabanlarını ve ayrı
+source review zorunluluğunu korur. `historical-identity` yalnız metadata denetimidir;
+eski schema'yı kullanmak gerçek güncel input digest kontrolünü kapatmaz.
+
 Hedef mevcut C/C++ analiz çekirdeğine gerçekten eksik, pratikte kullanılabilir
 davranışlar eklemek; her CWE'nin her varyantını çözdüğünü iddia etmek değildir.
 Kapsam araştırması main kodu üzerinden yapıldı; kaynakta görülen boşluklar

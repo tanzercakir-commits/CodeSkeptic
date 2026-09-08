@@ -1,0 +1,502 @@
+{
+  "schema": "codeskeptic-cwe-regression-inputs/v1",
+  "selection_base": "005b1264618dcf84aa20a5685efd9c03a26bd67f",
+  "inputs": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "92dce260fc14cd7ef3dcd0e96ebf1f3c8736bdb80f71b5f9e16ef3b15ee65ac8"
+    },
+    {
+      "path": ".github/workflows/juliet.yml",
+      "sha256": "2ee0718a932581be4d9bd2757eac0385a050267f32d80311f96aa7276558efef"
+    },
+    {
+      "path": ".github/workflows/realworld.yml",
+      "sha256": "d7aa6d9ca71780b96d3e314debebe694dd062e19088041ec18b42ba8a060d597"
+    },
+    {
+      "path": ".github/workflows/windows.yml",
+      "sha256": "42916bf2249535164739fd1e80d85ae3ae7a26f1ef1f447e267a01e13852d729"
+    },
+    {
+      "path": "CMakeLists.txt",
+      "sha256": "fbd19ddfa7d65fe0a1f0458bd5ba3c44f9b1511b8c97004b5348241315b0967e"
+    },
+    {
+      "path": "ci/regression-adjudications.json",
+      "sha256": "d979a69bbc5f7c8c7239329b4ccbd3a587eacd54c690487b83d746b206ed28c0"
+    },
+    {
+      "path": "ci/regression-checkpoint.json",
+      "sha256": "3e0daf49a3720d8898ff96edb39c65156cb96527ae4df67887113e150015628b"
+    },
+    {
+      "path": "scripts/compare_measurements.py",
+      "sha256": "bf9595ae70012dc0abc3c894dc3b897d91ffd8fdc72349135d703c06ef81afa3"
+    },
+    {
+      "path": "scripts/corpus_compile_commands.cpp",
+      "sha256": "4099c98b1cc2fd7b6994e84210dda53ce000424ebffe284730d3f209a0dae339"
+    },
+    {
+      "path": "scripts/corpus_expected.txt",
+      "sha256": "bec581e0fa7e4583d2fe24cd11597aad2ddef1eeffd993c65e10f102f73a31e5"
+    },
+    {
+      "path": "scripts/juliet_eval.py",
+      "sha256": "a4aa997e1a975fcfe5a5f9c7228d5a9304cfeb50fc03bb2c68c7eef648316a11"
+    },
+    {
+      "path": "scripts/juliet_expected.txt",
+      "sha256": "065b4e976fe3aee2c495e3a871343d913df1d9bbb38c4c2d446092ad3602463f"
+    },
+    {
+      "path": "scripts/local_test.sh",
+      "sha256": "5d0db8a410fa299cadab03d3b66d8ab889610529b8bd110ac80e755a7d46fe01"
+    },
+    {
+      "path": "scripts/measurement_baseline.json",
+      "sha256": "8ec87a2f252624886bfb60af84ad67d2a199f689cc183ddd2011b4e8e587a51e"
+    },
+    {
+      "path": "scripts/realworld_expected.txt",
+      "sha256": "428bde276cf5739770432899455af04f7827ea7d0b81a89accfad1451aaf0f92"
+    },
+    {
+      "path": "scripts/realworld_manifest.json",
+      "sha256": "e876ab5540215956a919a079fcfb9647042ebc32d1f7deefede5c74553c3f04f"
+    },
+    {
+      "path": "scripts/render_quality_dashboard.py",
+      "sha256": "b0f4b274dde8ab0f443cc8ca239103380cfa5f6bad1e67186797b493848a82d1"
+    },
+    {
+      "path": "scripts/run_corpus.sh",
+      "sha256": "aafb8b0589dfb6d7f88f94e4de152cf585ae63b1ed0b86eb3709496264bc5911"
+    },
+    {
+      "path": "scripts/run_juliet.sh",
+      "sha256": "2b99e8944664aec045ad44d6776107289e93875681704d118862616b92f62190"
+    },
+    {
+      "path": "scripts/run_measurement_lab.py",
+      "sha256": "6b3893cfbe3bbe15600c6d7216d342d5fe4e2fa563d9490dd8d474cef0c23dde"
+    },
+    {
+      "path": "scripts/run_realworld_campaign.py",
+      "sha256": "1e962ce2de8d6e62c72092fe6ccbdd90ac1b3a3fcc864599c6e8d1c7b9ffd4d3"
+    },
+    {
+      "path": "scripts/run_regression_checkpoint.py",
+      "sha256": "1e0a15d1cf09b86d12f553cf98f36bbc9a41b8c1703bc262429ce6d723021049"
+    },
+    {
+      "path": "scripts/run_stress_matrix.py",
+      "sha256": "be19af725419a97429a7daf41cbef5ed979161f02665f97c3e74ef635e509f34"
+    },
+    {
+      "path": "scripts/run_thesis.sh",
+      "sha256": "2c5c7aeb0d6cd7a8162e8f6494a2dfdb8c30d56832ca998adf15949675065e60"
+    },
+    {
+      "path": "scripts/test_first_scan.sh",
+      "sha256": "91dc7c50fe680f311961a6f56954c044f2181fba120bf2103108c61272751b6d"
+    },
+    {
+      "path": "scripts/verify_regression_checkpoint.py",
+      "sha256": "f087501eecd36ffbac814bf3fbec3752d2f6e8134525787dbd943c1fc52d3b61"
+    },
+    {
+      "path": "src/CMakeLists.txt",
+      "sha256": "3fb47c1702e92140c7d11b08415958f18d418bcf7a128a8bf9808d0183208d13"
+    },
+    {
+      "path": "src/core/RuleCapabilities.def",
+      "sha256": "17bd1d76e01534b6afd98ad04c105c656c8ed45a2778be8f4ed842716afcaadc"
+    },
+    {
+      "path": "tests/ActionArgsTest.py",
+      "sha256": "f6a4303f16d29b997deb4be14d7a3a9e96fb831c8b40bed3c4edfdfc92c94e25"
+    },
+    {
+      "path": "tests/AllocSizeOverflowRuleTest.cpp",
+      "sha256": "fb45120ee86a244aca6bba99f3d98a5e4469781e97f414cb0b7c58c398893c60"
+    },
+    {
+      "path": "tests/AnalysisCoordinatorTest.cpp",
+      "sha256": "8112dc369e06d00a9f4be40a3d243ab69cc50a24cc9f8a5d466be9d827ff08f1"
+    },
+    {
+      "path": "tests/AnalysisResultTest.cpp",
+      "sha256": "e03225c204a27a69274981caff87cf2e25d65a5b4c249607c458733e2f2860c9"
+    },
+    {
+      "path": "tests/AssertRecoveryTest.cpp",
+      "sha256": "3c65963dbf0f50b5966312e694a9feb648869ad088f3600d94cb230187a80e0b"
+    },
+    {
+      "path": "tests/AssumptionRuleTest.cpp",
+      "sha256": "cca0a1bdf2640a66852fc8893f52521c8bb0f2ee700e127ef8b33182de04bd7b"
+    },
+    {
+      "path": "tests/BaselineTest.cpp",
+      "sha256": "6b67593f94e98268c4263ab3c6524403a2f0de435d35554efd86859d548eb0ed"
+    },
+    {
+      "path": "tests/BoundsRuleTest.cpp",
+      "sha256": "b6a4095b1b67efa7cea61e6a966437b750382cd5030dd9881fd9c33e3d59bec0"
+    },
+    {
+      "path": "tests/BrokenTuTest.cpp",
+      "sha256": "1d8b66b971c79869507c860e4f7bb93e85f8491619bd6d6acbe527fb570234cd"
+    },
+    {
+      "path": "tests/CMakeLists.txt",
+      "sha256": "23204495b655f866cdf232ef9cccbcdc293ffbc09efcbb42732da6ebbb1591f9"
+    },
+    {
+      "path": "tests/CapabilitiesCliTest.py",
+      "sha256": "997c5a4165e937268f5034761a21514f023b81ce93be2ba0c821b1dd403ff812"
+    },
+    {
+      "path": "tests/CapabilitiesTest.cpp",
+      "sha256": "902563e99f6c82b57770f3400a9a8d088c13b90228af6fb885672be05d229906"
+    },
+    {
+      "path": "tests/CfgCacheTest.cpp",
+      "sha256": "9a48c8af0042d59a5a1ba8973512536fb2140f85ccb26460535b1fa206bf084e"
+    },
+    {
+      "path": "tests/CompilationDatabaseCliTest.py",
+      "sha256": "becbc2719da069b8763b9c15848aa210611595e0d66bd7902c36290e43d0fe6a"
+    },
+    {
+      "path": "tests/ConfigTest.cpp",
+      "sha256": "70fec3a1fd7e602f3f2b3d2591598ae11d5187deab545008866d23c69245e6e7"
+    },
+    {
+      "path": "tests/ContractTest.cpp",
+      "sha256": "5240418ab255607dce6305f9c05adb3888cbeb85480a975f029391378efea23b"
+    },
+    {
+      "path": "tests/CoverageReportTest.cpp",
+      "sha256": "ee1e38a37f989c60bbfde22a9cbce68ceb588f91096b17e7deb3ee10a8f3fe11"
+    },
+    {
+      "path": "tests/DiagnosticTest.cpp",
+      "sha256": "9a406b583866fa3dc505311397ca2d3448717d65879fbed9463ac231045789a4"
+    },
+    {
+      "path": "tests/DisjunctsV2bTest.cpp",
+      "sha256": "66fab6414602fcd888940b3899a53894dfdab6bef2b8ad530319b31b63c86415"
+    },
+    {
+      "path": "tests/DivByZeroRuleTest.cpp",
+      "sha256": "95ea6e0aa21b7b10ca54d720f14cebfc5fa90235e0e2813a1b0379996c832552"
+    },
+    {
+      "path": "tests/DockerWorkflowTest.py",
+      "sha256": "d0d206a2798cb366c1d5dc2cc0ef52bf1a776ca52b41989d793628fff021934c"
+    },
+    {
+      "path": "tests/FatalCallsTest.cpp",
+      "sha256": "6444d0eed435065e77b73e277f27f9bf42fd6e952af0b12371ba6a1607bfff1a"
+    },
+    {
+      "path": "tests/FdResourceRuleTest.cpp",
+      "sha256": "5dce4256cb609762177267d21e95ec69df5fd371b04dbe6b38fc1fd0dc1d47b3"
+    },
+    {
+      "path": "tests/FindingFingerprintTest.cpp",
+      "sha256": "e8f9902f85e79e15ed8e9734b54ae24399071058e057313015da0311804e822f"
+    },
+    {
+      "path": "tests/FirstScanTest.py",
+      "sha256": "1a876a95bb3d6a98ad8333408c0cfc8224644976a2673138e04c9cde91489e1b"
+    },
+    {
+      "path": "tests/FunctionFilterTest.cpp",
+      "sha256": "e4d5e9d5d1ca33d9ab15e9b0d0a7dd1508b54d22c47126517d2991a08cc5336f"
+    },
+    {
+      "path": "tests/HtmlReporterTest.cpp",
+      "sha256": "6f4b663d8a0b637ee48a206d9581f9b6f8670c1fea36bf87cdfa36c66e87e530"
+    },
+    {
+      "path": "tests/ImmutableFlagsTest.cpp",
+      "sha256": "f87efbfedb5fe97b41d6dcf285a3e0be40d888ba9a6b0932f4c9d022cc9fcc2d"
+    },
+    {
+      "path": "tests/IntOverflowRuleTest.cpp",
+      "sha256": "315c1860e1a02beb3f543bd78be525f3f959f7cf8805cb1869df6f35c3537bd0"
+    },
+    {
+      "path": "tests/InterproceduralTest.cpp",
+      "sha256": "4626fa94b47a708824d0d8444226efb1099037678f35adffa8113cb7821c69db"
+    },
+    {
+      "path": "tests/IntervalAnalysisTest.cpp",
+      "sha256": "2af368206704164da3214ce216fe70259d8351788d8fb429acd96f637e937f77"
+    },
+    {
+      "path": "tests/IntervalTest.cpp",
+      "sha256": "885b07b5220481cbe299d7bcdbd28faa52c8745d8d601944cbe5b3ebb9bb2cbb"
+    },
+    {
+      "path": "tests/JsonReporterTest.cpp",
+      "sha256": "0bfe83eefdee65393e283d703886a0321e6484552a4021b4fe3522046c225bc3"
+    },
+    {
+      "path": "tests/MacSdkPathTest.cpp",
+      "sha256": "07f85ba574c7d10854b4c9a02351333020622ec242907d4ff4beb61cecb887c7"
+    },
+    {
+      "path": "tests/McpServerTest.cpp",
+      "sha256": "97ad426ff832d16d348467c19706d914b68957b221954c99addaed7c8af2a621"
+    },
+    {
+      "path": "tests/MeasurementLabTest.py",
+      "sha256": "a60fbba4737c98f0188f379d16c126f61a88820b8650b4d5b9a52ce425e9665b"
+    },
+    {
+      "path": "tests/MeasurementWorkflowTest.py",
+      "sha256": "617192026c4ab5c6d59c56fb80e69d2a3d20b28030fdab336169bcb8fd7b1a6c"
+    },
+    {
+      "path": "tests/MemoryLeakRuleExTest.cpp",
+      "sha256": "0d7953a385063c255a0ae7c67e750c0f3fc5f92962f7c186f9ac6e13503be486"
+    },
+    {
+      "path": "tests/NullDerefRuleTest.cpp",
+      "sha256": "b41f0c19b05eecc25e6007c51d2d49f2d7c61abf4fd46f6fd440f1bcea23a74a"
+    },
+    {
+      "path": "tests/OutputParityCliTest.py",
+      "sha256": "a49ee42d2b9b3cc880bf4ad8fb118e0b0d0953374579f182e8f089dd06559c7d"
+    },
+    {
+      "path": "tests/ParamIntervalsTest.cpp",
+      "sha256": "be5bcf3ec7c70a9318c78ec7e44da380d47db2c7e62cfc2645055154158cbe11"
+    },
+    {
+      "path": "tests/RealworldCampaignTest.py",
+      "sha256": "4e59fe191f96c5b982a601a1de478f7abc23256fb578a10f8561599e2ad77f8c"
+    },
+    {
+      "path": "tests/RegressionCheckpointTest.py",
+      "sha256": "9f80446af0c26ca5d4a33af614055b636af493500f97e8611031ee71ff5b2fc1"
+    },
+    {
+      "path": "tests/ReleaseWorkflowTest.py",
+      "sha256": "c8904b2a8267b478738f514dbbb4d8c9b39cfc0efe75528e9c406fd29ac6c67b"
+    },
+    {
+      "path": "tests/ReportPathsTest.cpp",
+      "sha256": "9d9c2e20cac81823df5832973781db875700f9b444cc1312f92eff06c2964d9c"
+    },
+    {
+      "path": "tests/ResourceBudgetTest.cpp",
+      "sha256": "8b8a83a5cc4d91a22956957bf107b62fc44f3d154716ce7c5e675842e2933f6c"
+    },
+    {
+      "path": "tests/ResourceDirTest.cpp",
+      "sha256": "451a3404f02d03fa797d03ebe40b9a8677184c47a1c5861c3e064fc2b0dcd2a4"
+    },
+    {
+      "path": "tests/ReviewInputTest.py",
+      "sha256": "55196fac8b43799e77f0086d44e01a7a08c202ed4b45e020382ff3bf6fc14944"
+    },
+    {
+      "path": "tests/SarifReporterTest.cpp",
+      "sha256": "9792aecd038612ec7e66bd8e1806574623df65f40d1d9ffd35d67281ced0f130"
+    },
+    {
+      "path": "tests/SignConversionRuleTest.cpp",
+      "sha256": "dbe5ebf15926117902c55937d278d77164aaa7e268b5c1b115814802e035e840"
+    },
+    {
+      "path": "tests/SourceManagerTest.cpp",
+      "sha256": "d1812076a2da527623646585dc009a5fc68b7972e438dbfac7870e3a69836a5c"
+    },
+    {
+      "path": "tests/StatusAutomationTest.py",
+      "sha256": "ad6ddec165c85cd38f5666d69bc7be398cc2453374167874e46044b445a3f8ac"
+    },
+    {
+      "path": "tests/StressEdgeCaseTest.cpp",
+      "sha256": "a80b5c70889f5711c909b8fa88011e34f9d2a8fb94320d04a29191b48e5e0512"
+    },
+    {
+      "path": "tests/StressMatrixTest.py",
+      "sha256": "4ff78b866073bf26141a7ae005ff8f39dc810e81898ac83364727a69a8e0b269"
+    },
+    {
+      "path": "tests/SummaryDiffTest.cpp",
+      "sha256": "98bc0a562ec165e72b421540b6ad958e48bfd362da048eccaaf0b276c2836074"
+    },
+    {
+      "path": "tests/SuppressionFilterTest.cpp",
+      "sha256": "cbad06f48dc49605273aafcda1ffda2a4ad0d04918890a225132b62a372ef26b"
+    },
+    {
+      "path": "tests/TestHelper.cpp",
+      "sha256": "0a5f223ab906de0fa634bfb67d62ed7940587f8bd0bfa9145fb83d9a208a705d"
+    },
+    {
+      "path": "tests/TestHelper.h",
+      "sha256": "050d985b069c2b2c993d4ac18039e7e88aa7d0c4b4a8a096f9bed1f618aaa01b"
+    },
+    {
+      "path": "tests/UninitPointerRuleExTest.cpp",
+      "sha256": "af7d10c9979686f393235c817783442d1d8e42e6d128bba2f7e8dea1322b550c"
+    },
+    {
+      "path": "tests/UninitScalarRuleTest.cpp",
+      "sha256": "5dda80158e2308195ebcc16296c941923d39de67c6d66921198ffa25d6c33169"
+    },
+    {
+      "path": "tests/UnitEvidenceStoreTest.cpp",
+      "sha256": "15c144e701a75c556b07c844e5819f97360a5478266730f2165fbef1599bfde5"
+    },
+    {
+      "path": "tests/VerdictIntegrityTest.cpp",
+      "sha256": "9973c64b5db4288cbd12fe291e93979c86a96a19563f3972b19ea4f9ba79b4d7"
+    },
+    {
+      "path": "tests/WorkerProtocolTest.cpp",
+      "sha256": "2f5a32020b3119d2b1d989b5dfe51c91d7b7a58444446c19e6b54d35130bb75f"
+    },
+    {
+      "path": "tests/WorkflowPolicyTest.py",
+      "sha256": "dd42a8b10b5a42ea1090bb6bb9b008e0308ee38821f9363f40fcb5b77abc5e41"
+    },
+    {
+      "path": "tests/stress_corpus/README.md",
+      "sha256": "7ebf47bef5149b28d023a4797f092715bde1456d0bc1711284fea24aecf26fbf"
+    },
+    {
+      "path": "tests/stress_corpus/high_cfg.cpp",
+      "sha256": "00d5db5a7897043d190306dc2eb75b2b15ae802d7f2117c05b6c95bd02875c39"
+    },
+    {
+      "path": "tests/stress_corpus/macros.cpp",
+      "sha256": "e7b57daa0cf55e1ce0d199d484c2a442af93f22d986d66f551f53cac237d75da"
+    },
+    {
+      "path": "tests/stress_corpus/templates.cpp",
+      "sha256": "f43363e0aff05d6d10973914683eaff9ec1258522549aa3a093b26d2981d662d"
+    },
+    {
+      "path": "tests/test_project_queue.py",
+      "sha256": "11c9e2ef8c32d7eb13afb84f02ad206038e68d50f5106560e2e81b5ff7465dc5"
+    },
+    {
+      "path": "tests/test_review_diff.sh",
+      "sha256": "df65f62d38a3e25b6cb88967c76284f9fb4ed97b49c907eb882ba3380c387a33"
+    },
+    {
+      "path": "tests/thesis_corpus/README.md",
+      "sha256": "dc5822ac22e09572c183cacb0d6e2b9a3385805991aab88da0df371abdeaa2aa"
+    },
+    {
+      "path": "tests/thesis_corpus/alloc_fill.c",
+      "sha256": "ca364d94ca64dc7c1fafb135a27f1caaf5b816b01e9966517989fbadc80ea988"
+    },
+    {
+      "path": "tests/thesis_corpus/array_from_int.c",
+      "sha256": "577c5ede934cbcd24a26e587a85f3239484961e167f7d341518177a99a999688"
+    },
+    {
+      "path": "tests/thesis_corpus/avg_input.c",
+      "sha256": "ebbbef8703398ec94ea09b6dca6563b3b7db0a68ca56849be930013806476d0b"
+    },
+    {
+      "path": "tests/thesis_corpus/cmd_args.c",
+      "sha256": "686ab57a88c91b0357b47a4b9fe06e08773ea3997898eaa004c721a230907434"
+    },
+    {
+      "path": "tests/thesis_corpus/concat_heap.c",
+      "sha256": "9ed97e716de9a420d6949edca117d74c1fe1faf1617ddc40a274b5b40ae86ef3"
+    },
+    {
+      "path": "tests/thesis_corpus/config_parse.c",
+      "sha256": "0a8a365f3587c011efe08e1de98bad2d4d35bea0930212bc583bfc7b9e0878f6"
+    },
+    {
+      "path": "tests/thesis_corpus/csv_count.c",
+      "sha256": "63fc995beb2ead20242d5ba4fd5272401087c7d0079889ec6ec1dddaf30ffd2d"
+    },
+    {
+      "path": "tests/thesis_corpus/dyn_buffer.c",
+      "sha256": "5d97d9c25a37670516d17925705441d4f0ca9078a673ee6b97a79002ac095d44"
+    },
+    {
+      "path": "tests/thesis_corpus/format_bytes.c",
+      "sha256": "4f87a2dff90d9b7f2f4cc42fb959fc73c972336f877365b5143555ad7880c2ed"
+    },
+    {
+      "path": "tests/thesis_corpus/int_vector.c",
+      "sha256": "c9be5b055199609c217b3ad611c01e890c96e1d3d95b2cab2ae97c368b9b3f84"
+    },
+    {
+      "path": "tests/thesis_corpus/length_prefix.c",
+      "sha256": "bb86808d90023cc988872f06afa14a2aed80fb3e05deab54db5112fe7725c267"
+    },
+    {
+      "path": "tests/thesis_corpus/list_builder.c",
+      "sha256": "271d839bcc5954f1df1d21839e1d3e053c8f76f9ee68ce630167515cdbc1be8a"
+    },
+    {
+      "path": "tests/thesis_corpus/matrix_row_copy.c",
+      "sha256": "3f175c47c850de183940d0c94f5eff9321cfb92af647e6db5a85af631ebbab33"
+    },
+    {
+      "path": "tests/thesis_corpus/mem_pool.c",
+      "sha256": "9a50a57a457ca599e257e5cfda71d91fca5c7a1b7681b7811e9f0d5fde050c46"
+    },
+    {
+      "path": "tests/thesis_corpus/pixel_buffer.c",
+      "sha256": "871061235af5b0819cbeec2ad615718ef5988ededd6f38f224457c22b812a76e"
+    },
+    {
+      "path": "tests/thesis_corpus/port_parse.c",
+      "sha256": "41408690595254a8d79c6a07b0d5df61c7b12832a5a511a191efbc3ad3f82bcb"
+    },
+    {
+      "path": "tests/thesis_corpus/ring_buffer.c",
+      "sha256": "54e4ea6502f4c1d507742273e5f0070b3b20131c5c4988e2241a9ed0d18197b9"
+    },
+    {
+      "path": "tests/thesis_corpus/running_product.c",
+      "sha256": "9c3bd6e3655e8bb87d10f45d85e1c4adb7c6188b8be3ebcef2cb28218d77cfc4"
+    },
+    {
+      "path": "tests/thesis_corpus/scale_numbers.c",
+      "sha256": "52e4b6a73d60a8d231792a2f1eb9e0a04d25d605b47badc44c5006e56ea02e68"
+    },
+    {
+      "path": "tests/thesis_corpus/simple_hash.c",
+      "sha256": "a2513d99d28b4cef6cbefe11b5db012d918371a5fdd2ad58ca3cc77473269426"
+    },
+    {
+      "path": "tests/thesis_corpus/strdup_manual.c",
+      "sha256": "0ee2d051b25271972b7385ac7b1fb8c26e3cff04ef9230e3d57a9b49691901e6"
+    },
+    {
+      "path": "tests/thesis_corpus/temp_convert.c",
+      "sha256": "ee5e50a4480f16c8c53dd68100694c92abef4bcace98884a7f59be64ac2fecf5"
+    },
+    {
+      "path": "tests/thesis_corpus/thesis_expected.txt",
+      "sha256": "391649a4377acc6253c8a1182ce33cfab3c7be91d25b2213599885e398778325"
+    },
+    {
+      "path": "tests/thesis_corpus/tiny_stack.c",
+      "sha256": "825e96126a826de75234032bc844fb29c197ab8ee90ae613084fe433d8fa96c8"
+    },
+    {
+      "path": "tests/thesis_corpus/tokenize.c",
+      "sha256": "6cf537bea4177c3c243bc72b9da12043573eaedf4abfff3a7ead35ddc0e6c737"
+    }
+  ]
+}

@@ -21,6 +21,19 @@ ROOT = Path(__file__).resolve().parents[1]
 CATALOG = "tests/cwe_corpus/catalog.json"
 INVENTORY = "tests/cwe_corpus/regression_inventory.json"
 REGISTRY = "src/core/RuleCapabilities.def"
+HISTORICAL_FILES = {
+    "tests/cwe_corpus/snapshots/terminal-4fd4a21-catalog.json":
+        "ceaf1a23727e5379f55c7fa8baec97e30d29d9897c59f24d543617ba4cfb3681",
+    "tests/cwe_corpus/snapshots/terminal-4fd4a21-inventory.json":
+        "8eb0230c7c3135816d9aecf37e8d4351be5e943a151443b26e0309d16a69ac9c",
+    "tests/cwe_corpus/snapshots/terminal-4fd4a21-contract.json":
+        "63554f0f6f7efd8e70ca5ef38838f5c4920ef62d33de3ff8f4d15cbe3a861e0e",
+}
+VERSION_INPUTS = ("scripts/cwe_quality.py", "scripts/check_capabilities_sync.py",
+                  "tests/cwe_corpus/test_catalog.py")
+# Planned names bound the approved extension namespace, not installed behavior.
+PLANNED_CWES = {"format-string": [134], "command-injection": [78],
+                "sql-injection": [89], "path-traversal": [22]}
 FLOORS = (
     REGISTRY, "CMakeLists.txt", "src/CMakeLists.txt",
     "scripts/corpus_expected.txt", "scripts/run_corpus.sh",
@@ -40,7 +53,7 @@ SHA = re.compile(r"[0-9a-f]{64}")
 ID = re.compile(r"[a-z][a-z0-9-]{1,95}")
 ENTRY = re.compile(
     r'^CODESKEPTIC_RULE_CAPABILITY\("([^"]+)", (Supported|Experimental), '
-    r'(true|false), (true|false), (true|false), "[^"]*", "[^"]*", \(([0-9,]*)\)\)$')
+    r'(true|false), (true|false), (true|false), "([^"]*)", "([^"]*)", \(([0-9,]*)\)\)$')
 
 
 def require(condition, reason):
@@ -93,10 +106,12 @@ def read_json(root, name):
                       parse_constant=invalid, parse_float=finite)
 
 
-def required_inputs(root):
+def required_inputs(root, version=1):
     # Freeze the complete existing test tree, not a hand-picked passing subset.
     # Generated Python bytecode is not source; this new catalog has its own hash.
     result = set(FLOORS)
+    if version == 2:
+        result.update(VERSION_INPUTS)
     for path in (root / "tests").rglob("*"):
         relative = path.relative_to(root)
         if relative.parts[:2] == ("tests", "cwe_corpus") or "__pycache__" in relative.parts:
@@ -106,28 +121,153 @@ def required_inputs(root):
     return result
 
 
-def registry(root):
+def canonical_digest(value):
+    raw = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def historical_snapshot(root):
+    """Authenticate historical metadata bytes, not current input execution."""
+    for name, sha in HISTORICAL_FILES.items():
+        require(digest_file(root, name) == sha, "historical snapshot changed: " + name)
+    catalog, inventory, contract = (read_json(root, name) for name in HISTORICAL_FILES)
+    require(catalog["inventory_sha256"] == contract["inventory_sha256"], "historical snapshot linkage")
+    return {"catalog": catalog, "inventory": inventory, "contract": contract}
+
+
+def historical_identity(root):
+    snapshot = historical_snapshot(root)
+    contract, counts = snapshot["contract"], snapshot["contract"]["counts"]
+    return {"source_revision": contract["source_revision"], "catalog_sha256": contract["catalog_sha256"],
+            "inventory_sha256": contract["inventory_sha256"],
+            "public_capabilities": counts["public_capabilities"], "rules": counts["cwe_families"],
+            "cases": counts["cases"], "protected_inputs": counts["protected_inputs"],
+            "source_test_inputs": counts["source_test_inputs"], "roles": counts["roles"],
+            "current_inputs_verified": False, "quality_measured": False}
+
+
+def registry_descriptor(root):
     result = {}
-    for line in safe_file(root, REGISTRY).read_text(encoding="utf-8").splitlines():
+    for raw in safe_file(root, REGISTRY).read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
         if not line.startswith("CODESKEPTIC_RULE_CAPABILITY("):
             continue
         match = ENTRY.fullmatch(line)
         require(match is not None, "unparseable capability")
-        name, tier, default, gated, blocking, cwes = match.groups()
-        require(name not in result, "duplicate capability")
-        result[name] = {"tier": tier.lower(), "cwes": [int(x) for x in cwes.split(",")] if cwes else []}
-    require(len(result) == 15, "capability registry changed")
+        name, tier, default, gated, blocking, evidence, description, cwes = match.groups()
+        require(ID.fullmatch(name) and name not in result, "duplicate/invalid capability")
+        ids = [int(x) for x in cwes.split(",")] if cwes else []
+        require(len(ids) == len(set(ids)) and all(cwe > 0 for cwe in ids), "duplicate/invalid capability CWE")
+        flags = (default == "true", gated == "true", blocking == "true")
+        require((tier != "Supported" or all(flags)) and (tier != "Experimental" or not flags[2]),
+                "capability tier/flag invariant")
+        require(nonempty(evidence) and nonempty(description), "missing capability explanation")
+        result[name] = {"tier": tier.lower(), "cwes": ids, "default_enabled": flags[0],
+                        "quality_gated": flags[1], "blocks_verdict": flags[2],
+                        "evidence": evidence, "description": description}
+    require(bool(result), "empty capability registry")
     return result
 
 
+def evidence_payload_digest(catalog):
+    body = dict(catalog)
+    version = catalog["evidence_version"]
+    require(type(version.get("review")) is dict, "successor review fields")
+    body["evidence_version"] = {key: value for key, value in version.items() if key != "id"}
+    body["evidence_version"]["review"] = {key: value for key, value in version["review"].items()
+                                          if key != "payload_sha256"}
+    return canonical_digest(body)
+
+
+def validate_evidence_version(root, catalog, snapshot=None):
+    snapshot = snapshot or historical_snapshot(root)
+    version = catalog["evidence_version"]
+    fields(version, "schema sequence previous_catalog_sha256 previous_inventory_sha256 previous_version_id "
+           "registry_sha256 capabilities input_paths case_ids id review", "evidence version")
+    require(version["schema"] == "codeskeptic-cwe-evidence-version/v1", "evidence version schema")
+    require(type(version["sequence"]) is int and 1 <= version["sequence"] <= 1000, "evidence version sequence")
+    for name in ("previous_catalog_sha256", "previous_inventory_sha256", "registry_sha256", "id"):
+        require(type(version[name]) is str and SHA.fullmatch(version[name]) and version[name] != "0" * 64,
+                "invalid evidence version digest")
+    if version["sequence"] == 1:
+        prior = snapshot["contract"]["reviewed_u001_successor"]
+        require(version["previous_catalog_sha256"] == prior["catalog_sha256"]
+                and version["previous_inventory_sha256"] == prior["inventory_sha256"]
+                and version["previous_version_id"] is None, "wrong initial version predecessor")
+    else:
+        previous = version["previous_version_id"]
+        require(type(previous) is str and SHA.fullmatch(previous) and previous != "0" * 64
+                and previous != version["id"], "invalid previous version identity")
+    require(version["id"] == evidence_payload_digest(catalog), "evidence version payload changed")
+    review = version["review"]
+    fields(review, "schema source_base source_head implementer verifier verdict findings reason payload_sha256", "successor review")
+    require(review["schema"] == "codeskeptic-cwe-successor-review/v1"
+            and all(type(review[name]) is str and re.fullmatch(r"[0-9a-f]{40}", review[name])
+                    and review[name] != "0" * 40 for name in ("source_base", "source_head"))
+            and review["source_base"] != review["source_head"], "successor review source identity")
+    require(all(nonempty(review[name]) for name in ("implementer", "verifier", "reason"))
+            and review["implementer"] != review["verifier"] and review["verdict"] == "PASS"
+            and review["findings"] == [] and review["payload_sha256"] == version["id"],
+            "missing/stale independent successor review")
+    require(type(version["capabilities"]) is dict
+            and canonical_digest(version["capabilities"]) == canonical_digest(registry_descriptor(root))
+            and version["registry_sha256"] == digest_file(root, REGISTRY), "version capability registry mismatch")
+    baseline = snapshot["contract"]["capabilities"]
+    current = version["capabilities"]
+    require(set(baseline) <= set(current) <= set(baseline) | set(PLANNED_CWES), "unapproved capability identity")
+    for name, row in current.items():
+        if name in PLANNED_CWES:
+            require(row["cwes"] == PLANNED_CWES[name], "unapproved capability CWE mapping")
+        elif name == "bounds":
+            require(set(baseline[name]["cwes"]) <= set(row["cwes"])
+                    <= set(baseline[name]["cwes"]) | {121, 122}, "unapproved bounds subtype")
+        else:
+            require(row["cwes"] == baseline[name]["cwes"], "historical capability CWE changed")
+        if name in baseline and baseline[name]["tier"] == "supported":
+            require(row["tier"] == "supported", "historical supported rule demoted")
+        if name in ("assumption", "contract", "policy"):
+            require(row == baseline[name], "report-only project capability changed")
+    require(type(version["input_paths"]) is list
+            and all(type(path) is str for path in version["input_paths"])
+            and version["input_paths"] == sorted(set(version["input_paths"])), "version input identities")
+    require(type(version["case_ids"]) is list and all(type(name) is str for name in version["case_ids"])
+            and len(version["case_ids"]) == len(set(version["case_ids"])), "version fixture identities")
+    return version
+
+
+def registry(root, catalog=None):
+    catalog = read_json(root, CATALOG) if catalog is None else catalog
+    if catalog.get("schema") == "codeskeptic-cwe-catalog/v2":
+        return validate_evidence_version(root, catalog)["capabilities"]
+    require(catalog.get("schema") == "codeskeptic-cwe-catalog/v1", "catalog schema")
+    expected = historical_snapshot(root)["contract"]["capabilities"]
+    actual = registry_descriptor(root)
+    require(actual == expected, "capability registry changed without reviewed version")
+    return actual
+
+
+def frozen_contract_counts(root, catalog):
+    if catalog["schema"] == "codeskeptic-cwe-catalog/v1":
+        return historical_identity(root)
+    version = validate_evidence_version(root, catalog)
+    return {"rules": sum(bool(row["cwes"]) for row in version["capabilities"].values()),
+            "cases": len(version["case_ids"]), "protected_inputs": len(version["input_paths"]),
+            "source_test_inputs": sum(path.startswith("tests/") for path in version["input_paths"]),
+            "roles": dict(Counter(case["role"] for case in catalog["cases"]))}
+
+
 def validate(root, catalog, inventory):
-    fields(catalog, "schema selection_base profile inventory_sha256 rules excluded_capabilities cases", "catalog")
-    require(catalog["schema"] == "codeskeptic-cwe-catalog/v1", "catalog schema")
+    require(type(catalog) is dict and catalog.get("schema") in
+            ("codeskeptic-cwe-catalog/v1", "codeskeptic-cwe-catalog/v2"), "catalog schema")
+    version_number = 2 if catalog["schema"].endswith("/v2") else 1
+    fields(catalog, "schema selection_base profile inventory_sha256 rules excluded_capabilities cases"
+           + (" evidence_version" if version_number == 2 else ""), "catalog")
+    snapshot = historical_snapshot(root)
     require(type(catalog["selection_base"]) is str and re.fullmatch(r"[0-9a-f]{40}", catalog["selection_base"]), "selection base")
     require(catalog["profile"] == "linux-x86_64-clang20-cxx17-isolated-rule", "catalog profile")
     require(catalog["inventory_sha256"] == digest_file(root, INVENTORY), "inventory digest changed")
     fields(inventory, "schema selection_base inputs", "inventory")
-    require(inventory["schema"] == "codeskeptic-cwe-regression-inputs/v1"
+    require(inventory["schema"] == f"codeskeptic-cwe-regression-inputs/v{version_number}"
             and inventory["selection_base"] == catalog["selection_base"], "inventory identity")
     require(type(inventory["inputs"]) is list and 1 <= len(inventory["inputs"]) <= 2000, "inventory size")
     names = []
@@ -137,9 +277,19 @@ def validate(root, catalog, inventory):
         require(type(entry["sha256"]) is str and SHA.fullmatch(entry["sha256"]), "inventory SHA")
         require(digest_file(root, name) == entry["sha256"], "protected input changed: " + name)
         names.append(name)
-    require(names == sorted(set(names)) and set(names) == required_inputs(root), "missing/extra/unordered protected inputs")
+    require(names == sorted(set(names)) and set(names) == required_inputs(root, version_number), "missing/extra/unordered protected inputs")
+    require({row["path"] for row in snapshot["inventory"]["inputs"]} <= set(names),
+            "historical protected input removed")
+    for row in snapshot["contract"]["immutable_quality_inputs"]:
+        require(digest_file(root, row["path"]) == row["sha256"], "historical quality floor changed: " + row["path"])
+    require(type(catalog["cases"]) is list and catalog["cases"][:len(snapshot["catalog"]["cases"])]
+            == snapshot["catalog"]["cases"], "historical fixture contract changed")
+    version = validate_evidence_version(root, catalog, snapshot) if version_number == 2 else None
+    if version is not None:
+        require(version["input_paths"] == names and version["case_ids"] == [case["id"] for case in catalog["cases"]],
+                "version input/fixture set mismatch")
 
-    capabilities = registry(root)
+    capabilities = registry(root, catalog)
     wanted = {name for name, row in capabilities.items() if row["cwes"]}
     require(type(catalog["rules"]) is dict and set(catalog["rules"]) == wanted, "missing/extra CWE rules")
     for name, rule in catalog["rules"].items():
@@ -184,7 +334,7 @@ def validate(root, catalog, inventory):
     # Close the entire input namespace, not only the current .cpp suffix.
     # Otherwise a new .cc/.cxx/.c file (or an unbound included header) can be
     # omitted from both this profile and the protected pre-existing test tree.
-    expected_files = set(paths) | {CATALOG, INVENTORY, "tests/cwe_corpus/test_catalog.py"}
+    expected_files = set(paths) | {CATALOG, INVENTORY, "tests/cwe_corpus/test_catalog.py"} | set(HISTORICAL_FILES)
     actual = {p.relative_to(root).as_posix() for p in (root / "tests/cwe_corpus").rglob("*")
               if p.is_file() or p.is_symlink()}
     require(actual == expected_files, "unlisted/missing corpus file")
@@ -193,7 +343,8 @@ def validate(root, catalog, inventory):
     require(all({"buggy", "safe"} <= value for value in roles.values()), "rule lacks positive/negative pair")
     return {"catalog_sha256": digest_file(root, CATALOG), "cases": len(ids),
             "roles": dict(sorted(Counter(c["role"] for c in catalog["cases"]).items())),
-            "rules": len(wanted), "protected_inputs": len(names), "quality_measured": False}
+            "rules": len(wanted), "protected_inputs": len(names), "quality_measured": False,
+            **({"evidence_version_id": version["id"]} if version is not None else {})}
 
 
 def measure_report(report, case, source, exit_code, version, capability):
@@ -299,6 +450,27 @@ def source_checkout(root, revision):
     return identity[2]
 
 
+def capability_parity(actual, version, capabilities):
+    """Native discovery is compared with explicit source flags, never inferred counts."""
+    require(type(actual) is dict and type(actual.get("schema_version")) is int and actual["schema_version"] == 2
+            and actual.get("product") == "CodeSkeptic" and actual.get("version") == version,
+            "capability identity mismatch")
+    rules = actual.get("rule_capabilities")
+    require(type(rules) is list and all(type(row) is dict and type(row.get("id")) is str for row in rules),
+            "capability rows malformed")
+    require(len(rules) == len(capabilities) and len({row["id"] for row in rules}) == len(rules)
+            and {row["id"] for row in rules} == set(capabilities), "capability set mismatch")
+    for row in rules:
+        expected = capabilities[row["id"]]
+        require(row.get("tier") == expected["tier"]
+                and type(row.get("potential_cwes")) is list
+                and all(type(cwe) is dict and type(cwe.get("id")) is int for cwe in row["potential_cwes"])
+                and [cwe["id"] for cwe in row["potential_cwes"]] == expected["cwes"]
+                and all(type(row.get(flag)) is bool and row[flag] == expected[flag]
+                        for flag in ("default_enabled", "quality_gated", "blocks_verdict")),
+                "capability registry mismatch")
+
+
 def scan_case(binary, case, source, directory, capabilities, version, timeout):
     require(file_sha(source) == case["sha256"], "frozen fixture digest mismatch")
     directory.mkdir()
@@ -366,24 +538,7 @@ def run_catalog(root, binary, output, revision, timeout=20, tier="supported"):
         require(discovery["returncode"] == 0, "capabilities command failed")
         actual = json.loads(discovery["stdout"], object_pairs_hook=unique,
                             parse_constant=stress.invalid_constant, parse_float=stress.finite_float)
-        require(type(actual) is dict and type(actual.get("schema_version")) is int and actual["schema_version"] == 2
-                and actual.get("product") == "CodeSkeptic" and actual.get("version") == version,
-                "capability identity mismatch")
-        rules = actual.get("rule_capabilities")
-        require(type(rules) is list and len(rules) == len(capabilities)
-                and {r["id"] for r in rules} == set(capabilities), "capability set mismatch")
-        for row in rules:
-            expected = capabilities[row["id"]]
-            require(row["tier"] == expected["tier"]
-                    and type(row.get("potential_cwes")) is list
-                    and all(type(cwe) is dict and type(cwe.get("id")) is int for cwe in row["potential_cwes"])
-                    and [cwe["id"] for cwe in row["potential_cwes"]] == expected["cwes"]
-                    and type(row.get("default_enabled")) is bool
-                    and row["default_enabled"] == (row["id"] != "assumption")
-                    and type(row.get("quality_gated")) is bool
-                    and row["quality_gated"] == (expected["tier"] == "supported")
-                    and type(row["blocks_verdict"]) is bool
-                    and row["blocks_verdict"] == (expected["tier"] == "supported"), "capability registry mismatch")
+        capability_parity(actual, version, capabilities)
         # Analyzed by the same embedded frontend with the exact fixture flags.
         # No target override: verify the real default ABI before measurement.
         probe = output / "profile.cpp"
@@ -420,7 +575,7 @@ def run_catalog(root, binary, output, revision, timeout=20, tier="supported"):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("check", "run"))
+    parser.add_argument("command", choices=("check", "run", "historical-identity"))
     parser.add_argument("--binary", type=Path)
     parser.add_argument("--out", type=Path)
     parser.add_argument("--revision")
@@ -428,6 +583,9 @@ def main():
     parser.add_argument("--tier", choices=("supported", "experimental"), default="supported")
     args = parser.parse_args()
     try:
+        if args.command == "historical-identity":
+            print(json.dumps(historical_identity(ROOT), sort_keys=True))
+            return 0
         if args.command == "run":
             require(args.binary is not None and args.out is not None and args.revision is not None,
                     "run requires --binary, --out and --revision")

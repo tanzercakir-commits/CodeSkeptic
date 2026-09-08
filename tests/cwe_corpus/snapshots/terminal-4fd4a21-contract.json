@@ -1,0 +1,222 @@
+{
+  "schema": "codeskeptic-cwe-historical-contract/v1",
+  "source_revision": "4fd4a21f9b5dc381ea1ec3014daa3082a9d14e24",
+  "catalog_sha256": "ceaf1a23727e5379f55c7fa8baec97e30d29d9897c59f24d543617ba4cfb3681",
+  "inventory_sha256": "8eb0230c7c3135816d9aecf37e8d4351be5e943a151443b26e0309d16a69ac9c",
+  "capabilities": {
+    "uninit-ptr": {
+      "tier": "experimental",
+      "default_enabled": true,
+      "quality_gated": false,
+      "blocks_verdict": false,
+      "evidence": "per-rule precision sample pending",
+      "description": "Dereference of an uninitialized pointer",
+      "cwes": [
+        824
+      ]
+    },
+    "uninit-scalar": {
+      "tier": "experimental",
+      "default_enabled": true,
+      "quality_gated": false,
+      "blocks_verdict": false,
+      "evidence": "straight-line automatic integer/bool subset; independent precision sample pending",
+      "description": "Read of an uninitialized automatic scalar",
+      "cwes": [
+        457
+      ]
+    },
+    "memory-leak": {
+      "tier": "supported",
+      "default_enabled": true,
+      "quality_gated": true,
+      "blocks_verdict": true,
+      "evidence": "Juliet 0.860 precision (80 TP / 13 FP); Phase 3 gate >= 0.85",
+      "description": "Pointer-owned memory or resource is not released",
+      "cwes": [
+        401,
+        772,
+        775
+      ]
+    },
+    "double-free": {
+      "tier": "supported",
+      "default_enabled": true,
+      "quality_gated": true,
+      "blocks_verdict": true,
+      "evidence": "Juliet 1.000 precision (101 TP / 0 FP)",
+      "description": "Repeated release of memory or a resource",
+      "cwes": [
+        415,
+        675
+      ]
+    },
+    "use-after-free": {
+      "tier": "supported",
+      "default_enabled": true,
+      "quality_gated": true,
+      "blocks_verdict": true,
+      "evidence": "Juliet 1.000 precision (212 TP / 0 FP)",
+      "description": "Use of memory or a resource after release",
+      "cwes": [
+        416,
+        672
+      ]
+    },
+    "resource-leak": {
+      "tier": "supported",
+      "default_enabled": true,
+      "quality_gated": true,
+      "blocks_verdict": true,
+      "evidence": "pinned libarchive v3.8.9 mutation sample 1.000 precision (3 TP / 0 FP); Phase 5 gate >= 0.90",
+      "description": "Handle or other owned resource is not released",
+      "cwes": [
+        401,
+        772,
+        775
+      ]
+    },
+    "div-by-zero": {
+      "tier": "supported",
+      "default_enabled": true,
+      "quality_gated": true,
+      "blocks_verdict": true,
+      "evidence": "Juliet 1.000 precision (43 TP / 0 FP)",
+      "description": "Division or remainder with a zero divisor",
+      "cwes": [
+        369
+      ]
+    },
+    "null-deref": {
+      "tier": "supported",
+      "default_enabled": true,
+      "quality_gated": true,
+      "blocks_verdict": true,
+      "evidence": "Juliet 1.000 precision (140 TP / 0 FP)",
+      "description": "Dereference of a null pointer",
+      "cwes": [
+        476
+      ]
+    },
+    "bounds": {
+      "tier": "experimental",
+      "default_enabled": true,
+      "quality_gated": false,
+      "blocks_verdict": false,
+      "evidence": "per-rule precision sample pending",
+      "description": "Out-of-range memory access, pointer offset or unchecked copy",
+      "cwes": [
+        120,
+        125,
+        787,
+        823
+      ]
+    },
+    "int-overflow": {
+      "tier": "supported",
+      "default_enabled": true,
+      "quality_gated": true,
+      "blocks_verdict": true,
+      "evidence": "Juliet 1.000 precision (23 TP / 0 FP)",
+      "description": "Signed arithmetic or destination conversion exceeds its range",
+      "cwes": [
+        190,
+        191,
+        681
+      ]
+    },
+    "sign-conversion": {
+      "tier": "experimental",
+      "default_enabled": true,
+      "quality_gated": false,
+      "blocks_verdict": false,
+      "evidence": "per-rule precision sample pending",
+      "description": "Negative-to-unsigned or lossy narrowing conversion reaches a sink",
+      "cwes": [
+        195,
+        681
+      ]
+    },
+    "alloc-size-overflow": {
+      "tier": "experimental",
+      "default_enabled": true,
+      "quality_gated": false,
+      "blocks_verdict": false,
+      "evidence": "per-rule precision sample pending",
+      "description": "Unsigned size calculation can under-allocate a buffer",
+      "cwes": [
+        131
+      ]
+    },
+    "assumption": {
+      "tier": "experimental",
+      "default_enabled": false,
+      "quality_gated": false,
+      "blocks_verdict": false,
+      "evidence": "explicit --assumptions report-only mode",
+      "description": "Report of an inferred analysis assumption",
+      "cwes": []
+    },
+    "contract": {
+      "tier": "experimental",
+      "default_enabled": true,
+      "quality_gated": false,
+      "blocks_verdict": false,
+      "evidence": "contract corpus measured; independent precision sample pending",
+      "description": "Declared contract violation or contract-processing limitation",
+      "cwes": []
+    },
+    "policy": {
+      "tier": "experimental",
+      "default_enabled": true,
+      "quality_gated": false,
+      "blocks_verdict": false,
+      "evidence": "policy corpus measured; independent precision sample pending",
+      "description": "Configured project policy violation",
+      "cwes": []
+    }
+  },
+  "counts": {
+    "public_capabilities": 15,
+    "cwe_families": 12,
+    "cases": 52,
+    "protected_inputs": 124,
+    "source_test_inputs": 96,
+    "roles": {
+      "buggy": 24,
+      "safe": 22,
+      "unknown": 3,
+      "unsupported": 3
+    }
+  },
+  "immutable_quality_inputs": [
+    {
+      "path": "scripts/corpus_expected.txt",
+      "sha256": "bec581e0fa7e4583d2fe24cd11597aad2ddef1eeffd993c65e10f102f73a31e5"
+    },
+    {
+      "path": "scripts/juliet_expected.txt",
+      "sha256": "065b4e976fe3aee2c495e3a871343d913df1d9bbb38c4c2d446092ad3602463f"
+    },
+    {
+      "path": "scripts/measurement_baseline.json",
+      "sha256": "8ec87a2f252624886bfb60af84ad67d2a199f689cc183ddd2011b4e8e587a51e"
+    },
+    {
+      "path": "scripts/realworld_expected.txt",
+      "sha256": "428bde276cf5739770432899455af04f7827ea7d0b81a89accfad1451aaf0f92"
+    },
+    {
+      "path": "scripts/realworld_manifest.json",
+      "sha256": "e876ab5540215956a919a079fcfb9647042ebc32d1f7deefede5c74553c3f04f"
+    }
+  ],
+  "reviewed_u001_successor": {
+    "source_revision": "bd22896ee23dc7d6b53d9d23f255146ed26f2078",
+    "catalog_sha256": "ed163a76437f70d4179b05973c3d2566cc8d1f13cbdf01c5eaedf576f53451c8",
+    "inventory_sha256": "f018bfc0844bec6d12af82f7691fedd1857557852a16a4b970c2dc6e5c1a9e28",
+    "changed_input": "tests/test_project_queue.py",
+    "input_sha256": "c64cbb55bb2750c5e8be896861418f313d38809fd4be34e69e72f9d5867c1ec6"
+  },
+  "boundary": "Historical identities only; no current-source validation or new-family qualification."
+}

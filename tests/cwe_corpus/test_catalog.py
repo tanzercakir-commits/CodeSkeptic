@@ -2,6 +2,7 @@
 """Catalog and measurement regressions; synthetic reports are never product evidence."""
 import copy
 from contextlib import contextmanager
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -39,6 +40,8 @@ class CatalogTest(unittest.TestCase):
             paths.update(row["path"] for row in self.catalog["cases"])
             paths.update((quality.CATALOG, quality.INVENTORY))
             paths.add("tests/cwe_corpus/test_catalog.py")
+            paths.update(path.relative_to(ROOT).as_posix()
+                         for path in (ROOT / "tests/cwe_corpus/snapshots").glob("*.json"))
             for name in paths:
                 destination = root / name
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -47,15 +50,16 @@ class CatalogTest(unittest.TestCase):
 
     def test_complete_frozen_input_catalog_is_not_a_quality_result(self):
         result = self.validate()
-        self.assertEqual(result["rules"], 12)
-        self.assertEqual(result["cases"], 52)
-        self.assertEqual(result["protected_inputs"], 124)
-        self.assertEqual(result["roles"], {"buggy": 24, "safe": 22, "unknown": 3, "unsupported": 3})
+        expected = quality.frozen_contract_counts(ROOT, self.catalog)
+        self.assertEqual(result["rules"], expected["rules"])
+        self.assertEqual(result["cases"], expected["cases"])
+        self.assertEqual(result["protected_inputs"], expected["protected_inputs"])
+        self.assertEqual(result["roles"], expected["roles"])
         self.assertIs(result["quality_measured"], False)
 
     def test_all_existing_source_tests_are_required(self):
         tests = [row for row in self.inventory["inputs"] if row["path"].startswith("tests/")]
-        self.assertEqual(len(tests), 96)
+        self.assertEqual(len(tests), quality.frozen_contract_counts(ROOT, self.catalog)["source_test_inputs"])
         self.assertTrue({"tests/AllocSizeOverflowRuleTest.cpp", "tests/FdResourceRuleTest.cpp",
                          "tests/TestHelper.cpp", "tests/TestHelper.h", "tests/CMakeLists.txt",
                          "tests/RegressionCheckpointTest.py", "tests/WorkflowPolicyTest.py"}
@@ -409,10 +413,16 @@ class MeasurementTest(unittest.TestCase):
             self.assertEqual(original, (output / "results.json").read_bytes())
 
     def test_runner_frozen_selection_and_capability_schema(self):
-        self.runner_selection("supported", 7, 25)
+        self.runner_selection("supported", *self.frozen_selection_counts("supported"))
 
     def test_runner_selects_all_five_experimental_cwe_families(self):
-        self.runner_selection("experimental", 5, 27)
+        self.runner_selection("experimental", *self.frozen_selection_counts("experimental"))
+
+    def frozen_selection_counts(self, tier):
+        catalog = quality.read_json(ROOT, quality.CATALOG)
+        capabilities = quality.registry(ROOT)
+        selected = [case for case in catalog["cases"] if capabilities[case["rule"]]["tier"] == tier]
+        return len({case["rule"] for case in selected}), len(selected)
 
     def runner_selection(self, tier, rule_count, case_count):
         with tempfile.TemporaryDirectory() as temporary:
@@ -422,8 +432,8 @@ class MeasurementTest(unittest.TestCase):
             capabilities = quality.registry(ROOT)
             discovery = {"schema_version": 2, "product": "CodeSkeptic", "version": self.version,
                 "rule_capabilities": [{"id": name, "tier": row["tier"],
-                    "default_enabled": name != "assumption", "quality_gated": row["tier"] == "supported",
-                    "blocks_verdict": row["tier"] == "supported",
+                    "default_enabled": row["default_enabled"], "quality_gated": row["quality_gated"],
+                    "blocks_verdict": row["blocks_verdict"],
                     "potential_cwes": [{"id": cwe, "name": "CWE-" + str(cwe)} for cwe in row["cwes"]]}
                     for name, row in capabilities.items()]}
             processes = [{"returncode": 0, "reason": "", "stdout": "CodeSkeptic " + self.version, "stderr": ""},
@@ -486,6 +496,303 @@ class MeasurementTest(unittest.TestCase):
         with patch.object(quality.subprocess, "run", side_effect=[identity, dirty]):
             with self.assertRaisesRegex(ValueError, "dirty checkout"):
                 quality.source_checkout(ROOT, "a" * 40)
+
+
+class VersionedCatalogTest(unittest.TestCase):
+    def test_historical_snapshot_identity_is_not_live_qualification(self):
+        result = quality.historical_identity(ROOT)
+        self.assertEqual(result["source_revision"], "4fd4a21f9b5dc381ea1ec3014daa3082a9d14e24")
+        self.assertEqual(result["public_capabilities"], 15)
+        self.assertEqual(result["rules"], 12)
+        self.assertEqual(result["cases"], 52)
+        self.assertEqual(result["protected_inputs"], 124)
+        self.assertEqual(result["source_test_inputs"], 96)
+        self.assertEqual(result["roles"], {"buggy": 24, "safe": 22, "unknown": 3, "unsupported": 3})
+        self.assertFalse(result["current_inputs_verified"])
+        self.assertFalse(result["quality_measured"])
+        old = quality.historical_snapshot(ROOT)
+        caps = old["contract"]["capabilities"]
+        cases = old["catalog"]["cases"]
+        for tier, families, fixtures in (("supported", 7, 25), ("experimental", 5, 27)):
+            selected = [case for case in cases if caps[case["rule"]]["tier"] == tier]
+            self.assertEqual(len({case["rule"] for case in selected}), families)
+            self.assertEqual(len(selected), fixtures)
+
+    @contextmanager
+    def version_root(self):
+        parent = CatalogTest()
+        parent.setUp()
+        with parent.copied_root() as root:
+            for name in quality.VERSION_INPUTS:
+                destination = root / name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / name, destination)
+            catalog = quality.read_json(root, quality.CATALOG)
+            catalog.pop("evidence_version", None)
+            catalog["schema"] = "codeskeptic-cwe-catalog/v2"
+            inventory = quality.read_json(root, quality.INVENTORY)
+            inventory["schema"] = "codeskeptic-cwe-regression-inputs/v2"
+            self.freeze(root, catalog, inventory)
+            yield root, catalog, inventory
+
+    def freeze(self, root, catalog, inventory, previous=None):
+        """Synthetic fixture review; not a producer/qualification receipt."""
+        inventory["inputs"] = [{"path": path, "sha256": quality.digest_file(root, path)}
+                               for path in sorted(quality.required_inputs(root, version=2))]
+        (root / quality.INVENTORY).write_text(json.dumps(inventory, indent=2) + "\n", encoding="utf-8")
+        catalog["inventory_sha256"] = quality.digest_file(root, quality.INVENTORY)
+        catalog["evidence_version"] = {
+            "schema": "codeskeptic-cwe-evidence-version/v1", "sequence": 1,
+            "previous_catalog_sha256": "ed163a76437f70d4179b05973c3d2566cc8d1f13cbdf01c5eaedf576f53451c8",
+            "previous_inventory_sha256": "f018bfc0844bec6d12af82f7691fedd1857557852a16a4b970c2dc6e5c1a9e28",
+            "previous_version_id": None, "registry_sha256": quality.digest_file(root, quality.REGISTRY),
+            "capabilities": quality.registry_descriptor(root),
+            "input_paths": [entry["path"] for entry in inventory["inputs"]],
+            "case_ids": [case["id"] for case in catalog["cases"]],
+            "id": "", "review": {}}
+        if previous is not None:
+            catalog["evidence_version"].update(sequence=previous["sequence"] + 1,
+                previous_catalog_sha256=previous["catalog_sha256"],
+                previous_inventory_sha256=previous["inventory_sha256"], previous_version_id=previous["id"])
+        catalog["evidence_version"]["review"] = {
+            "schema": "codeskeptic-cwe-successor-review/v1", "source_base": "b" * 40,
+            "source_head": "a" * 40, "implementer": "synthetic-primary",
+            "verifier": "synthetic-independent", "verdict": "PASS", "findings": [],
+            "reason": "Synthetic exact-source successor fixture only", "payload_sha256": ""}
+        identity = quality.evidence_payload_digest(catalog)
+        catalog["evidence_version"]["id"] = identity
+        catalog["evidence_version"]["review"]["payload_sha256"] = identity
+        (root / quality.CATALOG).write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
+
+    def test_versioned_exact_current_set_passes(self):
+        with self.version_root() as (root, catalog, inventory):
+            result = quality.validate(root, catalog, inventory)
+            expected = quality.frozen_contract_counts(root, catalog)
+            self.assertEqual(result["rules"], expected["rules"])
+            self.assertEqual(result["protected_inputs"], len(inventory["inputs"]))
+            self.assertFalse(result["quality_measured"])
+            self.assertEqual(result["evidence_version_id"], catalog["evidence_version"]["id"])
+
+    def test_wrong_version_or_review_is_rejected(self):
+        with self.version_root() as (root, catalog, inventory):
+            original = copy.deepcopy(catalog)
+            mutations = (("schema", "unknown"), ("id", "0" * 64), ("sequence", True),
+                         ("previous_catalog_sha256", "0" * 64), ("previous_inventory_sha256", "0" * 64),
+                         ("previous_version_id", "0" * 64), ("registry_sha256", "0" * 64))
+            for key, value in mutations:
+                with self.subTest(key=key), self.assertRaises(ValueError):
+                    catalog = copy.deepcopy(original)
+                    catalog["evidence_version"][key] = value
+                    quality.validate(root, catalog, inventory)
+            for key, value in (("verdict", "PENDING"), ("findings", ["material"]),
+                               ("verifier", "synthetic-primary"), ("payload_sha256", "0" * 64),
+                               ("source_head", "short"), ("source_head", "c" * 40),
+                               ("source_base", "d" * 40), ("reason", "")):
+                with self.subTest(review_key=key), self.assertRaises(ValueError):
+                    catalog = copy.deepcopy(original)
+                    catalog["evidence_version"]["review"][key] = value
+                    quality.validate(root, catalog, inventory)
+
+    def test_same_count_missing_duplicate_ghost_and_flags_rejected(self):
+        with self.version_root() as (root, catalog, inventory):
+            original = copy.deepcopy(catalog)
+            for mode in ("replacement", "missing", "ghost", "tier", "cwe", "default", "quality", "blocking"):
+                catalog = copy.deepcopy(original)
+                caps = catalog["evidence_version"]["capabilities"]
+                if mode == "replacement":
+                    caps["fake-rule"] = caps.pop("memory-leak")
+                elif mode == "missing":
+                    caps.pop("bounds")
+                elif mode == "ghost":
+                    caps["fake-rule"] = copy.deepcopy(caps["bounds"])
+                else:
+                    field = {"tier": "tier", "cwe": "cwes", "default": "default_enabled",
+                             "quality": "quality_gated", "blocking": "blocks_verdict"}[mode]
+                    caps["bounds"][field] = ({"tier": "supported", "cwe": [134]}[mode]
+                                              if mode in ("tier", "cwe") else not caps["bounds"][field])
+                with self.subTest(mode=mode), self.assertRaises(ValueError):
+                    quality.validate(root, catalog, inventory)
+
+    def test_registry_duplicate_and_invalid_flags_are_not_count_checks(self):
+        with self.version_root() as (root, catalog, inventory):
+            path = root / quality.REGISTRY
+            raw = path.read_text(encoding="utf-8")
+            line = next(line for line in raw.splitlines() if line.startswith('CODESKEPTIC_RULE_CAPABILITY("bounds"'))
+            for changed in (raw + line + "\n", raw.replace('Supported, true, true, true', 'Supported, false, true, true', 1),
+                            raw.replace('Experimental, true, false, false', 'Experimental, true, false, true', 1)):
+                path.write_text(changed, encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    quality.registry_descriptor(root)
+
+    def test_coordinated_old_fixture_relabel_rehash_still_rejected(self):
+        for mode in ("label", "source", "expectation", "order", "remove"):
+            with self.subTest(mode=mode), self.version_root() as (root, catalog, inventory):
+                if mode == "label":
+                    catalog["cases"][0].update(role="unsupported", expected_diagnostics=None)
+                elif mode == "source":
+                    case = catalog["cases"][0]
+                    (root / case["path"]).write_text("int f(){return 0;}\n", encoding="utf-8")
+                    case["sha256"] = quality.digest_file(root, case["path"])
+                elif mode == "expectation":
+                    catalog["cases"][0]["expected_diagnostics"] *= 2
+                elif mode == "order":
+                    catalog["cases"][0], catalog["cases"][1] = catalog["cases"][1], catalog["cases"][0]
+                else:
+                    catalog["cases"].pop()
+                self.freeze(root, catalog, inventory)
+                with self.assertRaisesRegex(ValueError, "historical fixture"):
+                    quality.validate(root, catalog, inventory)
+
+    def test_coordinated_floor_rehash_cannot_weaken_original_floor(self):
+        with self.version_root() as (root, catalog, inventory):
+            (root / "scripts/juliet_expected.txt").write_text("CWE476 0 0\n", encoding="utf-8")
+            self.freeze(root, catalog, inventory)
+            with self.assertRaisesRegex(ValueError, "historical quality floor"):
+                quality.validate(root, catalog, inventory)
+
+    def test_original_test_path_cannot_be_removed_with_new_inventory(self):
+        with self.version_root() as (root, catalog, inventory):
+            (root / "tests/FdResourceRuleTest.cpp").unlink()
+            self.freeze(root, catalog, inventory)
+            with self.assertRaisesRegex(ValueError, "historical protected input"):
+                quality.validate(root, catalog, inventory)
+
+    def test_new_test_requires_exact_successor_then_is_admitted(self):
+        with self.version_root() as (root, catalog, inventory):
+            previous = self.previous(root, catalog)
+            (root / "tests/AdditionalRegression.cpp").write_text("// synthetic addition\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                quality.validate(root, catalog, inventory)
+            self.freeze(root, catalog, inventory, previous)
+            result = quality.validate(root, catalog, inventory)
+            self.assertEqual(result["protected_inputs"], len(inventory["inputs"]))
+            self.assertIn("tests/AdditionalRegression.cpp", catalog["evidence_version"]["input_paths"])
+
+    def previous(self, root, catalog):
+        return {"sequence": catalog["evidence_version"]["sequence"], "id": catalog["evidence_version"]["id"],
+                "catalog_sha256": quality.digest_file(root, quality.CATALOG),
+                "inventory_sha256": quality.digest_file(root, quality.INVENTORY)}
+
+    def test_additive_family_and_pair_require_new_exact_version(self):
+        with self.version_root() as (root, catalog, inventory):
+            previous = self.previous(root, catalog)
+            path = root / quality.REGISTRY
+            with path.open("a", encoding="utf-8") as stream:
+                stream.write('CODESKEPTIC_RULE_CAPABILITY("format-string", Experimental, true, false, false, '
+                             '"synthetic fixture only", "Format argument origin", (134))\n')
+                stream.write('CODESKEPTIC_CWE(134, "Uncontrolled format string")\n')
+            origin = "tests/SyntheticFutureFormatTest.cpp"
+            (root / origin).write_text("// synthetic parser test; no detector implementation\n", encoding="utf-8")
+            catalog["rules"]["format-string"] = {"tier_at_selection": "experimental", "cwes": [134],
+                "subset": "Synthetic metadata migration fixture", "limitations": ["No product execution"]}
+            for role in ("buggy", "safe"):
+                name = "synthetic-format-" + role
+                path = "tests/cwe_corpus/" + name + ".cpp"
+                (root / path).write_text("int f(){return 0;}\n", encoding="utf-8")
+                catalog["cases"].append({"id": name, "rule": "format-string", "role": role, "path": path,
+                    "sha256": quality.digest_file(root, path), "expected_diagnostics": [["format-string", "f"]] if role == "buggy" else [],
+                    "rationale": "Synthetic metadata positive; never analyzed/scored", "origin": origin,
+                    "compile_flags": ["-std=c++17"], "untrusted_sources": []})
+            with self.assertRaises(ValueError):
+                quality.validate(root, catalog, inventory)
+            self.freeze(root, catalog, inventory, previous)
+            result = quality.validate(root, catalog, inventory)
+            self.assertEqual(result["rules"], 13)
+            self.assertEqual(result["cases"], 54)
+            self.assertEqual(len(quality.registry(root)), 16)
+            self.assertFalse(result["quality_measured"])
+            self.assertNotEqual(result["evidence_version_id"], previous["id"])
+
+    def test_source_derived_promotion_preserves_old_case_contracts(self):
+        with self.version_root() as (root, catalog, inventory):
+            previous = self.previous(root, catalog)
+            path = root / quality.REGISTRY
+            raw = path.read_text(encoding="utf-8")
+            raw = raw.replace('("bounds", Experimental, true, false, false', '("bounds", Supported, true, true, true')
+            path.write_text(raw, encoding="utf-8")
+            catalog["rules"]["bounds"]["tier_at_selection"] = "supported"
+            with self.assertRaises(ValueError):
+                quality.validate(root, catalog, inventory)
+            self.freeze(root, catalog, inventory, previous)
+            result = quality.validate(root, catalog, inventory)
+            self.assertEqual(result["cases"], 52)
+            self.assertEqual(quality.registry(root)["bounds"]["tier"], "supported")
+            self.assertEqual(quality.historical_snapshot(root)["contract"]["capabilities"]["bounds"]["tier"], "experimental")
+
+    def test_coordinated_fake_rule_identity_is_still_rejected(self):
+        with self.version_root() as (root, catalog, inventory):
+            path = root / quality.REGISTRY
+            path.write_text(path.read_text(encoding="utf-8").replace('"memory-leak"', '"fake-memory"'), encoding="utf-8")
+            self.freeze(root, catalog, inventory)
+            with self.assertRaisesRegex(ValueError, "unapproved capability identity"):
+                quality.validate(root, catalog, inventory)
+
+    def test_numeric_lookalikes_do_not_equal_bool_or_integer_descriptor(self):
+        with self.version_root() as (root, catalog, inventory):
+            original = copy.deepcopy(catalog)
+            for key, value in (("default_enabled", 1), ("quality_gated", 0), ("cwes", [824.0])):
+                catalog = copy.deepcopy(original)
+                catalog["evidence_version"]["capabilities"]["uninit-ptr"][key] = value
+                identity = quality.evidence_payload_digest(catalog)
+                catalog["evidence_version"]["id"] = identity
+                catalog["evidence_version"]["review"]["payload_sha256"] = identity
+                with self.subTest(key=key), self.assertRaisesRegex(ValueError, "registry mismatch"):
+                    quality.validate(root, catalog, inventory)
+
+    def test_native_discovery_matches_explicit_flags_and_identities(self):
+        caps = quality.registry(ROOT)
+        version = "0.4.9-dev+g" + "a" * 12
+        actual = {"schema_version": 2, "product": "CodeSkeptic", "version": version,
+            "rule_capabilities": [{"id": name, "tier": row["tier"],
+                "default_enabled": row["default_enabled"], "quality_gated": row["quality_gated"],
+                "blocks_verdict": row["blocks_verdict"], "potential_cwes": [{"id": cwe} for cwe in row["cwes"]]}
+                for name, row in caps.items()]}
+        quality.capability_parity(actual, version, caps)
+        for mode in ("schema", "version", "duplicate", "missing", "ghost", "default", "quality", "blocking", "cwe-float"):
+            changed = copy.deepcopy(actual)
+            rows = changed["rule_capabilities"]
+            if mode == "schema":
+                changed["schema_version"] = 2.0
+            elif mode == "version":
+                changed["version"] += "stale"
+            elif mode == "duplicate":
+                rows[-1] = copy.deepcopy(rows[0])
+            elif mode == "missing":
+                rows.pop()
+            elif mode == "ghost":
+                rows[0]["id"] = "ghost"
+            elif mode == "cwe-float":
+                next(row for row in rows if row["potential_cwes"])["potential_cwes"][0]["id"] = 824.0
+            else:
+                key = {"default": "default_enabled", "quality": "quality_gated", "blocking": "blocks_verdict"}[mode]
+                rows[0][key] = not rows[0][key]
+            with self.subTest(mode=mode), self.assertRaises(ValueError):
+                quality.capability_parity(changed, version, caps)
+
+    def test_only_three_exact_snapshot_files_are_admitted(self):
+        with self.version_root() as (root, catalog, inventory):
+            (root / "tests/cwe_corpus/snapshots/hidden.json").write_text("{}\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "unlisted/missing corpus"):
+                quality.validate(root, catalog, inventory)
+
+    def test_snapshot_tampering_and_symlink_are_rejected(self):
+        for name in quality.HISTORICAL_FILES:
+            with self.subTest(name=name), self.version_root() as (root, catalog, inventory):
+                path = root / name
+                raw = path.read_bytes()
+                path.write_bytes(raw + b"\n")
+                with self.assertRaisesRegex(ValueError, "historical snapshot"):
+                    quality.validate(root, catalog, inventory)
+                path.unlink()
+                path.symlink_to(ROOT / name)
+                with self.assertRaisesRegex(ValueError, "symlink"):
+                    quality.validate(root, catalog, inventory)
+
+    def test_mixed_inventory_schema_is_rejected(self):
+        with self.version_root() as (root, catalog, inventory):
+            inventory["schema"] = "codeskeptic-cwe-regression-inputs/v1"
+            with self.assertRaises(ValueError):
+                quality.validate(root, catalog, inventory)
 
 
 if __name__ == "__main__":
