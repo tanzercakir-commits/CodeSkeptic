@@ -108,6 +108,57 @@ exact-candidate owner authority where applicable. No such external action is
 required to deliver this explicitly local dossier; the final FIFO unit must
 still verify and record that distinction before declaring the queue terminal.
 
+## Authorized local delivery — CH07-S01-U002
+
+The authorized handoff is the **local, unsigned development dossier and its
+retained artifacts**, not a public release. The accepted dossier source is
+`3012eabce97586e53362569a3f2ce61808f1a85f`; its canonical independent PASS receipt
+has SHA-256 `53eef36bee4a52bb8f74de73147e99852db7a355b9dc68035ebddd45bfb2e293`.
+Its actual ledger POP is `c588b9312dccbe761a866994e2989d6acbc3a50a`, validated
+by the finalized transition guard. This final handoff adds no analyzer code,
+workflow, fixture, quality-floor, package or version change. Matrix identities
+L/N and all historical component-source boundaries above remain unchanged.
+
+The local checkout is `/home/tanzer/Projects/CodeSkeptic`, on
+`agent/cs3-ch07-s01-u002-local-delivery`. The final implementation review SHA
+and check digests belong to this task's `BOOK.json` / `PROGRESS.md` record;
+the following ledger-only commit records its real POP. A documentation
+statement or prepared transaction alone does not make TODO terminal.
+
+| Retained handoff | Location / identity |
+|---|---|
+| Source, task contracts and accepted history | Local Git history; `docs/BOOK.json`, generated `PLAN.md`, `TODO.md`, `PROGRESS.md`; exact independent reviews and checks remain attached to each task |
+| Linux installable archive | Evidence root + `CS3-CH06-S01-U001/a23cf319264847c752a4fdc55ce2f3cadb196f78/artifacts/codeskeptic-v0.4.9-dev+ga23cf3192648-linux-x86_64.tar.gz`; L hashes/profile above |
+| Native evidence containers, including installable packages | Evidence root + `CS3-CH06-S02-U002/macos-e83b641-artifact-10063258404.zip` and `windows-e83b641-artifact-10063711096.zip`; N outer/inner hashes/profile above; outer evidence ZIPs are not themselves the installable packages |
+| Raw checks, receipts and final closure audit | `/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/`, including `CS3-CH07-S01-U001/` and `CS3-CH07-S01-U002/`; failed attempts remain separately retained |
+| Retired pre-restart work | The 15 archive refs, exact head manifest and verified bundle named in [RESTART.md](RESTART.md); preserved, not reactivated or merged |
+
+Before final acceptance, reconcile every completed task's full contract/review,
+all required and additional evidence digests, source Git objects, and the
+PLAN/PROGRESS/FIFO identity sequence. Recheck retained candidate artifact bytes
+and archive preservation. This is evidence continuity, not a fresh rerun of
+every old workload or an independent cryptographic producer attestation.
+Archive verification reconciles the bundle's original heads with the manifest
+and live archive refs; it is not a restore rehearsal. Newly recorded bundle/
+manifest digests are current inventory fingerprints, not a comparison with an
+independently retained original 2026-09-05 byte digest.
+
+Then require a clean exact-head independent PASS for this final unit, perform
+the real three-file ledger POP, commit it, and validate the transition. Only
+the resulting checked state with **46 completed / 0 remaining**, no FRONT,
+and terminal TODO constitutes local program closure. A failed/missing check,
+uncommitted POP or required external action cannot be converted into DONE.
+
+No new external action is required for this explicitly local delivery. In
+particular, main remains `7dfd37596414c9512316093ff4fb6b039673f55f`; no main
+integration, forced update, tag, new PR, public release, signing/notarization,
+hosted-protection change or archive deletion is authorized by this record.
+Earlier feature-branch CI runs remain their actual historical results, not
+new CI for the final documentation/ledger commit. A later public or unified
+same-source release needs its own exact-candidate approval and missing
+qualification; the exclusions and measured quality limits above remain open
+limitations of that broader promise, not hidden unfinished local tasks.
+
 ## Linux artifact qualification
 
 This is the CH06-S01-U001 package work, not a published or signed release.

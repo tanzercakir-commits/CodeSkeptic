@@ -31,6 +31,25 @@ main integration are not qualified by this dossier. Broader publication needs
 its own exact-candidate authorization and missing evidence; nothing here
 authorizes it or converts a historical failed run into success.
 
+## Local delivery decision
+
+The authorized result is the local, unsigned candidate dossier, not a new
+public release or a main merge. The accepted dossier is
+`3012eabce97586e53362569a3f2ce61808f1a85f`, independently reviewed with canonical
+receipt SHA-256 `53eef36bee4a52bb8f74de73147e99852db7a355b9dc68035ebddd45bfb2e293`
+and actually finalized by ledger commit
+`c588b9312dccbe761a866994e2989d6acbc3a50a`. The
+[local handoff record](docs/release-checklist.md#authorized-local-delivery--ch07-s01-u002)
+locates the source, unchanged artifacts, raw evidence and preserved archives.
+
+Final program closure is recorded only by the final task's independent review,
+real ledger POP and successful transition guard: all 46 task records in
+PROGRESS, terminal TODO with no remaining FRONT, and protected main unchanged.
+This paragraph does not substitute for that transition or predeclare a prepared
+POP complete. No required public action is being deferred under a DONE label:
+public release, signing/notarization and main integration are outside this
+explicitly local delivery and still need separate authority/qualification.
+
 ## Unsigned Linux artifact provenance
 
 The qualified Linux x86_64 tarball can now carry an unsigned CycloneDX 1.6
