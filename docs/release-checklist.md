@@ -2,8 +2,10 @@
 
 This is the CH06-S01-U001 package work, not a published or signed release.
 Only independently reviewed, actual artifact executions establish support.
-Windows/macOS, Container/Action parity and full SBOM/provenance remain separate
-FIFO units. Protected source/test inventories and CMake files stay unchanged.
+Windows/macOS support remains a separate FIFO unit. Container/Action parity is
+recorded in `docs/integrations.md`; the CH06-S02-U001 inventory/provenance profile
+below builds on this exact artifact. Protected source/test inventories and CMake
+files stay unchanged.
 
 ## Assembly profile
 
@@ -25,7 +27,7 @@ libraries, project LICENSE/README, and `licenses/INDEX.tsv`. Each redistributed
 component maps to its installed package copyright notice; referenced installed
 common license texts are also copied. These are distribution-provided notices,
 not a legal review or a signed provenance attestation. Keep the complete tree.
-Full SBOM/version-source/provenance work follows in CH06-S02-U001.
+Machine-readable inventory/version/provenance sidecars are described below.
 
 The ELF loader, glibc and linked libstdc++/libgcc remain host requirements;
 `DEPENDENCIES.txt` names them. A tarball is not an all-Linux portability promise:
@@ -122,3 +124,86 @@ glibc compatibility, all-Linux portability, another Python version, Docker/
 Action execution, Windows/macOS support, hosted CI, signature or publication.
 Final exact-head independent review and the FIFO ledger transition are required
 before this unit is complete.
+
+## CH06-S02-U001 — unsigned inventory and provenance
+
+This profile accepts only the previously qualified Linux x86_64, dynamic-LLVM,
+dpkg-notice tarball layout. It adds sidecars without changing or executing the
+archive. Python 3.9+ on Linux is required for this **metadata mode**; the earlier
+assembly-only interface retains its Python 3.8+ requirement. No runtime user
+needs Python. Nothing is downloaded, installed, signed or published by the tool.
+
+`CMakeLists.txt` remains the sole authored product-version source. The generator
+reads it and the native report/capability schema declarations from the **artifact
+source commit**, not from its own checkout. A clean development identity must
+match that commit's next-patch/version suffix; a release identity needs the exact
+matching local tag. Dirty, unbound and arbitrary version overrides are rejected.
+Native JSON and capabilities evidence must agree with this identity. These two
+files are identity inputs, not a replacement for the actual first-scan gates.
+
+Provide a producer-owned `codeskeptic-build-evidence/v1` JSON document with exactly:
+
+- `schema`, `source_sha` (full commit), `archive_sha256`, `binary_sha256`.
+- `report` and `capabilities`: each has `path` and `sha256` for saved native output.
+- `recipe`: exactly `source_sha`, `toolchain`, `commands`, `inputs`.
+  `source_sha` must agree; `toolchain` is a nonempty string-to-string map of the
+  observed tool versions/profile; `commands` is a nonempty list of reproduction
+  command strings, **recorded as data and never executed**. `inputs` is a nonempty
+  list of `{name, path, sha256}` records for retained build logs, cache, recipe
+  scripts or workflow. Names are unique; input files are bounded regular files.
+
+Paths resolve from the caller's working directory; absolute paths are simplest.
+No environment or credential inventory is taken. Prepare evidence deliberately:
+do not include secrets in logs/commands. Report/recipe/manifest SHA-256 bindings
+detect later inconsistency but cannot prove an honest producer, or prove that
+the asserted recipe actually produced the binary. The original build evidence
+and independent review remain necessary. Missing records are not fabricated.
+
+With a clean, committed generator and its two imported helpers:
+
+```bash
+bash scripts/package_release.sh --provenance /path/codeskeptic-vVERSION-linux-x86_64.tar.gz /path/build-evidence.json /fresh/sidecars
+python3 -B scripts/generate_sbom.py verify /path/codeskeptic-vVERSION-linux-x86_64.tar.gz /fresh/sidecars --source-sha FULL_SOURCE_SHA --version VERSION
+```
+
+The output directory must not exist, and its parent must already exist. Sidecars
+are named after the full archive filename: `.sbom.json`, `.provenance.json`, plus
+`sha256sums.txt` binding both JSON files and the unchanged archive. Keep the
+archive and sidecars together; the checksum file can be checked in that combined
+directory. Existing outputs are never overwritten. A late I/O failure can leave
+partial owned evidence, but never prints `PROVENANCE_OK`; preserve it and retry
+in a fresh directory. Verification writes nothing and checks the archived bytes,
+not merely internally consistent JSON hashes.
+
+The SBOM uses [CycloneDX 1.6 JSON](https://github.com/CycloneDX/specification/blob/1.6/schema/bom-1.6.schema.json).
+It inventories bundled libraries and Clang headers by installed package/version,
+with exact distribution-notice references and hashes. License URLs are relative
+to the unpacked artifact root; keep `licenses/` including referenced common
+texts. Notice names are deliberately **unclassified**, not invented SPDX license
+conclusions. The provenance also inventories every packaged file by path, size
+and SHA-256. Missing/duplicate/extra INDEX entries, conflicting package versions,
+missing notices, unclassified files, dependency/LLVM mismatches and unsafe archive
+members fail closed. Host libraries are named but their versions/licenses are
+unknown. Static source dependencies are not fully resolved: CycloneDX composition
+is explicitly `incomplete`, not a complete-all-dependencies or legal-review claim.
+
+The custom `codeskeptic-provenance/v1` record is unsigned. It separates original
+artifact source SHA, authored/tool/schema versions, binary/archive hashes and
+recorded recipe from the metadata-generator HEAD and source-file hashes. Build
+input names/digests are retained without publishing their local filesystem paths.
+This is neither a SLSA attestation nor proof of bit-for-bit reproducibility.
+In particular, the earlier a23cf319 package reused a development build cache;
+recording its procedure does not turn it into a fresh Release/clean-room build.
+
+The tag-only Release workflow prepares Linux sidecars after packaging, rechecks
+them against the archive, uploads them to the existing shared draft, and checks
+them again before combined checksums/publication. Checksums include sidecars.
+Existing platform smoke gates remain mandatory. This change does not run that
+workflow, grant release authority or claim equivalent macOS/Windows SBOM coverage;
+those platform support decisions belong to the next FIFO unit.
+
+T3 qualification requires focused `scripts/test_generate_sbom.py` negatives,
+existing package/release-workflow guards, actual unchanged qualified-archive
+generation and re-verification, and validation against the official CycloneDX
+schema with a separately recorded schema/validator version. Only then may an
+independent exact-head PASS and real FIFO POP complete this unit.

@@ -17,6 +17,13 @@
 # Usage: scripts/package_release.sh <codeskeptic-binary> [out-dir] [clang]
 set -euo pipefail
 
+# Explicit sidecar mode for an already assembled archive. It never repacks or
+# executes that archive. Assembly-only callers keep their existing interface.
+if [ "${1:-}" = --provenance ]; then
+    [ "$#" -eq 4 ] || { echo 'PROVENANCE_FAIL expected archive evidence.json fresh-output'; exit 1; }
+    exec python3 -B "$(dirname "${BASH_SOURCE[0]}")/generate_sbom.py" generate "$2" "$3" "$4"
+fi
+
 BIN=$(cd "$(dirname "$1")" && pwd)/$(basename "$1")
 OUT="${2:-dist}"
 CLANG="${3:-}"

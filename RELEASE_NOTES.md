@@ -1,3 +1,22 @@
+# Unreleased CWE restart — artifact provenance
+
+The qualified Linux x86_64 tarball can now carry an unsigned CycloneDX 1.6
+inventory and checksum-bound provenance sidecars. Source and generator revisions
+are separate; native version/schema records, bundled files, dpkg package versions
+and license notices are reconciled before publication of the sidecars. Original
+artifacts are not repacked or relabeled. The Release workflow includes Linux
+sidecars in draft assets and final checksum verification; this branch does not
+itself publish a release.
+
+The inventory explicitly leaves static source dependencies and target-host
+library versions unresolved. Distribution notices are preserved, not asserted to
+be a legal license classification. Recorded build recipes are not a signature,
+SLSA attestation, independent producer proof or byte-identical rebuild guarantee.
+See `docs/release-checklist.md` for the exact profile and evidence requirements.
+Windows/macOS support remains a separate qualification unit.
+
+The following notes describe the historical release, not a new release claim.
+
 # CodeSkeptic v0.4.8 — fail-closed verdict integrity
 
 v0.4.8 makes one promise precise across every interface: a clean result is

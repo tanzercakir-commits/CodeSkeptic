@@ -75,6 +75,59 @@ jobs:
           bash scripts/package_release.sh build/src/codeskeptic dist clang-20 \
             2>&1 | tee /tmp/package.log
 
+      - name: Bind Linux inventory to source and build evidence
+        # No signing/attestation claim. This profile inventories the Linux
+        # dpkg package, not unknown static or target-host dependency versions.
+        run: |
+          set -euo pipefail
+          mkdir /tmp/codeskeptic-build-evidence
+          build/src/codeskeptic --capabilities --json > /tmp/codeskeptic-build-evidence/capabilities.json
+          code=0
+          build/src/codeskeptic docs/demo.c --json /tmp/codeskeptic-build-evidence/report.json || code=$?
+          test "$code" -eq 1
+          python3 -B - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          from sys import path
+          path.insert(0, 'scripts')
+          from generate_sbom import canonical, file_hash
+          root = pathlib.Path('/tmp/codeskeptic-build-evidence')
+          source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          assert source == os.environ['GITHUB_SHA']
+          archives = list(pathlib.Path('dist').glob('codeskeptic-*-linux-x86_64.tar.gz'))
+          assert len(archives) == 1
+          def record(file):
+              p = pathlib.Path(file)
+              return {'path': str(p.absolute()), 'sha256': file_hash(p)}
+          recipe = {
+              'source_sha': source,
+              'toolchain': {
+                  'profile': 'GitHub ubuntu-22.04 hosted build; runner image not immutable',
+                  'clang': subprocess.check_output(['clang-20', '--version'], text=True).splitlines()[0],
+                  'cmake': subprocess.check_output(['cmake', '--version'], text=True).splitlines()[0],
+                  'llvm': subprocess.check_output(['llvm-config-20', '--version'], text=True).strip()},
+              'commands': [
+                  'git checkout --detach ' + source,
+                  'cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 -DCMAKE_EXE_LINKER_FLAGS="-static-libstdc++ -static-libgcc"',
+                  'cmake --build build',
+                  'bash scripts/package_release.sh build/src/codeskeptic dist clang-20'],
+              'inputs': [dict(name=name, **record(file)) for name, file in [
+                  ('build.log', '/tmp/build.log'), ('CMakeCache.txt', 'build/CMakeCache.txt'),
+                  ('release-workflow.yml', '.github/workflows/release.yml')]]}
+          manifest = {'schema': 'codeskeptic-build-evidence/v1', 'source_sha': source,
+                      'archive_sha256': file_hash(archives[0]),
+                      'binary_sha256': file_hash(pathlib.Path('build/src/codeskeptic')),
+                      'report': record(root / 'report.json'),
+                      'capabilities': record(root / 'capabilities.json'), 'recipe': recipe}
+          with (root / 'manifest.json').open('xb') as output:
+              output.write(canonical(manifest))
+          PY
+          archives=(dist/codeskeptic-*-linux-x86_64.tar.gz)
+          test "${#archives[@]}" -eq 1
+          bash scripts/package_release.sh --provenance "${archives[0]}" \
+            /tmp/codeskeptic-build-evidence/manifest.json dist/provenance
+          python3 -B scripts/generate_sbom.py verify "${archives[0]}" dist/provenance \
+            --source-sha "$GITHUB_SHA" --version "${GITHUB_REF_NAME#v}"
+
       - name: Smoke in clean containers (22.04 + 24.04)
         # The tarball must work on a machine with NO LLVM installed.
         # libc6-dev is installed because analyzing C code needs the
@@ -116,7 +169,8 @@ jobs:
           cp dist/codeskeptic-*-linux-*.tar.gz codeskeptic-linux-x86_64.tar.gz
           gh release upload "$GITHUB_REF_NAME" \
             dist/codeskeptic-*-linux-*.tar.gz \
-            codeskeptic-linux-x86_64.tar.gz --clobber
+            codeskeptic-linux-x86_64.tar.gz \
+            dist/provenance/*.sbom.json dist/provenance/*.provenance.json --clobber
 
       - name: Diagnostics -> refs/ci-logs/*
         if: always()
@@ -329,8 +383,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download "$GITHUB_REF_NAME" -p '*.tar.gz' -p '*.zip' -D assets
-          (cd assets && sha256sum *.tar.gz *.zip) > sha256sums.txt
+          set -euo pipefail
+          gh release download "$GITHUB_REF_NAME" -p '*.tar.gz' -p '*.zip' \
+            -p '*.sbom.json' -p '*.provenance.json' -D assets
+          archives=(assets/codeskeptic-v*-linux-x86_64.tar.gz)
+          test "${#archives[@]}" -eq 1
+          python3 -B scripts/generate_sbom.py verify "${archives[0]}" assets \
+            --source-sha "$GITHUB_SHA" --version "${GITHUB_REF_NAME#v}"
+          (cd assets && sha256sum *.tar.gz *.zip *.sbom.json *.provenance.json) > sha256sums.txt
           cat sha256sums.txt
           gh release upload "$GITHUB_REF_NAME" sha256sums.txt --clobber
           gh release edit "$GITHUB_REF_NAME" \
