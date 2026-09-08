@@ -508,3 +508,166 @@ protocol](../fuzz/README.md), followed by the full ordinary Linux, frozen qualit
 tiers, stress, real-world and actual hosted gates. One profile or input-integrity
 success cannot finalize the task; independent exact-head review and the guarded
 FIFO POP remain mandatory.
+
+## 4. Fixed-input usability, latency and review burden (CH05-S02-U002)
+
+Measured source: `c4fa60864f2e5853581c2f8a0dd66a3fc967239b`, version
+`0.4.9-dev+gc4fa60864f2e`, analyzer SHA-256
+`8396a440d5ab49b0a78675fe3a5a5a8e79c27ebbab380c96be2ae1cd5626a7b9`.
+This is a local Linux measurement, not hosted CI, a release, whole-project
+coverage for every sample, or evidence of market-wide accuracy.
+
+### 4.1 Fixed profiles and method
+
+All inputs were already acquired locally. The prospective plan freezes 750
+source, header, compilation-database, generated-configuration and provenance
+files. Its SHA-256 is
+`97975f03ae24f3416e86a39390e4afd225cb85bff1baf380e69e04521bab93b8`.
+No input was downloaded or uploaded for this campaign. The three independent
+upstream projects are cJSON 1.7.18, tinyxml2 10.0.0 and GoogleTest 1.14.0.
+
+Each profile ran three sequential fresh CLI processes with default rules,
+`--files`, its frozen `--build-path`, `--no-analysis-cache`, and `--json`.
+Only cJSON used `--accept-partial-coverage`, for its exact predeclared skipped
+source/reason set. There was no whole-program mode, suppression, baseline,
+analysis-cache reuse, optimization comparison, or claimed cold OS cache.
+
+The host was an Intel Core i5-1235U (12 visible logical CPUs, 16,040,576 KiB
+host memory), Fedora kernel `6.19.10-300.fc44.x86_64`; container glibc 2.39.
+The cached toolchain image was
+`25640c190484acc04e0dab2c64f8683668ad33930a3670900ff407023efc7fc5`
+(Clang/LLVM 20.1.2). That immutable image binds system/compiler headers in
+addition to the separately hashed project trees and recipes. Actual container
+inspection and kernel readings confirmed no network, read-only inputs/build,
+zero capability sets, 2 CPU quota, 6 GiB memory, 256 PID limit, and 1 GiB tmpfs.
+The configured memory-plus-swap bound was 12 GiB; 6 GiB is not a combined
+RAM-and-swap ceiling.
+
+The supervisor capped each execution at 240 seconds and each captured stream
+at 2 MiB, with owned-process-group cleanup. The wrapper used a 2,400-second
+campaign deadline, 15-second kill grace and separately bounded cleanup. The
+GNU-time binary SHA-256 was
+`3b11dec50514a8473e9f6efa7a34d584d0657538c09988f61b72d38ad4991a10`.
+Wall intervals include process launch, reporting and supervisor cleanup, but
+exclude input hashing. RSS below means GNU time `%M`, not a simultaneous
+process-tree/cgroup peak. The full raw commands and all nine runs are retained.
+
+### 4.2 Observed results
+
+| Fixed profile | Analyzed/requested sources | Findings (blocking/report-only) | Wall seconds min/median/max | GNU-time RSS KiB min/median/max |
+| --- | ---: | ---: | --- | --- |
+| cJSON, prepared all-source profile | 34/76; 42 declared broken-TU skips | 54 (51/3) | 11.831080 / 11.960854 / 12.069923 | 113276 / 114028 / 114204 |
+| tinyxml2, prepared all-source profile | 3/3 | 9 (9/0) | 9.198837 / 9.547739 / 11.300137 | 391072 / 392136 / 392248 |
+| GoogleTest, four C++17 library entry TUs | 4/4 selected | 3 (3/0) | 16.166833 / 16.298187 / 16.421282 | 326512 / 326580 / 326712 |
+
+All repetitions retained identical findings and source/command coverage.
+There were no unexpected failed/recovery TUs or incomplete functions. All
+CLI runs exited 1 because they reported blocking findings; successful
+measurement does not mean a clean analyzer verdict. cJSON remained explicitly
+partial-accepted, not complete coverage. GoogleTest's selected library surface
+includes sibling implementation files and headers; upstream tests/examples
+were not selected. In contrast, the cJSON/tinyxml2 profiles include upstream
+tests/examples: every tinyxml2 finding was in `xmltest.cpp`. These are not three
+equivalent production-only project scans.
+
+### 4.3 Source-bound independent adjudication
+
+Three separate read-only reviewers classified the first report from their
+assigned project against the exact frozen source and relevant callers/guards.
+The retained records bind each report and referenced source digest, rationale,
+source lines and a complete, disjoint partition of diagnostic indices. Repeated
+runs are not tripled into the denominator. The cJSON report has 53 distinct
+fingerprints but 54 occurrences; that duplicate remains real review burden.
+
+| Profile | Source-supported TP occurrences | Proven FP occurrences | Unresolved occurrences | FP count lower/upper bound |
+| --- | ---: | ---: | ---: | ---: |
+| cJSON | 9, all test/example-only | 39 | 6 | 39–45 of 54 |
+| tinyxml2 | 0 established | 5 | 4 | 5–9 of 9 |
+| GoogleTest library slice | 0 established | 3 | 0 | 3 of 3 |
+
+cJSON's nine TP occurrences comprise three deliberately broken Unity examples
+and six source-supported conditional test-harness defects, principally
+unchecked allocation results. No allocation failure or reported defect was
+executed to establish these classifications; these are not demonstrated
+production vulnerabilities. Six later-site warnings remain unknown because
+an earlier invalid access prevents proving a defined path to the reported site.
+The 39 FPs include lost linked-list invariants, nonnull predicate implications
+and Unity assertions whose failure aborts through the frozen longjmp profile.
+
+All tinyxml2 warnings are in upstream tests/examples. Five nullable-cast warnings
+are contradicted by the fixed literal inputs' node types; four filesystem
+load/save cases remain unknown because I/O checks do not stop the test. The
+three GoogleTest library FPs concern shared-pointer ownership, a const boolean
+nonnull guard and a FILE factory that returns ownership to callers which close
+the stream. Those are confirmed modeling limitations, not deliberately broken
+fixtures or production defects.
+
+These observations establish a substantial review burden in the measured
+profiles. They do not justify a low-FP, production-ready, market-precision or
+recall claim. There is no known-defect denominator for recall and unresolved
+findings are not silently scored. U002 requires measuring this burden, not
+eliminating every discovered FP; the separate qualification/promotion floors
+and inherited clean-corpus gates remain unchanged. No detector, tier, expected
+finding pin or safety threshold was altered by this measurement unit. Future
+modeling changes must enter the controlled FIFO plan; they are not unqueued
+follow-up implementation within this report.
+
+### 4.4 Qualification and evidence
+
+The fresh Linux T2 command completed successfully: 1,583 CTest passes in
+297.11 seconds, 1,568 single-process C++ passes in 432.113 seconds, 25 direct
+measurement Python tests and 48 catalog Python tests, with no skips credited.
+The new 25 tests are run directly from `scripts/test_measure_product.py`; they
+are not claimed to be registered in CTest or the frozen test-tree inventory.
+Input-integrity checks still bind the same 124 protected inputs. The new runner
+and its tests are the only product implementation files in this unit; analyzer
+C++, original tests, build configuration and hosted workflows are unchanged
+from section 3's qualified source. Section 3's sanitizer, Juliet and hosted
+results retain their original measured revisions and were not rerun here.
+
+Independent raw-evidence review verified all nine report/time/execution/file
+sets, all 750 input hashes, repeated full diagnostics/coverage and recomputed
+aggregates. Actual terminal container evidence records exit 0, no OOM and
+successful bounded removal/absence checking. Local measurement and Linux
+success do not imply fresh hosted CI success or a release.
+
+Durable raw measurements live under user-state
+`codeskeptic/cwe-restart-evidence/CS3-CH05-S02-U002/` and its full measured SHA.
+The saved `prepare_plan.py`, `offline_measurement.sh`, `runtime_execute.py`,
+`verify_container.py`, `verify_measurement.py` and `verify_adjudication.py`
+retain exact preparation, limits, command and evidence-accounting details.
+The reviewer JSONs are in the measured SHA's `adjudication/` directory. The
+helper checks reconcile records; they do not replace the reviewers' source
+reasoning. Exact-head independent completion review and FIFO POP are separate
+from these measured results.
+
+| Evidence relative to measured SHA | SHA-256 |
+| --- | --- |
+| `plan.json` | `97975f03ae24f3416e86a39390e4afd225cb85bff1baf380e69e04521bab93b8` |
+| `measurement/results.json` | `da420d8b12c528243d04605b28ebcfe2f75b9f96d15f81d549438ee2f0f63a26` |
+| `measurement-1.log` | `1edd74606eca843e4265490384312bdf50297a4fd24d4ad11956cf6a3cd78605` |
+| `linux-suite.log` | `b6e47e8322677c27a230df5abec0ebb8f5453cbf178e80dfb620b45f4e7c1557` |
+| `adjudication-summary.json` | `ebd3fec686cdb09cda893c66a3b05d094f9fab72566ab48a5a65bae73ddfd6a0` |
+
+Reproduction requires these already-acquired frozen inputs and the same
+container mount/compilation paths, rather than an implicit download:
+
+```bash
+python3 -B scripts/test_measure_product.py
+python3 -B scripts/measure_product.py --plan /absolute/frozen-plan.json \
+  --binary /absolute/codeskeptic --revision "$MEASURED_SHA" \
+  --out /absolute/fresh-evidence-directory
+```
+
+Set `MEASURED_SHA` to the clean checkout's full 40-character commit and build
+the binary from that same checkout. Use the documented offline container
+limits and GNU time for the second
+command; a bare host invocation is not the same measured resource profile.
+
+Pre-execution failures are retained: the first candidate mishandled branded
+version output and omitted report identity/verdict/failure checks; reproduced
+RED tests preceded the narrow fixes. Null baseline/empty suppression checks
+also have RED/GREEN evidence. The first external prepare attempt failed before
+starting any container workload because Podman's expanded capability list was
+misinterpreted; corrected metadata plus actual kernel checks passed on the
+second preparation. Neither failure was relabeled as successful execution.

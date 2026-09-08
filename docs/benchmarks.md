@@ -1,8 +1,26 @@
 # Benchmarks & measurement methodology
 
-Every number CodeSkeptic publishes is reproducible from this repository
-with one command — the same scripts CI runs. If you don't want to take
-our word for it (you shouldn't), run them:
+## Current CWE-restart fixed-input measurement
+
+The current local three-project measurements and source-bound FP adjudication
+are in [quality results, section 4](quality_results.md#4-fixed-input-usability-latency-and-review-burden-ch05-s02-u002).
+They use cJSON 1.7.18, tinyxml2 10.0.0 and GoogleTest 1.14.0 with 750 frozen
+input files and three repetitions per profile. Median wall times were
+11.961, 9.548 and 16.298 seconds respectively under the documented 2-CPU
+container profile. These timings are not cold-cache or comparative benchmarks.
+
+The observed review burden is explicit: cJSON has 39 proven FP, nine
+test/example-only source-supported TP and six unknown occurrences; tinyxml2
+has five FP and four unknown test/example occurrences; the four-TU GoogleTest
+library slice has three FP. No market-precision, recall or production-ready
+claim follows. cJSON coverage is only 34/76 requested sources with 42 declared
+skips; the GoogleTest profile excludes upstream tests/examples. See the linked
+report for per-run wall/RSS values, source/reviewer identities and limitations.
+
+The following sections preserve earlier benchmark methods and historical
+observations. Their original revisions, profiles and denominators remain
+separate; they were not all rerun by the current measurement unit. Existing
+benchmark runners include:
 
 ```bash
 bash scripts/run_juliet.sh ./build/src/codeskeptic juliet-work 400   # Juliet suite
