@@ -65,6 +65,22 @@ fresh actual Linux/Windows qualification is required. Necessary implementation
 files still need ordinary independently reviewed scope extensions afterward.
 This decision grants no general FRONT amendment or unrelated detector change.
 
+The owner approved the unchanged second-act product plan on 2026-09-08 and
+authorized its end-to-end execution in this same Chapter/Section/Unit FIFO.
+One direct checkpoint after 4fd4a21f9b5dc381ea1ec3014daa3082a9d14e24, on
+agent/cs3-ch08-s01-u001-product-completion-contract, may append exactly the
+independently reviewed 51 CH08-CH14 tasks. Its eight files are AGENTS.md,
+INVARIANTS.md, docs/QUEUE_GUIDE.md, scripts/project_queue.py,
+tests/test_project_queue.py, docs/BOOK.json, docs/PLAN.md and docs/TODO.md.
+The exact old/new BOOK and proposal digests are enforced by project_queue.
+All 46 completed contracts/receipts and PROGRESS bytes remain unchanged; this
+checkpoint is not a POP or product implementation. Ordinary closed-book reopen
+remains forbidden. The exact historical boundary verifies the old final POP
+and its preceding implementation before the first new unit may proceed.
+Independent exact-head review and transition negatives are mandatory; the
+proposal review alone is not implementation PASS. The plan's separate exact
+tag/signing/publication approvals still apply; main remains unchanged.
+
 ## Delegation boundary
 
 Before each assignment name the one allowed repository/worktree, branch and

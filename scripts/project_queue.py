@@ -98,6 +98,22 @@ OWNERSHIP_CHECKPOINT_REASON = (
     "counterexample rejected closing-brace suppression. Permit proven ownership-model corrections only; "
     "preserve failure-path ownership, negative controls, FIFO, completed history, all existing gates and floors."
 )
+# Owner2026-09-08 approved the independently reviewed, unchanged 51-unit
+# second act and this exact eight-file terminal boundary. This is not a
+# reusable reopen command or permission to alter any of the old 46 records.
+PRODUCT_RESTART_PARENT = "4fd4a21f9b5dc381ea1ec3014daa3082a9d14e24"
+PRODUCT_RESTART_BRANCH = "agent/cs3-ch08-s01-u001-product-completion-contract"
+PRODUCT_RESTART_TASK = "CS3-CH08-S01-U001"
+PRODUCT_RESTART_OLD_BOOK = "0cdbe0766567ce4283e710f51e2f9301ad747c58dbfd221944d79c9ad5870721"
+PRODUCT_RESTART_NEW_BOOK = "75f46badd7fe8a00362ee2d24352d4db704649d36566b4fbf413feea152d657d"
+PRODUCT_RESTART_CHAPTERS = "d5b9cea4331550e971050087c4fb4f21ce23aad4e5352b78f33640fecb76976a"
+PRODUCT_RESTART_COMPLETED = 46
+PRODUCT_RESTART_ADDED = 51
+PRODUCT_RESTART_FILES = (*FILES[:3], *SCOPE_POLICY_FILES)
+PRODUCT_RESTART_REASON = (
+    "Product completion continuation: append the owner-reviewed frozen CH08-CH14 plan after the "
+    "46-task terminal checkpoint; preserve completed contracts and evidence."
+)
 
 
 class QueueError(ValueError):
@@ -346,13 +362,38 @@ def ownership_checkpoint_book(book):
     return validate_book(updated)
 
 
+def product_restart_book(book, chapters):
+    """Pure frozen terminal continuation; ordinary amend still rejects it."""
+    validate_book(book)
+    require(digest(book) == PRODUCT_RESTART_OLD_BOOK and not pending(book) and
+            len(book["progress"]) == PRODUCT_RESTART_COMPLETED,
+            "not the owner-authorized terminal book")
+    require(isinstance(chapters, list) and digest(chapters) == PRODUCT_RESTART_CHAPTERS and
+            chapters[:len(book["chapters"])] == book["chapters"],
+            "not the frozen product continuation proposal")
+    updated = copy.deepcopy(book)
+    updated["chapters"] = copy.deepcopy(chapters)
+    updated["revision"] += 1
+    updated["decisions"].append({"revision": updated["revision"], "reason": PRODUCT_RESTART_REASON,
+                                 "previous_plan_sha256": digest(book["chapters"])})
+    validate_book(updated)
+    require(len(pending(updated)) == PRODUCT_RESTART_ADDED and
+            pending(updated)[0]["id"] == PRODUCT_RESTART_TASK and
+            digest(updated) == PRODUCT_RESTART_NEW_BOOK,
+            "product continuation count/front/book mismatch")
+    return updated
+
+
 def task_block(task, level=3):
     return (f"{'#' * level} {task['id']} — {task['title']}\n\n**Sonuç:** {task['outcome']}\n\n**Kabul:**\n\n" + "".join(f"- {x}\n" for x in task["acceptance"]) + f"\n**Test bütçesi:** {task['budget']}\n**Kontroller:** {', '.join(task['checks'])}\n**Kapsam:** {', '.join(task['scope'])}\n**Bağımlılıklar:** {', '.join(task['depends']) or 'Yok'}\n\n")
 
 
 def render(book):
     validate_book(book)
-    plan = f"# CodeSkeptic — CWE Ürün Planı\n\nSürüm: {book['revision']}. Eski planın devamı değil; main tabanlı yeni program.\n\nPLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.\n\n"
+    origin = ("Aynı Chapter → Section → Unit FIFO'sunda ürün tamamlama devamı; önceki kayıtlar korunur."
+              if any(t["id"] == PRODUCT_RESTART_TASK for t in tasks(book)) else
+              "Eski planın devamı değil; main tabanlı yeni program.")
+    plan = f"# CodeSkeptic — CWE Ürün Planı\n\nSürüm: {book['revision']}. {origin}\n\nPLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.\n\n"
     for chapter in book["chapters"]:
         plan += f"## {chapter['id']} — {chapter['title']}\n\n"
         for section in chapter["sections"]:
@@ -508,6 +549,39 @@ def ownership_checkpoint_edge(root, parent, head, old, book, changed):
             book == ownership_checkpoint_book(old))
 
 
+def product_restart_edge(root, parent, head, old, book, changed):
+    """Immutable historical facts; the direct guard checks the live branch.
+
+    Git commits do not store their branch. Historical replay must not compare
+    the old terminal review's branch with the current task branch.
+    """
+    return (parent == PRODUCT_RESTART_PARENT and
+            set(changed) == set(PRODUCT_RESTART_FILES) and
+            git(root, "rev-list", "--parents", "-n", "1", head).split() == [head, parent] and
+            digest(old) == PRODUCT_RESTART_OLD_BOOK and
+            digest(book) == PRODUCT_RESTART_NEW_BOOK and
+            book == product_restart_book(old, book["chapters"]))
+
+
+def terminal_restart_boundary(root, terminal, book):
+    """Verify the real old final POP and its preceding implementation span."""
+    require(terminal == PRODUCT_RESTART_PARENT and digest(book) == PRODUCT_RESTART_OLD_BOOK
+            and not pending(book) and bool(book["progress"]), "not the frozen terminal boundary")
+    parents = git(root, "rev-list", "--parents", "-n", "1", terminal).split()[1:]
+    require(len(parents) == 1, "terminal POP needs one parent")
+    reviewed = parents[0]
+    prior = validate_book(json.loads(git(root, "show", f"{reviewed}:{FILES[0]}"), object_pairs_hook=unique))
+    require(len(pending(prior)) == 1, "terminal parent was not the final FRONT")
+    record = book["progress"][0]
+    expected = complete(prior, record["review"], reviewed, record["review"]["branch"], record["completed_at"])
+    changed = git(root, "diff", "--name-only", reviewed, terminal).splitlines()
+    require(book == expected and set(changed) == {FILES[0], FILES[2], FILES[3]},
+            "invalid terminal starting POP")
+    # Use the historical review's branch above, not guard(), which reads the
+    # current CH08 HEAD. Earlier out-of-scope edits still cannot be laundered.
+    implementation_span(root, reviewed, prior)
+
+
 def implementation_span(root, head, book):
     """Check every implementation edge, not just the last commit or final diff.
 
@@ -530,7 +604,11 @@ def implementation_span(root, head, book):
         parent = parents[0]
         old = validate_book(json.loads(git(root, "show", f"{parent}:{FILES[0]}"), object_pairs_hook=unique))
         changed = git(root, "diff", "--name-only", parent, cursor).splitlines()
-        if (checkpoint_policy_edge(root, parent, cursor, old, book, changed) or
+        if product_restart_edge(root, parent, cursor, old, book, changed):
+            require(task["id"] == PRODUCT_RESTART_TASK, "restart is not this unit's boundary")
+            terminal_restart_boundary(root, parent, old)
+            return  # Do not index pending(old): it is the verified closed book.
+        elif (checkpoint_policy_edge(root, parent, cursor, old, book, changed) or
                 ownership_checkpoint_edge(root, parent, cursor, old, book, changed)):
             # Do not stop replay here: earlier implementation still has to
             # obey its original contract all the way back to the previous POP.
@@ -575,6 +653,10 @@ def guard(root, base):
         return "bootstrap"
     old_text = git(root, "show", f"{base}:{FILES[0]}")
     old = validate_book(json.loads(old_text, object_pairs_hook=unique))
+    if product_restart_edge(root, base, head, old, book, changed):
+        require(branch == PRODUCT_RESTART_BRANCH, "wrong product restart branch")
+        implementation_span(root, head, book)
+        return "checkpoint-product-restart"
     if checkpoint_policy_edge(root, base, head, old, book, changed):
         implementation_span(root, head, book)
         return "checkpoint-adjudication-policy"

@@ -45,3 +45,13 @@
     FIFO and completed records remain unchanged. History replay continues
     under the old contracts to the previous POP; no retroactive scope amnesty,
     general acceptance-edit API, product PASS or quality-floor reduction.
+13. The owner's2026-09-08 second-act authorization admits one exact terminal
+    continuation after 4fd4a21f9b5dc381ea1ec3014daa3082a9d14e24, on the
+    declared CH08-S01-U001 branch, with eight declared files and frozen old/new
+    BOOK/proposal digests. It appends exactly the approved 51 tasks to the same
+    FIFO without changing the old 46 contracts/receipts or PROGRESS bytes.
+    Ordinary amend still cannot reopen a closed book. Historical admission
+    verifies the actual old final three-file POP and its prior implementation;
+    no arbitrary empty queue or hidden historical edit becomes admissible.
+    Activation has no POP/product/release meaning and needs independent
+    exact-head PASS. No implicit main, signing, tag or publication authority.

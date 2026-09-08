@@ -34,6 +34,8 @@ ledger commit'inin parent'ı olmalıdır. Sıradaki iş için o ledger commit'in
 task dalı açılır. Bootstrap'ta bağımsız PASS implementation'ı doğrular; ilk gerçek
 POP ve guard bunun hemen ardından çalıştırılır, önce yapılmış gibi raporlanmaz.
 Son task bitince TODO yalnız terminal açıklaması taşır, işler PROGRESS'tedir.
+Terminal kuyruk sıradan amend ile yeniden açılamaz. Aşağıdaki sahibin onayladığı
+tek tarihsel devam geçişi aynı sistemi yeni bölümlere bağlar; ikinci TODO yoktur.
 
 İlk main-child bootstrap adayı henüz finalize edilmediyse inceleme bulgularının
 düzeltilmesi için `bootstrap` görünümleri yeniden üretebilir; front kabulü aynı
@@ -106,6 +108,44 @@ ile eklenir, dar RED/GREEN ve yeni exact-head gerçek kapılar tekrar doğrulan�
 Geçmiş denetimi checkpoint'te durmaz: eski kapsamla önceki POP'a kadar sürer.
 Ordinary amend ve extend-scope herhangi bir FRONT kabulünü yeniden yazamaz;
 bu tek istisna daha sonra yönetişim değişikliği yapma yetkisi vermez.
+
+### Onaylı ikinci perde — aynı FIFO'da ürün tamamlama devamı
+
+Sahip2026-09-08 tarihinde bağımsız incelenmiş 51 görevlik CH08-CH14 planını
+değiştirmeden sonuna kadar uygulamayı açıkça onayladı. Eski 46 tamamlanmış
+görev korunur; hedef toplam 97 görevdir. Yalnız doğrudan parent
+`4fd4a21f9b5dc381ea1ec3014daa3082a9d14e24` ve
+`agent/cs3-ch08-s01-u001-product-completion-contract` dalında bir kez:
+BOOK/PLAN/TODO, AGENTS, INVARIANTS, QUEUE_GUIDE, project_queue.py ve
+test_project_queue.py değişebilir. Ürün dosyası veya POP bu geçişe karışamaz;
+PROGRESS byte-byte aynı kalır. İlk yeni FRONT `CS3-CH08-S01-U001` olur.
+
+`product_restart_book` yalnız sabit eski BOOK ile dondurulmuş tam chapter
+önerisinden sabit yeni BOOK'u hesaplar. Eski bölümler, bitmiş sözleşmeler,
+receipt'ler ve karar geçmişi değişmez; tek yeni karar ve 51 görev eklenir.
+Eski/yeni BOOK ve proposal SHA-256 sabitleri bu exact yetkiyi sınırlar.
+Olağan amend/extend-scope terminal açma veya kabul zayıflatma izni kazanmaz.
+Saf dönüşüm yazma yapmaz; primary mevcut journal/lock/publish mekanizmasıyla
+sekiz dosyalık aday hazırlayıp tek commit olarak bağımsız exact-head denetletir.
+Guard başarıyla uygulanmış geçişi doğrulamadan ilk normal görev başlamaz.
+
+Doğrudan geçiş guard'ı exact dalı denetler. Daha sonraki implementation replay,
+Git commit'inin dal adı saklamadığı gerçeğine uygun olarak immutable parent,
+dosya kümesi ve BOOK/proposal kimlikleriyle bu sınırı tanır. Sınırda körlemesine
+durmaz: eski terminal commit'inin tek parent'ını, tam üç POP dosyasını ve
+gerçek review-head/branch ile `complete` eşitliğini denetler; ardından eski son
+görevin implementation geçmişini önceki POP'a kadar doğrular. Terminal
+pending listesine index atılmaz. Yanlış parent/digest, değiştirilmiş eski kayıt,
+eksik/ek dosya, gizli eski uygulama, sahte veya merge POP ve sonradan yeni
+yönetişim değişikliği ret alır. Yeni task'ın olağan dal/scope/receipt kontrolleri
+aynen geçerlidir.
+
+Öneri PASS'i gelecekteki kodun PASS'i değildir. Aktivasyon da yeni ürün görevinin
+tamamlanması değildir. İlk normal görev ayrı ürün planı/kalite sözleşmesini
+yayımlar ve aktivasyonun test farkı için onaylı prospective inventory successor'ı
+bağımsız doğrular; burada eski korpus pinleri veya kalite eşikleri değiştirilmez.
+Tag, publisher signing ve gerçek public yayın için planda ayrılan exact-target
+onayları ayrıca alınır. Main'e merge/yazma veya force-push izni yoktur.
 
 ## Değişiklik ve hata kurtarma
 

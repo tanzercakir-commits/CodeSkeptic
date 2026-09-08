@@ -122,7 +122,79 @@ def ownership_checkpoint_fixture(book, head=HEAD, branch=None):
         yield updated
 
 
+@contextlib.contextmanager
+def product_restart_fixture(book, head=HEAD):
+    """Bind only the frozen identities, never replace the production validator."""
+    chapters = copy.deepcopy(book["chapters"])
+    first = make_task("CH08", 1, [queue.tasks(book)[-1]["id"]])
+    second = make_task("CH08", 2, [first["id"]])
+    chapters.append({"id": "CH08", "title": "Product continuation", "sections": [
+        {"id": "S01", "title": "Preserved FIFO", "tasks": [first, second]},
+    ]})
+    updated = copy.deepcopy(book)
+    updated["chapters"] = chapters
+    updated["revision"] += 1
+    updated["decisions"].append({"revision": updated["revision"],
+        "reason": queue.PRODUCT_RESTART_REASON,
+        "previous_plan_sha256": queue.digest(book["chapters"])})
+    values = {
+        "PRODUCT_RESTART_PARENT": head,
+        "PRODUCT_RESTART_BRANCH": branch_for(first),
+        "PRODUCT_RESTART_TASK": first["id"],
+        "PRODUCT_RESTART_OLD_BOOK": queue.digest(book),
+        "PRODUCT_RESTART_NEW_BOOK": queue.digest(updated),
+        "PRODUCT_RESTART_CHAPTERS": queue.digest(chapters),
+        "PRODUCT_RESTART_COMPLETED": len(book["progress"]),
+        "PRODUCT_RESTART_ADDED": 2,
+    }
+    with contextlib.ExitStack() as stack:
+        for name, value in values.items():
+            stack.enter_context(mock.patch.object(queue, name, value))
+        yield updated
+
+
 class QueueContractTests(unittest.TestCase):
+    def test_65_product_restart_is_frozen_append_not_reusable_amendment(self):
+        old = make_book()
+        while queue.pending(old):
+            old = advance(old)
+        before = copy.deepcopy(old)
+        with product_restart_fixture(old) as expected:
+            updated = queue.product_restart_book(old, expected["chapters"])
+            self.assertEqual(updated, expected)
+            self.assertEqual(updated["progress"], old["progress"])
+            self.assertEqual(updated["chapters"][:len(old["chapters"])], old["chapters"])
+            self.assertEqual(queue.render(updated)["docs/PROGRESS.md"], queue.render(old)["docs/PROGRESS.md"])
+            with self.assertRaises(queue.QueueError):
+                queue.amend(old, expected["chapters"], "Ordinary terminal reopen remains forbidden")
+            with self.assertRaises(queue.QueueError):
+                queue.product_restart_book(updated, expected["chapters"])
+            for name, value in (("PRODUCT_RESTART_OLD_BOOK", "0" * 64),
+                                ("PRODUCT_RESTART_NEW_BOOK", "0" * 64),
+                                ("PRODUCT_RESTART_CHAPTERS", "0" * 64),
+                                ("PRODUCT_RESTART_TASK", "CS3-CH09-S01-U001"),
+                                ("PRODUCT_RESTART_COMPLETED", 0),
+                                ("PRODUCT_RESTART_ADDED", 99)):
+                with self.subTest(name=name), mock.patch.object(queue, name, value), self.assertRaises(queue.QueueError):
+                    queue.product_restart_book(old, expected["chapters"])
+        self.assertEqual(old, before)
+
+    def test_66_product_restart_rejects_mutated_proposal_and_nonterminal_input(self):
+        old = make_book()
+        while queue.pending(old):
+            old = advance(old)
+        with product_restart_fixture(old) as expected:
+            for field in ("outcome", "acceptance", "scope", "checks", "budget", "depends"):
+                changed = copy.deepcopy(expected["chapters"])
+                task = changed[-1]["sections"][0]["tasks"][0]
+                task[field] = "T0" if field == "budget" else "Changed" if field == "outcome" else ["Changed"]
+                with self.subTest(field=field), self.assertRaises(queue.QueueError):
+                    queue.product_restart_book(old, changed)
+            incomplete = copy.deepcopy(old)
+            incomplete["progress"].pop(0)
+            with mock.patch.object(queue, "PRODUCT_RESTART_OLD_BOOK", queue.digest(incomplete)), self.assertRaises(queue.QueueError):
+                queue.product_restart_book(incomplete, expected["chapters"])
+
     def test_57_ownership_checkpoint_preserves_contract_except_exact_append(self):
         old = advance(make_book())
         before = copy.deepcopy(old)
@@ -960,6 +1032,253 @@ q.publish(Path(sys.argv[2]), q.read_json(Path(sys.argv[3])))
             self.commit_ownership_checkpoint(updated, omit="docs/QUEUE_GUIDE.md")
             with self.assertRaises(queue.QueueError):
                 queue.guard(self.root, self.head)
+
+    def finish_restart_fixture(self, bad_last=None):
+        """Create real prior units and their terminal POP on different branches."""
+        current = queue.check(self.root)
+        while queue.pending(current):
+            task = queue.pending(current)[0]
+            branch = branch_for(task)
+            if self.git("branch", "--show-current") != branch:
+                self.git("switch", "-q", "-c", branch)
+            last = len(queue.pending(current)) == 1
+            source = self.root / "src/terminal-fixture.cc"
+            source.parent.mkdir(exist_ok=True)
+            source.write_text("// " + task["id"] + "\n", encoding="utf-8")
+            if last and bad_last == "hidden-implementation":
+                (self.root / "outside.txt").write_text("Not in prior FRONT scope\n", encoding="utf-8")
+            self.commit("Prior scoped implementation " + task["id"])
+            reviewed_head = self.git("rev-parse", "HEAD")
+            receipt = review_for(task, "f" * 40 if last and bad_last == "stale-review" else reviewed_head,
+                                 branch, self.evidence)
+            terminal = queue.complete(current, receipt, receipt["head"], branch, STAMP)
+            queue.publish(self.root, terminal)
+            if last and bad_last == "mixed-pop":
+                (self.root / "extra-pop.txt").write_text("Not a ledger-only POP\n", encoding="utf-8")
+            self.commit("Prior FIFO POP " + task["id"])
+            if not (last and bad_last):
+                self.assertEqual(queue.guard(self.root, reviewed_head), "finalized")
+            current = terminal
+        terminal_head = self.git("rev-parse", "HEAD")
+        if bad_last == "terminal-edit":
+            (self.root / "src/terminal-fixture.cc").write_text("// Forbidden post-terminal edit\n", encoding="utf-8")
+            self.commit("Hidden edit after terminal POP")
+            terminal_head = self.git("rev-parse", "HEAD")
+        elif bad_last == "merge-pop":
+            tree = self.git("rev-parse", "HEAD^{tree}")
+            merged = self.git("commit-tree", tree, "-p", reviewed_head, "-p", self.main_base,
+                              "-m", "Invalid merged terminal POP")
+            self.git("update-ref", "HEAD", merged, terminal_head)
+            terminal_head = merged
+        return current, terminal_head
+
+    def commit_product_restart(self, updated, omit=None, extra=None):
+        self.git("switch", "-q", "-c", queue.PRODUCT_RESTART_BRANCH)
+        for name in queue.PRODUCT_RESTART_FILES:
+            if name in queue.FILES or name == omit:
+                continue
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("Owner-authorized exact terminal continuation\n", encoding="utf-8")
+        before = self.snapshot()
+        queue.publish(self.root, updated)
+        if omit in queue.FILES:
+            (self.root / omit).write_bytes(before[omit])
+        if extra:
+            path = self.root / extra
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(path.read_text() + "\nMixed mutation\n" if path.exists() else "Mixed mutation\n", encoding="utf-8")
+        self.commit("Exact eight-file terminal continuation")
+        return self.git("rev-parse", "HEAD")
+
+    def test_67_product_restart_real_activation_implementation_and_pop(self):
+        old, terminal = self.finish_restart_fixture()
+        with product_restart_fixture(old, terminal) as expected:
+            before = (self.root / "docs/PROGRESS.md").read_bytes()
+            checkpoint = self.commit_product_restart(queue.product_restart_book(old, expected["chapters"]))
+            self.assertEqual(queue.guard(self.root, terminal), "checkpoint-product-restart")
+            self.assertEqual((self.root / "docs/PROGRESS.md").read_bytes(), before)
+            self.assertEqual(self.cli("finalize", "--review", str(self.receipt)), 2)
+            (self.root / "src/new-product.cc").write_text("int new_product;\n", encoding="utf-8")
+            self.commit("First CH08 scoped implementation")
+            product = self.git("rev-parse", "HEAD")
+            self.assertEqual(queue.guard(self.root, checkpoint), "implementation")
+            self.review = review_for(queue.pending(expected)[0], product, queue.PRODUCT_RESTART_BRANCH, self.evidence)
+            self.save_review()
+            self.assertEqual(self.cli("finalize", "--review", str(self.receipt)), 0)
+            self.commit("First real POP after terminal continuation")
+            self.assertEqual(queue.guard(self.root, product), "finalized")
+            self.assertEqual(queue.check(self.root)["progress"][1:], old["progress"])
+
+    def test_68_product_restart_scope_extension_replays_exact_terminal_boundary(self):
+        old, terminal = self.finish_restart_fixture()
+        with product_restart_fixture(old, terminal) as expected:
+            checkpoint = self.commit_product_restart(expected)
+            receipt = scope_review_for(expected, checkpoint, queue.PRODUCT_RESTART_BRANCH)
+            self.receipt.write_text(queue.canonical(receipt), encoding="utf-8")
+            self.assertEqual(self.cli("extend-scope", "--review", str(self.receipt)), 0)
+            self.commit("Reviewed first-task exact-file scope extension")
+            scope_head = self.git("rev-parse", "HEAD")
+            self.assertEqual(queue.guard(self.root, checkpoint), "scope-extension")
+            path = self.root / "include/cwe.h"
+            path.parent.mkdir()
+            path.write_text("int admitted;\n", encoding="utf-8")
+            self.commit("First product after scope extension")
+            product = self.git("rev-parse", "HEAD")
+            self.assertEqual(queue.guard(self.root, scope_head), "implementation")
+            current = queue.check(self.root)
+            self.review = review_for(queue.pending(current)[0], product, queue.PRODUCT_RESTART_BRANCH, self.evidence)
+            self.save_review()
+            self.assertEqual(self.cli("finalize", "--review", str(self.receipt)), 0)
+            self.commit("Verified extended first-task POP")
+            self.assertEqual(queue.guard(self.root, product), "finalized")
+
+    def test_69_product_restart_wrong_parent_branch_and_frozen_hashes_reject(self):
+        old, terminal = self.finish_restart_fixture()
+        with product_restart_fixture(old, terminal) as expected:
+            self.commit_product_restart(expected)
+            for name, value in (("PRODUCT_RESTART_PARENT", "0" * 40),
+                                ("PRODUCT_RESTART_BRANCH", queue.PRODUCT_RESTART_BRANCH + "-wrong"),
+                                ("PRODUCT_RESTART_OLD_BOOK", "0" * 64),
+                                ("PRODUCT_RESTART_NEW_BOOK", "0" * 64),
+                                ("PRODUCT_RESTART_CHAPTERS", "0" * 64)):
+                with self.subTest(name=name), mock.patch.object(queue, name, value), self.assertRaises(queue.QueueError):
+                    queue.guard(self.root, terminal)
+
+    def test_70_product_restart_mixed_product_rejects(self):
+        old, terminal = self.finish_restart_fixture()
+        with product_restart_fixture(old, terminal) as expected:
+            self.commit_product_restart(expected, extra="src/mixed.cc")
+            with self.assertRaises(queue.QueueError):
+                queue.guard(self.root, terminal)
+
+    def test_71_product_restart_progress_mutation_rejects(self):
+        old, terminal = self.finish_restart_fixture()
+        with product_restart_fixture(old, terminal) as expected:
+            self.commit_product_restart(expected, extra="docs/PROGRESS.md")
+            with self.assertRaises(queue.QueueError):
+                queue.guard(self.root, terminal)
+
+    def test_72_product_restart_requires_all_eight_files(self):
+        old, terminal = self.finish_restart_fixture()
+        with product_restart_fixture(old, terminal) as expected:
+            self.commit_product_restart(expected, omit="docs/QUEUE_GUIDE.md")
+            with self.assertRaises(queue.QueueError):
+                queue.guard(self.root, terminal)
+
+    def test_73_product_restart_prior_implementation_is_not_amnestied(self):
+        old, terminal = self.finish_restart_fixture("hidden-implementation")
+        with product_restart_fixture(old, terminal) as expected:
+            self.commit_product_restart(expected)
+            with self.assertRaises(queue.QueueError):
+                queue.guard(self.root, terminal)
+
+    def test_74_product_restart_requires_authentic_prior_pop_review(self):
+        old, terminal = self.finish_restart_fixture("stale-review")
+        with product_restart_fixture(old, terminal) as expected:
+            self.commit_product_restart(expected)
+            with self.assertRaises(queue.QueueError):
+                queue.guard(self.root, terminal)
+
+    def test_75_product_restart_requires_prior_pop_exact_files(self):
+        old, terminal = self.finish_restart_fixture("mixed-pop")
+        with product_restart_fixture(old, terminal) as expected:
+            self.commit_product_restart(expected)
+            with self.assertRaises(queue.QueueError):
+                queue.guard(self.root, terminal)
+
+    def test_76_product_restart_rejects_prior_terminal_extra_edge(self):
+        old, terminal = self.finish_restart_fixture("terminal-edit")
+        with product_restart_fixture(old, terminal) as expected:
+            self.commit_product_restart(expected)
+            with self.assertRaises(queue.QueueError):
+                queue.guard(self.root, terminal)
+
+    def test_77_product_restart_rejects_prior_pop_merge(self):
+        old, terminal = self.finish_restart_fixture("merge-pop")
+        with product_restart_fixture(old, terminal) as expected:
+            self.commit_product_restart(expected)
+            with self.assertRaises(queue.QueueError):
+                queue.guard(self.root, terminal)
+
+    def test_78_product_restart_does_not_grant_later_governance_edits(self):
+        old, terminal = self.finish_restart_fixture()
+        with product_restart_fixture(old, terminal) as expected:
+            checkpoint = self.commit_product_restart(expected)
+            self.assertEqual(queue.guard(self.root, terminal), "checkpoint-product-restart")
+            (self.root / "AGENTS.md").write_text("Unauthorized later policy edit\n", encoding="utf-8")
+            self.commit("Later governance edit remains forbidden")
+            with self.assertRaises(queue.QueueError):
+                queue.guard(self.root, checkpoint)
+
+    def test_79_product_restart_preservation_survives_output_digest_forgery(self):
+        old, terminal = self.finish_restart_fixture()
+        with product_restart_fixture(old, terminal) as expected:
+            forged = copy.deepcopy(expected)
+            forged["progress"][0]["completed_at"] = "Forged old record"
+            with mock.patch.object(queue, "PRODUCT_RESTART_NEW_BOOK", queue.digest(forged)):
+                self.commit_product_restart(forged)
+                with self.assertRaises(queue.QueueError):
+                    queue.guard(self.root, terminal)
+
+    def test_80_product_restart_failed_publish_restores_all_managed_bytes(self):
+        old, terminal = self.finish_restart_fixture()
+        with product_restart_fixture(old, terminal) as expected:
+            before = self.snapshot()
+            original = queue.atomic_write
+            calls = 0
+            def failing(path, data):
+                nonlocal calls
+                calls += 1
+                if calls == 3:
+                    raise OSError("Injected restart write failure")
+                return original(path, data)
+            with mock.patch.object(queue, "atomic_write", side_effect=failing), self.assertRaises(OSError):
+                queue.publish(self.root, queue.product_restart_book(old, expected["chapters"]))
+            self.assertEqual(self.snapshot(), before)
+            self.assertFalse(queue.paths(self.root)[0].exists())
+
+    def test_81_product_restart_edge_requires_every_exact_file(self):
+        old, terminal = self.finish_restart_fixture()
+        with product_restart_fixture(old, terminal) as expected:
+            checkpoint = self.commit_product_restart(expected)
+            self.assertTrue(queue.product_restart_edge(self.root, terminal, checkpoint, old, expected,
+                                                      queue.PRODUCT_RESTART_FILES))
+            for omitted in queue.PRODUCT_RESTART_FILES:
+                with self.subTest(omitted=omitted):
+                    changed = [name for name in queue.PRODUCT_RESTART_FILES if name != omitted]
+                    self.assertFalse(queue.product_restart_edge(self.root, terminal, checkpoint, old, expected, changed))
+            self.assertFalse(queue.product_restart_edge(self.root, terminal, checkpoint, old, expected,
+                [*queue.PRODUCT_RESTART_FILES, "extra.txt"]))
+
+    def test_82_product_restart_cannot_be_delayed_past_frozen_parent(self):
+        old, terminal = self.finish_restart_fixture()
+        (self.root / "AGENTS.md").write_text("Not a separately authorized checkpoint\n", encoding="utf-8")
+        self.commit("An intervening governance edit cannot be absorbed")
+        with product_restart_fixture(old, terminal) as expected:
+            self.commit_product_restart(expected)
+            with self.assertRaises(queue.QueueError):
+                queue.guard(self.root, terminal)
+
+    def test_83_product_restart_replay_does_not_use_the_live_branch_as_history(self):
+        old, terminal = self.finish_restart_fixture()
+        with product_restart_fixture(old, terminal) as expected:
+            checkpoint = self.commit_product_restart(expected)
+            self.assertEqual(queue.guard(self.root, terminal), "checkpoint-product-restart")
+            self.git("switch", "-q", "-c", queue.PRODUCT_RESTART_BRANCH + "-replay")
+            (self.root / "src/replay.cc").write_text("int same_task_scope;\n", encoding="utf-8")
+            self.commit("Valid current task branch with historical restart")
+            self.assertEqual(queue.guard(self.root, checkpoint), "implementation")
+
+    def test_84_product_restart_reason_cannot_change_with_only_output_digest(self):
+        old, terminal = self.finish_restart_fixture()
+        with product_restart_fixture(old, terminal) as expected:
+            forged = copy.deepcopy(expected)
+            forged["decisions"][-1]["reason"] = "Different authority or policy"
+            with mock.patch.object(queue, "PRODUCT_RESTART_NEW_BOOK", queue.digest(forged)):
+                self.commit_product_restart(forged)
+                with self.assertRaises(queue.QueueError):
+                    queue.guard(self.root, terminal)
 
     def commit_checkpoint_policy(self, updated):
         for name in queue.CHECKPOINT_POLICY_FILES:
