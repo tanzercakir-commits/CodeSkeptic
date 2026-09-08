@@ -16,7 +16,7 @@ Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter aç
 
 **Test bütçesi:** T3
 **Kontroller:** release-qualification, queue-check
-**Kapsam:** scripts/package_release.sh, scripts/generate_sbom.py, docs/release-checklist.md, RELEASE_NOTES.md, .github/workflows/release.yml
+**Kapsam:** scripts/package_release.sh, scripts/generate_sbom.py, docs/release-checklist.md, RELEASE_NOTES.md, .github/workflows/release.yml, scripts/test_generate_sbom.py
 **Bağımlılıklar:** CS3-CH06-S01-U001
 
 ### CS3-CH06-S02-U002 — Desteklenen platform sözünü gerçek paket testine bağla
