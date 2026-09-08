@@ -496,7 +496,7 @@ For edit-check loops (agents, IDEs, pre-commit hooks) analyze only what
 changed:
 
 ```bash
-# re-check just the function you edited (milliseconds)
+# scope the re-check to the function you edited; latency is workload-dependent
 codeskeptic src/parser.cpp --function Parser::parse
 
 # analyze only the functions actually touched since a git ref:

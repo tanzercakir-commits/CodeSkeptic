@@ -340,8 +340,9 @@ below ~50 lines; measurement, method and limits in
 - **Agents (MCP):** `codeskeptic --serve` exposes an `analyze` tool
   over stdio — findings with traces as structured JSON, scoped to the
   functions just edited. [docs/integrations.md](docs/integrations.md#mcp-server-agent-integration)
-- **Incremental:** `--function`/`--lines` re-check one function in
-  milliseconds; `--summary-in` keeps whole-project knowledge in
+- **Incremental:** `--function`/`--lines` scope a re-check to selected functions
+  or lines; latency depends on parsing, the project and configuration.
+  `--summary-in` supplies saved whole-project knowledge in
   single-file runs. [docs/usage.md](docs/usage.md#incremental-analysis)
 - **Semantic regression gate:** inferred contracts fail CI on
   `NeverNull → MaybeNull`, lost output/ownership/access guarantees, or new
@@ -362,11 +363,13 @@ to do — declared as structured comments, checked by the same dataflow:
 char *find_config(struct Cfg *cfg, const char *p, int n);
 ```
 
-When AI-generated (or human) code later breaks the promise, the diff
-between declared and actual behavior is a finding at the exact line
-that broke it. Violated contracts are errors (that friction is the
-point); `cs:ai` marks machine-proposed contracts that warn instead;
-sidecar files cover third-party code you can't annotate. Full grammar,
+For supported checkable cases, disagreement between a declaration and the
+analysis can produce a finding at the producer's reported location, which may
+be the declaration rather than the violating operation. Not every finding has
+a dataflow trace. Contract severity also reflects declaration policy: `cs:`
+violations use error severity, while `cs:ai` marks machine-proposed contracts
+that warn instead; severity is not a universal certainty measure or the
+blocking tier. Sidecar files cover third-party code you can't annotate. Full grammar,
 checkable subset and failure semantics: [CONTRACTS.md](CONTRACTS.md).
 
 ## Documentation map

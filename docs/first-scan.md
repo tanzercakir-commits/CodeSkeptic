@@ -232,14 +232,16 @@ size, is reported.
 
 ## Reading a finding before deciding it's noise
 
-- **Every finding carries a trace.** Follow it — allocated here, may be
-  null here, dereferenced here — before calling it a false positive.
-- **Severity tells you the claim.** `[error]` = definite on some path;
-  `[warning]` = may. An honest "may" on an accessor is not the tool
-  guessing — it is the tool declining to assume.
+- **Inspect the available evidence.** Follow dataflow notes when present —
+  allocated here, may be null here, dereferenced here. Some contract/policy
+  findings have no trace and point to a declaration or policy location.
+- **Severity is producer-specific.** It can reflect declaration policy as
+  well as the diagnostic's kind; `[error]` is not a universal certainty proof,
+  and `[warning]` is not a universal "may" classification. Read the message,
+  assumptions and rule metadata; maturity/blocking tier is a separate field.
 - **Want the shipped-build view instead?** `--no-assert-recovery`
-  reports the code exactly as the `NDEBUG` build runs it, with no
-  recovered assumptions at all.
+  disables recovery of compiled-out assertion assumptions. Other declared
+  models/contracts remain trusted inputs; this is not an execution proof.
 
 ## The short version
 

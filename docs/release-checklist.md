@@ -11,7 +11,7 @@ or platform coverage. There is no public candidate download, new tag or main mer
 
 | Delivery promise | Exact measured identity | Accepted PASS evidence and boundary |
 |---|---|---|
-| Linux installation, isolation and output parity | **L**: source/binary/archive below | CH06-S01-U001: actual non-root/offline package execution with LLVM and Python absent; 48 source/package analyses, 24 four-format comparisons, two dependency negatives. Ubuntu x86_64 ABI profile only. |
+| Linux installation, isolation and output parity | **L**: source/binary/archive below | CH06-S01-U001: actual non-root/offline package execution without a host LLVM installation or Python; bundled LLVM is present. 48 source/package analyses, 24 four-format comparisons, two dependency negatives. Ubuntu x86_64 ABI profile only. |
 | First C/C++ scan, doctor repair, baseline and report-only recipe | **L**, byte-identical installed binary | Same unit's `assembly.log` and terminal invocation: 12/12 FirstScan tests, including real marked recipes and static/mock negatives. Not 12 end-to-end runs; archive isolation is the separate row above. |
 | Local CLI/container/Action parity | **L** archive; implementation review **I** | CH06-S01-U002: six scenarios / 19 actual analyses with complete SARIF/exit parity. Report-only wrapper exit 0 retains analyzer exit 1. Local Action only; no hosted Action or source-rebuild qualification. |
 | Triage, baseline, suppression and PR delta | **T** | CH03-S02-U001: actual delta/shift/rename, gate ladder, assumption delta, suppression audit, baseline v3 and malformed-input negatives. Triage decisions do not establish clean code. |
