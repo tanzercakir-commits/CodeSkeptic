@@ -82,15 +82,17 @@ the native binary above ([status](docs/windows-support.md)):
 | Use | Current CWE restart qualification |
 |---|---|
 | Linux x86_64 native | Exact local Ubuntu artifact tested; see [package evidence](docs/release-checklist.md#local-qualification--2026-09-08) |
-| Native Windows x86_64 (MSVC) | Existing native CI passed; new checksum-bound artifact first-scan gate pending |
-| macOS arm64 | New native artifact first-scan gate pending; Linux results are not macOS evidence |
+| Native Windows x86_64 (MSVC) | Exact unsigned candidate artifact qualified on Windows Server 2025; [measured profile and limits](docs/release-checklist.md#hosted-native-measurement--2026-09-08) |
+| macOS arm64 | Exact unsigned candidate artifact qualified on the recorded arm64 runner; [measured profile and limits](docs/release-checklist.md#hosted-native-measurement--2026-09-08) |
 | Windows-host WSL2/Docker, Linux-targeted build | Linux-view route, not measured by the new native Windows qualification |
 
 The [platform artifact gate](docs/windows-support.md#current-platform-artifact-gate--ch06-s02-u002)
 records the exact runner, source SHA, archive/executable hashes and C/C++ first
-scans. The candidate jobs cannot publish a release or write Git refs; their
-existence is not a successful measurement. Historical download examples above
-remain release examples, not distribution of the current feature branch.
+scans, including tests skipped for platform prerequisites. Qualification applies
+to measured source `e83b641`, not every OS version or a later documentation HEAD.
+The candidate jobs cannot publish a release or write Git refs. Publisher signing,
+notarization and public distribution remain unqualified. Historical download
+examples above remain release examples, not distribution of this feature branch.
 
 ### Build from source
 

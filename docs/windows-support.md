@@ -2,19 +2,26 @@
 
 ## Current platform artifact gate — CH06-S02-U002
 
-The current restart is being qualified separately from the historical releases
-below. Green compilation/unit-test jobs are necessary, but do not identify a
-retained, checksum-bound package. The ordinary Windows lane has passed native
-tests and legacy relocation smoke at `156e2b582d1575cc379b0d04c867e8534fe26764`;
-its uploaded artifact is explicitly diagnostic-only, not a package receipt.
+The current restart's unsigned Windows x86_64 and macOS arm64 candidate packages
+were actually qualified at source
+`e83b641be32665740e8637cbb1368346e82ea471`, version
+`0.4.9-dev+ge83b641be326`. Native run
+[`34243269691`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34243269691)
+attempt 1 and ordinary Windows run
+[`34243269775`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34243269775)
+attempt 1 finished successfully. Independent read-only audits reconciled actual
+raw tests/scans, source and runner records, downloaded catalog/ZIP hashes, and
+packaged executable bytes. [Exact artifact identities](release-checklist.md#hosted-native-measurement--2026-09-08)
+are separate from this later documentation checkpoint and historical releases.
+The ordinary Windows artifact remains diagnostic-only, not a retained package.
 
 The candidate-only jobs in [release.yml](../.github/workflows/release.yml) now
 build **Windows x86_64** and **macOS arm64** packages without creating a tag,
 release, PR or Git ref. Their token is read-only, checkout credentials are not
 persisted, and legacy release writers are tag-only. The frozen Windows workflow
-and all existing quality floors stay unchanged. The new exact source/version
-and first-scan evidence is **pending an actual successful hosted run**; adding
-the jobs or passing local synthetic tests does not qualify either platform.
+and all existing quality floors stay unchanged. The measured promise is this
+bounded actual-runner profile; adding jobs or passing synthetic tests alone
+does not qualify another source, OS version or architecture.
 
 Each native job runs the full CTest and single-process suites, assembles one
 versioned archive, then hides its known build LLVM installation temporarily.
@@ -31,8 +38,14 @@ This is an actual-runner promise, not every Windows/macOS version or architectur
 Windows needs the host MSVC toolset and Windows SDK; macOS needs Apple developer
 headers/CLT and any remaining dependencies recorded in the package. Toolchain
 setup may download the explicit LLVM 20 packages (Windows cache miss or Homebrew
-on macOS). The helper itself makes no downloads and does not run a compiler.
-It is a controlled trusted-build test, not an OS sandbox or a signing service.
+on macOS). The helper makes no downloads. Its **artifact first-scan mode** does
+not run a compiler; its separate **build-stage `--ctest-accounting` mode** invokes
+the unchanged registered Python tests and may run their corpus compiler. The
+latter retains the full original CTest log plus a named compilation-input repeat
+using the registered interpreter, binary, working directory and compiler, and
+the same build-step temporary environment. `CAPTURED` is not an independent
+test/skip verdict. This is a controlled trusted-build test, not an OS sandbox
+or a signing service.
 There is no publisher signature, notarization, Gatekeeper download-install test,
 or macOS/Windows SBOM claim. Native Windows is not interchangeable with the
 Linux preprocessor view in WSL2/Docker; those Windows-host routes are not measured
@@ -46,6 +59,70 @@ and downloaded archive digest. A missing runner, artifact, signer or authority
 stays an explicit limitation/blocker; do not infer release or main-integration
 permission from feature-branch synchronization.
 
+### Actual tests and unexecuted platform coverage
+
+The source above was measured on Windows Server 2025 `10.0.26100`, AMD64, runner
+image `20260824.214.3`, and Darwin `23.6.0`, arm64, image `20260831.0302.1`.
+The Windows artifact helper used Python 3.12.10; the registered CTest Python
+was 3.14.7. macOS used Python 3.14.7. These are observed runners, not immutable
+image pins or an all-version support promise. macOS still needs Apple CLT and
+the host Homebrew zstd dependency listed in `DEPENDENCIES.txt`; Windows needs
+host MSVC/Windows SDK discovery. The build LLVM installation was hidden during
+the six packaged scans and restored before final successful job completion.
+
+| Actual evidence | Windows native and ordinary, independently counted | macOS native |
+|---|---|---|
+| CTest processes | 1,525 passed + 1 skipped / 1,526 | 1,540 passed / 1,540 |
+| Separate single-process C++ | 1,519 passed + 1 skipped / 1,520 | 1,525 passed / 1,525 |
+| Python unittest inside CTest | 105 passed + 16 skipped / 121 | 203 passed + 4 skipped / 207 |
+| Separate named compilation-input repeat | 48 passed + 6 skipped / 54 (native only) | 50 passed + 4 skipped / 54 |
+| StressMatrixCorpus | 7 expected outcomes | 7 expected outcomes |
+
+Do not add the repeated 54 tests to the original Python total, or count a CTest
+wrapper as all of its inner assertions passing. The ordinary diagnostic
+`LastTest.log` is truncated to 64 KiB, but its tail actually contains all six
+Python helper blocks; those results were independently counted, not inferred
+from the native run. The native jobs retain the complete original CTest log.
+Stress depth-limit evidence remains exit 2/incomplete, not a clean result.
+
+All skips below are **unexecuted assertions**, never PASS:
+
+- Windows C++: `SourceManagerTest.FailedDirectoryScanNeverPublishesTraversedPrefix`;
+  the runner cannot enforce its unreadable-directory fixture.
+- Both platforms' four compilation-input filesystem cases:
+  `test_mixed_source_encodings_preserve_every_requested_identity`,
+  `test_non_utf8_canonical_symlink_target_is_reported_and_mcp_recovers`,
+  `test_non_utf8_source_identity_cannot_corrupt_coverage_json`, and
+  `test_unrequested_database_symlink_with_non_utf8_target_fails_without_crash`.
+  Windows lacks the POSIX byte-path prerequisite; macOS actually returned
+  `EILSEQ` when creating the owned non-UTF8 fixture. The macOS no-file raw-byte
+  rejection and valid-UTF8 missing-path controls did execute successfully.
+- Windows compilation-input extras:
+  `test_corpus_rejects_non_utf8_response_values_without_output` and
+  `test_non_utf8_requested_paths_are_rejected_without_creating_files`, which
+  require raw POSIX byte paths/arguments.
+- Windows stress harness: `test_real_matrix_timeout_is_incomplete_and_next_case_runs`
+  and `test_real_signal_and_timeout_child_group_cleanup`, requiring a POSIX
+  executable shebang or owned process-group/signal behavior.
+- Windows review-input helpers: `test_quoted_command_rename_preserves_literal_macro_value`
+  and `test_real_alias_remaps_to_base_without_repairing_wrong_input`, requiring
+  POSIX shell quoting or a real POSIX directory alias.
+- Windows `ReviewFlowInputTest` class, all six POSIX-flow cases:
+  `test_generated_headers_and_multiple_variants_work_on_both_sides`,
+  `test_rename_preserves_build_cwd_and_generated_headers`,
+  `test_missing_generated_header_is_not_clean_even_with_warn_gate`,
+  `test_missing_database_is_not_clean_even_with_warn_gate`,
+  `test_malformed_and_wrong_input_commands_are_not_repaired`, and
+  `test_added_source_has_a_real_head_command_and_no_base_counterpart`.
+
+Windows' original 128 MiB touched-allocation regression passed. macOS also passed
+that unchanged regression and all three new kernel-enforcement scenarios:
+the same 192 MiB mapping succeeds before lowering the limit, then is refused
+with `ENOMEM` while a touched 8 MiB positive mapping remains live. Finite exact
+readback, tighter inherited limits and unchanged parent limits are asserted.
+This qualifies the [snapshot-based Darwin contract](usage.md), not RSS, heap,
+committed memory, cumulative allocations or preexisting mappings.
+
 ### Measured failures and the bounded SDK comparison
 
 The first candidate run `34217016638` at
@@ -53,8 +130,8 @@ The first candidate run `34217016638` at
 Windows passed build/full tests/package and the C intrinsic-header clean scan,
 but its C finding scan could not find `stdio.h` in the isolated child environment
 (exit 2, no analyzed translation unit). macOS failed to compile the file-clock
-timestamp conversion; the lossless wide-integer correction has local regression
-evidence but still needs a fresh native run. Neither old failure is qualified.
+timestamp conversion. Later source fixes and fresh successful native executions
+do not change either old failure into a qualified result.
 
 A temporary Windows pre-build comparison reuses only that exact retained package
 (artifact `10052976442`, full outer and nested SHA-256 pinned in the helper).
@@ -93,8 +170,11 @@ that historical download/A/B or requests its Actions-read permission. The
 diagnostic helper and old failures remain available in history; current SDK
 discovery, six scan fixtures and full qualification gates are unchanged.
 The owner subsequently approved the macOS-only snapshot-based memory contract
-in [usage.md](usage.md). Its actual native enforcement and the new exact-head
-platform qualification remain pending.
+in [usage.md](usage.md). Its actual enforcement passed in the new measured
+profile above; the earlier absolute-cap failure remains failed. The intermediate
+`c4fd06b` native run passed its jobs but lacked complete inner-Python accounting;
+that evidence gap was closed only by the retained full/named `e83b641` outputs,
+not by assuming zero skips or reclassifying the older campaign.
 
 ## Historical support foundation
 

@@ -242,5 +242,84 @@ with an already-installed wide-integer-capable compiler, covering signed minima
 and high bits without narrowing. No compiler is downloaded. This local check
 does not run native Windows/macOS binaries. Existing frozen
 `tests/WorkflowPolicyTest.py`, `tests/ReleaseWorkflowTest.py` and package/SBOM
-regressions remain unchanged. Until the hosted profile passes, the corresponding
-support entries stay pending rather than claiming platform compatibility.
+regressions remain unchanged. A profile is qualified only by actual retained
+hosted evidence, with unexecuted platform assertions disclosed separately.
+
+## Hosted native measurement — 2026-09-08
+
+Measured source: `e83b641be32665740e8637cbb1368346e82ea471`; native binary identity:
+`0.4.9-dev+ge83b641be326`. This later documentation-only checkpoint does not
+rebuild or relabel the executables, archives or their embedded README files.
+The existing Linux package remains the separately identified `a23cf319` artifact
+above; these measurements do not produce a new Linux tarball.
+
+Actual native [run 34243269691](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34243269691),
+attempt 1, finished SUCCESS. Both native jobs completed full CTest, named
+compilation-input accounting, separate single-process tests, packaging, six
+first scans and final LLVM restoration. Read-only independent audits inspected
+the actual downloaded artifacts and raw logs, not only self-authored results.
+
+| Profile | Actual job | Outer retained artifact | Outer bytes |
+|---|---|---|---:|
+| macOS arm64 | [102118622191](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34243269691/job/102118622191) | `10063258404` | 61,519,331 |
+| Windows x86_64 | [102118622475](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34243269691/job/102118622475) | `10063711096` | 20,334,058 |
+
+The outer GitHub ZIP is the retained evidence container, not the nested
+installable package. Its catalog name binds target/full source/run/attempt.
+All digests below are SHA-256, independently recomputed from retained bytes.
+
+macOS:
+
+- Outer ZIP: `cf118758acdafbbdda548f8fc91fb97c04c0386a8df1f648b75b9724fcfd4b42`.
+- Package: `codeskeptic-v0.4.9-dev+ge83b641be326-darwin-arm64.tar.gz`, 56,354,213 bytes;
+  `a2d81c883c3e7d87d2ea661a294bf51300efd53a206fab4233ee2e5e9d27b0fc`.
+- Packaged executable: `7a33f5851a0ff124231b98719baa180c3b508b9621f7cd1430b5abe934af4c7c`.
+- Source-build executable: `13a81a8301a5b572a2189d39ce25cb5de59ff0cb53a732ef7e64192e0c9ff2f7`.
+  Actual Mach-O arm64 load-path rewriting/ad-hoc signing changes the bytes;
+  equal native version and separate source/accounting binding are verified.
+
+Windows:
+
+- Outer ZIP: `de8c77dc670270b5ef3b951067e5e5df3e75d95d2cec6df879061cdf3d7d717f`.
+- Package: `codeskeptic-v0.4.9-dev+ge83b641be326-windows-x86_64.zip`, 15,106,441 bytes;
+  `bb510deece8ab475a467a155dfe501c4b943c13948fa0e00beacf38cd8d98348`.
+- Packaged and source-build executable, byte-identical PE AMD64:
+  `c7c2f701e4ef5fe4478958e03b825b76d6987556ae6c4ecdc7749d0237b4a886`.
+
+For each language, the retained packaged scans show complete clean exit 0,
+one supported blocking null-dereference/exit 1, and missing-header incomplete
+exit 2. Source, compilation database, report, command and stdout/stderr hashes
+reconcile. No partial-coverage or recovery acceptance is enabled. The actual
+runner/test totals, exact skipped identities, dependencies and memory-contract
+limits are [recorded together](windows-support.md#actual-tests-and-unexecuted-platform-coverage).
+Skipped assertions are not counted as passing or hidden behind green wrappers.
+
+The separate ordinary Windows [run 34243269775](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34243269775),
+attempt 1, job `102118622584`, also succeeded with its unchanged SDK-discovery,
+normal packaging, real 7-Zip-masked PowerShell fallback and LLVM-hidden
+relocation gates. Diagnostic artifact `10063891996` is 11,991 bytes, SHA-256
+`9cb15cd01eb603e4a71603ab1b30efb467e336aed76df36efd4aaf2d5d81d992`.
+It does not retain that ordinary job's package bytes; do not attribute the
+native candidate's binary/ZIP checksums to it.
+
+Native artifact first-scan mode makes no downloads and runs no compiler.
+The separate build-stage `--ctest-accounting` mode runs unchanged registered
+tests and may invoke their compiler. Its `CAPTURED` marker does not classify
+skips: independent review reconciles the original full CTest log with the named
+repeat, exact source/script/binary, interpreter, compiler, CWD and temporary
+environment. The earlier `c4fd06b` accounting gap is not retroactively erased.
+
+Raw evidence is retained outside the worktree under
+`/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH06-S02-U002/`:
+`e83b641-native-final-run.json`, `e83b641-native-final-catalog.json`, exact
+`macos-e83b641-*` / `windows-e83b641-*` archives and job logs, ordinary Windows
+records, and independent `macos-review-e83b641.md` / `windows-review-e83b641.md`.
+Native ZIPs include `codeskeptic-platform/` raw scan/package records and
+`codeskeptic-native-build/` full CTest/single-process/build/accounting evidence.
+GitHub's 14-day artifact retention is not permanent distribution.
+
+This qualifies only these unsigned candidate profiles. Publisher signing,
+notarization/Gatekeeper download-install qualification, native SBOM coverage,
+public release and main integration remain unperformed or unauthorized. Missing
+signer/release authority is an explicit blocker to those broader claims, not
+success. No tag, release, PR or main merge is created by this qualification.
