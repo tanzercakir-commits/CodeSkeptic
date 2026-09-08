@@ -1,0 +1,379 @@
+#!/usr/bin/env python3
+"""Focused metadata tests; no analyzer or native qualification is performed."""
+import copy
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import unittest
+from unittest import mock
+
+import product_identity as identity
+
+
+class DependencyTests(unittest.TestCase):
+    def test_posix_dependencies_include_system_headers_and_escaped_names(self):
+        raw = ('identity-probe: /usr/include/a.h ' + '\\' + '\n'
+               ' /sdk/with\\ space/b.h /sdk/hash\\#name.h /sdk/dollar$$name.h\n')
+        self.assertEqual(identity.dependency_paths(raw, 'posix'),
+                         ['/usr/include/a.h', '/sdk/with space/b.h',
+                          '/sdk/hash#name.h', '/sdk/dollar$name.h'])
+
+    def test_windows_drive_paths_and_continuations(self):
+        raw = 'identity-probe: C:/SDK/a.h \\\r\n C:/Program\\ Files/VC/b.h\r\n'
+        self.assertEqual(identity.dependency_paths(raw, 'windows'),
+                         ['C:/SDK/a.h', 'C:/Program Files/VC/b.h'])
+
+    def test_wrong_target_relative_missing_and_malformed_dependencies_fail(self):
+        for raw in ('other: /sdk/a.h\n', 'identity-probe:',
+                    'identity-probe: relative.h\n', 'identity-probe: /a.h\nother: /b.h\n',
+                    'identity-probe: /a.h $variable\n', 'identity-probe: /a.h\\',
+                    'identity-probe: /a.h\x00\n'):
+            with self.subTest(raw=raw), self.assertRaises(identity.IdentityError):
+                identity.dependency_paths(raw, 'posix')
+
+    def test_duplicate_dependency_paths_do_not_inflate_inventory(self):
+        with self.assertRaises(identity.IdentityError):
+            identity.dependency_paths('identity-probe: /a.h /a.h\n', 'posix')
+
+    def test_dependency_flavor_and_limit_are_enforced(self):
+        with self.assertRaises(identity.IdentityError):
+            identity.dependency_paths('identity-probe: C:/a.h\n', 'posix')
+        with self.assertRaises(identity.IdentityError):
+            identity.dependency_paths('identity-probe: /a.h\n', 'invented')
+        with self.assertRaises(identity.IdentityError):
+            identity.dependency_paths('identity-probe: ' + 'a' * identity.MAX_OUTPUT, 'posix')
+
+
+class FileIdentityTests(unittest.TestCase):
+    def test_selected_header_bytes_and_resolved_identity_are_recorded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'native header.h'
+            path.write_bytes(b'int native_function(void);\n')
+            result = identity.file_identity(path)
+            self.assertEqual(result, {'path': str(path), 'resolved_path': str(path.resolve()),
+                                     'bytes': 27, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()})
+
+    def test_native_sdk_alias_preserves_both_names(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path, alias = Path(directory) / 'real.h', Path(directory) / 'alias.h'
+            path.write_bytes(b'header')
+            try:
+                alias.symlink_to(path)
+            except OSError as error:
+                self.skipTest('host does not allow creating this symlink fixture: ' + str(error))
+            record = identity.file_identity(alias)
+            self.assertEqual(record['path'], str(alias))
+            self.assertEqual(record['resolved_path'], str(path.resolve()))
+            self.assertEqual(record['sha256'], identity.file_identity(path)['sha256'])
+
+    def test_missing_directory_relative_and_oversized_file_fail(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'a.h'
+            for invalid in (path, Path(directory), Path('relative.h')):
+                with self.subTest(invalid=invalid), self.assertRaises(identity.IdentityError):
+                    identity.file_identity(invalid)
+            path.write_bytes(b'12345')
+            with self.assertRaises(identity.IdentityError):
+                identity.file_identity(path, maximum=4)
+
+
+class InvocationTests(unittest.TestCase):
+    def test_command_failure_timeout_size_and_invalid_utf8_fail_closed(self):
+        outcomes = [subprocess.CompletedProcess(['/tool'], 1, b'', b'failed'),
+                    subprocess.CompletedProcess(['/tool'], 0, b'x' * (identity.MAX_OUTPUT + 1), b''),
+                    subprocess.CompletedProcess(['/tool'], 0, b'\xff', b''),
+                    subprocess.TimeoutExpired(['/tool'], 30), OSError('missing')]
+        for outcome in outcomes:
+            with self.subTest(kind=type(outcome).__name__):
+                kwargs = {'side_effect': outcome} if isinstance(outcome, Exception) else {'return_value': outcome}
+                with mock.patch.object(identity.subprocess, 'run', **kwargs), \
+                     self.assertRaises(identity.IdentityError):
+                    identity.run(['/tool'])
+
+    def test_fixed_probe_has_no_codegen_analyzer_or_missing_header_fallback(self):
+        for system in ('Linux', 'Windows', 'Darwin'):
+            for language in ('c', 'c++'):
+                argv, source = identity.probe_command('/selected/clang', language, system, '/sdk')
+                self.assertIn('-M', argv)
+                self.assertIn('-MT', argv)
+                self.assertIn('--no-default-config', argv)
+                self.assertIn('-fno-modules', argv)
+                self.assertNotIn('-MG', argv)
+                self.assertNotIn('-MM', argv)
+                self.assertNotIn('--analyze', argv)
+                self.assertNotIn('-c', argv)
+                self.assertNotIn('-o', argv)
+                self.assertNotIn('main(', source)
+                self.assertIn('#include <stdio.h>', source)
+                self.assertEqual('-isysroot' in argv, system == 'Darwin')
+                if system == 'Windows':
+                    self.assertIn('#include <winsock2.h>', source)
+                    self.assertNotIn('#include <unistd.h>', source)
+                else:
+                    self.assertIn('#include <sys/socket.h>', source)
+                if language == 'c++':
+                    self.assertIn('-std=c++17', argv)
+                    self.assertIn('#include <filesystem>', source)
+
+    def test_probe_rejects_unknown_language_platform_and_missing_mac_sdk(self):
+        for arguments in (('/clang', 'c#', 'Linux', None),
+                          ('/clang', 'c', 'unknown', None),
+                          ('/clang', 'c', 'Darwin', None)):
+            with self.subTest(arguments=arguments), self.assertRaises(identity.IdentityError):
+                identity.probe_command(*arguments)
+
+    def test_environment_allowlist_never_captures_credentials(self):
+        result = identity.observed_environment({'ImageOS': 'ubuntu24', 'ImageVersion': '123',
+                    'GITHUB_TOKEN': 'do-not-copy', 'AWS_SECRET_ACCESS_KEY': 'do-not-copy',
+                    'GITHUB_RUN_ID': '456', 'INCLUDE': 'C:/SDK/include', 'HOME': '/private'})
+        self.assertEqual(result, {'ImageOS': 'ubuntu24', 'ImageVersion': '123',
+                                 'GITHUB_RUN_ID': '456', 'INCLUDE': 'C:/SDK/include'})
+
+    def test_ambient_include_overrides_fail_instead_of_changing_the_probe(self):
+        for key in identity.FORBIDDEN_ENV:
+            with self.subTest(key=key), self.assertRaises(identity.IdentityError):
+                identity.checked_environment({key: '/unreviewed'})
+        self.assertEqual(identity.checked_environment({'PATH': '/bin'}), {'PATH': '/bin'})
+
+
+class DocumentTests(unittest.TestCase):
+    def setUp(self):
+        header = {'path': '/sdk/stdio.h', 'resolved_path': '/sdk/stdio.h',
+                  'bytes': 4, 'sha256': 'd' * 64}
+        command = {'argv': ['/tool/cc', '--version'], 'exit_code': 0,
+                   'stdout': 'test compiler version 1', 'stderr': ''}
+        tool = {'file': {**header, 'path': '/tool/cc', 'resolved_path': '/tool/cc'},
+                'version': command, 'target': 'x86_64-test-linux-gnu', 'resource_dir': None}
+        self.document = {
+            'schema': 'codeskeptic-observed-product-identity/v1',
+            'source': {'head': 'a' * 40, 'tree': 'b' * 40,
+                       'collector_sha256': 'c' * 64, 'workflow_sha256': 'd' * 64,
+                       'profiles_sha256': 'e' * 64, 'api_models_sha256': 'f' * 64},
+            'platform': {'system': 'Linux', 'machine': 'x86_64', 'release': 'test-kernel',
+                         'version': 'test-version', 'python': '3.12.0', 'environment': {},
+                         'metadata': {'os_release': {'ID': 'test', 'VERSION_ID': '1'},
+                                      'os_release_file': header,
+                                      'package_query': command}},
+            'tools': {role: copy.deepcopy(tool) for role in identity.TOOL_ROLES},
+            'probes': {}, 'metadata_only': True, 'native_qualified': False,
+            'immutable_image': False, 'product_qualified': False,
+            'external_dependencies': {'sqlite': 'NOT_SELECTED_OR_CAPTURED'},
+        }
+        for role in ('clang', 'clangxx'):
+            self.document['tools'][role]['resource_dir'] = '/tool/resource'
+        for language in ('c', 'c++'):
+            argv, source = identity.probe_command('/tool/cc', language, 'Linux', None)
+            self.document['probes'][language] = {
+                'language': language, 'source_sha256': hashlib.sha256(source.encode()).hexdigest(),
+                'command': {**command, 'argv': argv, 'stdout': 'identity-probe: /sdk/stdio.h\n'},
+                'headers': [copy.deepcopy(header)], 'dependency_count': 1}
+
+    def native_document(self, system):
+        value = copy.deepcopy(self.document)
+        value['platform']['system'] = system
+        query = lambda argv, stdout: {'argv': argv, 'exit_code': 0, 'stdout': stdout, 'stderr': ''}
+        if system == 'Darwin':
+            value['platform']['machine'] = 'arm64'
+            metadata = {
+                'developer_directory': query(['/usr/bin/xcode-select', '-p'], '/Applications/Xcode.app/Contents/Developer'),
+                'sdk_path_query': query(['/usr/bin/xcrun', '--sdk', 'macosx', '--show-sdk-path'], '/sdk'),
+                'sdk_version': query(['/usr/bin/xcrun', '--sdk', 'macosx', '--show-sdk-version'], '14.5'),
+                'sdk_build': query(['/usr/bin/xcrun', '--sdk', 'macosx', '--show-sdk-build-version'], '23F73'),
+                'os_version': query(['/usr/bin/sw_vers', '-productVersion'], '14.8.9'),
+                'os_build': query(['/usr/bin/sw_vers', '-buildVersion'], '23J731'),
+                'sdk_root': '/sdk',
+                'clt_package': query(['/usr/sbin/pkgutil', '--pkg-info', 'com.apple.pkg.CLTools_Executables'], 'version: 15.3'),
+                'xcode_version': query(['/usr/bin/xcodebuild', '-version'], 'Xcode 15.4\nBuild version 15F31d'),
+                'sdk_settings': {'path': '/sdk/SDKSettings.json', 'resolved_path': '/sdk/SDKSettings.json',
+                                 'bytes': 4, 'sha256': 'd' * 64}}
+            header_path = '/sdk/stdio.h'
+        else:
+            environment = {'VSINSTALLDIR': 'C:/VS/', 'VCToolsInstallDir': 'C:/VS/Tools/14.0/',
+                           'VCToolsVersion': '14.0', 'WindowsSdkDir': 'C:/SDK/',
+                           'WindowsSDKVersion': '10.0.1.0/', 'UniversalCRTSdkDir': 'C:/SDK/',
+                           'UCRTVersion': '10.0.1.0', 'INCLUDE': 'C:/VS/Tools/14.0/include;C:/SDK/Include/10.0.1.0/ucrt'}
+            value['platform']['environment'] = environment
+            os_info = {'Caption': 'Microsoft Windows Server 2025 Datacenter', 'Version': '10.0.26100',
+                       'BuildNumber': '26100', 'OSArchitecture': '64-bit'}
+            metadata = {'installation': {'instanceId': 'test', 'installationPath': 'C:/VS',
+                        'installationVersion': '17.14.0', 'productId': 'test-product'},
+                        'locator': {'path': 'C:/Installer/vswhere.exe', 'resolved_path': 'C:/Installer/vswhere.exe',
+                                    'bytes': 4, 'sha256': 'd' * 64},
+                        'selected_roots': {key: environment[key].rstrip('/') for key in
+                                           ('VCToolsInstallDir', 'WindowsSdkDir', 'UniversalCRTSdkDir')},
+                        'versions': {key: environment[key].rstrip('/') for key in
+                                     ('VCToolsVersion', 'WindowsSDKVersion', 'UCRTVersion')},
+                        'os_query': query(['powershell.exe', '-NoProfile', '-NonInteractive', '-Command',
+                                          identity.WINDOWS_OS_QUERY], json.dumps(os_info)), 'os': os_info}
+            header_path = 'C:/SDK/Include/10.0.1.0/ucrt/stdio.h'
+            for role, tool in value['tools'].items():
+                path = 'C:/VS/Tools/14.0/bin/cl.exe' if role in ('cc', 'cxx') else 'C:/LLVM/bin/' + role + '.exe'
+                tool['file'].update(path=path, resolved_path=path)
+                msvc = role in ('cc', 'cxx')
+                tool['version'] = query([path, '/Bv' if msvc else '--version'],
+                                        'Microsoft C/C++ Optimizing Compiler Version 19.0 for x64' if msvc else 'clang version 20.1.8')
+                tool['target'] = None if msvc else 'x86_64-pc-windows-msvc'
+                tool['resource_dir'] = None if msvc else 'C:/LLVM/lib/clang/20'
+        value['platform']['metadata'] = metadata
+        for language, probe in value['probes'].items():
+            role = 'clang' if language == 'c' else 'clangxx'
+            argv, source = identity.probe_command(value['tools'][role]['file']['path'], language,
+                                                   system, metadata.get('sdk_root'))
+            probe['source_sha256'] = hashlib.sha256(source.encode()).hexdigest()
+            probe['command'] = query(argv, 'identity-probe: ' + header_path + '\n')
+            probe['headers'][0].update(path=header_path, resolved_path=header_path)
+        return value
+
+    def test_both_foreign_native_shapes_remain_observations(self):
+        for system in ('Windows', 'Darwin'):
+            with self.subTest(system=system):
+                result = identity.validate_document(self.native_document(system))
+                self.assertFalse(result['native_qualified'])
+                self.assertFalse(result['local_native_bytes_verified'])
+
+    def test_native_query_identity_or_sdk_environment_cannot_be_relabelled(self):
+        for mutation in ('sdk-query', 'sdk-version', 'sdk-settings', 'win-os', 'win-environment'):
+            value = self.native_document('Windows' if mutation.startswith('win') else 'Darwin')
+            metadata = value['platform']['metadata']
+            if mutation == 'sdk-query':
+                metadata['sdk_version']['argv'] = metadata['os_build']['argv']
+            elif mutation == 'sdk-version':
+                metadata['sdk_version']['stdout'] = '/not-a-version'
+            elif mutation == 'sdk-settings':
+                metadata['sdk_settings']['path'] = '/other/SDKSettings.json'
+            elif mutation == 'win-os':
+                metadata['os'], metadata['os_query']['stdout'] = None, 'null'
+            else:
+                value['platform']['environment']['UCRTVersion'] = '9.9.9.9'
+            with self.subTest(mutation=mutation), self.assertRaises(identity.IdentityError):
+                identity.validate_document(value)
+
+    def test_structural_check_is_not_native_or_product_qualification(self):
+        result = identity.validate_document(self.document)
+        self.assertTrue(result['metadata_only'])
+        self.assertFalse(result['local_native_bytes_verified'])
+        self.assertFalse(result['native_qualified'])
+        self.assertFalse(result['immutable_image'])
+        self.assertFalse(result['product_qualified'])
+
+    def test_missing_extra_and_bool_integer_substitutions_fail(self):
+        for key in list(self.document):
+            altered = copy.deepcopy(self.document)
+            del altered[key]
+            with self.subTest(missing=key), self.assertRaises(identity.IdentityError):
+                identity.validate_document(altered)
+        for alteration in ({'extra': True}, {'schema': 'fake'}, {'metadata_only': 1},
+                           {'native_qualified': True}, {'immutable_image': True},
+                           {'product_qualified': 0}):
+            with self.subTest(alteration=alteration), self.assertRaises(identity.IdentityError):
+                identity.validate_document({**self.document, **alteration})
+
+    def test_wrong_source_hash_or_missing_role_or_probe_fails(self):
+        for mutation in ('source', 'role', 'probe', 'header', 'hash', 'bytes', 'count', 'empty-output'):
+            altered = copy.deepcopy(self.document)
+            if mutation == 'source':
+                altered['source']['head'] = '0' * 40
+            elif mutation == 'role':
+                del altered['tools']['cxx']
+            elif mutation == 'probe':
+                del altered['probes']['c++']
+            elif mutation == 'header':
+                altered['probes']['c']['headers'] = []
+            elif mutation == 'hash':
+                altered['probes']['c']['headers'][0]['sha256'] = '0' * 64
+            elif mutation == 'bytes':
+                altered['probes']['c']['headers'][0]['bytes'] = True
+            elif mutation == 'count':
+                altered['probes']['c']['dependency_count'] = 7
+            else:
+                altered['tools']['cc']['version']['stdout'] = ''
+            with self.subTest(mutation=mutation), self.assertRaises(identity.IdentityError):
+                identity.validate_document(altered)
+
+    def test_command_or_probe_source_tampering_is_detected(self):
+        for mutation in ('argv', 'source', 'duplicate', 'language'):
+            altered = copy.deepcopy(self.document)
+            probe = altered['probes']['c']
+            if mutation == 'argv':
+                probe['command']['argv'].append('-MG')
+            elif mutation == 'source':
+                probe['source_sha256'] = 'e' * 64
+            elif mutation == 'duplicate':
+                probe['headers'].append(copy.deepcopy(probe['headers'][0]))
+                probe['dependency_count'] += 1
+            else:
+                probe['language'] = 'c++'
+            with self.subTest(mutation=mutation), self.assertRaises(identity.IdentityError):
+                identity.validate_document(altered)
+
+    def test_malformed_nested_commands_or_event_identity_fail(self):
+        for mutation in ('command', 'runner', 'event', 'version-argv', 'resource'):
+            altered = copy.deepcopy(self.document)
+            if mutation == 'command':
+                altered['probes']['c']['command'] = None
+            elif mutation == 'runner':
+                altered['platform']['environment']['RUNNER_OS'] = 'Windows'
+            elif mutation == 'event':
+                altered['platform']['environment']['GITHUB_SHA'] = 'e' * 40
+            elif mutation == 'version-argv':
+                altered['tools']['cc']['version']['argv'] = ['/different/compiler', '--version']
+            else:
+                altered['tools']['clang']['resource_dir'] = 'relative-resource'
+            with self.subTest(mutation=mutation), self.assertRaises(identity.IdentityError):
+                identity.validate_document(altered)
+
+    def test_check_cli_accepts_metadata_but_rejects_unknown_secret_fields(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'identity.json'
+            path.write_text(json.dumps(self.document))
+            command = [sys.executable, '-B', str(Path(identity.__file__)), 'check', str(path)]
+            result = subprocess.run(command, capture_output=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(json.loads(result.stdout)['product_qualified'])
+            self.document['platform']['environment']['GITHUB_TOKEN'] = 'do-not-copy'
+            path.write_text(json.dumps(self.document))
+            self.assertEqual(subprocess.run(command, capture_output=True, timeout=10).returncode, 2)
+
+    def test_capture_cli_refuses_existing_output_before_executing_any_tool(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'preserved.json'
+            path.write_bytes(b'preserved')
+            command = [sys.executable, '-B', str(Path(identity.__file__)), 'capture',
+                       '--root', directory, '--source-sha', 'a' * 40, '--output', str(path)]
+            for role in identity.TOOL_ROLES:
+                command += ['--' + role, str(Path(directory) / 'not-a-tool')]
+            result = subprocess.run(command, capture_output=True, timeout=10)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(b'output must be new', result.stderr)
+            self.assertEqual(path.read_bytes(), b'preserved')
+
+
+    def test_check_cli_rejects_malformed_and_false_qualification(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'identity.json'
+            path.write_text(json.dumps({**self.document, 'native_qualified': True}))
+            result = subprocess.run([sys.executable, '-B', str(Path(identity.__file__)),
+                                     'check', str(path)], capture_output=True, timeout=10)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(b'IDENTITY_INVALID', result.stderr)
+
+
+class WorkflowTests(unittest.TestCase):
+    def test_identity_lane_has_narrow_push_and_readonly_permissions(self):
+        workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/product-identity.yml').read_text()
+        self.assertIn('branches: [agent/cs3-ch08-s01-u003-frozen-product-profiles]', workflow)
+        self.assertIn('contents: read', workflow)
+        self.assertIn('persist-credentials: false', workflow)
+        self.assertIn('runner: [ubuntu-24.04, windows-2025, macos-14]', workflow)
+        self.assertIn('timeout-minutes: 10', workflow)
+        self.assertIn('path: ${{ runner.temp }}/codeskeptic-product-identity.json', workflow)
+        for forbidden in ('sudo ', 'apt-get ', 'brew install', 'cmake ', 'ctest ',
+                          'git push', 'contents: write', 'id-token: write', 'pull_request_target:'):
+            self.assertNotIn(forbidden, workflow)
+
+
+if __name__ == '__main__':
+    unittest.main()

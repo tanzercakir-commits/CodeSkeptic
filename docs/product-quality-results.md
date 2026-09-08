@@ -103,3 +103,22 @@ Gerçek compiler/SDK/package kimliği ve resource sınırlarının realization/r
 kanıtı ölçümden önce ayrıca gerekir. Eksik SDK hash'i tahmin edilmez; rolling
 runner label veya eski successful job yeni ortamın kanıtı sayılmaz. Hiçbir eski
 measurement, yayın veya imza bu taslakta güncelmiş gibi gösterilmez.
+
+### Native kimlik toplayıcısının yerel hazırlığı
+
+U003 kapsamına üç kesin yol, bağımsız scope incelemesi ve yalnız BOOK/PLAN/TODO
+değiştiren `8f0f243` geçişiyle eklendi. Geçişin kendisi ve dokuz scope negatif/geçiş
+testi bağımsız doğrulandı; PROGRESS, 48 bitmiş kayıt, FIFO ve main korunur.
+
+Yeni collector sabit header dependency probe'ları ve kurulu araç metadata'sını
+okur; kurulum, analyzer build/run, ürün ölçümü veya kabul edilmiş korpus eklemez.
+İlk arayüz yokluğu RED'i ardından yerel testler geçmiştir. Geliştirme sırasında
+Mac SDK sürüm sorgusunu başka komutla etiketleme, sürüm yerine yol, yanlış SDKSettings
+yolu, boş Windows OS kaydı ve tutarsız UCRT ortamı için beş RED kontrolü ayrıca
+üretildi; düzeltme sonrasında reddedilirler. Windows/macOS şema testleri sentetiktir,
+o sistemlerin SDK/ABI davranışının gerçekten çalıştığı iddiası değildir.
+
+Bu checkpoint'te hosted identity gözlemi henüz yoktur. Workflow sadece kurulu Clang'ı
+gözler; LLVM-20/nihai API modeline seçildiği veya native qualification geçtiği
+varsayılmaz. SQLite dependency'si, tam compiler runtime closure'ı, gerçek korpus ve
+dondurulmuş ortam karşılaştırması bu hazırlıkla tamamlanmış sayılmaz.

@@ -1,0 +1,100 @@
+name: Product profile identity observation
+
+# A new workflow_dispatch-only file cannot run off the default branch. This
+# tightly scoped push lane needs no main change. Only the primary may push it.
+on:
+  push:
+    branches: [agent/cs3-ch08-s01-u003-frozen-product-profiles]
+    paths:
+      - .github/workflows/product-identity.yml
+      - scripts/product_identity.py
+      - scripts/test_product_identity.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: product-identity-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    name: Observe ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, windows-2025, macos-14]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Focused metadata tests
+        shell: bash
+        run: python -B -m unittest discover -s scripts -p test_product_identity.py -q
+
+      - name: Observe installed Linux or macOS tools and header dependencies
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            identity_cc=/usr/bin/gcc
+            identity_cxx=/usr/bin/g++
+          else
+            identity_cc=/usr/bin/clang
+            identity_cxx=/usr/bin/clang++
+          fi
+          identity_clang="$(command -v clang)"
+          identity_clangxx="$(command -v clang++)"
+          python3 -B scripts/product_identity.py capture \
+            --root "$GITHUB_WORKSPACE" --source-sha "$GITHUB_SHA" \
+            --cc "$identity_cc" --cxx "$identity_cxx" \
+            --clang "$identity_clang" --clangxx "$identity_clangxx" \
+            --output "$RUNNER_TEMP/codeskeptic-product-identity.json"
+
+      - name: Observe installed MSVC, SDK and Clang header dependencies
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          VSLANG: "1033"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $identityLocator = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $identityVs = & $identityLocator -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if ($LASTEXITCODE -ne 0 -or -not $identityVs) { throw 'No installed x64 VC toolset' }
+          # Configure this process only. No installer, environment file or system change.
+          $identitySetup = Join-Path $identityVs 'VC\Auxiliary\Build\vcvars64.bat'
+          $identityEnvironment = & cmd.exe /s /c "`"$identitySetup`" > NUL 2>&1 && set"
+          if ($LASTEXITCODE -ne 0) { throw 'vcvars64 failed' }
+          foreach ($identityLine in $identityEnvironment) {
+            if ($identityLine -match '^([^=]+)=(.*)$') {
+              [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
+            }
+          }
+          $identityCl = Join-Path $env:VCToolsInstallDir 'bin\Hostx64\x64\cl.exe'
+          $identityClang = (Get-Command clang.exe -ErrorAction Stop).Source
+          $identityClangxx = (Get-Command clang++.exe -ErrorAction Stop).Source
+          python -B scripts/product_identity.py capture `
+            --root "$env:GITHUB_WORKSPACE" --source-sha "$env:GITHUB_SHA" `
+            --cc "$identityCl" --cxx "$identityCl" `
+            --clang "$identityClang" --clangxx "$identityClangxx" `
+            --output "$env:RUNNER_TEMP/codeskeptic-product-identity.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Identity observation failed' }
+
+      - name: Retain only observed metadata, never SDK headers or compiler binaries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: product-identity-${{ matrix.runner }}-${{ github.sha }}
+          path: ${{ runner.temp }}/codeskeptic-product-identity.json
+          if-no-files-found: error
+          retention-days: 30
+
+# Success means the observation file exists. The collector always records
+# native_qualified=false, product_qualified=false and immutable_image=false.
+# Preinstalled Clang selection is observed, NOT a promised LLVM-20 profile.

@@ -106,6 +106,24 @@ sınar; gerçek header/ABI doğrulaması, Clang veri akışı veya korpus kabul�
 Native header closure/hashleri, copy/concat ve C++ overload seçimi, gerçek örnekler ve
 bağımsız etiket incelemesi tamamlanmadan U003 için freeze/PASS yoktur.
 
+`product_identity.py` ayrı, metadata-only bir ön hazırlık toplayıcısıdır. Seçili
+native C/C++ derleyicisi ile header probe'unu yapan Clang rolleri ayrı kaydedilir;
+sürüm/target/resource yolu, binary hash'i, OS/package veya VS/SDK/Xcode/CLT gözlemleri
+ve sabit C17/C++17 include probe'larının gerçek sistem-header bağımlılıkları tutulur.
+Clang `-M` yalnız preprocessing/dependency çıktısı üretir; fixture/analyzer çalıştırmaz.
+SDK header içerikleri/binary'ler dışa aktarılmaz. JSON okuma kontrolü yapısal tutarlılıktır:
+başka host'un gerçek byte'larını doğruladığı, imzalı attestation veya API/ABI hakemliği
+olduğu iddia edilmez. Driver binary hash'i bütün runtime DLL/shared-library closure'ı
+değildir; bu gözlem gerçek proje build seçeneklerini de qualified etmez.
+
+Dar `product-identity.yml` yalnız bu U003 dalındaki üç collector/workflow dosyasına
+yapılan push için tanımlıdır; main, mevcut CI veya kalite kapıları değişmez. Yalnız
+önceden kurulu araçları gözler; stock Clang'ı otomatik LLVM-20 profili diye kabul etmez.
+Rolling runner label/ImageVersion sabit replay garantisi değildir. Gözlemin native,
+ürün ve immutable-image bayrakları daima false; seçilecek SQLite dependency'si açık
+`NOT_SELECTED_OR_CAPTURED` kalır. Bu dosyaların hazırlanması hosted çalıştırma veya
+profil freeze kanıtı değildir. Gerçek native kimlik seçimi/karşılaştırması hâlâ gereklidir.
+
 Argüman indeksleri sıfır tabanlıdır: `printf` format=0, `fprintf`/`sprintf` format=1,
 `snprintf` format=2; formatla veri argümanı ayrıdır. Bu roller
 [glibc çağrı sözleşmelerine](https://sourceware.org/glibc/manual/2.42/html_node/Formatted-Output-Functions.html)
