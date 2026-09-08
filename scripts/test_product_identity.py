@@ -458,9 +458,27 @@ class DocumentTests(unittest.TestCase):
             with self.subTest(mutation=mutation), self.assertRaises(identity.IdentityError):
                 identity.validate_document(altered)
 
+    def test_positive_cli_fixture_uses_canonical_temporary_parent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory).resolve()
+            actual, alias = parent / 'actual', parent / 'temporary alias'
+            actual.mkdir()
+            try:
+                alias.symlink_to(actual, target_is_directory=True)
+            except OSError as error:
+                self.skipTest('host does not allow this temporary alias fixture: ' + str(error))
+            unresolved = alias / 'metadata.json'
+            unresolved.write_text(json.dumps(self.document))
+            result = subprocess.run([sys.executable, '-B', str(Path(identity.__file__)),
+                                     'check', str(unresolved)], capture_output=True, timeout=10)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(b'metadata input must be a bounded absolute regular file', result.stderr)
+            with mock.patch.object(tempfile, 'tempdir', str(alias)):
+                self.test_check_cli_accepts_metadata_but_rejects_unknown_secret_fields()
+
     def test_check_cli_accepts_metadata_but_rejects_unknown_secret_fields(self):
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / 'identity.json'
+            path = Path(directory).resolve() / 'identity.json'
             path.write_text(json.dumps(self.document))
             command = [sys.executable, '-B', str(Path(identity.__file__)), 'check', str(path)]
             result = subprocess.run(command, capture_output=True, timeout=10)
@@ -472,7 +490,7 @@ class DocumentTests(unittest.TestCase):
 
     def test_capture_cli_refuses_existing_output_before_executing_any_tool(self):
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / 'preserved.json'
+            path = Path(directory).resolve() / 'preserved.json'
             path.write_bytes(b'preserved')
             command = [sys.executable, '-B', str(Path(identity.__file__)), 'capture',
                        '--root', directory, '--source-sha', 'a' * 40, '--output', str(path)]
@@ -486,12 +504,12 @@ class DocumentTests(unittest.TestCase):
 
     def test_check_cli_rejects_malformed_and_false_qualification(self):
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / 'identity.json'
+            path = Path(directory).resolve() / 'identity.json'
             path.write_text(json.dumps({**self.document, 'native_qualified': True}))
             result = subprocess.run([sys.executable, '-B', str(Path(identity.__file__)),
                                      'check', str(path)], capture_output=True, timeout=10)
             self.assertEqual(result.returncode, 2)
-            self.assertIn(b'IDENTITY_INVALID', result.stderr)
+            self.assertIn(b'observation must not claim native/product qualification', result.stderr)
 
 
 class WorkflowTests(unittest.TestCase):

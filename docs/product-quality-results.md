@@ -140,7 +140,24 @@ sağlayamayan denemeleri bu RED kanıtı değildir. Native Windows çalışması
 Her lane test ve capture için aynı açık Python yolunu kullanır; Windows yolu
 vcvars PATH değişiminden önce seçilir. Python 3.10 altı ortam baştan reddedilir.
 
-Bu checkpoint'te hosted identity gözlemi henüz yoktur. Workflow sadece kurulu Clang'ı
-gözler; LLVM-20/nihai API modeline seçildiği veya native qualification geçtiği
-varsayılmaz. SQLite dependency'si, tam compiler runtime closure'ı, gerçek korpus ve
-dondurulmuş ortam karşılaştırması bu hazırlıkla tamamlanmış sayılmaz.
+`8890413` bağımsız kısmi incelemesinden sonra yalnız U003 feature dalı normal push
+ile gönderildi; main değişmedi. İlk gerçek metadata çalışması
+[`34286039331`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34286039331)
+başarısızdır: Ubuntu gözlemi başarılı, macOS ve Windows aynı pozitif CLI testinin
+kanonik olmayan geçici dosya yolunda durmuştur. Bu iki lane native capture'a
+ulaşmamıştır. Ham run/job/log ve Ubuntu ZIP/JSON kanıtları exact head/run-attempt'e
+bağlı saklandı; özet SHA-256
+`c6b70e7cfda7363329da4b16a3d0d058676cd69159e50fd2c9087e3ba9d13e7a`.
+İlk ham-log retention denemesinde gh terminal-escape koruması durdurdu; bu ayrı
+yardımcı hata da korunur, CI başarısızlığının nedeni olarak gösterilmez.
+
+Geçici dizin alias'ı ile yerelde aynı pozitif-test RED'i üretildi. CLI testleri
+artık gerçek kanonik geçici yolu kullanır; reader'ın alias/overwrite ret koşulları
+gevşetilmedi. Yanlış qualification negatifi ayrıca ret nedenini doğrular; yanlış
+bir yol nedeniyle erken reddi ürün-güvence kanıtı saymaz. Taze Windows/macOS
+çalışması hâlâ gerekir; eski başarısız run daha sonra PASS diye etiketlenmez.
+
+Workflow sadece kurulu Clang'ı gözler; LLVM-20/nihai API modeline seçildiği veya
+native qualification geçtiği varsayılmaz. SQLite dependency'si, tam compiler
+runtime closure'ı, gerçek korpus ve dondurulmuş ortam karşılaştırması bu hazırlıkla
+tamamlanmış sayılmaz. Otomatik genel CI sonuçları bu dar metadata gözleminden ayrıdır.
