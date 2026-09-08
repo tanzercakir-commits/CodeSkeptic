@@ -296,7 +296,7 @@
     },
     {
       "path": "tests/ResourceBudgetTest.cpp",
-      "sha256": "e5e0a204ea9e3377042b55a48176076053f4624d8256788d490022dcc0b2c37f"
+      "sha256": "8b8a83a5cc4d91a22956957bf107b62fc44f3d154716ce7c5e675842e2933f6c"
     },
     {
       "path": "tests/ResourceDirTest.cpp",

@@ -188,3 +188,22 @@ a separately independently classified prospective successor. All other inputs,
 52 CWE cases, expectations, floors and historical results remain unchanged.
 Native package scans, full hosted gates and exact-head independent review remain
 required; source reasoning or local tests alone do not qualify macOS.
+
+At clean implementation `8ee2c09b2667d5921025d00435f5df45f77df5f6`, read-only
+reviewer `/root/measurement_inputs` independently classified all 127 additive
+Apple-guarded lines and verified all 13 existing test bodies/assertions unchanged.
+The reviewer recomputed the following exact one-row successor before its freeze;
+`/root/gtest_measurement_verifier` separately returned source-readiness PASS.
+Neither review is native execution or whole-task qualification.
+
+| Bound input | Previous SHA-256 | Successor SHA-256 |
+|---|---|---|
+| `tests/ResourceBudgetTest.cpp` | `e5e0a204ea9e3377042b55a48176076053f4624d8256788d490022dcc0b2c37f` | `8b8a83a5cc4d91a22956957bf107b62fc44f3d154716ce7c5e675842e2933f6c` |
+| `regression_inventory.json` | `2d1de674463568b8d9fc7927c1d7d2b4e2b295bc9cb4fbcb63410d5876e69060` | `8eb0230c7c3135816d9aecf37e8d4351be5e943a151443b26e0309d16a69ac9c` |
+| `catalog.json` | `ae87d17d8894cebacf4f56eb5a1fdc0c03249aad9ea4011f8087745d53ba0594` | `ceaf1a23727e5379f55c7fa8baec97e30d29d9897c59f24d543617ba4cfb3681` |
+
+Only that inventory row and the catalog inventory link change. All other 123
+input hashes and all 52 CWE cases match the preceding freeze; no expected
+analyzer output or quality floor changes. Fresh hosted/native measurement must
+use this successor, preserve historical failures and explicitly account for
+any unrelated platform-prerequisite skips as unexecuted, not passed assertions.
