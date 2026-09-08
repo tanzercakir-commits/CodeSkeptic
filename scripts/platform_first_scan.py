@@ -30,6 +30,16 @@ SHA = re.compile(r"[0-9a-f]{40}")
 DIGEST = re.compile(r"[0-9a-f]{64}")
 VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?(?:\+[A-Za-z0-9.-]+)?")
 DEVELOPER_ENV = re.compile(r"INCLUDE|EXTERNAL_INCLUDE|LIB|LIBPATH|DevEnvDir|VSINSTALLDIR|VCINSTALLDIR|VCIDEInstallDir|VCToolsInstallDir|VCToolsVersion|VCToolsRedistDir|WindowsSdkDir|WindowsSDKVersion|WindowsSdkBinPath|WindowsSDKBinVersion|WindowsSDKLibVersion|UniversalCRTSdkDir|UCRTVersion|VSCMD_.*|Framework.*|ExtensionSdkDir", re.I)
+WINDOWS_OS_LOCATORS = ("ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "SystemDrive")
+# One retained failed native build, not a configurable external executable.
+SDK_ARTIFACT_SHA256 = "644407b4102be943aba0e2ccfed99302e42a858b20671de32b182e418028095f"
+SDK_PACKAGE_SHA256 = "261d97c1632afec144b6845b2d24809710866d0356847d0aba51445a77ed1df9"
+SDK_SOURCE = "b459d99feddd8e94a4252312ca03dc247500bbf9"
+SDK_VERSION = "0.4.9-dev+gb459d99feddd"
+SDK_ROOT = "codeskeptic-v" + SDK_VERSION + "-windows-x86_64"
+SDK_PACKAGE_MEMBER = "codeskeptic-platform/" + SDK_ROOT + ".zip"
+SDK_FIXTURE_MEMBER = "codeskeptic-platform/fixtures/c-finding/güvenli_çalışma.c"
+SDK_DATABASE_MEMBER = "codeskeptic-platform/fixtures/c-finding/compile_commands.json"
 
 
 class QualificationError(ValueError):
@@ -247,6 +257,143 @@ def child_environment(home, temporary):
     return environment
 
 
+def windows_locator_environment(base):
+    """Explicit OS-locator profile; never forward PATH or developer overrides."""
+    environment = dict(base)
+    for name in WINDOWS_OS_LOCATORS:
+        values = [v for k, v in os.environ.items() if k.casefold() == name.casefold()]
+        require(len(values) == 1 and 0 < len(values[0]) <= 4096
+                and not any(ord(c) < 32 for c in values[0]), "missing/ambiguous OS locator: " + name)
+        require(not any(k.casefold() == name.casefold() for k in base), "OS locator already in baseline")
+        environment[name] = values[0]
+    return environment
+
+
+def sdk_inputs(archive, output):
+    """Select three exact members only, after verifying the complete historical ZIP."""
+    outer = output / "historical-artifact.zip"
+    snapshot(archive, SDK_ARTIFACT_SHA256, outer)
+    selected, seen, total = {}, set(), 0
+    with zipfile.ZipFile(outer) as package:
+        require(len(package.infolist()) <= MAX_MEMBERS, "diagnostic member count exceeded")
+        for item in package.infolist():
+            name = item.filename.removesuffix("/") if item.is_dir() else item.filename
+            member_path(name, name.split("/")[0], seen)
+            mode = item.external_attr >> 16
+            require(not item.flag_bits & 1 and (not stat.S_IFMT(mode) or stat.S_ISREG(mode) or stat.S_ISDIR(mode)),
+                    "diagnostic encrypted/link/special member")
+            total += item.file_size
+            require(0 <= item.file_size <= MAX_EXPANDED and total <= MAX_EXPANDED, "diagnostic expanded bound exceeded")
+            if name in (SDK_PACKAGE_MEMBER, SDK_FIXTURE_MEMBER, SDK_DATABASE_MEMBER):
+                limit = MAX_ARCHIVE if name == SDK_PACKAGE_MEMBER else MAX_REPORT
+                require(not item.is_dir() and 0 < item.file_size <= limit, "invalid diagnostic input")
+                with package.open(item) as stream:
+                    data = stream.read(limit + 1)
+                require(len(data) == item.file_size, "diagnostic input size mismatch")
+                selected[name] = data
+    require(set(selected) == {SDK_PACKAGE_MEMBER, SDK_FIXTURE_MEMBER, SDK_DATABASE_MEMBER}, "exact diagnostic members missing")
+    require(sha(selected[SDK_PACKAGE_MEMBER]) == SDK_PACKAGE_SHA256, "historical package checksum mismatch")
+    nested = output / (SDK_ROOT + ".zip")
+    write_new(nested, selected[SDK_PACKAGE_MEMBER])
+    return nested, selected[SDK_FIXTURE_MEMBER], selected[SDK_DATABASE_MEMBER]
+
+
+def sdk_arms(binary, source, database, cwd, base, output, version):
+    restored = windows_locator_environment(base)
+    inputs = {str(p): file_hash(p) for p in (binary, source, database)}
+    arms = []
+    for label, env in (("baseline", base), ("os-locators", restored)):
+        report_path = output / (label + "-report.json")
+        arm = {"name": label, "valid_report": False, "execution": None}
+        try:
+            arm["execution"] = execute([str(binary), str(source), "--build-path", str(database.parent),
+                                        "--lang", "en", "--json", str(report_path)], cwd, env, output, label)
+            code = arm["execution"]["exit_code"]
+            require(code in (1, 2), "diagnostic finding input has unexpected exit")
+            arm["verdict"] = validate_report(parse_json(read_regular(report_path)), version, code, "c", source)
+            arm["report_sha256"] = file_hash(report_path)
+            arm["stdio_header_missing"] = b"'stdio.h' file not found" in read_regular(output / (label + ".stderr")) if code == 2 else False
+            arm["valid_report"] = True
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+            arm["error"] = str(error)
+        arms.append(arm)
+        require({p: file_hash(Path(p)) for p in inputs} == inputs, "diagnostic inputs changed between arms")
+    return arms
+
+
+def sdk_diagnostic(args):
+    """Native A/B on a pinned OLD binary; never a qualification of current HEAD."""
+    info = identity(args.source_sha, args.version)
+    require(read_regular(Path(__file__)) == git("show", args.source_sha + ":scripts/platform_first_scan.py"), "helper differs from source")
+    runner = runner_profile()
+    require(runner["system"] == "Windows", "SDK diagnostic requires native Windows")
+    require(args.archive_sha256 == SDK_ARTIFACT_SHA256, "only pinned historical diagnostic artifact allowed")
+    require_hidden_llvm(args)
+    require(os.environ.get("GITHUB_SHA") == args.source_sha, "diagnostic hosted event/source mismatch")
+    require(not os.path.lexists(args.output), "output exists; use fresh diagnostic directory")
+    args.output.mkdir()
+    try:
+        archive, fixture_bytes, original_database_bytes = sdk_inputs(args.archive, args.output)
+        original_database = parse_json(original_database_bytes)
+        require(isinstance(original_database, list) and len(original_database) == 1
+                and isinstance(original_database[0], dict), "historical database shape mismatch")
+        original = original_database[0]
+        require(set(original) == {"directory", "file", "arguments"}
+                and isinstance(original["directory"], str) and isinstance(original["file"], str)
+                and original["arguments"] == ["clang", "-std=c11", "-c", original["file"]], "historical command semantics changed")
+        write_new(args.output / "historical-compile_commands.json", original_database_bytes)
+        source = args.output / "güvenli_çalışma.c"
+        database = args.output / "compile_commands.json"
+        write_new(source, fixture_bytes)
+        # Same archived source bytes and original command semantics, rebased once
+        # to this runner's fresh path; no SDK/include flags in either arm.
+        write_new(database, canonical([{"directory": str(args.output), "file": str(source),
+                                       "arguments": ["clang", "-std=c11", "-c", str(source)]}]))
+        with tempfile.TemporaryDirectory(prefix="codeskeptic SDK comparison ") as temporary:
+            cwd = Path(temporary)
+            package = extract(archive, cwd, SDK_ROOT)
+            binary = package / "bin/codeskeptic.exe"
+            binary_digest = sha(read_regular(binary, MAX_ARCHIVE))
+            home, temp = cwd / "home", cwd / "temporary"
+            home.mkdir(); temp.mkdir()
+            base = child_environment(home, temp)
+            version = execute([str(binary), "--version"], cwd, base, args.output, "version", 15)
+            require(version["exit_code"] == 0 and (args.output / "version.stdout").read_text().strip() == "CodeSkeptic " + SDK_VERSION,
+                    "historical executable version mismatch")
+            arms = sdk_arms(binary, source, database, cwd, base, args.output, SDK_VERSION)
+            require(file_hash(binary) == binary_digest and file_hash(archive) == SDK_PACKAGE_SHA256,
+                    "historical artifact changed during diagnostic")
+        result = {"schema": "codeskeptic-windows-sdk-diagnostic/v1", "purpose": "historical binary environment A/B; not qualification",
+                  "diagnostic_source": info, "binary_source": SDK_SOURCE, "binary_version": SDK_VERSION,
+                  "runner": runner, "historical_run_id": "34217016638", "historical_artifact_id": "10052976442",
+                  "artifact_sha256": SDK_ARTIFACT_SHA256, "package_sha256": SDK_PACKAGE_SHA256,
+                  "binary_sha256": binary_digest, "fixture_sha256": file_hash(source), "database_sha256": file_hash(database),
+                  "historical_database_sha256": sha(original_database_bytes),
+                  "added_os_locators": {k: v for k, v in windows_locator_environment({}).items()},
+                  "baseline_environment_keys": sorted(base), "child_path": base["PATH"],
+                  "baseline_environment_sha256": sha(canonical(base)),
+                  "os_locators_environment_sha256": sha(canonical(windows_locator_environment(base))),
+                  "llvm_original": str(args.llvm_original), "llvm_hidden": str(args.llvm_hidden), "arms": arms,
+                  "baseline_failure_then_locator_finding": all(a["valid_report"] for a in arms)
+                      and [a["execution"]["exit_code"] for a in arms] == [2, 1]
+                      and arms[0].get("stdio_header_missing") is True}
+        require(identity(args.source_sha, args.version) == info, "diagnostic source changed")
+        write_new(args.output / "sdk-diagnostic.json", canonical(result))
+        require(result["baseline_failure_then_locator_finding"], "OS-locator hypothesis not established; no qualification fallback")
+        print("SDK_DIAGNOSTIC_OBSERVED baseline=2 os-locators=1 historical-source=" + SDK_SOURCE)
+        return result
+    except BaseException as error:
+        write_new(args.output / "diagnostic-failure.json", canonical({"diagnostic_source_sha": args.source_sha,
+                  "binary_source": SDK_SOURCE, "error": str(error), "purpose": "diagnostic; not qualification"}))
+        raise
+
+
+def require_hidden_llvm(args):
+    require(args.llvm_original.is_absolute() and args.llvm_hidden.is_absolute()
+            and args.llvm_original != args.llvm_hidden and not os.path.lexists(args.llvm_original)
+            and args.llvm_hidden.is_dir() and not args.llvm_hidden.is_symlink(), "known LLVM installation must be hidden by caller")
+
+
 def execute(argv, cwd, environment, output, label, timeout=60):
     result = {"argv": [str(a) for a in argv], "cwd": str(cwd), "timeout_seconds": timeout,
               "exit_code": None, "timed_out": False}
@@ -332,10 +479,10 @@ def qualify(args):
     info = identity(args.source_sha, args.version)
     require(read_regular(Path(__file__)) == git("show", args.source_sha + ":scripts/platform_first_scan.py"), "helper differs from source")
     runner = runner_profile()
-    require(args.llvm_original.is_absolute() and args.llvm_hidden.is_absolute()
-            and args.llvm_original != args.llvm_hidden and not os.path.lexists(args.llvm_original)
-            and args.llvm_hidden.is_dir() and not args.llvm_hidden.is_symlink(), "known LLVM installation must be hidden by caller")
-    require(DIGEST.fullmatch(args.source_binary_sha256), "source binary SHA-256 required")
+    require_hidden_llvm(args)
+    require(isinstance(args.source_binary_sha256, str) and DIGEST.fullmatch(args.source_binary_sha256), "source binary SHA-256 required")
+    os_locators = getattr(args, "windows_os_locators", False)
+    require(not os_locators or runner["system"] == "Windows", "OS-locator profile is Windows-only")
     root_name = "codeskeptic-v" + args.version + "-" + runner["target"]
     extension = ".zip" if runner["system"] == "Windows" else ".tar.gz"
     require(args.archive.name == root_name + extension, "archive filename/source/platform mismatch")
@@ -366,6 +513,8 @@ def qualify(args):
             home, temp = extraction / "home", extraction / "temporary"
             home.mkdir(); temp.mkdir()
             env = child_environment(home, temp)
+            if os_locators:
+                env = windows_locator_environment(env)
             version_result = execute([str(binary), "--version"], extraction, env, scans, "version", 15)
             require(version_result["exit_code"] == 0 and (scans / "version.stdout").read_text().strip() == "CodeSkeptic " + args.version,
                     "packaged native version mismatch")
@@ -411,6 +560,7 @@ def qualify(args):
                                "resource_major": headers[0].parent.parent.name, "version": args.version},
                   "profile": {"llvm_original": str(args.llvm_original), "llvm_hidden": str(args.llvm_hidden),
                               "developer_environment": "excluded from native children", "native_installation_hidden": True,
+                              "windows_os_locators": {k: env[k] for k in WINDOWS_OS_LOCATORS} if os_locators else {},
                               "sdk": "host-provided Windows SDK/MSVC or Apple CLT; not a toolchain-free OS",
                               "network": "hosted setup may download toolchain; helper makes no network calls",
                               "signing": "no publisher signing/notarization claim; macOS may have local ad-hoc signature",
@@ -430,15 +580,22 @@ def main():
     parser.add_argument("--archive-sha256", required=True)
     parser.add_argument("--source-sha", required=True)
     parser.add_argument("--version", required=True)
-    parser.add_argument("--source-binary-sha256", required=True)
+    parser.add_argument("--source-binary-sha256")
+    parser.add_argument("--sdk-diagnostic", action="store_true")
+    parser.add_argument("--windows-os-locators", action="store_true")
     parser.add_argument("--llvm-original", type=Path, required=True)
     parser.add_argument("--llvm-hidden", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     try:
-        qualify(args)
+        require(not (args.sdk_diagnostic and args.windows_os_locators), "diagnostic controls both environment arms itself")
+        if args.sdk_diagnostic:
+            sdk_diagnostic(args)
+        else:
+            qualify(args)
     except (OSError, ValueError, RuntimeError, tarfile.TarError, zipfile.BadZipFile, subprocess.SubprocessError) as error:
-        parser.exit(1, "PLATFORM_FIRST_SCAN_FAIL " + str(error) + "\n")
+        label = "SDK_DIAGNOSTIC_FAIL " if args.sdk_diagnostic else "PLATFORM_FIRST_SCAN_FAIL "
+        parser.exit(1, label + str(error) + "\n")
 
 
 if __name__ == "__main__":

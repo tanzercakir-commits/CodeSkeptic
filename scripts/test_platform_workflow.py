@@ -282,7 +282,7 @@ class NativeEvidenceTests(unittest.TestCase):
         self.assertTrue(receipt["timed_out"])
         self.assertIsNone(receipt["exit_code"])
 
-    def synthetic_qualification(self, failed_case=None):
+    def synthetic_qualification(self, failed_case=None, os_locators=False):
         version = "0.4.9-dev+g0123456789ab"
         root = "codeskeptic-v" + version + "-windows-x86_64"
         archive = self.work / (root + ".zip")
@@ -298,7 +298,7 @@ class NativeEvidenceTests(unittest.TestCase):
         args = argparse.Namespace(archive=archive, archive_sha256=native.file_hash(archive), source_sha=source,
                                   version=version, source_binary_sha256=native.sha(binary),
                                   llvm_original=self.work / "llvm-original", llvm_hidden=hidden,
-                                  output=self.work / "evidence")
+                                  output=self.work / "evidence", windows_os_locators=os_locators)
         def execution(argv, cwd, env, output, label, timeout=60):
             if label == "version":
                 data, code = ("CodeSkeptic " + version + "\n").encode(), 0
@@ -347,6 +347,170 @@ class NativeEvidenceTests(unittest.TestCase):
         self.assertFalse((output / "result.json").exists())
         self.assertEqual(json.loads((output / "scans/cpp-finding.command.json").read_bytes())["exit_code"], 7)
         self.assertTrue(list(output.glob("*.zip")))
+
+    def test_explicit_locator_profile_still_requires_all_six_cases(self):
+        locators = {name: "C:" for name in native.WINDOWS_OS_LOCATORS}
+        with patch.dict(os.environ, locators):
+            result, _ = self.synthetic_qualification(os_locators=True)
+        self.assertEqual(result["profile"]["windows_os_locators"], locators)
+        self.assertEqual([r["execution"]["exit_code"] for r in result["cases"]], [0, 1, 2, 0, 1, 2])
+
+
+class WindowsSdkDiagnosticTests(unittest.TestCase):
+    setUp = NativeEvidenceTests.setUp
+
+    def test_only_four_os_locators_added_to_existing_isolation(self):
+        locators = {"ProgramFiles": r"C:\Program Files", "ProgramFiles(x86)": r"C:\Program Files (x86)",
+                    "ProgramW6432": r"C:\Program Files", "SystemDrive": "C:"}
+        with patch.dict(os.environ, {**locators, "INCLUDE": "forbidden", "GH_TOKEN": "forbidden",
+                                     "PATH": "developer-path"}, clear=True):
+            base = native.child_environment(self.work / "home", self.work / "temp")
+            restored = native.windows_locator_environment(base)
+        self.assertEqual(restored, {**base, **locators})
+        self.assertNotIn("ProgramFiles", base)
+        self.assertNotIn("GH_TOKEN", restored)
+        self.assertNotIn("INCLUDE", restored)
+        self.assertEqual(base["PATH"], restored["PATH"])
+
+    def test_missing_locator_is_not_silently_invented(self):
+        with patch.dict(os.environ, {}, clear=True), self.assertRaisesRegex(ValueError, "OS locator"):
+            native.windows_locator_environment({"PATH": "isolated"})
+
+    def test_arms_keep_inputs_and_capture_failure_without_qualification_pass(self):
+        binary, source, database = (self.work / name for name in ("binary", "güvenli_çalışma.c", "compile_commands.json"))
+        for path in (binary, source, database):
+            path.write_bytes(b"fixed synthetic input")
+        environments, calls = [], []
+        version = "0.4.9-dev+g0123456789ab"
+        def execution(argv, cwd, env, output, label, timeout=60):
+            environments.append(env); calls.append((argv, cwd))
+            code = 2 if label == "baseline" else 1
+            report = NativeEvidenceTests.report(code, str(source))
+            Path(argv[-1]).write_bytes(native.canonical(report))
+            (output / (label + ".stderr")).write_bytes(b"fatal error: 'stdio.h' file not found" if code == 2 else b"")
+            return {"exit_code": code, "timed_out": False}
+        with patch.object(native, "windows_locator_environment", side_effect=lambda e: {**e, "SystemDrive": "C:"}), \
+                patch.object(native, "execute", side_effect=execution):
+            result = native.sdk_arms(binary, source, database, self.work, {"PATH": "isolated"}, self.work, version)
+        self.assertEqual([arm["execution"]["exit_code"] for arm in result], [2, 1])
+        self.assertEqual(calls[0][0][:-1], calls[1][0][:-1])
+        self.assertEqual(calls[0][1], calls[1][1])
+        self.assertEqual(environments[1], {**environments[0], "SystemDrive": "C:"})
+        self.assertEqual([arm["valid_report"] for arm in result], [True, True])
+        self.assertFalse((self.work / "result.json").exists())
+
+    def test_arm_timeout_or_invalid_report_does_not_skip_other_arm(self):
+        for failure in ("timeout", "malformed", "unexpected-clean"):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory(dir=self.work) as folder:
+                work = Path(folder)
+                binary, source, database = (work / name for name in ("binary", "source.c", "compile_commands.json"))
+                for path in (binary, source, database):
+                    path.write_bytes(b"fixed")
+                calls = []
+                def execution(argv, cwd, env, output, label, timeout=60):
+                    calls.append(label)
+                    if label == "baseline" and failure == "timeout":
+                        raise native.QualificationError("native command timed out")
+                    code = 0 if label == "baseline" and failure == "unexpected-clean" else 2
+                    data = b"invalid" if label == "baseline" and failure == "malformed" else native.canonical(NativeEvidenceTests.report(code, str(source)))
+                    Path(argv[-1]).write_bytes(data)
+                    (output / (label + ".stderr")).write_bytes(b"fatal error: 'stdio.h' file not found")
+                    return {"exit_code": code, "timed_out": False}
+                with patch.object(native, "windows_locator_environment", side_effect=dict), patch.object(native, "execute", side_effect=execution):
+                    result = native.sdk_arms(binary, source, database, work, {}, work, "0.4.9-dev+g0123456789ab")
+                self.assertEqual(calls, ["baseline", "os-locators"])
+                self.assertFalse(result[0]["valid_report"])
+                self.assertTrue(result[1]["valid_report"])
+
+    def test_historical_archive_selection_and_digest_rejection(self):
+        package = b"synthetic nested archive"
+        archive = self.work / "artifact.zip"
+        entries = [(native.SDK_PACKAGE_MEMBER, package), (native.SDK_FIXTURE_MEMBER, b"same source"),
+                   (native.SDK_DATABASE_MEMBER, b"same database")]
+        def select(values, *, outer_digest=None, nested_digest=None):
+            with zipfile.ZipFile(archive, "w") as z:
+                for name, data in values:
+                    z.writestr(name, data)
+            with tempfile.TemporaryDirectory(dir=self.work) as folder, \
+                    patch.object(native, "SDK_ARTIFACT_SHA256", outer_digest or native.file_hash(archive)), \
+                    patch.object(native, "SDK_PACKAGE_SHA256", nested_digest or native.sha(package)):
+                path, source, db = native.sdk_inputs(archive, Path(folder))
+                self.assertEqual(path.read_bytes(), package)
+                self.assertEqual((source, db), (b"same source", b"same database"))
+        select(entries)
+        with self.assertRaisesRegex(ValueError, "checksum"):
+            select(entries, outer_digest="0" * 64)
+        with self.assertRaisesRegex(ValueError, "checksum"):
+            select(entries, nested_digest="0" * 64)
+        with self.assertRaisesRegex(ValueError, "missing"):
+            select(entries[:-1])
+        with self.assertRaisesRegex(ValueError, "case-colliding"):
+            select(entries + [(native.SDK_PACKAGE_MEMBER.upper(), package)])
+        with self.assertRaisesRegex(ValueError, "unsafe"):
+            select(entries + [("root/../escape", b"no")])
+
+    def synthetic_diagnostic(self, work, second_code=1, missing_stdio=True):
+        inner = io.BytesIO()
+        with zipfile.ZipFile(inner, "w") as z:
+            z.writestr(native.SDK_ROOT + "/bin/codeskeptic.exe", b"synthetic; never executed")
+        archive = work / "outer.zip"
+        with zipfile.ZipFile(archive, "w") as z:
+            z.writestr(native.SDK_PACKAGE_MEMBER, inner.getvalue())
+            z.writestr(native.SDK_FIXTURE_MEMBER, b"same archived source")
+            z.writestr(native.SDK_DATABASE_MEMBER, native.canonical([{"directory": "old", "file": "old/source.c",
+                        "arguments": ["clang", "-std=c11", "-c", "old/source.c"]}]))
+        hidden = work / "hidden"
+        hidden.mkdir()
+        current_sha = "1" * 40
+        args = argparse.Namespace(source_sha=current_sha, version="0.4.9-dev+g111111111111", archive=archive,
+                                  archive_sha256=native.file_hash(archive), llvm_original=work / "original",
+                                  llvm_hidden=hidden, output=work / "evidence")
+        def execution(argv, cwd, env, output, label, timeout=60):
+            if label == "version":
+                (output / "version.stdout").write_text("CodeSkeptic " + native.SDK_VERSION + "\n")
+                return {"exit_code": 0, "timed_out": False}
+            code = 2 if label == "baseline" else second_code
+            report = NativeEvidenceTests.report(code, str(Path(argv[1]).resolve()))
+            report["tool_version"] = native.SDK_VERSION
+            Path(argv[-1]).write_bytes(native.canonical(report))
+            (output / (label + ".stderr")).write_bytes(b"'stdio.h' file not found" if missing_stdio else b"different error")
+            return {"exit_code": code, "timed_out": False}
+        info = {"sha": current_sha, "version": args.version}
+        with patch.object(native, "identity", return_value=info), \
+                patch.object(native, "git", return_value=Path(native.__file__).read_bytes()), \
+                patch.object(native, "runner_profile", return_value={"system": "Windows", "target": "windows-x86_64"}), \
+                patch.object(native, "SDK_ARTIFACT_SHA256", args.archive_sha256), \
+                patch.object(native, "SDK_PACKAGE_SHA256", native.sha(inner.getvalue())), \
+                patch.object(native, "execute", side_effect=execution), patch.object(native, "qualify") as qualify, \
+                patch.dict(os.environ, {"GITHUB_SHA": current_sha, **{k: "C:" for k in native.WINDOWS_OS_LOCATORS}}), \
+                contextlib.redirect_stdout(io.StringIO()):
+            if second_code == 1 and missing_stdio:
+                result = native.sdk_diagnostic(args)
+            else:
+                with self.assertRaisesRegex(ValueError, "hypothesis not established"):
+                    native.sdk_diagnostic(args)
+                result = json.loads((args.output / "sdk-diagnostic.json").read_bytes())
+                self.assertTrue((args.output / "diagnostic-failure.json").is_file())
+            qualify.assert_not_called()
+        self.assertFalse((args.output / "result.json").exists())
+        self.assertNotIn("result", result)
+        self.assertEqual(result["schema"], "codeskeptic-windows-sdk-diagnostic/v1")
+        self.assertEqual(result["diagnostic_source"]["sha"], current_sha)
+        self.assertEqual(result["binary_source"], native.SDK_SOURCE)
+        self.assertNotEqual(result["diagnostic_source"]["sha"], result["binary_source"])
+        self.assertEqual(result["historical_database_sha256"], native.file_hash(args.output / "historical-compile_commands.json"))
+        self.assertNotEqual(result["historical_database_sha256"], result["database_sha256"])
+        return result
+
+    def test_full_diagnostic_cannot_qualify_old_binary_as_current(self):
+        result = self.synthetic_diagnostic(self.work)
+        self.assertTrue(result["baseline_failure_then_locator_finding"])
+
+    def test_both_failed_unexpected_clean_and_wrong_red_do_not_establish_hypothesis(self):
+        for code, stdio in ((2, True), (0, True), (1, False)):
+            with self.subTest(code=code, stdio=stdio), tempfile.TemporaryDirectory(dir=self.work) as folder:
+                result = self.synthetic_diagnostic(Path(folder), code, stdio)
+                self.assertFalse(result["baseline_failure_then_locator_finding"])
 
 
 class CheckpointTimeTests(unittest.TestCase):
@@ -441,12 +605,12 @@ class RoutingTests(unittest.TestCase):
     def test_candidate_has_read_token_no_release_dependency_or_writers(self):
         job = self.workflow["jobs"]["candidate-native"]
         self.assertEqual(job["if"], "github.event_name == 'push' && github.ref == 'refs/heads/agent/cs3-ch06-s02-u002-platform-support'")
-        self.assertEqual(job["permissions"], {"contents": "read"})
+        self.assertEqual(job["permissions"], {"contents": "read", "actions": "read"})
         self.assertNotIn("needs", job)
         self.assertFalse(job["strategy"]["fail-fast"])
         self.assertEqual(job["timeout-minutes"], 90)
         text = json.dumps(job)
-        for forbidden in ("gh release", "git push", "git tag", "refs/status", "refs/ci-logs", "GH_TOKEN", "secrets."):
+        for forbidden in ("gh release", "git push", "git tag", "refs/status", "refs/ci-logs", "secrets."):
             self.assertNotIn(forbidden, text)
         checkout = next(step for step in job["steps"] if step.get("uses") == "actions/checkout@v4")
         self.assertFalse(checkout["with"]["persist-credentials"])
@@ -460,7 +624,30 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(upload["with"]["retention-days"], 14)
         self.assertEqual(upload["with"]["if-no-files-found"], "error")
         self.assertIn("${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}", upload["with"]["name"])
-        self.assertEqual(upload["with"]["path"].splitlines(), ["${{ runner.temp }}/codeskeptic-platform/", "${{ runner.temp }}/codeskeptic-native-build/"])
+        self.assertEqual(upload["with"]["path"].splitlines(), ["${{ runner.temp }}/codeskeptic-platform/", "${{ runner.temp }}/codeskeptic-native-build/", "${{ runner.temp }}/codeskeptic-sdk-diagnostic/"])
+
+    def test_sdk_diagnostic_precedes_build_and_token_is_download_only(self):
+        steps = self.workflow["jobs"]["candidate-native"]["steps"]
+        download = next(s for s in steps if s.get("name") == "Download pinned Windows diagnostic artifact")
+        compare = next(s for s in steps if s.get("name") == "Compare Windows OS locators on exact historical package")
+        build = next(s for s in steps if s.get("name") == "Windows configure, build and full tests")
+        self.assertLess(steps.index(download), steps.index(compare))
+        self.assertLess(steps.index(compare), steps.index(build))
+        self.assertEqual(download["env"], {"GH_TOKEN": "${{ github.token }}"})
+        self.assertIn("/repos/tanzercakir-commits/CodeSkeptic/actions/artifacts/10052976442/zip", download["run"])
+        for step in (download, compare):
+            self.assertEqual(step["if"], "runner.os == 'Windows'")
+            self.assertNotIn("continue-on-error", step)
+            self.assertIn(native.SDK_ARTIFACT_SHA256, step["run"])
+        self.assertIn("} finally {", compare["run"])
+        self.assertIn("--sdk-diagnostic", compare["run"])
+        for step in steps:
+            if step is not download:
+                self.assertNotIn("GH_TOKEN", json.dumps(step))
+                self.assertNotIn("github.token", json.dumps(step))
+        for step in steps:
+            if step.get("name", "").startswith("Exact "):
+                self.assertEqual("--windows-os-locators" in step["run"], "Windows" in step["name"])
 
     def test_candidate_checkout_preserves_blob_line_endings(self):
         environment = self.workflow["jobs"]["candidate-native"].get("env", {})

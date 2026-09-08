@@ -424,6 +424,7 @@ jobs:
     name: candidate-native (${{ matrix.target }})
     permissions:
       contents: read
+      actions: read  # fixed same-repository diagnostic artifact download only
     # Match Git blobs byte-for-byte, including on Windows. Runtime-only Git
     # configuration; no global or repository configuration file is changed.
     env:
@@ -448,6 +449,37 @@ jobs:
       - name: Setup MSVC and LLVM (explicit cache or upstream download)
         if: runner.os == 'Windows'
         uses: ./.github/actions/setup-msvc-llvm
+
+      # Temporary, fail-closed A/B of the retained failed binary; not a package
+      # qualification or a permanent dependency on an expiring historical run.
+      - name: Download pinned Windows diagnostic artifact
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'codeskeptic-sdk-historical.zip'
+          if (Test-Path $archive) { throw 'diagnostic archive path already exists' }
+          curl.exe --fail --silent --show-error --location --max-time 180 --max-filesize 33554432 --header "Authorization: Bearer $env:GH_TOKEN" --header 'Accept: application/vnd.github+json' --output $archive 'https://api.github.com/repos/tanzercakir-commits/CodeSkeptic/actions/artifacts/10052976442/zip'
+          if ($LASTEXITCODE -ne 0) { throw 'pinned historical artifact unavailable; diagnostic cannot run' }
+          $digest = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($digest -ne '644407b4102be943aba0e2ccfed99302e42a858b20671de32b182e418028095f') { throw 'historical artifact checksum mismatch' }
+
+      - name: Compare Windows OS locators on exact historical package
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $original = 'C:\llvm'
+          $hidden = 'C:\codeskeptic-qualification-llvm-hidden'
+          if ((Test-Path $hidden) -or -not (Test-Path $original -PathType Container)) { throw 'unsafe LLVM hide paths' }
+          Move-Item -LiteralPath $original -Destination $hidden
+          try {
+            $version = '0.4.9-dev+g' + $env:GITHUB_SHA.Substring(0, 12)
+            python -B scripts/platform_first_scan.py --sdk-diagnostic --archive "$env:RUNNER_TEMP/codeskeptic-sdk-historical.zip" --archive-sha256 '644407b4102be943aba0e2ccfed99302e42a858b20671de32b182e418028095f' --source-sha $env:GITHUB_SHA --version $version --llvm-original $original --llvm-hidden $hidden --output "$env:RUNNER_TEMP/codeskeptic-sdk-diagnostic"
+            if ($LASTEXITCODE -ne 0) { throw 'OS-locator hypothesis not established; fresh Windows build not started' }
+          } finally {
+            Move-Item -LiteralPath $hidden -Destination $original -ErrorAction Stop
+          }
 
       - name: Setup macOS LLVM 20 (explicit Homebrew download)
         if: runner.os == 'macOS'
@@ -517,7 +549,7 @@ jobs:
           if ((Test-Path $hidden) -or -not (Test-Path $original -PathType Container)) { throw 'unsafe LLVM hide paths' }
           Move-Item -LiteralPath $original -Destination $hidden
           try {
-            python -B scripts/platform_first_scan.py --archive $archives[0].FullName --archive-sha256 $archiveDigest --source-sha $env:GITHUB_SHA --version $version --source-binary-sha256 $binaryDigest --llvm-original $original --llvm-hidden $hidden --output "$env:RUNNER_TEMP/codeskeptic-platform"
+            python -B scripts/platform_first_scan.py --windows-os-locators --archive $archives[0].FullName --archive-sha256 $archiveDigest --source-sha $env:GITHUB_SHA --version $version --source-binary-sha256 $binaryDigest --llvm-original $original --llvm-hidden $hidden --output "$env:RUNNER_TEMP/codeskeptic-platform"
             if ($LASTEXITCODE -ne 0) { throw 'Windows artifact qualification failed' }
           } finally {
             Move-Item -LiteralPath $hidden -Destination $original -ErrorAction Stop
@@ -559,6 +591,7 @@ jobs:
           path: |
             ${{ runner.temp }}/codeskeptic-platform/
             ${{ runner.temp }}/codeskeptic-native-build/
+            ${{ runner.temp }}/codeskeptic-sdk-diagnostic/
           if-no-files-found: error
           retention-days: 14
           compression-level: 0

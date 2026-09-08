@@ -46,6 +46,37 @@ and downloaded archive digest. A missing runner, artifact, signer or authority
 stays an explicit limitation/blocker; do not infer release or main-integration
 permission from feature-branch synchronization.
 
+### Measured failures and the bounded SDK comparison
+
+The first candidate run `34217016638` at
+`b459d99feddd8e94a4252312ca03dc247500bbf9` failed on both native platforms.
+Windows passed build/full tests/package and the C intrinsic-header clean scan,
+but its C finding scan could not find `stdio.h` in the isolated child environment
+(exit 2, no analyzed translation unit). macOS failed to compile the file-clock
+timestamp conversion; the lossless wide-integer correction has local regression
+evidence but still needs a fresh native run. Neither old failure is qualified.
+
+A temporary Windows pre-build comparison reuses only that exact retained package
+(artifact `10052976442`, full outer and nested SHA-256 pinned in the helper).
+It preserves the archived C finding source and command semantics, recording the
+original and rebased database digests. With build LLVM hidden, both arms use the
+same binary, inputs, working directory, fresh HOME/TMP and system-only PATH.
+Arm B adds only `ProgramFiles`, `ProgramFiles(x86)`, `ProgramW6432`, `SystemDrive`;
+developer variables, SDK overrides and credentials remain excluded. Arm A must
+reproduce the missing-stdio failure, and B must yield complete supported findings.
+Otherwise the experiment fails explicitly before the expensive Windows rebuild.
+This tests the sufficiency of the locator set on that runner, not which member
+is necessary, nor every machine's SDK discovery.
+
+The comparison has a separate `codeskeptic-windows-sdk-diagnostic/v1` record,
+distinguishing current helper source from the historical executable source.
+It never emits a platform qualification PASS. Only after that observation may
+the fresh candidate use the explicit OS-locator profile, still requiring all six
+unchanged C/C++ scans and full tests. The frozen no-developer-prompt Windows guard
+remains separate and unchanged. Missing/expired historical input is an explicit
+diagnostic failure; this temporary wiring must not become a permanent release
+dependency. No successful native SDK comparison is claimed before its actual run.
+
 ## Historical support foundation
 
 The following landed/working statements describe earlier editions and their
