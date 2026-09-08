@@ -36,7 +36,12 @@ jobs:
 
       - name: Focused metadata tests
         shell: bash
-        run: python -B -m unittest discover -s scripts -p test_product_identity.py -q
+        run: |
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            python -B -m unittest discover -s scripts -p test_product_identity.py -q
+          else
+            python3 -B -m unittest discover -s scripts -p test_product_identity.py -q
+          fi
 
       - name: Observe installed Linux or macOS tools and header dependencies
         if: runner.os != 'Windows'

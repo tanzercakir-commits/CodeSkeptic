@@ -82,6 +82,23 @@ def observed_environment(environment):
     return {key: environment[key] for key in ENV_KEYS if key in environment}
 
 
+def linux_package_command(tool):
+    require(type(tool) is str and PurePosixPath(tool).is_absolute(), 'package tool path')
+    if PurePosixPath(tool).name == 'dpkg-query':
+        return [tool, '-W', '-f=${binary:Package}\t${Version}\t${db:Status-Status}\n',
+                'libc6', 'libc6-dev', 'gcc-*', 'g++-*', 'libstdc++*-dev']
+    require(PurePosixPath(tool).name == 'rpm', 'unrecognized native package query tool')
+    return [tool, '-q', 'glibc', 'glibc-headers', 'glibc-devel',
+            'gcc', 'gcc-c++', 'libstdc++', 'libstdc++-devel']
+
+
+def requires_xcode_version(developer):
+    require(nonempty(developer) and PurePosixPath(developer).is_absolute(), 'active developer directory')
+    # Only the explicit standalone CLT location omits Xcode. Other selections,
+    # including a nonstandard/aliased Xcode path, must query instead of guessing.
+    return PurePosixPath(developer) != PurePosixPath('/Library/Developer/CommandLineTools')
+
+
 def run(argv, source=None, allowed=(0,), cwd=None):
     """Trusted fixed metadata commands, with timeout and post-capture size limits.
 
@@ -208,14 +225,8 @@ def native_metadata(system):
         release = platform.freedesktop_os_release()
         package_tool = shutil.which('dpkg-query') or shutil.which('rpm')
         require(package_tool, 'native package metadata tool missing')
-        if Path(package_tool).name == 'dpkg-query':
-            argv = [package_tool, '-W', '-f=${binary:Package}\t${Version}\t${db:Status-Status}\n',
-                    'libc6', 'libc6-dev', 'gcc-*', 'g++-*', 'libstdc++*-dev']
-        else:
-            argv = [package_tool, '-q', 'glibc', 'glibc-headers', 'glibc-devel',
-                    'gcc', 'gcc-c++', 'libstdc++', 'libstdc++-devel']
         return {'os_release': release, 'os_release_file': file_identity(Path('/etc/os-release')),
-                'package_query': run(argv, allowed=(0, 1))}
+                'package_query': run(linux_package_command(package_tool), allowed=(0, 1))}
     if system == 'Darwin':
         result = {key: run(argv) for key, argv in DARWIN_QUERIES.items()}
         result['sdk_root'] = result['sdk_path_query']['stdout'].strip()
@@ -223,7 +234,7 @@ def native_metadata(system):
                                      'com.apple.pkg.CLTools_Executables'], allowed=(0, 1))
         developer = result['developer_directory']['stdout'].strip()
         result['xcode_version'] = (run(['/usr/bin/xcodebuild', '-version'])
-                                   if '.app/Contents/Developer' in developer else None)
+                                   if requires_xcode_version(developer) else None)
         settings = Path(result['sdk_root']) / 'SDKSettings.json'
         result['sdk_settings'] = file_identity(settings if settings.is_file()
                                                else settings.with_suffix('.plist'))
@@ -317,6 +328,8 @@ def validate_document(value):
                 'Linux distribution missing')
         validate_file(metadata['os_release_file'], flavor)
         validate_command(metadata['package_query'], allowed=(0, 1))
+        require(metadata['package_query']['argv'] == linux_package_command(metadata['package_query']['argv'][0]),
+                'Linux package query identity')
     elif host['system'] == 'Darwin':
         fields(metadata, 'developer_directory sdk_path_query sdk_version sdk_build os_version os_build '
                'sdk_root clt_package xcode_version sdk_settings', 'Darwin metadata')
@@ -332,6 +345,8 @@ def validate_document(value):
         validate_command(metadata['clt_package'], allowed=(0, 1))
         require(metadata['clt_package']['argv'] == ['/usr/sbin/pkgutil', '--pkg-info',
                                                     'com.apple.pkg.CLTools_Executables'], 'CLT package query identity')
+        require((metadata['xcode_version'] is not None) == requires_xcode_version(
+                metadata['developer_directory']['stdout'].strip()), 'Xcode query missing or inconsistent with developer selection')
         if metadata['xcode_version'] is not None:
             validate_command(metadata['xcode_version'])
             require(metadata['xcode_version']['argv'] == ['/usr/bin/xcodebuild', '-version']
@@ -374,6 +389,12 @@ def validate_document(value):
         require(nonempty(tool['version']['stdout']) or nonempty(tool['version']['stderr']), 'empty compiler version')
         require(tool['version']['argv'] == [tool['file']['path'], '/Bv' if msvc else '--version'],
                 'version command does not belong to selected tool')
+        if msvc:
+            require(PureWindowsPath(tool['file']['resolved_path']).is_relative_to(
+                    PureWindowsPath(metadata['selected_roots']['VCToolsInstallDir']))
+                    and 'Compiler Version' in tool['version']['stdout'] + tool['version']['stderr']
+                    and 'for x64' in tool['version']['stdout'] + tool['version']['stderr'],
+                    'MSVC identity does not belong to selected x64 VC toolset')
         require(tool['target'] is None if msvc else nonempty(tool['target']), 'compiler target')
         path_type = PureWindowsPath if flavor == 'windows' else PurePosixPath
         require((nonempty(tool['resource_dir']) and path_type(tool['resource_dir']).is_absolute())
@@ -395,6 +416,22 @@ def validate_document(value):
             validate_file(record, flavor)
             require(str(path_type(record['path'])) == str(path_type(path)), 'header dependency order/path mismatch')
         require(sum(record['bytes'] for record in probe['headers']) <= MAX_HEADER_BYTES, 'header byte bound')
+    # Repeated compiler/header inputs are identities, not independent records that
+    # can disagree between C and C++ or between a logical name and its SDK alias.
+    all_files = ([tool['file'] for tool in value['tools'].values()]
+                 + [record for probe in value['probes'].values() for record in probe['headers']])
+    all_files.append(metadata[{'Linux': 'os_release_file', 'Darwin': 'sdk_settings', 'Windows': 'locator'}[host['system']]])
+    by_name, by_resolved = {}, {}
+    path_type = PureWindowsPath if flavor == 'windows' else PurePosixPath
+    for record in all_files:
+        path, resolved = path_type(record['path']), path_type(record['resolved_path'])
+        require('..' not in resolved.parts, 'resolved identity path is not canonical')
+        identity = (resolved, record['bytes'], record['sha256'])
+        contents = (record['bytes'], record['sha256'])
+        require(path not in by_name or by_name[path] == identity, 'one path carries inconsistent identities')
+        require(resolved not in by_resolved or by_resolved[resolved] == contents,
+                'resolved input aliases carry inconsistent contents')
+        by_name[path], by_resolved[resolved] = identity, contents
     require(value['external_dependencies'] == {'sqlite': 'NOT_SELECTED_OR_CAPTURED'},
             'external dependency selection is not established by this collector')
     return {'metadata_only': True, 'local_native_bytes_verified': False, 'native_qualified': False,

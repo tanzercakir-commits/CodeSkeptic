@@ -118,6 +118,14 @@ yolu, boş Windows OS kaydı ve tutarsız UCRT ortamı için beş RED kontrolü 
 üretildi; düzeltme sonrasında reddedilirler. Windows/macOS şema testleri sentetiktir,
 o sistemlerin SDK/ABI davranışının gerçekten çalıştığı iddiası değildir.
 
+`14e1bac` bağımsız reader incelemesinde dört tutarsız kayıt kabul edildi: ilgisiz
+Linux package-query komutu, seçili toolset dışı MSVC, C/C++ arasında aynı header için
+çelişkili hash ve seçili Xcode'a rağmen atlanmış version sorgusu. Bu head'in incelemesi
+başarısızdır; 114 geçen test bunu PASS'e çevirmedi. Dört odaklı RED ve ek alias/prefix/
+CLT kontrolleri ardından reader bağları düzeltildi; yeni exact-head inceleme gerekir.
+Kanıt runner'ındaki ayrı `ready_to_freeze`/`task_ready` marker hatasının başarısız
+attempt'i de korunur; bu yardımcı hata analyzer veya ürün regression'u değildir.
+
 Bu checkpoint'te hosted identity gözlemi henüz yoktur. Workflow sadece kurulu Clang'ı
 gözler; LLVM-20/nihai API modeline seçildiği veya native qualification geçtiği
 varsayılmaz. SQLite dependency'si, tam compiler runtime closure'ı, gerçek korpus ve

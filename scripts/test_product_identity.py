@@ -156,7 +156,9 @@ class DocumentTests(unittest.TestCase):
                          'version': 'test-version', 'python': '3.12.0', 'environment': {},
                          'metadata': {'os_release': {'ID': 'test', 'VERSION_ID': '1'},
                                       'os_release_file': header,
-                                      'package_query': command}},
+                                      'package_query': {**command, 'argv': ['/usr/bin/dpkg-query', '-W',
+                                          '-f=${binary:Package}\t${Version}\t${db:Status-Status}\n',
+                                          'libc6', 'libc6-dev', 'gcc-*', 'g++-*', 'libstdc++*-dev']}}},
             'tools': {role: copy.deepcopy(tool) for role in identity.TOOL_ROLES},
             'probes': {}, 'metadata_only': True, 'native_qualified': False,
             'immutable_image': False, 'product_qualified': False,
@@ -248,6 +250,51 @@ class DocumentTests(unittest.TestCase):
                 metadata['os'], metadata['os_query']['stdout'] = None, 'null'
             else:
                 value['platform']['environment']['UCRTVersion'] = '9.9.9.9'
+            with self.subTest(mutation=mutation), self.assertRaises(identity.IdentityError):
+                identity.validate_document(value)
+
+    def test_independent_review_contradictions_are_rejected(self):
+        for mutation in ('linux-package-query', 'msvc-outside-toolset', 'header-hash', 'xcode-omitted'):
+            value = (self.native_document('Windows') if mutation == 'msvc-outside-toolset'
+                     else self.native_document('Darwin') if mutation == 'xcode-omitted'
+                     else copy.deepcopy(self.document))
+            if mutation == 'linux-package-query':
+                value['platform']['metadata']['package_query']['argv'] = ['/unrelated/tool', '--not-a-package-query']
+            elif mutation == 'msvc-outside-toolset':
+                for role in ('cc', 'cxx'):
+                    value['tools'][role]['file'].update(path='C:/unrelated/cl.exe', resolved_path='C:/unrelated/cl.exe')
+                    value['tools'][role]['version']['argv'] = ['C:/unrelated/cl.exe', '/Bv']
+            elif mutation == 'header-hash':
+                value['probes']['c++']['headers'][0]['sha256'] = 'e' * 64
+            else:
+                value['platform']['metadata']['xcode_version'] = None
+            with self.subTest(mutation=mutation), self.assertRaises(identity.IdentityError):
+                identity.validate_document(value)
+
+    def test_explicit_standalone_clt_may_omit_xcode_but_unknown_selection_may_not(self):
+        value = self.native_document('Darwin')
+        metadata = value['platform']['metadata']
+        metadata['developer_directory']['stdout'] = '/Library/Developer/CommandLineTools'
+        metadata['xcode_version'] = None
+        self.assertTrue(identity.validate_document(value)['metadata_only'])
+        metadata['developer_directory']['stdout'] = '/unresolved/Developer'
+        with self.assertRaises(identity.IdentityError):
+            identity.validate_document(value)
+
+    def test_prefix_collision_alias_content_and_package_argument_variants_fail(self):
+        for mutation in ('toolset-prefix', 'header-alias', 'header-retarget', 'package-arguments', 'compiler-hash'):
+            value = self.native_document('Windows') if mutation == 'toolset-prefix' else copy.deepcopy(self.document)
+            if mutation == 'toolset-prefix':
+                value['tools']['cc']['file']['resolved_path'] = 'C:/VS/Tools/14.0-unrelated/cl.exe'
+            elif mutation == 'header-alias':
+                value['probes']['c++']['headers'][0].update(path='/alias/stdio.h', sha256='e' * 64)
+                value['probes']['c++']['command']['stdout'] = 'identity-probe: /alias/stdio.h\n'
+            elif mutation == 'header-retarget':
+                value['probes']['c++']['headers'][0]['resolved_path'] = '/other/stdio.h'
+            elif mutation == 'package-arguments':
+                value['platform']['metadata']['package_query']['argv'] = ['/usr/bin/rpm', '--not-a-query']
+            else:
+                value['tools']['cxx']['file']['sha256'] = 'e' * 64
             with self.subTest(mutation=mutation), self.assertRaises(identity.IdentityError):
                 identity.validate_document(value)
 
