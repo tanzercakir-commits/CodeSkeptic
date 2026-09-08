@@ -5,6 +5,21 @@ the baseline/incremental workflows. For a five-minute start, see the
 [README quickstart](../README.md#quickstart); to evaluate CodeSkeptic on
 your own project, follow [evaluate.md](evaluate.md).
 
+This reference describes the development interface, not a promise that every
+feature has been rerun on every packaged platform. The
+[candidate acceptance matrix](release-checklist.md#candidate-acceptance-matrix)
+binds installation, first scan, CI, triage, output/model validation and platform
+support to their exact measured sources and artifacts. Component receipts from
+older sources remain older-source evidence; a documentation commit does not
+rebuild a binary. Published v0.4.8 examples are not the restart candidate.
+
+Begin with report-only adoption and inspect completeness/coverage as well as
+findings. A baseline or suppression records a triage choice, not proof that
+the code is safe. Declared contracts/models are trusted inputs with bounded
+validation, not independently proved program facts. Experimental rules remain
+report-only; project-specific false positives and unexecuted platform assertions
+are [disclosed with the candidate](release-checklist.md#candidate-limits-and-publication-boundary).
+
 ## CLI options
 
 ```

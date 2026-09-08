@@ -1,4 +1,37 @@
-# Unreleased CWE restart — artifact provenance
+# Unreleased CWE restart — bounded candidate dossier
+
+This is an unsigned, unpublished development candidate dossier, not v0.4.8,
+a new version/tag, or one rebuilt same-source cross-platform release. The
+[acceptance matrix](docs/release-checklist.md#candidate-acceptance-matrix)
+binds each accepted workflow to its actual source/artifact and independent
+PASS evidence. A later documentation or FIFO commit never relabels a binary.
+
+- Linux x86_64: `a23cf319264847c752a4fdc55ce2f3cadb196f78`,
+  `0.4.9-dev+ga23cf3192648`; real offline/non-root relocation, C/C++ first
+  scans, all four output formats, and local container/Action parity qualified.
+- Windows x86_64 and macOS arm64:
+  `e83b641be32665740e8637cbb1368346e82ea471`,
+  `0.4.9-dev+ge83b641be326`; actual hosted native test/package/first-scan
+  jobs passed. Linux CI and ordinary Windows CI on that source also passed;
+  this does not create a new Linux archive. Exact package/executable hashes,
+  runner dependencies and skipped assertions are recorded in the matrix's
+  linked native profile. Skips are unexecuted coverage, not passes.
+- Triage, output/model validation, bounded CWE qualification and project
+  measurements keep their own exact component-source receipts. Seven supported
+  and five experimental CWE-family sample sets passed their bounded checks;
+  experimental rules remain report-only. These are not all-CWE coverage,
+  general precision/recall guarantees or low-noise qualification for every project.
+
+Known limits include false positives and incomplete cJSON coverage in the
+recorded real-project sample, narrow GoogleTest/tinyxml2 scopes, platform SDK/
+host-library prerequisites, and different native memory-cap semantics.
+Publisher signing, notarization/Gatekeeper download-install, native SBOMs,
+hosted execution of the new local Action scenario, public distribution and
+main integration are not qualified by this dossier. Broader publication needs
+its own exact-candidate authorization and missing evidence; nothing here
+authorizes it or converts a historical failed run into success.
+
+## Unsigned Linux artifact provenance
 
 The qualified Linux x86_64 tarball can now carry an unsigned CycloneDX 1.6
 inventory and checksum-bound provenance sidecars. Source and generator revisions
@@ -13,7 +46,8 @@ library versions unresolved. Distribution notices are preserved, not asserted to
 be a legal license classification. Recorded build recipes are not a signature,
 SLSA attestation, independent producer proof or byte-identical rebuild guarantee.
 See `docs/release-checklist.md` for the exact profile and evidence requirements.
-Windows/macOS support remains a separate qualification unit.
+Windows/macOS now have separately measured candidate profiles; the Linux
+sidecars do not claim inventory/provenance coverage for those native packages.
 
 The following notes describe the historical release, not a new release claim.
 

@@ -10,15 +10,17 @@
 
 > **Everyone generates. CodeSkeptic verifies.**
 
-Real C/C++ bugs, deterministic dataflow traces, low-noise PR gating.
+C/C++ static analysis, dataflow traces and evidence-aware PR gating.
 
 CodeSkeptic is a precision-first static analyzer built on Clang
 LibTooling. It performs CFG-based forward dataflow analysis — not just
 AST pattern matching — so it can reason about *paths*: what a pointer's
 state is at a dereference, whether an allocation is freed on every
 path, whether a divisor can be zero on the path that reaches a
-division. It only speaks when the dataflow proves something, and every
-finding carries the trace that proves it.
+division. Findings expose the available analysis evidence; they are not a
+formal safety proof. Unknowns, assumptions and false positives remain possible.
+The [candidate acceptance matrix](docs/release-checklist.md#candidate-acceptance-matrix)
+separates measured workflows, rule-quality limits and unqualified promises.
 
 The long-term goal is a fast, embeddable **semantic verification layer
 for AI-assisted development**: an analyzer that sits inside the
@@ -31,8 +33,11 @@ For the current CWE development branch, start with the
 [locally tested C/C++ first-scan walkthrough](docs/first-scan.md#a-small-reproducible-c-and-c-project)
 and its [report-only CI recipe](docs/integrations.md#local-report-only-ci).
 It checks a locally installed binary, real compilation inputs and complete
-reports. This local qualification does **not** mean the development changes
-are in the releases/actions below or have passed new cross-platform release CI.
+reports. The current [candidate dossier](docs/release-checklist.md#candidate-acceptance-matrix)
+also records actual Windows/macOS candidate CI. Its separately identified
+Linux and native artifacts are unsigned development builds, not one new
+same-source public release. The releases/actions below do not contain this
+branch merely because its qualification passed.
 
 **Published-release binary (not the current restart candidate)** — Linux x86_64
 (macOS arm64: `codeskeptic-darwin-arm64.tar.gz`). The Linux archive bundles its
@@ -45,13 +50,13 @@ curl -sL https://github.com/tanzercakir-commits/CodeSkeptic/releases/latest/down
 ./codeskeptic-v*/bin/codeskeptic path/to/your.c
 ```
 
-**Docker** — nothing installed at all:
+**Historical published Docker image** — requires a working container engine:
 
 ```bash
 docker run --rm -v "$PWD:/work" ghcr.io/tanzercakir-commits/codeskeptic:v0.4.8 src/ --sarif out.sarif  # :latest floats
 ```
 
-**CI** — the [packaged action](action.yml), report-only by default:
+**Historical published CI Action** — the [packaged action](action.yml), report-only by default:
 
 ```yaml
 # Pinning the action pins the analyzer binary too (same tag).
@@ -142,7 +147,12 @@ Next steps: [your first scan](docs/first-scan.md) · the full [usage reference](
 [evaluate it on *your* code in about an hour](docs/evaluate.md) ·
 [CI, editor & agent integrations](docs/integrations.md).
 
-## Proven on real code
+## Historical real-code campaigns
+
+This section preserves earlier campaigns, not measurements of the current
+restart candidate. Its "now/current" labels refer to those historical reports.
+For the restart's narrower measured projects, including false positives and
+broken translation units, use the [candidate limits](docs/release-checklist.md#candidate-limits-and-publication-boundary).
 
 Synthetic benchmarks reward pattern coverage; real codebases punish
 every false positive. Each project was built with its own build system
@@ -151,7 +161,7 @@ stay dated; current fail-closed receipts live in the [canonical replay
 ledger](docs/benchmarks.md#current-engine-real-world-replay-ledger).
 "Initial" means the first scan, before its exposed FP families were fixed.
 
-| Project | Scope | Initial → now | Hand-verified real bugs |
+| Project | Historical scope | Initial → later historical count | Historical adjudication |
 |---------|-------|--------------:|------------------------|
 | [systemd](https://github.com/systemd/systemd) | 494 files (basic/core/shared) | 414 → **53** | 3 deliberate leak-shaped idioms, documented |
 | [shadPS4](https://github.com/shadps4-emu/shadPS4) | 377 files | 209 → **22** | **3 reported upstream — 2 merged ([#4702](https://github.com/shadps4-emu/shadPS4/pull/4702), [#4703](https://github.com/shadps4-emu/shadPS4/pull/4703))** |
@@ -211,16 +221,16 @@ Read its silence accordingly:
 
 ## Use it alongside, not instead
 
-Keep your existing net. CodeSkeptic replaces none of it — it adds a
-low-noise, trace-backed layer that is strongest exactly where the
-others are weakest: gating *new* changes (human or AI-generated).
+Keep your existing net. CodeSkeptic replaces none of it. It adds static
+findings and evidence-aware gating of *new* changes (human or AI-generated).
+Noise and coverage depend on the project and rule; measure them before gating.
 
 | Keep using | It gives you | CodeSkeptic adds |
 |------------|--------------|------------------|
 | Compiler warnings (`-Wall -Wextra`) | Cheap, universal checks | Path-sensitive bugs warnings can't see |
 | Sanitizers (ASan/UBSan/TSan) | Runtime proof on executed paths | Static coverage of paths tests never run |
-| clang analyzer / gcc `-fanalyzer` | Broad heuristic coverage | Deterministic traces, low-noise PR delta gating ([coverage differs both ways](docs/comparison.md)) |
-| CodeQL & co. | Query breadth, security taxonomies | Millisecond re-checks inside an edit loop |
+| clang analyzer / gcc `-fanalyzer` | Broad heuristic coverage | Traces and PR delta gating ([coverage differs both ways](docs/comparison.md)) |
+| CodeQL & co. | Query breadth, security taxonomies | Scoped re-checks inside an edit loop; latency is workload-dependent |
 | Fuzzing & tests | Ground truth on real executions | A verdict *before* the code runs |
 
 ## Rules
@@ -288,8 +298,11 @@ assumptions, contracts or project policy.
 See [the capability contract](docs/capabilities.md) for subtype selection,
 unclassified metadata and message-dependent baseline compatibility.
 
-## The numbers
+## Historical benchmark numbers
 
+These earlier benchmark/token measurements are not fresh measurements of the
+candidate artifacts. Current bounded CWE results and actual project limitations
+are linked in the [candidate matrix](docs/release-checklist.md#candidate-acceptance-matrix).
 
 Two axes, tracked separately ([full methodology](docs/benchmarks.md)):
 

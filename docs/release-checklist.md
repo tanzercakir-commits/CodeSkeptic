@@ -1,8 +1,118 @@
-# Linux artifact qualification
+# Candidate acceptance and artifact qualification
+
+## Candidate acceptance matrix
+
+This CH07 dossier assembles independently accepted development profiles; it
+does **not** claim a fresh same-source cross-platform release. The documentation
+review SHA is recorded by the CH07 receipt in `BOOK.json` / `PROGRESS.md` after
+independent acceptance. It is not any executable's source identity. All PASS
+entries below mean the stated bounded measurement passed, not universal feature
+or platform coverage. There is no public candidate download, new tag or main merge.
+
+| Delivery promise | Exact measured identity | Accepted PASS evidence and boundary |
+|---|---|---|
+| Linux installation, isolation and output parity | **L**: source/binary/archive below | CH06-S01-U001: actual non-root/offline package execution with LLVM and Python absent; 48 source/package analyses, 24 four-format comparisons, two dependency negatives. Ubuntu x86_64 ABI profile only. |
+| First C/C++ scan, doctor repair, baseline and report-only recipe | **L**, byte-identical installed binary | Same unit's `assembly.log` and terminal invocation: 12/12 FirstScan tests, including real marked recipes and static/mock negatives. Not 12 end-to-end runs; archive isolation is the separate row above. |
+| Local CLI/container/Action parity | **L** archive; implementation review **I** | CH06-S01-U002: six scenarios / 19 actual analyses with complete SARIF/exit parity. Report-only wrapper exit 0 retains analyzer exit 1. Local Action only; no hosted Action or source-rebuild qualification. |
+| Triage, baseline, suppression and PR delta | **T** | CH03-S02-U001: actual delta/shift/rename, gate ladder, assumption delta, suppression audit, baseline v3 and malformed-input negatives. Triage decisions do not establish clean code. |
+| Output, discovery and verdict contract | **O** | CH03-S01-U002: 52 output-parity checks, capabilities/producer selection and CWE metadata. Later **L** four-format artifact parity and **N** native 0/1/2 scans are additional, separately bound evidence. |
+| Declared models and sidecar validation | **M** | CH02-S02-U001: 45 JSON, two SARIF and four same-process MCP checks plus malformed/framing/transaction negatives. Validation is not proof that user-supplied semantic declarations are true. |
+| Supported/experimental CWE qualification | **Q** | CH05-S01-U003: seven supported and five experimental family sample sets; frozen positive/safe/boundary checks pass. These narrow samples do not promote experimental rules or establish family-wide precision/recall. |
+| Real-project measurement and noise disclosure | **R** | CH05-S02-U002: retained measured results and independent adjudication; passing the measurement process does not mean a clean scan or that every usability target was achieved. Actual limitations below. |
+| Linux inventory/provenance sidecars | **L** archive; generator review **S** | CH06-S02-U001: unchanged archive, 328 files / 13 licensed-component entries, schema/checksum validation and negative controls. Unsigned and incomplete composition; no native-package SBOM claim. |
+| Native Windows/macOS support; Linux and ordinary Windows CI | **N** | CH06-S02-U002: actual native run 34243269691 attempt 1, ordinary Windows 34243269775 attempt 1, Linux 34243269733 attempt 2 all SUCCESS. Raw artifact and test/skip audits retained. Native first scans preserve clean/finding/unavailable 0/1/2; profiles and exclusions below. |
+
+Identity keys are exact source commits unless explicitly marked as an
+implementation/documentation review. The Linux archive and both native packages
+retain different actual binary/version identities; they are not repackaged here.
+
+| Key | Full identity | Artifact or primary measurement |
+|---|---|---|
+| L | `a23cf319264847c752a4fdc55ce2f3cadb196f78` | [Linux archive and executable hashes](#local-qualification--2026-09-08) |
+| I | `9070e9ba17c07f8c5438709675fb4c9d24da52c5` (implementation review, not binary source) | [Local integration evidence](integrations.md#qualified-artifact-integration-profiles) uses L |
+| T | `3a222ffee8343d567318530c49ce27ba02b1ee98` | CH03-S02-U001 exact-source `cli-smoke.log` |
+| O | `184a30cdef4c33f4b70394d15fa771f823fd8c13` | CH03-S01-U002 exact-source `cli-smoke-v2.log` |
+| M | `574fa3158093782407118e93b36caa252c1be09e` | CH02-S02-U001 `574fa31/cli.log` |
+| Q | `157724b079803c2fbe28d1de8e2c1032eb8f703f` | [Frozen sample results](quality_results.md), supported/experimental `results.json` |
+| R | `c4fa60864f2e5853581c2f8a0dd66a3fc967239b` | CH05-S02-U002 exact-source `measurement/results.json` and `adjudication-summary.json` |
+| S | `f0f348faa3944a3c152173f9ef027a81f90f6422` (generator/documentation review, not binary source) | L archive plus [inventory/provenance profile](#ch06-s02-u001--unsigned-inventory-and-provenance) |
+| N | `e83b641be32665740e8637cbb1368346e82ea471` | [Native archive/executable hashes and actual jobs](#hosted-native-measurement--2026-09-08); independent final review `85cbb8fbbc725dd0a0192dd83f0ac851d47c74be` is documentation-only |
+
+### Evidence retention and reproducibility
+
+Each task row resolves to its completed `BOOK.json` record: the full contract,
+exact review SHA, distinct implementer/verifier, PASS with zero findings, and
+named check commands/absolute evidence paths/SHA-256 digests. `PROGRESS.md`
+exposes the same review and check digests. These are procedural independent
+receipts, not signatures or external producer attestations. Source histories,
+archives, raw results and failed attempts are preserved, not replaced by this
+summary. Durable local evidence root:
+`/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/`.
+CH07 qualification rechecks the bound bytes and documented identities without
+claiming to rerun historical/native binaries at the new documentation HEAD.
+
+Canonical completed receipt digests (SHA-256 of JSON+LF) bind every original
+required check **and** additional source/evidence-continuity checks. Older
+three-check contracts are not reduced to CH07's two check names.
+
+| Matrix key | Canonical independent PASS receipt SHA-256 |
+|---|---|
+| L | `787972bea8f66d4b0b922ea254f164ef1f57c70c5d65869017427521bfec0100` |
+| I | `abb0a7eb9a9d6023fa869d718181530d3f546261280f2da79de67b559ecb7ef1` |
+| T | `efc7ebfdf8fc030f5ad06604e5ab3b2298e0e3af453f066baacc0e4ace2cccba` |
+| O | `0e560f735aaf5e4a8878a9cc480752a44fd04bfa2606588f91b769392b65a3fb` |
+| M | `97f30d8eca4131882b3e9fcc959536e6c4afb8af7a021ad6ba6978c4c1d90dc8` |
+| Q | `2b2dd8f058732b7dbdfb2b490099119fa6e902b60686d07c025e86b27f9c8bf5` |
+| R | `188c77e1452c035e5674ff98c57b27d63f08bfe66d660e3866d192a17f4432f8` |
+| S | `8c672e2dbaf4c78aabb521f65d1eef6c7df7e26dae249d9a0520dccbbae60a19` |
+| N | `09cfa0a998fdd9ce715bc760b86539038ea6c3779421cdaf79dec0bd028174d7` |
+
+The L first-scan binding is specifically its `a23cf319.../assembly.log`
+(SHA-256 `9ae85946389d96f8942f881591e9daf34f7e65e0adedcd7e63af9bfc0e369bb4`),
+which records the installed/source version and byte-equal executable hash,
+plus `container-assembly-afkwrQ/terminal-inspect.json` under the same source
+directory (SHA-256 `5d1fd23517a09083f5eb2fec67f8499f9819923401d256f9e471bd28648145d7`)
+recording the actual `FirstScanTest.py` invocation and terminal exit 0.
+Marked walkthrough recipes are unchanged from L. This is output/coverage
+contract evidence, not a separate first-use demonstration of function contracts.
+
+### Candidate limits and publication boundary
+
+The R measurement has cJSON 34/76 analyzed translation units, with 42 broken;
+its adjudication is 39 false positives, nine true positives and six unknowns.
+GoogleTest covers only four library translation units (not its tests/examples),
+with three false positives. tinyxml2 covers three translation units, with five
+false positives and four unknowns. These are measured limitations, not clean
+projects, a low-noise guarantee, or a reason to lower quality floors. Q's seeded
+sample precision/recall success is not a substitute for this project evidence.
+Earlier README benchmark/token and v0.4.8 campaign numbers remain historical.
+
+Native profiles have explicit [unexecuted platform assertions and prerequisites](windows-support.md#actual-tests-and-unexecuted-platform-coverage).
+Linux's absolute address-space, Windows's Job Object committed-memory and
+macOS's one-time startup-virtual-size-plus-budget cap are different contracts;
+see [worker budgets](usage.md#worker-resource-limits-and-cancellation). Native CI success does not
+prove older OS/ABI/SDK compatibility, Windows-host WSL execution, native SBOMs,
+publisher signing, macOS notarization/Gatekeeper download-install, or a public
+release. GitHub artifacts' 14-day retention is not permanent distribution.
+
+Linux CI attempt 1 was cancelled at its 30-minute limit after slow dependency
+download; its interrupted and unexecuted gates remain failures/unexecuted.
+Only the independently diagnosed, fresh same-source attempt 2 supplies the
+complete Linux PASS. Earlier failed native jobs and the c4fd06b accounting gap
+also remain failed/incomplete; none is relabeled by this matrix.
+
+Acceptance here is limited to the documented local candidate dossier and retained
+unsigned artifacts. A unified new-source release, missing broader qualification,
+main integration, tag/release publication or signing requires separate work and
+exact-candidate owner authority where applicable. No such external action is
+required to deliver this explicitly local dossier; the final FIFO unit must
+still verify and record that distinction before declaring the queue terminal.
+
+## Linux artifact qualification
 
 This is the CH06-S01-U001 package work, not a published or signed release.
 Only independently reviewed, actual artifact executions establish support.
-Windows/macOS support remains a separate FIFO unit. Container/Action parity is
+Windows/macOS support is recorded in the separate measured profile below. Container/Action parity is
 recorded in `docs/integrations.md`; the CH06-S02-U001 inventory/provenance profile
 below builds on this exact artifact. Protected source/test inventories and CMake
 files stay unchanged.
@@ -203,7 +313,7 @@ them against the archive, uploads them to the existing shared draft, and checks
 them again before combined checksums/publication. Checksums include sidecars.
 Existing platform smoke gates remain mandatory. This change does not run that
 workflow, grant release authority or claim equivalent macOS/Windows SBOM coverage;
-those platform support decisions belong to the next FIFO unit.
+those native profiles are recorded separately below.
 
 T3 qualification requires focused `scripts/test_generate_sbom.py` negatives,
 existing package/release-workflow guards, actual unchanged qualified-archive

@@ -3,15 +3,21 @@
 ## A small, reproducible C and C++ project
 
 Start with an installed `codeskeptic` on `PATH`, Python 3, CMake, Ninja and
-working C/C++ compilers. This walkthrough is qualified locally on Linux with
-the current development binary; it is not evidence of a published release,
-standalone package portability or a hosted GitHub job.
+working C/C++ compilers. The marked recipes were qualified locally on Linux
+with source `a23cf319264847c752a4fdc55ce2f3cadb196f78`, binary
+`0.4.9-dev+ga23cf3192648`, SHA-256
+`5272baff931cae3dbd21c51409dd129a607df983a69e851b3f6cf57e5e845677`.
+The 12 passing FirstScan tests include real C/C++ workflows plus static/mock
+negative controls; they are not 12 independent end-to-end scans. This proof
+uses a byte-identical local installation, not archive extraction or a hosted
+GitHub job. Separate package-isolation and native-platform evidence is in the
+[candidate acceptance matrix](release-checklist.md#candidate-acceptance-matrix).
 
 For an already-built development binary, an **unprivileged local installation**
 can be made on the same machine. Set `CODESKEPTIC_BUILT_BINARY` to its absolute
 path and `CODESKEPTIC_LOCAL_PREFIX` to a **new, empty prefix you own**. This copy
 still needs the build environment's LLVM shared libraries and Clang resource
-headers; it is not a replacement for the later release-packaging checks.
+headers; it is not a replacement for the separate release-packaging checks.
 
 <!-- first-scan:install -->
 ```bash
