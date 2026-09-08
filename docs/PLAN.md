@@ -1,6 +1,6 @@
 # CodeSkeptic — CWE Ürün Planı
 
-Sürüm: 57. Eski planın devamı değil; main tabanlı yeni program.
+Sürüm: 58. Eski planın devamı değil; main tabanlı yeni program.
 
 PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.
 
@@ -737,7 +737,7 @@ PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. G
 
 **Test bütçesi:** T3
 **Kontroller:** release-qualification, queue-check
-**Kapsam:** .github/workflows/windows.yml, .github/workflows/release.yml, docs/windows-support.md, README.md, docs/release-checklist.md, scripts/package_release.sh, scripts/platform_first_scan.py, scripts/test_platform_workflow.py, src/analyzer/StaticAnalyzer.cpp, src/analyzer/CheckpointTime.h
+**Kapsam:** .github/workflows/windows.yml, .github/workflows/release.yml, docs/windows-support.md, README.md, docs/release-checklist.md, scripts/package_release.sh, scripts/platform_first_scan.py, scripts/test_platform_workflow.py, src/analyzer/StaticAnalyzer.cpp, src/analyzer/CheckpointTime.h, src/core/ResourceBudget.cpp, tests/CompilationDatabaseCliTest.py, tests/cwe_corpus/regression_inventory.json, tests/cwe_corpus/catalog.json, docs/quality_protocol.md
 **Bağımlılıklar:** Yok
 
 ## CH07 — Teslim ve kapanış
