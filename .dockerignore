@@ -1,0 +1,16 @@
+# Default deny. Never transmit the working tree, .git, runner credentials,
+# evidence, builds or arbitrary local files as a daemon build context.
+**
+!Dockerfile
+!.dockerignore
+!CMakeLists.txt
+!LICENSE
+!README.md
+!src/
+!src/**
+!scripts/
+!scripts/package_release.sh
+!scripts/package_linux.py
+# Only the isolated prepared-artifact context populates this directory.
+!package/
+!package/**
