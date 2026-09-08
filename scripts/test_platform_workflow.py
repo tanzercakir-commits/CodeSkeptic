@@ -608,6 +608,138 @@ int main() {
         self.assertNotIn("std::to_string(std::filesystem::last_write_time(", source)
 
 
+class DarwinBudgetTests(unittest.TestCase):
+    def test_checked_ceiling_and_fail_closed_native_sequence(self):
+        compiler = "/usr/bin/c++" if Path("/usr/bin/c++").is_file() else shutil.which("c++")
+        self.assertIsNotNone(compiler, "a local C++17 compiler is required; no download is performed")
+        source = r'''
+#include "core/DarwinMemoryBudget.h"
+#include <cassert>
+#include <iostream>
+#include <string>
+using namespace codeskeptic::darwin_memory;
+constexpr std::uint64_t M = 1024 * 1024;
+constexpr auto MAX = std::numeric_limits<std::uint64_t>::max();
+constexpr auto INF = MAX >> 1; // Darwin can use a sentinel below the type maximum.
+struct FakeNative {
+    Limits inherited{INF, INF}, installed{};
+    Snapshot snapshot{392 * 1024 * M, 12, 12};
+    std::string calls;
+    unsigned failure = 0, reads = 0, snapshots = 0, writes = 0, mismatch = 0;
+    bool readLimits(Limits& out) {
+        calls += 'r'; ++reads;
+        if (calls.size() == failure) return false;
+        out = reads == 1 ? inherited : installed;
+        if (reads == 2 && mismatch == 1) ++out.soft;
+        if (reads == 2 && mismatch == 2) --out.hard;
+        if (reads == 2 && mismatch == 3) out = {INF, INF};
+        return true;
+    }
+    bool readSnapshot(Snapshot& out) {
+        calls += 'q'; ++snapshots; out = snapshot;
+        return calls.size() != failure;
+    }
+    bool writeLimits(Limits in) {
+        calls += 'w'; ++writes;
+        if (calls.size() == failure) return false;
+        installed = in; return true;
+    }
+};
+int main() {
+    auto check = [](std::uint64_t base, std::uint64_t mb, Limits limits,
+                    std::uint64_t maximum, std::uint64_t infinity,
+                    Stage stage, std::uint64_t expected = 0) {
+        std::uint64_t target = 17;
+        assert(ceiling(base, mb, limits, maximum, infinity, target) == stage);
+        assert(target == (stage == Stage::Ready ? expected : 17));
+    };
+    for (auto baseline : {std::uint64_t(1), 128*M, 392*1024*M}) {
+        check(baseline, 128, {INF, INF}, MAX, INF, Stage::Ready, baseline+128*M);
+        check(baseline, 128, {baseline+32*M, baseline+96*M}, MAX, INF, Stage::Ready, baseline+32*M);
+        check(baseline, 128, {baseline+64*M, baseline+64*M}, MAX, INF, Stage::Ready, baseline+64*M);
+        check(baseline, 128, {baseline, INF}, MAX, INF, Stage::Ready, baseline);
+        check(baseline, 128, {baseline-1, INF}, MAX, INF, Stage::BelowSnapshot);
+    }
+    check(1, 0, {INF, INF}, MAX, INF, Stage::InvalidAllowance);
+    check(1, MAX/M+1, {INF, INF}, MAX, INF, Stage::InvalidAllowance);
+    check(0, 1, {INF, INF}, MAX, INF, Stage::InvalidSnapshot);
+    check(INF, 1, {INF, INF}, MAX, INF, Stage::InvalidSnapshot);
+    check(MAX, 1, {MAX, MAX}, MAX, MAX, Stage::InvalidSnapshot);
+    check(1, 1, {INF, 32*M}, MAX, INF, Stage::InvalidLimits);
+    check(1, 1, {40*M, 32*M}, MAX, INF, Stage::InvalidLimits);
+    check(1, 1, {INF+1, INF+1}, MAX, INF, Stage::InvalidLimits);
+    check(INF-M-1, 1, {INF, INF}, MAX, INF, Stage::Ready, INF-1);
+    check(INF-M, 1, {INF, INF}, MAX, INF, Stage::Overflow);
+    check(MAX-M+1, 1, {MAX, MAX}, MAX, MAX, Stage::Overflow);
+    check(1, MAX/M, {MAX, MAX}, MAX, MAX, Stage::Ready, (MAX/M)*M+1);
+    // A narrow native representation must fail before conversion; clamping
+    // to inherited limits must never rescue overflow or an infinity target.
+    check(2*M, 1, {INF, INF}, M, INF, Stage::InvalidSnapshot);
+    check(1, 1, {INF, INF}, M-1, INF, Stage::Overflow);
+    check(1, 1, {2*M, 2*M}, M, INF, Stage::InvalidLimits);
+    check(INF-M, 1, {INF-M, INF}, MAX, INF, Stage::Overflow);
+    FakeNative good;
+    auto result = install(good, 128, MAX, INF);
+    assert(result.stage == Stage::Applied && good.calls == "rqwr");
+    assert(result.target == good.snapshot.bytes+128*M);
+    assert(good.installed.soft == result.target && good.installed.hard == result.target);
+    for (unsigned failure = 1; failure <= 4; ++failure) {
+        FakeNative native; native.failure = failure;
+        result = install(native, 128, MAX, INF);
+        const Stage stages[] = {Stage::ReadInherited, Stage::ReadSnapshot, Stage::Install, Stage::Readback};
+        assert(result.stage == stages[failure-1]);
+        assert(native.calls == std::string("rqwr").substr(0, failure));
+        assert(native.snapshots <= 1 && native.writes <= 1); // no retry/rebaseline
+        if (failure == 4) assert(native.installed.soft == native.snapshot.bytes+128*M);
+    }
+    for (unsigned mismatch : {1u, 2u, 3u}) {
+        FakeNative native; native.mismatch = mismatch;
+        assert(install(native, 128, MAX, INF).stage == Stage::Mismatch);
+        assert(native.calls == "rqwr" && native.writes == 1);
+    }
+    for (unsigned count : {0u, 11u, 13u}) {
+        FakeNative native; native.snapshot.count = count;
+        assert(install(native, 128, MAX, INF).stage == Stage::InvalidSnapshot);
+        assert(native.calls == "rq" && native.writes == 0);
+    }
+    for (auto bytes : {std::uint64_t(0), INF, MAX}) {
+        FakeNative native; native.snapshot.bytes = bytes;
+        assert(install(native, 128, MAX, INF).stage == Stage::InvalidSnapshot);
+        assert(native.calls == "rq" && native.writes == 0);
+    }
+    for (unsigned which = 0; which < 4; ++which) {
+        FakeNative native;
+        if (which == 0) native.snapshot.expected_count = 0;
+        if (which == 1) native.inherited = {INF, 32*M};
+        if (which == 2) native.inherited = {32*M, INF};
+        if (which == 3) native.snapshot.bytes = INF-M;
+        assert(install(native, 128, MAX, INF).stage != Stage::Applied);
+        assert(native.calls == "rq" && native.writes == 0);
+    }
+    for (bool soft_only : {false, true}) {
+        FakeNative native;
+        const auto bound = native.snapshot.bytes + 32*M;
+        native.inherited = {bound, soft_only ? INF : bound};
+        result = install(native, 128, MAX, INF);
+        assert(result.stage == Stage::Applied && result.target == bound);
+        assert(native.installed.soft == bound && native.installed.hard == bound);
+    }
+    std::cout << "darwin-checked-ceiling-and-native-sequence PASS\n";
+}
+'''
+        with tempfile.TemporaryDirectory(prefix="Darwin budget compiler fixture ") as temporary:
+            work = Path(temporary)
+            unit, binary = work / "budget.cpp", work / "budget"
+            unit.write_text(source)
+            compiled = subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror",
+                                       "-I", str(REPO / "src"), str(unit), "-o", str(binary)],
+                                      capture_output=True, text=True, timeout=45)
+            self.assertEqual(compiled.returncode, 0, compiled.stderr)
+            executed = subprocess.run([str(binary)], capture_output=True, text=True, timeout=10)
+            self.assertEqual(executed.returncode, 0, executed.stderr)
+            self.assertEqual(executed.stdout, "darwin-checked-ceiling-and-native-sequence PASS\n")
+
+
 class RoutingTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -641,7 +773,7 @@ class RoutingTests(unittest.TestCase):
     def test_candidate_has_read_token_no_release_dependency_or_writers(self):
         job = self.workflow["jobs"]["candidate-native"]
         self.assertEqual(job["if"], "github.event_name == 'push' && github.ref == 'refs/heads/agent/cs3-ch06-s02-u002-platform-support'")
-        self.assertEqual(job["permissions"], {"contents": "read", "actions": "read"})
+        self.assertEqual(job["permissions"], {"contents": "read"})
         self.assertNotIn("needs", job)
         self.assertFalse(job["strategy"]["fail-fast"])
         self.assertEqual(job["timeout-minutes"], 90)
@@ -660,27 +792,13 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(upload["with"]["retention-days"], 14)
         self.assertEqual(upload["with"]["if-no-files-found"], "error")
         self.assertIn("${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}", upload["with"]["name"])
-        self.assertEqual(upload["with"]["path"].splitlines(), ["${{ runner.temp }}/codeskeptic-platform/", "${{ runner.temp }}/codeskeptic-native-build/", "${{ runner.temp }}/codeskeptic-sdk-diagnostic/"])
+        self.assertEqual(upload["with"]["path"].splitlines(), ["${{ runner.temp }}/codeskeptic-platform/", "${{ runner.temp }}/codeskeptic-native-build/"])
 
-    def test_sdk_diagnostic_precedes_build_and_token_is_download_only(self):
+    def test_retired_historical_sdk_comparison_is_not_a_release_dependency(self):
         steps = self.workflow["jobs"]["candidate-native"]["steps"]
-        download = next(s for s in steps if s.get("name") == "Download pinned Windows diagnostic artifact")
-        compare = next(s for s in steps if s.get("name") == "Compare Windows OS locators on exact historical package")
-        build = next(s for s in steps if s.get("name") == "Windows configure, build and full tests")
-        self.assertLess(steps.index(download), steps.index(compare))
-        self.assertLess(steps.index(compare), steps.index(build))
-        self.assertEqual(download["env"], {"GH_TOKEN": "${{ github.token }}"})
-        self.assertIn("/repos/tanzercakir-commits/CodeSkeptic/actions/artifacts/10052976442/zip", download["run"])
-        for step in (download, compare):
-            self.assertEqual(step["if"], "runner.os == 'Windows'")
-            self.assertNotIn("continue-on-error", step)
-            self.assertIn(native.SDK_ARTIFACT_SHA256, step["run"])
-        self.assertIn("} finally {", compare["run"])
-        self.assertIn("--sdk-diagnostic", compare["run"])
         for step in steps:
-            if step is not download:
-                self.assertNotIn("GH_TOKEN", json.dumps(step))
-                self.assertNotIn("github.token", json.dumps(step))
+            for retired in ("10052976442", "--sdk-diagnostic", "GH_TOKEN", "github.token", "codeskeptic-sdk-historical"):
+                self.assertNotIn(retired, json.dumps(step))
         for step in steps:
             if step.get("name", "").startswith("Exact "):
                 self.assertEqual("--windows-os-locators" in step["run"], "Windows" in step["name"])

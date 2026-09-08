@@ -23,6 +23,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #ifdef __APPLE__
+#include "core/DarwinMemoryBudget.h"
 #include <mach/mach.h>
 #endif
 #endif
@@ -226,14 +227,8 @@ WorkerMemoryLimit::~WorkerMemoryLimit() {
 
 bool WorkerMemoryLimit::apply(unsigned memory_mb, std::string& error) {
     if (!validWorkerLimits({1, memory_mb})) { error = "invalid worker memory limit"; return false; }
+#ifndef __APPLE__
     const std::uint64_t bytes = static_cast<std::uint64_t>(memory_mb) * 1024 * 1024;
-#ifdef __APPLE__
-    // Observation only: never turn loader mappings into an extra allowance or
-    // substitute resident/footprint bytes for the address-space contract.
-    mach_task_basic_info_data_t entry_vm{};
-    mach_msg_type_number_t entry_count = MACH_TASK_BASIC_INFO_COUNT;
-    const auto entry_status = task_info(mach_task_self(), MACH_TASK_BASIC_INFO,
-        reinterpret_cast<task_info_t>(&entry_vm), &entry_count);
 #endif
 #ifdef _WIN32
     if (job_ || bytes > std::numeric_limits<SIZE_T>::max()) {
@@ -251,6 +246,50 @@ bool WorkerMemoryLimit::apply(unsigned memory_mb, std::string& error) {
         return false;
     }
     job_ = job;
+#elif defined(__APPLE__)
+    struct DarwinNative {
+        int native_errno = 0;
+        kern_return_t mach_status = KERN_SUCCESS;
+        bool readLimits(darwin_memory::Limits& result) {
+            struct rlimit value{};
+            if (getrlimit(RLIMIT_AS, &value) != 0) { native_errno = errno; return false; }
+            result = {value.rlim_cur, value.rlim_max};
+            return true;
+        }
+        bool readSnapshot(darwin_memory::Snapshot& result) {
+            mach_task_basic_info_data_t value{};
+            mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+            mach_status = task_info(mach_task_self(), MACH_TASK_BASIC_INFO,
+                reinterpret_cast<task_info_t>(&value), &count);
+            result = {value.virtual_size, count, MACH_TASK_BASIC_INFO_COUNT};
+            return mach_status == KERN_SUCCESS;
+        }
+        bool writeLimits(darwin_memory::Limits value) {
+            const struct rlimit limits{static_cast<rlim_t>(value.soft), static_cast<rlim_t>(value.hard)};
+            if (setrlimit(RLIMIT_AS, &limits) != 0) { native_errno = errno; return false; }
+            return true;
+        }
+    } native;
+    static_assert(std::numeric_limits<rlim_t>::digits <= 64);
+    const auto attempt = darwin_memory::install(native, memory_mb,
+        std::numeric_limits<rlim_t>::max(), RLIM_INFINITY);
+    if (attempt.stage != darwin_memory::Stage::Applied) {
+        // Bounded failure evidence only. A failed readback leaves any installed
+        // stricter limit in place; it never authorizes setup acknowledgement.
+        error = "cannot apply worker Darwin snapshot address-space limit; stage="
+            + std::to_string(static_cast<unsigned>(attempt.stage))
+            + "; native_errno=" + std::to_string(native.native_errno)
+            + "; mach_status=" + std::to_string(native.mach_status)
+            + "; snapshot_bytes=" + std::to_string(attempt.snapshot.bytes)
+            + "; snapshot_count=" + std::to_string(attempt.snapshot.count)
+            + "; allowance_mib=" + std::to_string(memory_mb)
+            + "; target_bytes=" + std::to_string(attempt.target)
+            + "; inherited_soft=" + std::to_string(attempt.inherited.soft)
+            + "; inherited_hard=" + std::to_string(attempt.inherited.hard)
+            + "; observed_soft=" + std::to_string(attempt.observed.soft)
+            + "; observed_hard=" + std::to_string(attempt.observed.hard);
+        return false;
+    }
 #else
     struct rlimit previous{};
     if (bytes > std::numeric_limits<rlim_t>::max() || getrlimit(RLIMIT_AS, &previous) != 0) {
@@ -260,39 +299,8 @@ bool WorkerMemoryLimit::apply(unsigned memory_mb, std::string& error) {
     if (previous.rlim_cur != RLIM_INFINITY) target = std::min(target, previous.rlim_cur);
     if (previous.rlim_max != RLIM_INFINITY) target = std::min(target, previous.rlim_max);
     const struct rlimit limits{target, target};
-#ifdef __APPLE__
-    mach_task_basic_info_data_t before_vm{};
-    mach_msg_type_number_t before_count = MACH_TASK_BASIC_INFO_COUNT;
-    const auto before_status = task_info(mach_task_self(), MACH_TASK_BASIC_INFO,
-        reinterpret_cast<task_info_t>(&before_vm), &before_count);
-#endif
     if (setrlimit(RLIMIT_AS, &limits) != 0) {
-#ifdef __APPLE__
-        const int native_errno = errno;  // Capture before any other native call.
-        struct rlimit after{};
-        const int after_status = getrlimit(RLIMIT_AS, &after);
-#endif
         error = "cannot apply worker address-space limit";
-#ifdef __APPLE__
-        // Bounded numeric failure evidence, no environment/path dump. These
-        // Mach observations are not asserted equivalent to XNU's limit counter.
-        error += "; darwin_limit_errno=" + std::to_string(native_errno)
-            + "; resource=" + std::to_string(RLIMIT_AS)
-            + "; requested_bytes=" + std::to_string(bytes)
-            + "; target_bytes=" + std::to_string(target)
-            + "; previous_soft=" + std::to_string(previous.rlim_cur)
-            + "; previous_hard=" + std::to_string(previous.rlim_max)
-            + "; after_query=" + std::to_string(after_status)
-            + "; after_soft=" + std::to_string(after.rlim_cur)
-            + "; after_hard=" + std::to_string(after.rlim_max)
-            + "; page_size=" + std::to_string(sysconf(_SC_PAGESIZE))
-            + "; entry_query=" + std::to_string(entry_status)
-            + "; entry_virtual_bytes=" + std::to_string(entry_vm.virtual_size)
-            + "; entry_resident_bytes=" + std::to_string(entry_vm.resident_size)
-            + "; before_query=" + std::to_string(before_status)
-            + "; before_virtual_bytes=" + std::to_string(before_vm.virtual_size)
-            + "; before_resident_bytes=" + std::to_string(before_vm.resident_size);
-#endif
         return false;
     }
 #endif

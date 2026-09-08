@@ -182,12 +182,28 @@ the checked cap before configuration, summary import or AST analysis and
 acknowledges setup. This is not a limit on the parent, loader startup, aggregate
 machine memory, or an equal cross-platform RSS measurement:
 
-- Linux/POSIX uses `RLIMIT_AS`, bounding virtual address space; any stricter
+- Linux/other POSIX uses an absolute `RLIMIT_AS` cap of N MiB, bounding virtual
+  address space; any stricter
   inherited soft/hard limit is retained rather than raised.
+- macOS uses N MiB as an allowance above **one startup
+  `MACH_TASK_BASIC_INFO.virtual_size` snapshot**, taken at that same worker
+  setup point. It fixes the absolute `RLIMIT_AS` ceiling to checked snapshot +
+  N MiB, clamped down to every finite inherited soft/hard limit. Both limits
+  must be installed and read back exactly; query, arithmetic, installation or
+  readback failure refuses setup. There is no retry with a higher baseline or
+  unlimited fallback. This is not a resident/committed-memory, heap-byte or
+  cumulative-allocation budget: existing reservations can be reused/touched
+  without map growth. Later unmapping does not reduce the fixed ceiling and
+  can leave more than N MiB headroom relative to the later smaller map.
 - The Windows implementation uses a private process-memory Job Object, retained
   throughout that worker, to constrain committed memory. Failure to create or
   assign it is a failure, not silently unlimited execution. Native Windows/macOS
   runtime qualification of these new limits is not established by Linux tests.
+
+The macOS snapshot is an observed Mach value, not a claim of equality with the
+kernel's raw mapping counter. A conservative observation or concurrent mapping
+change can cause setup failure. The owner authorized this macOS-specific
+contract on 2026-09-08; Linux and Windows retain their original meanings.
 
 Source reasons distinguish `worker_timeout`, `worker_cancelled`,
 `worker_memory_limit_unavailable` and an observed allocation failure

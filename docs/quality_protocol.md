@@ -156,3 +156,35 @@ skip accounting, all applicable source/hosted gates and independent applied-
 freeze review remain required. Darwin memory diagnostics preserve the existing
 cap and fail-closed behavior; this record does not approve a larger or redefined
 memory budget, claim that issue fixed, or qualify the whole platform unit.
+
+## 6. Owner-authorized macOS memory contract — 2026-09-08
+
+After the preceding diagnostics-only work, the owner explicitly authorized a
+prospective macOS memory-contract redesign, preserving Linux/Windows behavior.
+This later decision does not rewrite section 5, the earlier reviewed boundary,
+or any failed campaign. Applied scope edge `a1b1997` adds only the four necessary
+implementation/documentation/test paths; independent review confirmed unchanged
+acceptance, T3 budget/checks, FIFO, completed records and main.
+
+The new contract is documented in [usage.md](usage.md): one startup Mach virtual
+size snapshot plus checked MiB allowance, fixed as a finite absolute RLIMIT_AS
+ceiling no greater than inherited finite limits, with exact soft/hard readback.
+No repeated baseline, upward retry, RSS substitution or unlimited fallback.
+Existing mappings and later unmapping carry the explicit limitations documented
+there. Arithmetic/OS-sequence checks are synthetic, not native qualification.
+
+The additive Darwin resource tests retain every original body/assertion,
+including the actual 128 MiB touched-allocation rejection. New child controls
+require the same 192 MiB anonymous/private read-write mapping to succeed before
+lowering limits, then fail with ENOMEM after installing the cap while an 8 MiB
+volatile-touched positive mapping remains live. The large control is unmapped
+without physical-page touching; missing control or unexpected success fails,
+never skips. Separate inherited-soft/hard cases and unchanged-parent checks
+exercise the actual native API. They cannot turn the prior setup failure into
+allocation-denial evidence without a fresh successful native run.
+
+Only the necessary protected resource-test input and its digest links may gain
+a separately independently classified prospective successor. All other inputs,
+52 CWE cases, expectations, floors and historical results remain unchanged.
+Native package scans, full hosted gates and exact-head independent review remain
+required; source reasoning or local tests alone do not qualify macOS.

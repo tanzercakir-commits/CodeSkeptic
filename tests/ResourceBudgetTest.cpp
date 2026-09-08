@@ -21,7 +21,98 @@
 #include <unistd.h>
 #endif
 
+#ifdef __APPLE__
+#include <cerrno>
+#include <cstdio>
+#include <limits>
+#include <mach/mach.h>
+#include <sys/mman.h>
+#include <sys/resource.h>
+#endif
+
 #ifdef CODESKEPTIC_RESOURCE_TEST_CHILD
+
+#ifdef __APPLE__
+bool darwinSnapshot(std::uint64_t& bytes) {
+    mach_task_basic_info_data_t value{};
+    mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+    const auto status = task_info(mach_task_self(), MACH_TASK_BASIC_INFO,
+        reinterpret_cast<task_info_t>(&value), &count);
+    bytes = value.virtual_size;
+    return status == KERN_SUCCESS && count == MACH_TASK_BASIC_INFO_COUNT && bytes != 0;
+}
+
+int darwinMappingLimit(const std::string& inherited_mode) {
+    constexpr std::uint64_t mib = 1024 * 1024;
+    constexpr std::size_t large = 192 * mib, small = 8 * mib;
+    constexpr int protection = PROT_READ | PROT_WRITE, flags = MAP_PRIVATE | MAP_ANON;
+    auto fail = [](int stage) {
+        std::fprintf(stderr, "darwin-native-budget failure_stage=%d errno=%d\n", stage, errno);
+        return stage;
+    };
+    // Same-request positive control BEFORE lowering any cap. Reserve address
+    // space only: do not touch 192 MiB of physical pages. Missing control fails.
+    void* control = mmap(nullptr, large, protection, flags, -1, 0);
+    if (control == MAP_FAILED) return fail(70);
+    if (munmap(control, large) != 0) return fail(71);
+    std::fprintf(stdout, "darwin-native-budget precontrol_bytes=%zu passed=1\n", large);
+    struct rlimit inherited{};
+    if (getrlimit(RLIMIT_AS, &inherited) != 0) return fail(72);
+    if (inherited_mode != "none") {
+        std::uint64_t baseline = 0;
+        if (!darwinSnapshot(baseline) || baseline >= RLIM_INFINITY - 96*mib) return fail(73);
+        const bool soft_only = inherited_mode == "soft";
+        if (!soft_only && inherited_mode != "hard") return fail(74);
+        rlim_t soft = static_cast<rlim_t>(baseline + (soft_only ? 32 : 64)*mib);
+        rlim_t hard = static_cast<rlim_t>(baseline + (soft_only ? 96 : 64)*mib);
+        // Never raise either inherited host limit, even in the test child.
+        if (inherited.rlim_max != RLIM_INFINITY) hard = std::min(hard, inherited.rlim_max);
+        if (inherited.rlim_cur != RLIM_INFINITY) soft = std::min(soft, inherited.rlim_cur);
+        soft = std::min(soft, hard);
+        inherited = {soft, hard};
+        if (setrlimit(RLIMIT_AS, &inherited) != 0) return fail(75);
+    }
+    codeskeptic::WorkerMemoryLimit cap;
+    std::string error;
+    if (!cap.apply(128, error)) {
+        std::fprintf(stderr, "%s\n", error.c_str());
+        return fail(76);
+    }
+    struct rlimit installed{};
+    if (getrlimit(RLIMIT_AS, &installed) != 0 || installed.rlim_cur == RLIM_INFINITY ||
+        installed.rlim_cur != installed.rlim_max || installed.rlim_cur == 0) return fail(77);
+    if ((inherited.rlim_cur != RLIM_INFINITY && installed.rlim_cur > inherited.rlim_cur) ||
+        (inherited.rlim_max != RLIM_INFINITY && installed.rlim_max > inherited.rlim_max)) return fail(78);
+    if (inherited_mode != "none" && installed.rlim_cur != inherited.rlim_cur) return fail(79);
+    void* positive = mmap(nullptr, small, protection, flags, -1, 0);
+    if (positive == MAP_FAILED) return fail(80);
+    struct ReleasePositive {
+        void* address;
+        ~ReleasePositive() { munmap(address, small); }
+    } release{positive};
+    const long page = sysconf(_SC_PAGESIZE);
+    if (page <= 0 || static_cast<std::size_t>(page) > small) return fail(81);
+    auto* touched = static_cast<volatile unsigned char*>(positive);
+    for (std::size_t offset = 0; offset < small; offset += static_cast<std::size_t>(page))
+        touched[offset] = 0x5a; // Volatile: an optimizing build must perform touches.
+    std::uint64_t current = 0;
+    if (!darwinSnapshot(current) || current > installed.rlim_cur ||
+        large <= installed.rlim_cur - current) return fail(82);
+    errno = 0;
+    void* rejected = mmap(nullptr, large, protection, flags, -1, 0);
+    const int denial_errno = errno;
+    if (rejected != MAP_FAILED) {
+        munmap(rejected, large); // Unexpected success must not touch host RAM.
+        return fail(83);
+    }
+    if (denial_errno != ENOMEM) return fail(84);
+    std::fprintf(stdout, "darwin-native-budget target_bytes=%llu observed_bytes=%llu "
+        "positive_bytes=%zu refused_bytes=%zu denial_errno=%d\n",
+        static_cast<unsigned long long>(installed.rlim_cur),
+        static_cast<unsigned long long>(current), small, large, denial_errno);
+    return 0;
+}
+#endif
 
 int consumeMemory(unsigned memory_mb) {
     codeskeptic::WorkerMemoryLimit cap;
@@ -64,6 +155,9 @@ int main(int argc, char** argv) {
     if (argc != 4) return 2;
     const std::string mode(argv[1]);
     std::ofstream(argv[3]) << "started\n";
+#ifdef __APPLE__
+    if (mode == "darwin-mapping") return darwinMappingLimit(argv[2]);
+#endif
     if (mode == "sleep") {
         std::this_thread::sleep_for(std::chrono::seconds(30));
         return 0;
@@ -182,6 +276,39 @@ TEST_F(ResourceBudgetTest, RealNativeMemoryCapRejectsTouchedAllocations) {
     ASSERT_EQ(setup.stop, ResourceStop::Exited);
     EXPECT_EQ(setup.exit_code, 90);
 }
+
+#ifdef __APPLE__
+TEST_F(ResourceBudgetTest, DarwinFiniteCeilingHasPositiveControlAndKernelMappingDenial) {
+    struct rlimit before{}, after{};
+    ASSERT_EQ(getrlimit(RLIMIT_AS, &before), 0);
+    const auto result = child("darwin-mapping", "none", {5000, 128});
+    std::ifstream errors(root / "stderr"), output(root / "stdout");
+    const std::string detail{std::istreambuf_iterator<char>(errors), {}};
+    std::cout << std::string(std::istreambuf_iterator<char>(output), {});
+    EXPECT_EQ(result.stop, ResourceStop::Exited) << result.detail << detail;
+    EXPECT_EQ(result.exit_code, 0) << detail;
+    ASSERT_EQ(getrlimit(RLIMIT_AS, &after), 0);
+    EXPECT_EQ(after.rlim_cur, before.rlim_cur);
+    EXPECT_EQ(after.rlim_max, before.rlim_max);
+}
+
+TEST_F(ResourceBudgetTest, DarwinRetainsStricterInheritedSoftAndHardCeilings) {
+    struct rlimit before{}, after{};
+    ASSERT_EQ(getrlimit(RLIMIT_AS, &before), 0);
+    for (const std::string mode : {"soft", "hard"}) {
+        SCOPED_TRACE(mode);
+        const auto result = child("darwin-mapping", mode, {5000, 128});
+        std::ifstream errors(root / "stderr"), output(root / "stdout");
+        const std::string detail{std::istreambuf_iterator<char>(errors), {}};
+        std::cout << std::string(std::istreambuf_iterator<char>(output), {});
+        EXPECT_EQ(result.stop, ResourceStop::Exited) << result.detail << detail;
+        EXPECT_EQ(result.exit_code, 0) << detail;
+        ASSERT_EQ(getrlimit(RLIMIT_AS, &after), 0);
+        EXPECT_EQ(after.rlim_cur, before.rlim_cur);
+        EXPECT_EQ(after.rlim_max, before.rlim_max);
+    }
+}
+#endif
 
 TEST_F(ResourceBudgetTest, SuccessNonzeroCrashAndLaunchFailureRemainDistinct) {
     for (int code : {0, 7}) {

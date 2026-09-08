@@ -75,7 +75,26 @@ the fresh candidate use the explicit OS-locator profile, still requiring all six
 unchanged C/C++ scans and full tests. The frozen no-developer-prompt Windows guard
 remains separate and unchanged. Missing/expired historical input is an explicit
 diagnostic failure; this temporary wiring must not become a permanent release
-dependency. No successful native SDK comparison is claimed before its actual run.
+dependency.
+
+That temporary experiment subsequently ran and was independently checked in
+job `102065286527`, run `34227551813`, at source
+`bdba538d9517665470badfe1b9e3cd6ac5291921`. The pinned historical A/B reproduced
+exit 2 without the four OS locators and complete findings/exit 1 with them.
+The fresh Windows package separately passed all six scans and full tests;
+outer artifact `10057354923` has SHA-256
+`c11a3efb3140aac9904210dd44db29b5f447f781c207b51589cd51010dc689d5`.
+The ordinary frozen Windows lane `34227551814` also succeeded. The overall
+native run still failed because macOS could not install its former absolute
+MiB address-space cap; no all-platform completion is claimed.
+
+With the diagnostic evidence retained, the candidate workflow no longer repeats
+that historical download/A/B or requests its Actions-read permission. The
+diagnostic helper and old failures remain available in history; current SDK
+discovery, six scan fixtures and full qualification gates are unchanged.
+The owner subsequently approved the macOS-only snapshot-based memory contract
+in [usage.md](usage.md). Its actual native enforcement and the new exact-head
+platform qualification remain pending.
 
 ## Historical support foundation
 

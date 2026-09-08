@@ -57,6 +57,11 @@ ResourceProcessResult runResourceWorker(const std::string& executable,
 // Worker-only: changes this process's limits, never the parent's. A successful
 // Windows application retains its private Job handle for this object's lifetime.
 // POSIX address-space and Windows committed-memory caps are NOT equal RSS limits.
+// On macOS only, MiB is added to ONE startup MACH_TASK_BASIC_INFO.virtual_size
+// snapshot. The finite absolute RLIMIT_AS ceiling is clamped to inherited limits,
+// installed once and read back exactly. It does not bound resident/committed
+// memory or reuse/touching of existing mappings. Later unmapping does not lower
+// the ceiling, so remaining headroom can then exceed the original allowance.
 class WorkerMemoryLimit {
 public:
     WorkerMemoryLimit() = default;
