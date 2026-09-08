@@ -4,12 +4,15 @@ import os
 import argparse
 import contextlib
 import copy
+import errno
 import io
 import json
 from pathlib import Path
 import re
+import runpy
 import shutil
 import subprocess
+import sys
 import tempfile
 import tarfile
 import unittest
@@ -511,6 +514,39 @@ class WindowsSdkDiagnosticTests(unittest.TestCase):
             with self.subTest(code=code, stdio=stdio), tempfile.TemporaryDirectory(dir=self.work) as folder:
                 result = self.synthetic_diagnostic(Path(folder), code, stdio)
                 self.assertFalse(result["baseline_failure_then_locator_finding"])
+
+
+class FilesystemPrerequisiteTests(unittest.TestCase):
+    def fixture_case(self, root):
+        # Import declarations only. No analyzer, unittest runner or test setUp
+        # is invoked by these synthetic prerequisite-boundary checks.
+        with patch.object(sys, "argv", ["CompilationDatabaseCliTest.py", sys.executable]):
+            module = runpy.run_path(str(REPO / "tests/CompilationDatabaseCliTest.py"), run_name="prerequisite_fixture")
+        case = module["CompilationDatabaseCliTest"]()
+        case.root = root
+        return case
+
+    def test_only_darwin_eilseq_is_an_explicit_unexecuted_prerequisite(self):
+        with tempfile.TemporaryDirectory(prefix="byte-name-prerequisite-") as folder:
+            case = self.fixture_case(Path(folder))
+            for host, error, expected in (("darwin", errno.EILSEQ, unittest.SkipTest),
+                                         ("linux", errno.EILSEQ, OSError), ("darwin", errno.EACCES, OSError),
+                                         ("darwin", errno.ENOSPC, OSError), ("darwin", errno.EIO, OSError),
+                                         ("darwin", errno.EEXIST, OSError)):
+                with self.subTest(host=host, error=error), patch.object(sys, "platform", host), \
+                        patch.object(os, "open", side_effect=OSError(error, "synthetic prerequisite failure")), \
+                        self.assertRaises(expected):
+                    case.require_non_utf8_filename_filesystem()
+
+    def test_supported_filesystem_runs_and_only_its_owned_probe_is_removed(self):
+        with tempfile.TemporaryDirectory(prefix="byte-name-prerequisite-") as folder:
+            root = Path(folder)
+            sentinel = root / "keep.txt"
+            sentinel.write_bytes(b"unchanged")
+            case = self.fixture_case(root)
+            case.require_non_utf8_filename_filesystem()
+            self.assertEqual(list(root.iterdir()), [sentinel])
+            self.assertEqual(sentinel.read_bytes(), b"unchanged")
 
 
 class CheckpointTimeTests(unittest.TestCase):

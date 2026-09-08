@@ -22,6 +22,9 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <mach/mach.h>
+#endif
 #endif
 
 namespace codeskeptic {
@@ -224,6 +227,14 @@ WorkerMemoryLimit::~WorkerMemoryLimit() {
 bool WorkerMemoryLimit::apply(unsigned memory_mb, std::string& error) {
     if (!validWorkerLimits({1, memory_mb})) { error = "invalid worker memory limit"; return false; }
     const std::uint64_t bytes = static_cast<std::uint64_t>(memory_mb) * 1024 * 1024;
+#ifdef __APPLE__
+    // Observation only: never turn loader mappings into an extra allowance or
+    // substitute resident/footprint bytes for the address-space contract.
+    mach_task_basic_info_data_t entry_vm{};
+    mach_msg_type_number_t entry_count = MACH_TASK_BASIC_INFO_COUNT;
+    const auto entry_status = task_info(mach_task_self(), MACH_TASK_BASIC_INFO,
+        reinterpret_cast<task_info_t>(&entry_vm), &entry_count);
+#endif
 #ifdef _WIN32
     if (job_ || bytes > std::numeric_limits<SIZE_T>::max()) {
         error = "worker memory limit cannot be represented or was already applied"; return false;
@@ -249,8 +260,40 @@ bool WorkerMemoryLimit::apply(unsigned memory_mb, std::string& error) {
     if (previous.rlim_cur != RLIM_INFINITY) target = std::min(target, previous.rlim_cur);
     if (previous.rlim_max != RLIM_INFINITY) target = std::min(target, previous.rlim_max);
     const struct rlimit limits{target, target};
+#ifdef __APPLE__
+    mach_task_basic_info_data_t before_vm{};
+    mach_msg_type_number_t before_count = MACH_TASK_BASIC_INFO_COUNT;
+    const auto before_status = task_info(mach_task_self(), MACH_TASK_BASIC_INFO,
+        reinterpret_cast<task_info_t>(&before_vm), &before_count);
+#endif
     if (setrlimit(RLIMIT_AS, &limits) != 0) {
-        error = "cannot apply worker address-space limit"; return false;
+#ifdef __APPLE__
+        const int native_errno = errno;  // Capture before any other native call.
+        struct rlimit after{};
+        const int after_status = getrlimit(RLIMIT_AS, &after);
+#endif
+        error = "cannot apply worker address-space limit";
+#ifdef __APPLE__
+        // Bounded numeric failure evidence, no environment/path dump. These
+        // Mach observations are not asserted equivalent to XNU's limit counter.
+        error += "; darwin_limit_errno=" + std::to_string(native_errno)
+            + "; resource=" + std::to_string(RLIMIT_AS)
+            + "; requested_bytes=" + std::to_string(bytes)
+            + "; target_bytes=" + std::to_string(target)
+            + "; previous_soft=" + std::to_string(previous.rlim_cur)
+            + "; previous_hard=" + std::to_string(previous.rlim_max)
+            + "; after_query=" + std::to_string(after_status)
+            + "; after_soft=" + std::to_string(after.rlim_cur)
+            + "; after_hard=" + std::to_string(after.rlim_max)
+            + "; page_size=" + std::to_string(sysconf(_SC_PAGESIZE))
+            + "; entry_query=" + std::to_string(entry_status)
+            + "; entry_virtual_bytes=" + std::to_string(entry_vm.virtual_size)
+            + "; entry_resident_bytes=" + std::to_string(entry_vm.resident_size)
+            + "; before_query=" + std::to_string(before_status)
+            + "; before_virtual_bytes=" + std::to_string(before_vm.virtual_size)
+            + "; before_resident_bytes=" + std::to_string(before_vm.resident_size);
+#endif
+        return false;
     }
 #endif
     error.clear();

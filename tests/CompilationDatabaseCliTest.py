@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Hermetic compilation-database discovery checks using the real CLI."""
 
+import errno
 import json
 import os
 from pathlib import Path
@@ -89,6 +90,23 @@ class CompilationDatabaseCliTest(unittest.TestCase):
             reports.append(coverage)
         self.assertEqual(reports[0], reports[1])
         return reports[0]
+
+    def require_non_utf8_filename_filesystem(self):
+        # These tests need actual directory entries, not just invalid argv.
+        # Native Darwin's fixture filesystem was measured rejecting their names
+        # with EILSEQ. Keep that prerequisite visible as SKIP, never a PASS;
+        # Linux and all other errors still fail rather than losing coverage.
+        probe = os.fsencode(self.root) + b"/codeskeptic-byte-probe-\xff"
+        try:
+            descriptor = os.open(probe, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except OSError as error:
+            if sys.platform == "darwin" and error.errno == errno.EILSEQ:
+                self.skipTest("Darwin fixture filesystem rejects non-UTF8 filenames (EILSEQ); filesystem assertions unexecuted")
+            raise
+        try:
+            os.close(descriptor)
+        finally:
+            os.unlink(probe)  # Exactly the exclusively created owned probe.
 
     def corpus_inputs(self, database, root, anchor, output, expected=0):
         producer = Path(BINARY).with_name("codeskeptic_corpus_inputs" + Path(BINARY).suffix)
@@ -411,6 +429,7 @@ class CompilationDatabaseCliTest(unittest.TestCase):
 
     @unittest.skipUnless(os.name == "posix", "non-UTF8 filesystem bytes require POSIX")
     def test_non_utf8_source_identity_cannot_corrupt_coverage_json(self):
+        self.require_non_utf8_filename_filesystem()
         for name in (b"invalid-\xff.cpp", b"invalid-\xfe.cpp", b"parent-\xff/valid.cpp"):
             source = self.root / os.fsdecode(name)
             source.parent.mkdir(exist_ok=True)
@@ -441,6 +460,7 @@ class CompilationDatabaseCliTest(unittest.TestCase):
 
     @unittest.skipUnless(os.name == "posix", "non-UTF8 filesystem bytes require POSIX")
     def test_mixed_source_encodings_preserve_every_requested_identity(self):
+        self.require_non_utf8_filename_filesystem()
         invalid = self.root / os.fsdecode(b"invalid-\xff.cpp")
         invalid.write_text("int safe(){return 0;}\n", encoding="utf-8")
         coverage = self.coverage_formats([self.root, "--accept-partial-coverage"], 2)
@@ -455,6 +475,7 @@ class CompilationDatabaseCliTest(unittest.TestCase):
 
     @unittest.skipUnless(os.name == "posix", "non-UTF8 filesystem bytes require POSIX")
     def test_non_utf8_canonical_symlink_target_is_reported_and_mcp_recovers(self):
+        self.require_non_utf8_filename_filesystem()
         source = self.root / os.fsdecode(b"target-\xff.cpp")
         source.write_text("int safe(){return 0;}\n", encoding="utf-8")
         alias = self.root / "alias.cpp"
@@ -489,6 +510,7 @@ class CompilationDatabaseCliTest(unittest.TestCase):
 
     @unittest.skipUnless(os.name == "posix", "non-UTF8 filesystem bytes require POSIX")
     def test_unrequested_database_symlink_with_non_utf8_target_fails_without_crash(self):
+        self.require_non_utf8_filename_filesystem()
         target = self.root / os.fsdecode(b"target-\xff.cpp")
         target.write_text("int safe(){return 0;}\n", encoding="utf-8")
         alias = self.root / "alias.cpp"
@@ -502,6 +524,48 @@ class CompilationDatabaseCliTest(unittest.TestCase):
         self.assertEqual(coverage["failed_tus"], 1)
         self.assertEqual(coverage["sources"][0]["file"], str(self.source))
         self.assertEqual(coverage["sources"][0]["reason"], "compilation_input_unavailable")
+
+    @unittest.skipUnless(os.name == "posix", "raw non-UTF8 argv bytes require POSIX")
+    def test_non_utf8_requested_paths_are_rejected_without_creating_files(self):
+        identities = set()
+        for name in (b"absent-\xff.cpp", b"absent-\xfe.cpp", b"absent-parent-\xff/valid.cpp"):
+            source = self.root / os.fsdecode(name)
+            identity = "codeskeptic-bytes:" + os.fsencode(source).hex()
+            identities.add(identity)
+            for flag in (None, "--accept-partial-coverage", "--analyze-broken-tus"):
+                with self.subTest(name=name, flag=flag):
+                    coverage = self.coverage_formats([source, *([flag] if flag else [])], 2)
+                    self.assertFalse(coverage["complete"])
+                    self.assertEqual(coverage["attempted_tus"], 1)
+                    self.assertEqual(coverage["failed_tus"], 1)
+                    self.assertEqual(coverage["attempted_commands"], 0)
+                    self.assertEqual(len(coverage["sources"]), 1)
+                    row = coverage["sources"][0]
+                    self.assertEqual(row["file"], identity)
+                    self.assertEqual(row["status"], "failed")
+                    self.assertEqual(row["reason"], "source_path_not_utf8")
+            output = self.root / "absent-byte-path.html"
+            result = self.run_cli(source, "--html", output)
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            html = output.read_text(encoding="utf-8")
+            self.assertIn(identity, html)
+            self.assertIn("Full coverage: no", html)
+            self.assertIn("source_path_not_utf8", html)
+            self.doctor(source, expected=2)
+        self.assertEqual(len(identities), 3)
+
+    def test_valid_utf8_missing_path_is_not_mislabeled_as_invalid_encoding(self):
+        source = self.root / "absent-çalışma.cpp"
+        self.assertFalse(source.exists())
+        coverage = self.coverage_formats([source], 2)
+        self.assertFalse(coverage["complete"])
+        self.assertEqual(coverage["attempted_tus"], 1)
+        self.assertEqual(coverage["failed_tus"], 1)
+        self.assertEqual(len(coverage["sources"]), 1)
+        row = coverage["sources"][0]
+        self.assertEqual(row["file"], str(source))
+        self.assertEqual(row["status"], "failed")
+        self.assertNotEqual(row["reason"], "source_path_not_utf8")
 
     def test_valid_unicode_source_identity_round_trips_all_coverage_formats(self):
         source = self.root / "çalışma-λ-�.cpp"

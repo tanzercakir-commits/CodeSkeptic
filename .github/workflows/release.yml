@@ -510,6 +510,11 @@ jobs:
           set -euo pipefail
           logs="$RUNNER_TEMP/codeskeptic-native-build"
           mkdir "$logs"
+          # Give temporary evidence a canonical, non-symlink ancestor. Keep the
+          # campaign's strict symlink rejection, including in synthetic tests.
+          export TMPDIR="$(cd "$RUNNER_TEMP" && pwd -P)/codeskeptic-native-test-tmp"
+          mkdir "$TMPDIR"
+          printf 'test_tmpdir=%s\n' "$TMPDIR" | tee "$logs/test-environment.log"
           cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="$(brew --prefix llvm@20)" 2>&1 | tee "$logs/configure.log"
           cmake --build build --parallel 2 2>&1 | tee "$logs/build.log"
