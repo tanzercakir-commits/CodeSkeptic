@@ -110,3 +110,49 @@ FIFO unit or a reviewed future plan amendment: retain the old catalog in Git,
 record the reason and old/new digests, classify changed rows independently and
 freeze the successor before a fresh measurement. Existing failures remain
 failures; no silent removal, threshold reduction or retroactive success.
+
+## 5. CH06 native-filesystem prerequisite successor — 2026-09-08
+
+Actual macOS arm64 run `34222316673`, source
+`a3c3c60acc187dce76bc0f24be8a56185c886cce`, could not create the invalid-byte
+filenames needed by four compilation-input tests: Darwin returned `EILSEQ`
+before analyzer execution. The retained failed artifact `10054475612` has
+SHA-256 `f0952996639e18cabd3a474e0dadba332073c12c45d3678552be45f2c173dd34`.
+That run remains failed, including its separate worker-memory setup failures.
+
+The current FRONT's independently applied scope edge `46b7db6` admitted the
+necessary prerequisite correction, not an acceptance or policy rewrite.
+At candidate `0fc8ebe849ba26c0ef5afa0fc9913d3c12cd9ee6`, read-only verifier
+`/root/gtest_measurement_verifier` independently classified the exact change
+and recomputed the successor digests below before this prospective freeze.
+All four original bodies/assertions remain byte-identical except for an added
+prerequisite call. Only measured Darwin `EILSEQ` from exclusively creating an
+owned probe permits an explicit SKIP; Linux and all other errors remain blocking.
+Those filesystem assertions are **unexecuted**, not passed, on such a filesystem.
+
+Two additional controls execute real CLI rejection without creating a file:
+distinct invalid POSIX argv paths (including an invalid parent) must retain
+encoded identity, exit 2, failed coverage and refusal of partial/recovery flags
+across JSON/SARIF/console/HTML; a valid UTF-8 missing path must not be mislabeled
+as invalid encoding. These complement rather than replace the directory and
+canonical-symlink cases, which continue to require an actual compatible
+filesystem. Windows retains its existing POSIX-only exclusions.
+
+| Bound input | Previous SHA-256 | Successor SHA-256 |
+|---|---|---|
+| `tests/CompilationDatabaseCliTest.py` | `7cb7bf40058443262cc6012ea3e25b55dc50b6ccc78052debce1a5ee9b426984` | `becbc2719da069b8763b9c15848aa210611595e0d66bd7902c36290e43d0fe6a` |
+| `regression_inventory.json` | `2d39b4f324b151f012585e50c175af3f2186c4d1b3ba3dc4868d7c1228425c75` | `2d1de674463568b8d9fc7927c1d7d2b4e2b295bc9cb4fbcb63410d5876e69060` |
+| `catalog.json` | `4ed2c19615b70b41fa41413ba4269b20ab84000103fa2517964e7c02a69ac048` | `ae87d17d8894cebacf4f56eb5a1fdc0c03249aad9ea4011f8087745d53ba0594` |
+
+Only this single inventory row and its catalog digest link change. The old
+inputs remain in Git; all other 123 rows, all 52 CWE cases/expected findings,
+selection base, registry, floors, previous measurements and completed contracts
+remain unchanged. No expectations were derived from analyzer output.
+
+The proposed six-test Linux check passed without skips using the explicitly
+older `9040852` executable; it is not new-candidate or native macOS evidence.
+The 47 offline harness checks also passed. Fresh native execution, explicit
+skip accounting, all applicable source/hosted gates and independent applied-
+freeze review remain required. Darwin memory diagnostics preserve the existing
+cap and fail-closed behavior; this record does not approve a larger or redefined
+memory budget, claim that issue fixed, or qualify the whole platform unit.

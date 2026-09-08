@@ -168,7 +168,7 @@
     },
     {
       "path": "tests/CompilationDatabaseCliTest.py",
-      "sha256": "7cb7bf40058443262cc6012ea3e25b55dc50b6ccc78052debce1a5ee9b426984"
+      "sha256": "becbc2719da069b8763b9c15848aa210611595e0d66bd7902c36290e43d0fe6a"
     },
     {
       "path": "tests/ConfigTest.cpp",
