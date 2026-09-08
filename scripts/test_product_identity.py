@@ -298,6 +298,29 @@ class DocumentTests(unittest.TestCase):
             with self.subTest(mutation=mutation), self.assertRaises(identity.IdentityError):
                 identity.validate_document(value)
 
+    def test_resolved_targets_cannot_also_be_aliases_in_either_order(self):
+        for reverse in (False, True):
+            for same_contents in (False, True):
+                value = copy.deepcopy(self.document)
+                records = [('/alias/a.h', '/sdk/b.h', 'd' * 64),
+                           ('/sdk/b.h', '/sdk/c.h', ('d' if same_contents else 'e') * 64)]
+                if reverse:
+                    records.reverse()
+                for language, (path, resolved, sha) in zip(('c', 'c++'), records):
+                    value['probes'][language]['headers'][0].update(path=path, resolved_path=resolved, sha256=sha)
+                    value['probes'][language]['command']['stdout'] = 'identity-probe: ' + path + '\n'
+                with self.subTest(reverse=reverse, same_contents=same_contents), self.assertRaises(identity.IdentityError):
+                    identity.validate_document(value)
+
+    def test_stable_aliases_and_direct_target_share_one_identity(self):
+        for paths in (('/alias/a.h', '/sdk/b.h'), ('/sdk/b.h', '/alias/a.h'), ('/alias/a.h', '/alias/c.h')):
+            value = copy.deepcopy(self.document)
+            for language, path in zip(('c', 'c++'), paths):
+                value['probes'][language]['headers'][0].update(path=path, resolved_path='/sdk/b.h')
+                value['probes'][language]['command']['stdout'] = 'identity-probe: ' + path + '\n'
+            with self.subTest(paths=paths):
+                self.assertTrue(identity.validate_document(value)['metadata_only'])
+
     def test_structural_check_is_not_native_or_product_qualification(self):
         result = identity.validate_document(self.document)
         self.assertTrue(result['metadata_only'])

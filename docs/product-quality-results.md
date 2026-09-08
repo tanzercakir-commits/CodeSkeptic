@@ -125,6 +125,10 @@ başarısızdır; 114 geçen test bunu PASS'e çevirmedi. Dört odaklı RED ve e
 CLT kontrolleri ardından reader bağları düzeltildi; yeni exact-head inceleme gerekir.
 Kanıt runner'ındaki ayrı `ready_to_freeze`/`task_ready` marker hatasının başarısız
 attempt'i de korunur; bu yardımcı hata analyzer veya ürün regression'u değildir.
+`85a4d7a` incelemesi ayrıca bir resolved hedefin başka kayıtta alias olabildiğini
+buldu. İki karşılaşma sırası ve eşit/farklı içerik için dört RED korunur; tek ortak
+logical/resolved kimlik tablosu ve gerçekçi safe-alias kontrolleriyle düzeltildi.
+Bu ikinci başarısız inceleme de sonradan PASS diye etiketlenmez.
 
 Bu checkpoint'te hosted identity gözlemi henüz yoktur. Workflow sadece kurulu Clang'ı
 gözler; LLVM-20/nihai API modeline seçildiği veya native qualification geçtiği

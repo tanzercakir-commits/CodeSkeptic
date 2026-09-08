@@ -421,17 +421,16 @@ def validate_document(value):
     all_files = ([tool['file'] for tool in value['tools'].values()]
                  + [record for probe in value['probes'].values() for record in probe['headers']])
     all_files.append(metadata[{'Linux': 'os_release_file', 'Darwin': 'sdk_settings', 'Windows': 'locator'}[host['system']]])
-    by_name, by_resolved = {}, {}
+    bindings = {}
     path_type = PureWindowsPath if flavor == 'windows' else PurePosixPath
     for record in all_files:
         path, resolved = path_type(record['path']), path_type(record['resolved_path'])
         require('..' not in resolved.parts, 'resolved identity path is not canonical')
         identity = (resolved, record['bytes'], record['sha256'])
-        contents = (record['bytes'], record['sha256'])
-        require(path not in by_name or by_name[path] == identity, 'one path carries inconsistent identities')
-        require(resolved not in by_resolved or by_resolved[resolved] == contents,
-                'resolved input aliases carry inconsistent contents')
-        by_name[path], by_resolved[resolved] = identity, contents
+        for name in (path, resolved):
+            require(name not in bindings or bindings[name] == identity,
+                    'logical/resolved input names carry inconsistent identities')
+            bindings[name] = identity
     require(value['external_dependencies'] == {'sqlite': 'NOT_SELECTED_OR_CAPTURED'},
             'external dependency selection is not established by this collector')
     return {'metadata_only': True, 'local_native_bytes_verified': False, 'native_qualified': False,
