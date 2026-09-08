@@ -16,7 +16,7 @@ Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter aç
 
 **Test bütçesi:** T2
 **Kontroller:** linux-suite, relevant-corpus, queue-check
-**Kapsam:** scripts/measure_product.py, docs/quality_results.md, docs/benchmarks.md
+**Kapsam:** scripts/measure_product.py, docs/quality_results.md, docs/benchmarks.md, tests/ProductMeasurementTest.py
 **Bağımlılıklar:** Yok
 
 ## Sonraki chapter kuyruğu — henüz yürütülemez
