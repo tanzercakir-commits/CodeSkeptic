@@ -1,5 +1,56 @@
 # Windows support — status and remaining work
 
+## Current platform artifact gate — CH06-S02-U002
+
+The current restart is being qualified separately from the historical releases
+below. Green compilation/unit-test jobs are necessary, but do not identify a
+retained, checksum-bound package. The ordinary Windows lane has passed native
+tests and legacy relocation smoke at `156e2b582d1575cc379b0d04c867e8534fe26764`;
+its uploaded artifact is explicitly diagnostic-only, not a package receipt.
+
+The candidate-only jobs in [release.yml](../.github/workflows/release.yml) now
+build **Windows x86_64** and **macOS arm64** packages without creating a tag,
+release, PR or Git ref. Their token is read-only, checkout credentials are not
+persisted, and legacy release writers are tag-only. The frozen Windows workflow
+and all existing quality floors stay unchanged. The new exact source/version
+and first-scan evidence is **pending an actual successful hosted run**; adding
+the jobs or passing local synthetic tests does not qualify either platform.
+
+Each native job runs the full CTest and single-process suites, assembles one
+versioned archive, then hides its known build LLVM installation temporarily.
+The recorded packaged executable runs outside checkout/build paths with a fresh
+home and without developer-prompt, SDKROOT or dynamic-loader override variables.
+UTF-8 paths and explicit compilation databases exercise both C and C++ across
+clean (0), supported null-dereference finding (1), and missing-header/unavailable
+(2) cases. Source/fixture/archive/executable hashes, native version/capabilities,
+commands, raw outputs, JSON coverage and verdicts are retained together. A timeout
+or failure retains failure evidence; it is never converted into PASS. The caller
+restores LLVM in a finally/exit handler, and the final job must also succeed.
+
+This is an actual-runner promise, not every Windows/macOS version or architecture:
+Windows needs the host MSVC toolset and Windows SDK; macOS needs Apple developer
+headers/CLT and any remaining dependencies recorded in the package. Toolchain
+setup may download the explicit LLVM 20 packages (Windows cache miss or Homebrew
+on macOS). The helper itself makes no downloads and does not run a compiler.
+It is a controlled trusted-build test, not an OS sandbox or a signing service.
+There is no publisher signature, notarization, Gatekeeper download-install test,
+or macOS/Windows SBOM claim. Native Windows is not interchangeable with the
+Linux preprocessor view in WSL2/Docker; those Windows-host routes are not measured
+by this new native profile.
+
+Qualification archives use
+`native-<target>-<full-source-sha>-<run-id>-<attempt>` with 14-day retention.
+The uploaded helper `result.json` is not by itself independent or final hosted
+evidence: reconcile it with the exact run, completed jobs/steps, artifact catalog
+and downloaded archive digest. A missing runner, artifact, signer or authority
+stays an explicit limitation/blocker; do not infer release or main-integration
+permission from feature-branch synchronization.
+
+## Historical support foundation
+
+The following landed/working statements describe earlier editions and their
+historical CI. They are preserved as context, not as current artifact receipts.
+
 > **Working paths today**: native MSVC build from source (Tier 1,
 > below), WSL2, or Docker — see the
 > [README's Windows section](../README.md#windows-native-build-from-source-or-wsl2docker),
@@ -17,7 +68,7 @@ per-push packaging rehearsal + relocation smoke in windows.yml. The
 per-item notes below record what landed and what each gap turned out
 to be in practice.
 
-## Current restart qualification and Unicode paths
+## Earlier restart checkpoint and Unicode paths
 
 The dated landed results below describe historical revisions, not automatic
 qualification of the current restart. At `d98354a`, the native MSVC build passed

@@ -8,12 +8,23 @@ name: Release
 on:
   push:
     tags: ["v*"]
+    branches: ["agent/cs3-ch06-s02-u002-platform-support"]
+    paths:
+      - '.github/workflows/release.yml'
+      - '.github/actions/setup-msvc-llvm/**'
+      - 'scripts/package_release.sh'
+      - 'scripts/platform_first_scan.py'
+      - 'scripts/test_platform_workflow.py'
+      - 'CMakeLists.txt'
+      - 'src/**'
+      - 'tests/**'
 
 permissions:
   contents: write
 
 jobs:
   prepare:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     steps:
       - name: Create the single shared draft release
@@ -35,6 +46,7 @@ jobs:
           fi
 
   linux:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs: prepare
     runs-on: ubuntu-22.04   # older glibc -> wider binary compatibility
     steps:
@@ -192,6 +204,7 @@ jobs:
             "HEAD:refs/status/${{ github.sha }}/release-linux/${{ job.status }}"
 
   macos:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs: prepare
     runs-on: macos-14   # arm64
     steps:
@@ -275,6 +288,7 @@ jobs:
             "HEAD:refs/status/${{ github.sha }}/release-macos/${{ job.status }}"
 
   windows:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs: prepare
     runs-on: windows-latest
     steps:
@@ -375,6 +389,7 @@ jobs:
             "HEAD:refs/status/${{ github.sha }}/release-windows/${{ job.status }}"
 
   publish:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs: [linux, macos, windows]
     runs-on: ubuntu-24.04
     steps:
@@ -401,3 +416,143 @@ jobs:
         run: |
           git push --force origin \
             "HEAD:refs/status/${{ github.sha }}/release-publish/${{ job.status }}"
+
+  candidate-native:
+    # No prepare/release dependency, release token, status ref or Git writer.
+    # Branch+path selection avoids repeating native builds for a ledger-only POP.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/agent/cs3-ch06-s02-u002-platform-support'
+    name: candidate-native (${{ matrix.target }})
+    permissions:
+      contents: read
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            target: windows-x86_64
+          - runner: macos-14
+            target: darwin-arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup MSVC and LLVM (explicit cache or upstream download)
+        if: runner.os == 'Windows'
+        uses: ./.github/actions/setup-msvc-llvm
+
+      - name: Setup macOS LLVM 20 (explicit Homebrew download)
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+        run: brew install llvm@20 cmake ninja
+
+      - name: Windows configure, build and full tests
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $logs = Join-Path $env:RUNNER_TEMP 'codeskeptic-native-build'
+          New-Item -ItemType Directory -Path $logs | Out-Null
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl "-DCMAKE_PREFIX_PATH=C:\llvm\clang+llvm-$env:LLVM_VER-x86_64-pc-windows-msvc" 2>&1 | Tee-Object -FilePath "$logs/configure.log"
+          if ($LASTEXITCODE -ne 0) { throw 'configure failed' }
+          cmake --build build --parallel 2 2>&1 | Tee-Object -FilePath "$logs/build.log"
+          if ($LASTEXITCODE -ne 0) { throw 'build failed' }
+          ctest --test-dir build --output-on-failure 2>&1 | Tee-Object -FilePath "$logs/ctest.log"
+          if ($LASTEXITCODE -ne 0) { throw 'ctest failed' }
+          & .\build\tests\codeskeptic_tests.exe 2>&1 | Tee-Object -FilePath "$logs/single-process.log"
+          if ($LASTEXITCODE -ne 0) { throw 'single-process tests failed' }
+
+      - name: macOS configure, build and full tests
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          logs="$RUNNER_TEMP/codeskeptic-native-build"
+          mkdir "$logs"
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix llvm@20)" 2>&1 | tee "$logs/configure.log"
+          cmake --build build --parallel 2 2>&1 | tee "$logs/build.log"
+          ctest --test-dir build --output-on-failure 2>&1 | tee "$logs/ctest.log"
+          build/tests/codeskeptic_tests 2>&1 | tee "$logs/single-process.log"
+
+      - name: Package candidate (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/package_release.sh build/src/codeskeptic.exe build/native-dist \
+            "/c/llvm/clang+llvm-${LLVM_VER}-x86_64-pc-windows-msvc/bin/clang.exe" \
+            2>&1 | tee "$RUNNER_TEMP/codeskeptic-native-build/package.log"
+
+      - name: Package candidate (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/package_release.sh build/src/codeskeptic build/native-dist \
+            "$(brew --prefix llvm@20)/bin/clang" 2>&1 | tee "$RUNNER_TEMP/codeskeptic-native-build/package.log"
+
+      - name: Exact Windows artifact first scans with LLVM hidden
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $archives = @(Get-ChildItem build/native-dist -Filter 'codeskeptic-*-windows-x86_64.zip')
+          if ($archives.Count -ne 1) { throw 'exactly one candidate archive required' }
+          $identity = & .\build\src\codeskeptic.exe --version
+          if ($LASTEXITCODE -ne 0) { throw 'native version failed' }
+          $version = $identity -replace '^CodeSkeptic ', ''
+          $archiveDigest = (Get-FileHash $archives[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $binaryDigest = (Get-FileHash build/src/codeskeptic.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $original = 'C:\llvm'
+          $hidden = 'C:\codeskeptic-qualification-llvm-hidden'
+          if ((Test-Path $hidden) -or -not (Test-Path $original -PathType Container)) { throw 'unsafe LLVM hide paths' }
+          Move-Item -LiteralPath $original -Destination $hidden
+          try {
+            python -B scripts/platform_first_scan.py --archive $archives[0].FullName --archive-sha256 $archiveDigest --source-sha $env:GITHUB_SHA --version $version --source-binary-sha256 $binaryDigest --llvm-original $original --llvm-hidden $hidden --output "$env:RUNNER_TEMP/codeskeptic-platform"
+            if ($LASTEXITCODE -ne 0) { throw 'Windows artifact qualification failed' }
+          } finally {
+            Move-Item -LiteralPath $hidden -Destination $original -ErrorAction Stop
+          }
+
+      - name: Exact macOS artifact first scans with LLVM hidden
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          archives=(build/native-dist/codeskeptic-*-darwin-arm64.tar.gz)
+          test "${#archives[@]}" -eq 1 && test -f "${archives[0]}"
+          identity=$(build/src/codeskeptic --version)
+          version=${identity#CodeSkeptic }
+          archive_digest=$(shasum -a 256 "${archives[0]}" | cut -d ' ' -f 1)
+          binary_digest=$(shasum -a 256 build/src/codeskeptic | cut -d ' ' -f 1)
+          llvm_original=$(cd "$(brew --prefix llvm@20)" && pwd -P)
+          case "$llvm_original" in /opt/homebrew/Cellar/llvm@20/*) ;; *) exit 2;; esac
+          llvm_hidden="${llvm_original}.codeskeptic-qualification-hidden"
+          test -d "$llvm_original" && test ! -e "$llvm_hidden" && test ! -L "$llvm_hidden"
+          mv "$llvm_original" "$llvm_hidden"
+          restore_llvm() {
+            original_status=$?
+            trap - EXIT
+            mv "$llvm_hidden" "$llvm_original" || exit 2
+            exit "$original_status"
+          }
+          trap restore_llvm EXIT
+          python3 -B scripts/platform_first_scan.py --archive "${archives[0]}" \
+            --archive-sha256 "$archive_digest" --source-sha "$GITHUB_SHA" --version "$version" \
+            --source-binary-sha256 "$binary_digest" --llvm-original "$llvm_original" \
+            --llvm-hidden "$llvm_hidden" --output "$RUNNER_TEMP/codeskeptic-platform"
+
+      - name: Retain exact candidate package, scans and build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.target }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/codeskeptic-platform/
+            ${{ runner.temp }}/codeskeptic-native-build/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

@@ -56,8 +56,15 @@ RES_DIR=$("$CLANG" -print-resource-dir)
 [ "$OS" = windows ] && RES_DIR=$(cygpath -u "$RES_DIR")
 [ -d "$RES_DIR/include" ] || { echo "PACKAGE_FAIL resource dir has no include/: $RES_DIR"; exit 1; }
 
-VERSION=$("$BIN" --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9.-]*' | head -1)
-[ -n "$VERSION" ] || { echo "PACKAGE_FAIL could not parse --version output"; exit 1; }
+VERSION_TEXT=$("$BIN" --version)
+# MSVC's text stdout uses CRLF; command substitution strips LF, not CR.
+VERSION_TEXT=${VERSION_TEXT%$'\r'}
+if [[ "$VERSION_TEXT" =~ ^CodeSkeptic\ ([0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?(\+[A-Za-z0-9.-]+)?)$ ]]; then
+    VERSION=${BASH_REMATCH[1]}
+else
+    echo "PACKAGE_FAIL could not parse complete --version identity"
+    exit 1
+fi
 
 ARCH=$(uname -m)
 NAME="codeskeptic-v${VERSION}-${OS}-${ARCH}"

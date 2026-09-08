@@ -210,3 +210,34 @@ existing package/release-workflow guards, actual unchanged qualified-archive
 generation and re-verification, and validation against the official CycloneDX
 schema with a separately recorded schema/validator version. Only then may an
 independent exact-head PASS and real FIFO POP complete this unit.
+
+## Native platform qualification — CH06-S02-U002
+
+The separate `candidate-native` jobs in `release.yml` build/test/package Windows
+x86_64 and macOS arm64 on the exact candidate branch. They never enter the
+tag-only prepare/upload/publish or legacy ref-writing jobs. Branch/path filters
+avoid rerunning expensive native builds for a ledger-only POP; changed native
+source, package/helper/tests or workflow select a fresh run. A changed source
+commit invalidates previous package identity; never stamp it onto an old binary.
+
+Before support is recorded, require each actual native job's full test gates,
+six C/C++ packaged first scans, final successful conclusion and retained exact
+archive/JSON/command metadata. `scripts/platform_first_scan.py` accepts only the
+two native architectures, checks full source/version, executes the freshly
+unpacked trusted archive with the caller's build LLVM hidden, and preserves
+clean/finding/unavailable semantics and Unicode paths. Windows packaged binary
+bytes equal the source executable; macOS load-path/ad-hoc-signature changes can
+change those bytes, so both hashes and matching version are recorded explicitly.
+
+The package/scan artifact and separate build diagnostics are uploaded with an
+exact source/run/attempt name even when a job fails. Missing evidence or a failed
+step is not success. Restore LLVM before final job success. Retain downloaded
+catalog/run/job records and raw archive digests outside the worktree for an
+independent audit; a self-authored helper result is not external qualification.
+
+Local `python3 -B scripts/test_platform_workflow.py` checks version preservation,
+candidate/tag boundaries, bounded archive handling and negative report/runner
+evidence. It does not run native Windows/macOS binaries. Existing frozen
+`tests/WorkflowPolicyTest.py`, `tests/ReleaseWorkflowTest.py` and package/SBOM
+regressions remain unchanged. Until the hosted profile passes, the corresponding
+support entries stay pending rather than claiming platform compatibility.

@@ -34,10 +34,11 @@ It checks a locally installed binary, real compilation inputs and complete
 reports. This local qualification does **not** mean the development changes
 are in the releases/actions below or have passed new cross-platform release CI.
 
-**Binary** — Linux x86_64 (macOS arm64: `codeskeptic-darwin-arm64.tar.gz`),
-no LLVM install needed; the tarball bundles the Clang headers and every
-non-glibc library, and each release is smoke-tested in clean containers
-before publishing:
+**Published-release binary (not the current restart candidate)** — Linux x86_64
+(macOS arm64: `codeskeptic-darwin-arm64.tar.gz`). The Linux archive bundles its
+non-core runtime libraries and Clang headers; macOS has a separate native
+dependency/SDK profile. Release smoke gates are platform-specific; clean Ubuntu
+container results do not certify macOS or Windows:
 
 ```bash
 curl -sL https://github.com/tanzercakir-commits/CodeSkeptic/releases/latest/download/codeskeptic-linux-x86_64.tar.gz | tar xz
@@ -60,8 +61,8 @@ docker run --rm -v "$PWD:/work" ghcr.io/tanzercakir-commits/codeskeptic:v0.4.8 s
 
 ### Windows (native binary, or WSL2/Docker)
 
-Native Windows is supported and CI-proven — full test suite + a
-packaged-zip relocation smoke on `windows-latest`, every push
+Historical releases support native Windows, with a full test suite and
+packaged-zip relocation smoke on `windows-latest`, every matching push
 ([windows.yml](.github/workflows/windows.yml)). Needs an MSVC toolset
 + Windows SDK on the machine (any VS/Build Tools install) — analyzed
 code resolves real headers, as with any compiler:
@@ -78,11 +79,18 @@ analyzes the program the compiler sees: the Linux preprocessor view,
 so `#ifdef _WIN32` branches are invisible; MSVC-targeted code wants
 the native binary above ([status](docs/windows-support.md)):
 
-| Use | Status |
+| Use | Current CWE restart qualification |
 |---|---|
-| Linux x86_64 / macOS arm64 native | Supported (prebuilt binary) |
-| Native Windows (MSVC) — prebuilt zip or build from source | Supported — tests + zip smoke, CI-proven |
-| Windows + WSL2 or Docker, Linux-targeted build | Supported path, CI-smoked on windows-latest |
+| Linux x86_64 native | Exact local Ubuntu artifact tested; see [package evidence](docs/release-checklist.md#local-qualification--2026-09-08) |
+| Native Windows x86_64 (MSVC) | Existing native CI passed; new checksum-bound artifact first-scan gate pending |
+| macOS arm64 | New native artifact first-scan gate pending; Linux results are not macOS evidence |
+| Windows-host WSL2/Docker, Linux-targeted build | Linux-view route, not measured by the new native Windows qualification |
+
+The [platform artifact gate](docs/windows-support.md#current-platform-artifact-gate--ch06-s02-u002)
+records the exact runner, source SHA, archive/executable hashes and C/C++ first
+scans. The candidate jobs cannot publish a release or write Git refs; their
+existence is not a successful measurement. Historical download examples above
+remain release examples, not distribution of the current feature branch.
 
 ### Build from source
 
@@ -109,8 +117,9 @@ demo.cpp:9:12 [warning] div-by-zero: Possible division by zero: 'z' may be zero 
     -> demo.cpp:7:5 'z' assigned zero here
 ```
 
-macOS (Homebrew): `brew install llvm cmake ninja`, then the same
-`cmake` + build steps (LLVM found automatically). Windows (MSVC): from
+macOS (Homebrew): `brew install llvm@20 cmake ninja`, then configure with
+`cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$(brew --prefix llvm@20)"`
+and run `cmake --build build`. Windows (MSVC): from
 an *x64 Native Tools* prompt, `cl` as compiler and the official
 clang+llvm windows-msvc tarball as `CMAKE_PREFIX_PATH` — exactly what
 [CI runs](.github/workflows/windows.yml). Requires CMake ≥ 3.20, C++17,
