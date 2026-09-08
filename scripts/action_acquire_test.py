@@ -144,6 +144,18 @@ class AcquisitionTests(unittest.TestCase):
             with self.subTest(constant=constant), patch.object(acquire, constant, 1):
                 self.rejected()
 
+    def test_large_pax_metadata_is_bounded_before_tarfile_parsing(self):
+        with tarfile.open(self.archive, "w:gz", format=tarfile.PAX_FORMAT) as output:
+            info = tarfile.TarInfo(self.package + "/LICENSE")
+            info.pax_headers = {"comment": "m" * 65536}
+            output.addfile(info)
+        self.refresh()
+        installation = self.root / "extract"
+        installation.mkdir()
+        with patch.object(acquire, "MAX_EXPANDED", 1024):
+            with self.assertRaisesRegex(acquire.ActionError, "decompressed|metadata"):
+                acquire.extract_package(self.archive, installation, "")
+
     def test_branch_and_sha_refs_never_implicitly_float(self):
         for ref in ("", "main", "a" * 40, "./", "vgarbage", "v1.2.3/unsafe"):
             with self.subTest(ref=ref), self.assertRaises(acquire.ActionError):
@@ -192,6 +204,23 @@ class AcquisitionTests(unittest.TestCase):
     def test_requested_release_must_match_archive_identity(self):
         with self.release_setup("v1.2.3"):
             self.rejected("release")
+
+    def test_release_pins_public_origin_and_ignores_ambient_credentials(self):
+        with self.release_setup(), patch.dict(os.environ, {
+                "GH_HOST": "unrelated.invalid", "GH_ENTERPRISE_TOKEN": "synthetic-enterprise",
+                "GITHUB_ENTERPRISE_TOKEN": "synthetic-enterprise-2", "GITHUB_TOKEN": "synthetic-unselected",
+                "GH_CONFIG_DIR": str(self.root / "ambient-config"), "UNRELATED_SECRET": "synthetic-only"}):
+            with patch.object(acquire, "execute", side_effect=self.mock_download) as execute:
+                root = acquire.acquire("release")
+            call = execute.call_args_list[0]
+            arguments, environment = call.args[:2]
+            self.assertEqual(arguments[arguments.index("-R") + 1], "github.com/tanzercakir-commits/CodeSkeptic")
+            self.assertEqual(environment["GH_HOST"], "github.com")
+            self.assertEqual(environment["GH_TOKEN"], "synthetic-test-only")
+            for key in ("GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN", "GITHUB_TOKEN", "UNRELATED_SECRET"):
+                self.assertNotIn(key, environment)
+            self.assertTrue(Path(environment["GH_CONFIG_DIR"]).is_relative_to(root.parent))
+            self.assertNotEqual(environment["HOME"], os.environ["HOME"])
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ from the fixed project repository. Checksums establish integrity, not a signatur
 or a sandbox: only supply packages whose producer you trust.
 """
 import hashlib
+import gzip
 import os
 from pathlib import Path, PurePosixPath
 import platform
@@ -25,7 +26,7 @@ TAG = re.compile("v" + VERSION)
 PACKAGE = re.compile("codeskeptic-v(" + VERSION + ")-linux-x86_64")
 MAX_ARCHIVE = 512 * 1024 * 1024
 MAX_EXPANDED = 2 * 1024 * 1024 * 1024
-REPOSITORY = "tanzercakir-commits/CodeSkeptic"
+REPOSITORY = "github.com/tanzercakir-commits/CodeSkeptic"
 
 
 def digest_value(text):
@@ -63,8 +64,42 @@ def verified_snapshot(source, digest, destination):
 
 
 def extract_package(archive, destination, selected):
+    # tarfile interprets PAX/long-name data before yielding a member. Bound the
+    # gzip envelope on disk, then each raw metadata header before that parser
+    # can allocate from archive-supplied lengths. The temporary file is owned.
+    with tempfile.TemporaryFile(dir=destination) as raw, gzip.open(archive, "rb") as compressed:
+        copied = 0
+        while block := compressed.read(1024 * 1024):
+            copied += len(block)
+            require(copied <= MAX_EXPANDED, "decompressed tar exceeds size bound")
+            raw.write(block)
+        raw.seek(0)
+        headers, metadata = 0, 0
+        while header := raw.read(512):
+            require(len(header) == 512, "truncated tar header")
+            if header == b"\0" * 512:
+                # Native package padding is zero; no hidden concatenated tar.
+                while padding := raw.read(1024 * 1024):
+                    require(not padding.strip(b"\0"), "nonzero trailing tar data")
+                break
+            info = tarfile.TarInfo.frombuf(header, "utf-8", "strict")
+            headers += 1
+            require(headers <= 40000 and 0 <= info.size <= MAX_EXPANDED, "raw tar header/size bound exceeded")
+            require(info.type in (tarfile.REGTYPE, tarfile.AREGTYPE, tarfile.DIRTYPE,
+                                 tarfile.XHDTYPE, tarfile.XGLTYPE, tarfile.GNUTYPE_LONGNAME), "unsupported raw tar member")
+            if info.type in (tarfile.XHDTYPE, tarfile.XGLTYPE, tarfile.GNUTYPE_LONGNAME):
+                metadata += info.size
+                require(info.size <= 65536 and metadata <= 8 * 1024 * 1024, "tar metadata exceeds bound")
+            skip = (info.size + 511) // 512 * 512
+            require(raw.tell() + skip <= copied, "truncated tar member")
+            raw.seek(skip, os.SEEK_CUR)
+        raw.seek(0)
+        return extract_members(raw, destination, selected)
+
+
+def extract_members(raw, destination, selected):
     # Prevalidate the complete member list before creating extracted files.
-    with tarfile.open(archive, mode="r:gz") as package:
+    with tarfile.open(fileobj=raw, mode="r:") as package:
         members, names, directories, expanded, root_name = [], set(), set(), 0, None
         for member in package:
             require(len(members) < 20000, "too many archive members")
@@ -147,8 +182,19 @@ def acquire(mode):
             if selected != "latest":
                 arguments.append(selected)
             arguments.extend(["-R", REPOSITORY, "-p", "codeskeptic-*-linux-x86_64.tar.gz", "-p", "sha256sums.txt", "-D", str(download)])
-            # gh alone receives the token; source paths/content are not arguments.
-            download_code, _, _ = execute(arguments, dict(os.environ), 120)
+            # Pin the public host AND isolate configuration. Ambient GH_HOST,
+            # enterprise credentials, stored logins, git config and proxies must
+            # not silently select another acquisition origin/credential.
+            config = installation / "gh-config"
+            config.mkdir(mode=0o700)
+            gh_environment = child_environment(installation)
+            gh_environment.update(GH_HOST="github.com", GH_CONFIG_DIR=str(config),
+                                  GH_PROMPT_DISABLED="1", GH_NO_UPDATE_NOTIFIER="1",
+                                  GIT_TERMINAL_PROMPT="0")
+            if os.environ.get("GH_TOKEN"):
+                gh_environment["GH_TOKEN"] = os.environ["GH_TOKEN"]
+            # gh alone receives the explicit acquisition token, never the analyzer.
+            download_code, _, _ = execute(arguments, gh_environment, 120)
             require(download_code == 0, "release download failed")
             archives = list(download.glob("codeskeptic-*-linux-x86_64.tar.gz"))
             require(len(archives) == 1, "release must contain exactly one Linux x86_64 archive")
