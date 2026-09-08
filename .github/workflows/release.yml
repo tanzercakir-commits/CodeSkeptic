@@ -467,7 +467,11 @@ jobs:
           cmake --build build --parallel 2 2>&1 | Tee-Object -FilePath "$logs/build.log"
           if ($LASTEXITCODE -ne 0) { throw 'build failed' }
           ctest --test-dir build --output-on-failure 2>&1 | Tee-Object -FilePath "$logs/ctest.log"
-          if ($LASTEXITCODE -ne 0) { throw 'ctest failed' }
+          $ctestStatus = $LASTEXITCODE
+          Copy-Item -LiteralPath build/Testing/Temporary/LastTest.log -Destination "$logs/ctest-full.log" -ErrorAction Stop
+          if ($ctestStatus -ne 0) { throw 'ctest failed' }
+          python -B scripts/platform_first_scan.py --ctest-accounting --source-sha $env:GITHUB_SHA --build build --ctest-log "$logs/ctest-full.log" --output "$logs/compilation-input-accounting"
+          if ($LASTEXITCODE -ne 0) { throw 'native test accounting failed' }
           & .\build\tests\codeskeptic_tests.exe 2>&1 | Tee-Object -FilePath "$logs/single-process.log"
           if ($LASTEXITCODE -ne 0) { throw 'single-process tests failed' }
 
@@ -486,7 +490,12 @@ jobs:
           cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="$(brew --prefix llvm@20)" 2>&1 | tee "$logs/configure.log"
           cmake --build build --parallel 2 2>&1 | tee "$logs/build.log"
-          ctest --test-dir build --output-on-failure 2>&1 | tee "$logs/ctest.log"
+          ctest_status=0
+          ctest --test-dir build --output-on-failure 2>&1 | tee "$logs/ctest.log" || ctest_status=$?
+          cp build/Testing/Temporary/LastTest.log "$logs/ctest-full.log"
+          if [ "$ctest_status" -ne 0 ]; then exit "$ctest_status"; fi
+          python3 -B scripts/platform_first_scan.py --ctest-accounting --source-sha "$GITHUB_SHA" \
+            --build build --ctest-log "$logs/ctest-full.log" --output "$logs/compilation-input-accounting"
           build/tests/codeskeptic_tests 2>&1 | tee "$logs/single-process.log"
 
       - name: Package candidate (Windows)

@@ -16,6 +16,7 @@ import re
 import shutil
 import stat
 import subprocess
+import sys
 import tarfile
 import tempfile
 import zipfile
@@ -574,7 +575,85 @@ def qualify(args):
         raise
 
 
+def ctest_accounting(args):
+    """Retain original CTest output and a named rerun; do not infer skip counts."""
+    require(SHA.fullmatch(args.source_sha) is not None and
+            git("rev-parse", "HEAD").decode().strip() == args.source_sha and
+            not git("status", "--porcelain").strip(), "exact clean accounting source required")
+    build = args.build.resolve(strict=True)
+    require(build.is_dir() and not os.path.lexists(args.output), "fresh accounting output required")
+    # The workflow copies this BEFORE checking CTest's exit status, including
+    # failures. Discovery/verbose reruns must not replace the original evidence.
+    original = read_regular(build / "Testing/Temporary/LastTest.log", 32 * 1024 * 1024)
+    retained = read_regular(args.ctest_log, 32 * 1024 * 1024)
+    require(original == retained, "retained CTest log differs from actual LastTest.log")
+    args.output.mkdir()
+    environment = dict(os.environ)  # Same build-step environment; never dump it.
+    discovery = execute(["ctest", "--test-dir", str(build), "--show-only=json-v1"],
+                        REPO, environment, args.output, "discovery", 30)
+    require(discovery["exit_code"] == 0, "CTest discovery failed")
+    listing = parse_json(read_regular(args.output / "discovery.stdout"))
+    require(isinstance(listing, dict) and isinstance(listing.get("tests"), list), "invalid CTest discovery")
+    selected = [test for test in listing["tests"] if isinstance(test, dict)
+                and test.get("name") == "CompilationDatabaseCliContract"]
+    require(len(selected) == 1, "one exact compilation-input CTest registration required")
+    test = selected[0]
+    command = test.get("command")
+    script = REPO / "tests/CompilationDatabaseCliTest.py"
+    binary = build / "src" / ("codeskeptic.exe" if os.name == "nt" else "codeskeptic")
+    require(isinstance(command, list) and len(command) == 4 and
+            all(isinstance(value, str) and value for value in command) and command[1] == "-B" and
+            Path(command[0]).is_absolute() and Path(command[0]).is_file() and
+            Path(command[2]).resolve(strict=True) == script.resolve(strict=True) and
+            Path(command[3]).resolve(strict=True) == binary.resolve(strict=True),
+            "unexpected compilation-input CTest command")
+    properties = test.get("properties")
+    require(isinstance(properties, list) and all(isinstance(p, dict) and
+            isinstance(p.get("name"), str) and "value" in p for p in properties), "invalid CTest properties")
+    require(len({p["name"] for p in properties}) == len(properties), "duplicate CTest property")
+    properties = {p["name"]: p["value"] for p in properties}
+    require("ENVIRONMENT_MODIFICATION" not in properties, "unsupported CTest environment modification")
+    overrides = properties.get("ENVIRONMENT")
+    prefix = "CODESKEPTIC_CORPUS_COMPILER="
+    require(isinstance(overrides, list) and len(overrides) == 1 and
+            isinstance(overrides[0], str) and overrides[0].startswith(prefix) and
+            len(overrides[0]) > len(prefix), "exact CTest corpus compiler environment required")
+    environment["CODESKEPTIC_CORPUS_COMPILER"] = overrides[0][len(prefix):]
+    directory = properties.get("WORKING_DIRECTORY")
+    require(isinstance(directory, str) and Path(directory).resolve(strict=True) ==
+            (build / "tests").resolve(strict=True), "unexpected CTest working directory")
+    before = file_hash(binary)
+    script_before = file_hash(script)
+    execution = execute([*command, "-v"], directory, environment, args.output, "compilation-inputs", 180)
+    require(execution["exit_code"] == 0, "verbose compilation-input tests failed")
+    require(file_hash(binary) == before and file_hash(script) == script_before,
+            "tested binary or script changed during accounting")
+    require(git("rev-parse", "HEAD").decode().strip() == args.source_sha and
+            not git("status", "--porcelain").strip(), "source changed during accounting")
+    write_new(args.output / "accounting.json", canonical({
+        "schema": "codeskeptic-native-test-accounting/v1", "source_sha": args.source_sha,
+        "binary_sha256": before, "test_script_sha256": script_before,
+        "helper_sha256": file_hash(Path(__file__)),
+        "ctest_log_sha256": sha(retained), "discovery": discovery, "execution": execution,
+        "ctest_environment": overrides, "inherited_tmpdir": environment.get("TMPDIR"),
+        "result": "CAPTURED", "skip_audit_complete": False}))
+    print("NATIVE_TEST_ACCOUNTING_CAPTURED source=" + args.source_sha)
+
+
 def main():
+    if sys.argv[1:2] == ["--ctest-accounting"]:
+        parser = argparse.ArgumentParser(description="Retain native CTest and named compilation-input output")
+        parser.add_argument("--ctest-accounting", action="store_true", required=True)
+        parser.add_argument("--source-sha", required=True)
+        parser.add_argument("--build", type=Path, required=True)
+        parser.add_argument("--ctest-log", type=Path, required=True)
+        parser.add_argument("--output", type=Path, required=True)
+        args = parser.parse_args()
+        try:
+            ctest_accounting(args)
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+            parser.exit(1, "NATIVE_TEST_ACCOUNTING_FAIL " + str(error) + "\n")
+        return
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive", type=Path, required=True)
     parser.add_argument("--archive-sha256", required=True)

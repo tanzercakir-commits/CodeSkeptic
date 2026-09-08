@@ -516,6 +516,117 @@ class WindowsSdkDiagnosticTests(unittest.TestCase):
                 self.assertFalse(result["baseline_failure_then_locator_finding"])
 
 
+class CtestAccountingTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="ctest accounting fixture ")
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.build = self.root / "build"
+        (self.build / "Testing/Temporary").mkdir(parents=True)
+        (self.build / "tests").mkdir()
+        (self.build / "src").mkdir()
+        self.binary = self.build / "src" / ("codeskeptic.exe" if os.name == "nt" else "codeskeptic")
+        self.binary.write_bytes(b"synthetic; never executed")
+        self.full = self.root / "ctest-full.log"
+        self.full.write_bytes(b"original complete CTest output\n")
+        (self.build / "Testing/Temporary/LastTest.log").write_bytes(self.full.read_bytes())
+        self.args = argparse.Namespace(source_sha="0" * 40, build=self.build,
+                                       ctest_log=self.full, output=self.root / "accounting")
+        self.registration = {
+            "name": "CompilationDatabaseCliContract",
+            "command": [sys.executable, "-B", str(REPO / "tests/CompilationDatabaseCliTest.py"), str(self.binary)],
+            "properties": [{"name": "WORKING_DIRECTORY", "value": str(self.build / "tests")},
+                           {"name": "ENVIRONMENT", "value": ["CODESKEPTIC_CORPUS_COMPILER=/exact/clang"]}]}
+
+    def run_accounting(self, registrations=None, failure=None):
+        calls = []
+        listing = {"tests": [self.registration] if registrations is None else registrations}
+
+        def execute(argv, cwd, environment, output, label, timeout):
+            calls.append({"argv": argv, "cwd": cwd, "environment": environment.copy(), "timeout": timeout})
+            if failure == "discovery" and label == "discovery":
+                return {"exit_code": 2}
+            if label == "discovery":
+                (output / "discovery.stdout").write_bytes(native.canonical(listing))
+            else:
+                self.assertEqual(argv, [*self.registration["command"], "-v"])
+                self.assertEqual(Path(cwd), self.build / "tests")
+                self.assertEqual(environment["CODESKEPTIC_CORPUS_COMPILER"], "/exact/clang")
+                self.assertEqual(environment["TMPDIR"], "/exact/canonical/native/tmp")
+                self.assertEqual(timeout, 180)
+                if failure == "binary-change":
+                    self.binary.write_bytes(b"changed during diagnostic")
+                if failure == "timeout":
+                    raise native.QualificationError("native command timed out")
+            return {"exit_code": 1 if failure == "tests" and label != "discovery" else 0}
+
+        def git(*args):
+            if args == ("rev-parse", "HEAD"):
+                return (self.args.source_sha + "\n").encode()
+            self.assertEqual(args, ("status", "--porcelain"))
+            return b" M source\n" if failure == "dirty" else b""
+
+        with patch.object(native, "git", side_effect=git), patch.object(native, "execute", side_effect=execute), \
+                patch.dict(os.environ, {"TMPDIR": "/exact/canonical/native/tmp", "CODESKEPTIC_CORPUS_COMPILER": "/wrong/inherited/clang"}), \
+                contextlib.redirect_stdout(io.StringIO()):
+            native.ctest_accounting(self.args)
+        return calls
+
+    def test_exact_registered_command_environment_and_cwd_are_retained(self):
+        calls = self.run_accounting()
+        self.assertEqual(len(calls), 2)
+        record = json.loads((self.args.output / "accounting.json").read_bytes())
+        self.assertEqual(record["result"], "CAPTURED")
+        self.assertFalse(record["skip_audit_complete"])
+        self.assertEqual(record["ctest_log_sha256"], native.file_hash(self.full))
+        self.assertEqual(record["binary_sha256"], native.file_hash(self.binary))
+        self.assertEqual(record["test_script_sha256"], native.file_hash(REPO / "tests/CompilationDatabaseCliTest.py"))
+        self.assertEqual(record["inherited_tmpdir"], "/exact/canonical/native/tmp")
+
+    def test_missing_or_duplicate_registration_is_not_executed(self):
+        for registrations in ([], [self.registration, self.registration]):
+            with self.subTest(count=len(registrations)), tempfile.TemporaryDirectory(dir=self.root) as temporary:
+                self.args.output = Path(temporary) / "accounting"
+                with self.assertRaisesRegex(ValueError, "one exact"):
+                    self.run_accounting(registrations)
+                self.assertFalse((self.args.output / "accounting.json").exists())
+
+    def test_modified_command_or_environment_is_rejected(self):
+        original = copy.deepcopy(self.registration)
+        changes = [lambda r: r["command"].append("extra"), lambda r: r["command"].__setitem__(1, "-c"),
+                   lambda r: r["command"].__setitem__(0, "relative-python"),
+                   lambda r: r["command"].__setitem__(2, str(REPO / "scripts/test_platform_workflow.py")),
+                   lambda r: r["command"].__setitem__(3, sys.executable),
+                   lambda r: r["properties"][0].update(value=str(self.root)),
+                   lambda r: r["properties"][1].update(value=[]),
+                   lambda r: r["properties"][1].update(value=["WRONG_COMPILER=/clang"]),
+                   lambda r: r["properties"].append(copy.deepcopy(r["properties"][1])),
+                   lambda r: r["properties"].append({"name": "ENVIRONMENT_MODIFICATION", "value": ["X=reset:"]})]
+        for index, change in enumerate(changes):
+            self.registration = copy.deepcopy(original)
+            change(self.registration)
+            with self.subTest(case=index), tempfile.TemporaryDirectory(dir=self.root) as temporary:
+                self.args.output = Path(temporary) / "accounting"
+                with self.assertRaises(ValueError):
+                    self.run_accounting()
+                self.assertFalse((self.args.output / "accounting.json").exists())
+
+    def test_dirty_source_discovery_test_timeout_and_mutation_fail_closed(self):
+        for failure in ("dirty", "discovery", "tests", "timeout", "binary-change"):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory(dir=self.root) as temporary:
+                self.args.output = Path(temporary) / "accounting"
+                with self.assertRaises(ValueError):
+                    self.run_accounting(failure=failure)
+                self.assertFalse((self.args.output / "accounting.json").exists())
+
+    def test_original_full_log_is_required_and_never_overwritten(self):
+        self.full.write_bytes(b"wrong original CTest output\n")
+        with self.assertRaisesRegex(ValueError, "differs"):
+            self.run_accounting()
+        self.assertEqual(self.full.read_bytes(), b"wrong original CTest output\n")
+        self.assertFalse(self.args.output.exists())
+
+
 class FilesystemPrerequisiteTests(unittest.TestCase):
     def fixture_case(self, root):
         # Import declarations only. No analyzer, unittest runner or test setUp
@@ -802,6 +913,32 @@ class RoutingTests(unittest.TestCase):
         for step in steps:
             if step.get("name", "").startswith("Exact "):
                 self.assertEqual("--windows-os-locators" in step["run"], "Windows" in step["name"])
+
+    def test_native_ctest_full_output_and_named_accounting_preserve_failures(self):
+        steps = self.workflow["jobs"]["candidate-native"]["steps"]
+        for platform in ("Windows", "macOS"):
+            step = next(s for s in steps if s.get("name") == platform + " configure, build and full tests")
+            source = step["run"]
+            with self.subTest(platform=platform):
+                ctest = source.index("ctest --test-dir build --output-on-failure")
+                copy = source.index("build/Testing/Temporary/LastTest.log")
+                accounting = source.index("--ctest-accounting")
+                single = source.index("codeskeptic_tests", accounting)
+                self.assertLess(ctest, copy)
+                self.assertLess(copy, accounting)
+                self.assertLess(accounting, single)
+                self.assertIn('--ctest-log "$logs/ctest-full.log"', source)
+                self.assertIn('--output "$logs/compilation-input-accounting"', source)
+                self.assertNotIn("continue-on-error", step)
+                if platform == "Windows":
+                    self.assertIn('$ctestStatus = $LASTEXITCODE', source[ctest:copy])
+                    self.assertIn("if ($ctestStatus -ne 0) { throw 'ctest failed' }", source[copy:accounting])
+                    self.assertIn("throw 'native test accounting failed'", source[accounting:single])
+                else:
+                    self.assertIn("|| ctest_status=$?", source[ctest:copy])
+                    self.assertIn('if [ "$ctest_status" -ne 0 ]; then exit "$ctest_status"; fi', source[copy:accounting])
+                    self.assertIn("set -euo pipefail", source)
+                    self.assertLess(source.index("export TMPDIR="), accounting)
 
     def test_candidate_checkout_preserves_blob_line_endings(self):
         environment = self.workflow["jobs"]["candidate-native"].get("env", {})
