@@ -2,6 +2,19 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH08-S01-U002 — Katalog ve capability sözleşmesini eklemeli kanıt sürümlerine hazırla
+
+- Commit: `5db8970b199801bb7029007eb40a99cb309414a7`
+- Dal: `agent/cs3-ch08-s01-u002-catalog-evidence-versions`
+- Implementer: `/root`
+- Bağımsız denetçi: `/root/product_plan_verifier`
+- İnceleme SHA-256: `1e64d64172f22b579bbb9733c1a2bc7b6a5ee2457a90e43301566ede07583a68`
+- Tarih: 2026-09-08T19:55:31.242434+00:00
+- Sonuç: Yeni aile/test/tier eklenebilir, ama eski korpus ve kalite kanıtı sessizce yeniden yazılamaz.
+- focused-tests: PASS; SHA-256 `43fc314e0ab43b36fe1a3dd52d998f8e69391c1f351e72070aa3ce1d145fd625`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U002/qualify-version.py 5db8970b199801bb7029007eb40a99cb309414a7`
+- cli-smoke: PASS; SHA-256 `88da621ee0e6b410e6ff78c88d21436195b2a57796d57383745a7f2b54687dde`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U002/qualify-version.py 5db8970b199801bb7029007eb40a99cb309414a7`
+- queue-check: PASS; SHA-256 `cbcc65a0e0040d23f1254e70b0368f14ef3406ac5708aa1a50168a11581306f9`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U002/qualify-version.py 5db8970b199801bb7029007eb40a99cb309414a7`
+
 ## CS3-CH08-S01-U001 — Yeni ürün planını ve bitiş sözleşmesini FIFO'ya bağla
 
 - Commit: `bd22896ee23dc7d6b53d9d23f255146ed26f2078`

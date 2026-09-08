@@ -2,24 +2,7 @@
 
 Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter açılır; POP ancak exact-head bağımsız PASS sonrası yapılır. BOOK.json ile byte eşitliği guardrail tarafından doğrulanır.
 
-## FRONT — CS3-CH08-S01-U002
-
-### CS3-CH08-S01-U002 — Katalog ve capability sözleşmesini eklemeli kanıt sürümlerine hazırla
-
-**Sonuç:** Yeni aile/test/tier eklenebilir, ama eski korpus ve kalite kanıtı sessizce yeniden yazılamaz.
-
-**Kabul:**
-
-- Mevcut 15 capability, 12 CWE ailesi, 52 fixture ve kayıtlı input/label/threshold snapshot'ı sürümlü exact digest ile korunur. Eski receipts özgün sözleşmelerinde doğrulanabilir; yeni aileleri kapsıyor diye yeniden etiketlenmez.
-- scripts/cwe_quality.py ve check_capabilities_sync içindeki sabit 15 ile test_catalog sabit sayıları yalnız reviewed katalog sürümündeki exact registry/input setine bağlanır. Gelişigüzel aile/fixture/tier ekleme veya eksiltme kabul edilmez; aynı-name fake/duplicate/missing/ghost kayıt negatifleri ret alır.
-- Her ileriki scope içi test/registry/tier değişikliği source-derived bağımsız sınıflandırmalı prospective successor gerektirir; bütün eski daha sıkı profile floors ve eski fixture assertions korunur. Yeni büyük corpus, eski baseline/corpus beklentilerinin yerine geçmez.
-- Bu görev yeni kuralı varmış gibi kaydetmez: installed capabilities sayısı gerçekten mevcut olandır, planned target ayrıdır. Eski v1 negatifleri, yeni sürüm migration RED/GREEN ve gerçek CLI capability parity geçer.
-- Korumalı inventory/catalog değişikliği yalnız bu task'ın gerçek kaynak/test/tier farkına bağlı, bağımsız sınıflandırmalı prospective successor'dır; eski snapshot/receipt/fixture anlamı ve daha sıkı floors korunur. Yeni frozen değerlendirme seti bu izinle düzenlenmez.
-
-**Test bütçesi:** T1
-**Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** scripts/cwe_quality.py, scripts/check_capabilities_sync.py, tests/cwe_corpus/test_catalog.py, tests/cwe_corpus/regression_inventory.json, tests/cwe_corpus/catalog.json, tests/cwe_corpus/snapshots/terminal-4fd4a21-catalog.json, tests/cwe_corpus/snapshots/terminal-4fd4a21-inventory.json, tests/cwe_corpus/snapshots/terminal-4fd4a21-contract.json, docs/product-quality-contract.md, docs/CWE_SCOPE.md
-**Bağımlılıklar:** CS3-CH08-S01-U001
+## FRONT — CS3-CH08-S01-U003
 
 ### CS3-CH08-S01-U003 — Gerçek proje girdilerini ve geniş kalite korpusunu önceden dondur
 
