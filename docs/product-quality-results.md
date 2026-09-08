@@ -154,10 +154,35 @@ yardımcı hata da korunur, CI başarısızlığının nedeni olarak gösterilme
 Geçici dizin alias'ı ile yerelde aynı pozitif-test RED'i üretildi. CLI testleri
 artık gerçek kanonik geçici yolu kullanır; reader'ın alias/overwrite ret koşulları
 gevşetilmedi. Yanlış qualification negatifi ayrıca ret nedenini doğrular; yanlış
-bir yol nedeniyle erken reddi ürün-güvence kanıtı saymaz. Taze Windows/macOS
-çalışması hâlâ gerekir; eski başarısız run daha sonra PASS diye etiketlenmez.
+bir yol nedeniyle erken reddi ürün-güvence kanıtı saymaz. Bu düzeltmenin sonraki
+hosted denemesi aşağıdadır; eski başarısız run daha sonra PASS diye etiketlenmez.
 
 Workflow sadece kurulu Clang'ı gözler; LLVM-20/nihai API modeline seçildiği veya
 native qualification geçtiği varsayılmaz. SQLite dependency'si, tam compiler
 runtime closure'ı, gerçek korpus ve dondurulmuş ortam karşılaştırması bu hazırlıkla
 tamamlanmış sayılmaz. Otomatik genel CI sonuçları bu dar metadata gözleminden ayrıdır.
+
+`533cc11` test düzeltmesinin bağımsız kısmi incelemesi ardından ikinci gerçek
+[`34286875317`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34286875317)
+metadata çalışması yapıldı. Sonuç yine **FAIL**: Ubuntu ve macOS gözlemleri başarılı,
+Windows 34 testten sonra gerçek capture sırasında `unsupported dependency escape`
+ile durdu. Windows artefact'i yoktur; o hatanın tam dependency stdout'u tutulmadığı
+için hangi bayt dizisinin tetiklediği gözlendi diye iddia edilmez. Saklanan ikinci
+paketin özet SHA-256'sı
+`5a1f00d21ec5bd68a47383f2f8b64921c948eb6ab8e2115646977604d7908e28`;
+run/attempt/source ve iki artefact bağı bağımsız denetlendi.
+
+Ubuntu'da GCC/G++ 13.3 yanında probe Clang 18.1.3 ve libstdc++14 header'ları seçmiştir
+(64 C, 272 C++). macOS arm64 14.8.9 gözlemi seçili Xcode 15.4 / Apple Clang 15.0.0 /
+SDK 14.5 ile 146 C ve 890 C++ header kaydı içerir. Ayrı kurulu CLT 16.2 seçili
+developer directory değildir. Mac hashleri `/usr/bin/clang` giriş noktalarını ve
+seçili header/SDKSettings dosyalarını kapsar; gerçek Xcode compiler/runtime closure'ı
+veya bütün SDK/ABI yeterliliği diye sunulmaz. Hiçbiri LLVM-20 ürün profili değildir.
+
+Bağımsız kaynak incelemesi [LLVM 20.1.8 dependency writer](https://github.com/llvm/llvm-project/blob/llvmorg-20.1.8/clang/lib/Frontend/DependencyFile.cpp#L292-L378)
+içinde normal Windows backslash ayraçlarının literal yazıldığını doğruladı. Reader
+bu geçerli biçimi reddediyordu. Literal drive/UNC, backslash-run/space/#/dollar ve
+LF/CRLF regresyonlarıyla düzeltilir; belirsiz trailing-backslash/tab adları bu dar
+regular-header altkümesine alınmaz. Harf büyüklüğü değişen aynı Windows yolu için
+ayrı duplicate RED'i de kapatıldı. Bu kaynak-format kanıtı kaybolan stdout'un
+yerine geçirilmez; yeni gerçek Windows gözlemi gereklidir.

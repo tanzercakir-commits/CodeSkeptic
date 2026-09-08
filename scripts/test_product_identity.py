@@ -26,6 +26,45 @@ class DependencyTests(unittest.TestCase):
         self.assertEqual(identity.dependency_paths(raw, 'windows'),
                          ['C:/SDK/a.h', 'C:/Program Files/VC/b.h'])
 
+    def test_clang_native_windows_separators_and_unc_are_literal(self):
+        raw = (r'identity-probe: C:\SDK\stdio.h C:\Program\ Files\VC\vector '
+               r'\\server\SDK\include\stddef.h' + '\n')
+        self.assertEqual(identity.dependency_paths(raw, 'windows'),
+                         [r'C:\SDK\stdio.h', r'C:\Program Files\VC\vector',
+                          r'\\server\SDK\include\stddef.h'])
+
+    def test_clang_backslash_runs_around_make_metacharacters(self):
+        # LLVM 20.1.8 DependencyFile.cpp PrintFilename, not shell escaping:
+        # n slashes before space => 2n+1; before # => n+1; otherwise literal.
+        for flavor, prefix in (('posix', '/sdk/p'), ('windows', 'C:\\SDK\\p')):
+            for count in range(4):
+                for character in (' ', '#', '$', 'z'):
+                    original = prefix + '\\' * count + character + 'q.h'
+                    if character == ' ':
+                        encoded = '\\' * (2 * count + 1) + ' '
+                    elif character == '#':
+                        encoded = '\\' * (count + 1) + '#'
+                    else:
+                        encoded = '\\' * count + ('$$' if character == '$' else character)
+                    raw = 'identity-probe: ' + prefix + encoded + 'q.h\n'
+                    with self.subTest(flavor=flavor, count=count, character=character):
+                        self.assertEqual(identity.dependency_paths(raw, flavor), [original])
+
+    def test_native_separator_paths_support_both_line_endings(self):
+        for ending in ('\n', '\r\n'):
+            raw = 'identity-probe: C:\\SDK\\a.h \\' + ending + '  C:\\SDK\\b.h' + ending
+            with self.subTest(ending=ending):
+                self.assertEqual(identity.dependency_paths(raw, 'windows'),
+                                 [r'C:\SDK\a.h', r'C:\SDK\b.h'])
+
+    def test_tab_and_ambiguous_trailing_separator_inputs_are_not_admitted(self):
+        for raw in ('identity-probe: /sdk/has\ttab.h\n',
+                    'identity-probe: /sdk/tail\\ /sdk/next.h\n',
+                    'identity-probe: /sdk/tail\\\\ /sdk/next.h\n',
+                    'identity-probe: /sdk/tail\\\n'):
+            with self.subTest(raw=raw), self.assertRaises(identity.IdentityError):
+                identity.dependency_paths(raw, 'posix')
+
     def test_wrong_target_relative_missing_and_malformed_dependencies_fail(self):
         for raw in ('other: /sdk/a.h\n', 'identity-probe:',
                     'identity-probe: relative.h\n', 'identity-probe: /a.h\nother: /b.h\n',
@@ -37,6 +76,10 @@ class DependencyTests(unittest.TestCase):
     def test_duplicate_dependency_paths_do_not_inflate_inventory(self):
         with self.assertRaises(identity.IdentityError):
             identity.dependency_paths('identity-probe: /a.h /a.h\n', 'posix')
+
+    def test_windows_case_aliases_are_duplicate_dependencies(self):
+        with self.assertRaises(identity.IdentityError):
+            identity.dependency_paths('identity-probe: C:/SDK/a.h c:/sdk/A.h\n', 'windows')
 
     def test_dependency_flavor_and_limit_are_enforced(self):
         with self.assertRaises(identity.IdentityError):

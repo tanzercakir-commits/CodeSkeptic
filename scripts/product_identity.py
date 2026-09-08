@@ -150,25 +150,44 @@ def file_identity(path, maximum=MAX_FILE):
 
 
 def dependency_paths(raw, flavor):
-    """Parse the one fixed -MT rule, including make escaping and Windows drives."""
+    """Read the fixed Clang Make rule, not arbitrary Make/shell escaping.
+
+    LLVM 20.1.8 DependencyFile.cpp PrintFilename leaves ordinary backslashes
+    literal, emits 2n+1 before a space and n+1 before #. Tabs and ambiguous
+    trailing-backslash names are outside this regular-header subset.
+    """
     require(flavor in ('posix', 'windows') and type(raw) is str
-            and len(raw.encode('utf-8')) <= MAX_OUTPUT and '\x00' not in raw,
+            and len(raw.encode('utf-8')) <= MAX_OUTPUT and '\x00' not in raw and '\t' not in raw,
             'dependency format/size')
-    raw = raw.replace('\\\r\n', ' ').replace('\\\n', ' ').replace('\r\n', '\n').strip()
+    # Only the writer's separated, indented continuation form is admitted.
+    raw = re.sub(r' \\\r?\n +(?=\S)', ' ', raw).replace('\r\n', '\n').strip(' \r\n')
     require(raw.startswith('identity-probe:') and '\n' not in raw and '\r' not in raw,
             'expected exactly one fixed dependency rule')
     text, result, token, index = raw[len('identity-probe:'):], [], [], 0
     while index < len(text):
         char = text[index]
-        if char.isspace():
+        if char == ' ':
             if token:
                 result.append(''.join(token))
                 token = []
         elif char == '\\':
-            index += 1
-            require(index < len(text) and text[index] in (' ', '\t', '#', '\\'),
-                    'unsupported dependency escape')
-            token.append(text[index])
+            start = index
+            while index < len(text) and text[index] == '\\':
+                index += 1
+            count = index - start
+            require(index < len(text), 'trailing dependency backslash is unsupported')
+            if text[index] == ' ':
+                require(count % 2 == 1 and index + 1 < len(text)
+                        and not re.match(r'(?:[A-Za-z]:[\\/]|/|\\\\)', text[index + 1:]),
+                        'ambiguous trailing-backslash dependency name')
+                token.extend(('\\' * ((count - 1) // 2), ' '))
+                index += 1
+            elif text[index] == '#':
+                token.extend(('\\' * (count - 1), '#'))
+                index += 1
+            else:
+                token.append('\\' * count)
+            continue
         elif char == '$':
             index += 1
             require(index < len(text) and text[index] == '$', 'dependency variable is not a filename')
@@ -183,7 +202,8 @@ def dependency_paths(raw, flavor):
     path_type = PureWindowsPath if flavor == 'windows' else PurePosixPath
     require(0 < len(result) <= MAX_HEADERS and all(path_type(path).is_absolute() for path in result),
             'empty, excessive or relative header dependency')
-    require(len({str(path_type(path)) for path in result}) == len(result), 'duplicate dependency path')
+    require(not any(path.endswith(('\\', '/')) for path in result), 'trailing header separator')
+    require(len({path_type(path) for path in result}) == len(result), 'duplicate dependency path')
     return result
 
 
