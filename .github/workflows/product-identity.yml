@@ -30,24 +30,22 @@ jobs:
       PYTHONDONTWRITEBYTECODE: "1"
       PYTHONUTF8: "1"
     steps:
+      - name: Preserve committed source bytes before checkout
+        shell: bash
+        run: git config --global core.autocrlf false
+
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-
-      - name: Focused metadata tests
-        shell: bash
-        run: |
-          if [[ "$RUNNER_OS" == Windows ]]; then
-            python -B -m unittest discover -s scripts -p test_product_identity.py -q
-          else
-            python3 -B -m unittest discover -s scripts -p test_product_identity.py -q
-          fi
 
       - name: Observe installed Linux or macOS tools and header dependencies
         if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
+          identity_python="$(command -v python3)"
+          "$identity_python" -B -c 'import sys; assert sys.version_info >= (3, 10), "Python 3.10+ required"'
+          "$identity_python" -B -m unittest discover -s scripts -p test_product_identity.py -q
           if [[ "$RUNNER_OS" == Linux ]]; then
             identity_cc=/usr/bin/gcc
             identity_cxx=/usr/bin/g++
@@ -57,7 +55,7 @@ jobs:
           fi
           identity_clang="$(command -v clang)"
           identity_clangxx="$(command -v clang++)"
-          python3 -B scripts/product_identity.py capture \
+          "$identity_python" -B scripts/product_identity.py capture \
             --root "$GITHUB_WORKSPACE" --source-sha "$GITHUB_SHA" \
             --cc "$identity_cc" --cxx "$identity_cxx" \
             --clang "$identity_clang" --clangxx "$identity_clangxx" \
@@ -70,6 +68,12 @@ jobs:
           VSLANG: "1033"
         run: |
           $ErrorActionPreference = 'Stop'
+          # Select once, before vcvars can change PATH; tests and capture share it.
+          $identityPython = (Get-Command python.exe -ErrorAction Stop).Source
+          & $identityPython -B -c 'import sys; assert sys.version_info >= (3, 10), "Python 3.10+ required"'
+          if ($LASTEXITCODE -ne 0) { throw 'Python 3.10+ required' }
+          & $identityPython -B -m unittest discover -s scripts -p test_product_identity.py -q
+          if ($LASTEXITCODE -ne 0) { throw 'Focused metadata tests failed' }
           $identityLocator = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $identityVs = & $identityLocator -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
           if ($LASTEXITCODE -ne 0 -or -not $identityVs) { throw 'No installed x64 VC toolset' }
@@ -85,7 +89,7 @@ jobs:
           $identityCl = Join-Path $env:VCToolsInstallDir 'bin\Hostx64\x64\cl.exe'
           $identityClang = (Get-Command clang.exe -ErrorAction Stop).Source
           $identityClangxx = (Get-Command clang++.exe -ErrorAction Stop).Source
-          python -B scripts/product_identity.py capture `
+          & $identityPython -B scripts/product_identity.py capture `
             --root "$env:GITHUB_WORKSPACE" --source-sha "$env:GITHUB_SHA" `
             --cc "$identityCl" --cxx "$identityCl" `
             --clang "$identityClang" --clangxx "$identityClangxx" `

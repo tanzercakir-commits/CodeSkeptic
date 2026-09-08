@@ -215,6 +215,11 @@ def source_identity(root, expected):
         path = root / relative
         require(not path.is_symlink() and path.resolve() == path, 'source helper alias is not admitted')
         value[field] = file_identity(path)['sha256']
+        # A Git-clean worktree may still contain CRLF or smudge-filtered bytes.
+        # Bind the observed helper bytes to the actual committed blob as well.
+        committed = run(['git', 'cat-file', 'blob', head + ':' + relative], cwd=root)['stdout']
+        require(value[field] == hashlib.sha256(committed.encode('utf-8')).hexdigest(),
+                'source helper bytes differ from the committed blob: ' + relative)
     require(Path(__file__).resolve() == root / SOURCE_FILES['collector_sha256'],
             'collector must run from the selected checkout')
     return value

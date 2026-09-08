@@ -130,6 +130,16 @@ buldu. İki karşılaşma sırası ve eşit/farklı içerik için dört RED koru
 logical/resolved kimlik tablosu ve gerçekçi safe-alias kontrolleriyle düzeltildi.
 Bu ikinci başarısız inceleme de sonradan PASS diye etiketlenmez.
 
+`ef2dd8c` alias düzeltmesi bağımsız kısmi incelemede bulgusuzdur; bu U003 PASS'i
+değildir. Ayrı portability incelemesi Git-clean CRLF checkout'un aynı HEAD altında
+farklı helper byte hashleri üretebildiğini belirledi. Dört kaynak dosyası için bu
+durum ayrı, gerçek geçici Git depolarında RED olarak üretildi; collector artık
+çalışma dosyasını doğrudan HEAD blob hash'iyle de karşılaştırır. Workflow checkout
+öncesinde CRLF dönüşümünü kapatır. İlk test düzeneğinin temiz-index koşulunu
+sağlayamayan denemeleri bu RED kanıtı değildir. Native Windows çalışması ayrıca gerekir.
+Her lane test ve capture için aynı açık Python yolunu kullanır; Windows yolu
+vcvars PATH değişiminden önce seçilir. Python 3.10 altı ortam baştan reddedilir.
+
 Bu checkpoint'te hosted identity gözlemi henüz yoktur. Workflow sadece kurulu Clang'ı
 gözler; LLVM-20/nihai API modeline seçildiği veya native qualification geçtiği
 varsayılmaz. SQLite dependency'si, tam compiler runtime closure'ı, gerçek korpus ve

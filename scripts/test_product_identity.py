@@ -80,6 +80,69 @@ class FileIdentityTests(unittest.TestCase):
                 identity.file_identity(path, maximum=4)
 
 
+class SourceIdentityTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix='codeskeptic-identity-source-')
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name).resolve()
+        self.git('init', '-q')
+        for key, value in (('core.autocrlf', 'true'), ('core.safecrlf', 'false'),
+                           ('core.hooksPath', str(self.root / 'no-hooks')),
+                           ('commit.gpgsign', 'false'), ('user.name', 'Identity fixture'),
+                           ('user.email', 'identity-fixture@example.invalid')):
+            self.git('config', '--local', key, value)
+        for relative in identity.SOURCE_FILES.values():
+            path = self.root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b'first line\nsecond line\n')
+        self.git('add', '--', *identity.SOURCE_FILES.values())
+        self.git('commit', '-q', '-m', 'Isolated identity source fixture')
+        self.head = self.git('rev-parse', 'HEAD').decode().strip()
+
+    def git(self, *arguments):
+        return subprocess.check_output(['git', *arguments], cwd=self.root,
+                                       stderr=subprocess.PIPE, timeout=15)
+
+    def observe(self):
+        with mock.patch.object(identity, '__file__',
+                               str(self.root / identity.SOURCE_FILES['collector_sha256'])):
+            return identity.source_identity(self.root, self.head)
+
+    def test_committed_source_bytes_are_accepted_with_autocrlf_enabled(self):
+        self.git('config', '--local', 'core.autocrlf', 'true')
+        result = self.observe()
+        for field, relative in identity.SOURCE_FILES.items():
+            self.assertEqual(result[field], hashlib.sha256(
+                self.git('cat-file', 'blob', self.head + ':' + relative)).hexdigest())
+
+    def test_git_clean_crlf_conversion_cannot_change_any_source_identity(self):
+        self.git('config', '--local', 'core.autocrlf', 'true')
+        for relative in identity.SOURCE_FILES.values():
+            path = self.root / relative
+            original = path.read_bytes()
+            path.write_bytes(original.replace(b'\n', b'\r\n'))
+            try:
+                # Git normalizes the CRLF bytes to the unchanged committed blob.
+                # Refreshing this isolated index also removes racy stat effects.
+                self.git('add', '--', relative)
+                self.git('diff', '--cached', '--exit-code')
+                self.assertEqual(self.git('status', '--porcelain'), b'',
+                                 self.git('ls-files', '--eol').decode())
+                with self.subTest(relative=relative), self.assertRaises(identity.IdentityError):
+                    self.observe()
+            finally:
+                path.write_bytes(original)
+                self.git('add', '--', relative)
+
+    def test_dirty_or_wrong_head_source_is_rejected(self):
+        with self.assertRaises(identity.IdentityError):
+            identity.source_identity(self.root, 'a' * 40)
+        path = self.root / identity.SOURCE_FILES['collector_sha256']
+        path.write_bytes(path.read_bytes() + b'changed\n')
+        with self.assertRaises(identity.IdentityError):
+            self.observe()
+
+
 class InvocationTests(unittest.TestCase):
     def test_command_failure_timeout_size_and_invalid_utf8_fail_closed(self):
         outcomes = [subprocess.CompletedProcess(['/tool'], 1, b'', b'failed'),
@@ -432,6 +495,17 @@ class DocumentTests(unittest.TestCase):
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_each_lane_uses_one_explicit_python_for_tests_and_capture(self):
+        workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/product-identity.yml').read_text()
+        self.assertIn('identity_python="$(command -v python3)"', workflow)
+        self.assertIn('"$identity_python" -B -m unittest', workflow)
+        self.assertIn('"$identity_python" -B scripts/product_identity.py capture', workflow)
+        self.assertIn('$identityPython = (Get-Command python.exe -ErrorAction Stop).Source', workflow)
+        self.assertIn('& $identityPython -B -m unittest', workflow)
+        self.assertIn('& $identityPython -B scripts/product_identity.py capture', workflow)
+        self.assertLess(workflow.index('$identityPython ='), workflow.index('$identitySetup ='))
+        self.assertEqual(workflow.count('sys.version_info >= (3, 10)'), 2)
+
     def test_identity_lane_has_narrow_push_and_readonly_permissions(self):
         workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/product-identity.yml').read_text()
         self.assertIn('branches: [agent/cs3-ch08-s01-u003-frozen-product-profiles]', workflow)
@@ -439,6 +513,8 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn('persist-credentials: false', workflow)
         self.assertIn('runner: [ubuntu-24.04, windows-2025, macos-14]', workflow)
         self.assertIn('timeout-minutes: 10', workflow)
+        self.assertLess(workflow.index('git config --global core.autocrlf false'),
+                        workflow.index('uses: actions/checkout@'))
         self.assertIn('path: ${{ runner.temp }}/codeskeptic-product-identity.json', workflow)
         for forbidden in ('sudo ', 'apt-get ', 'brew install', 'cmake ', 'ctest ',
                           'git push', 'contents: write', 'id-token: write', 'pull_request_target:'):
