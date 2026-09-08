@@ -22,6 +22,9 @@ NUMERIC = {'attempted_tus', 'analyzed_tus', 'broken_tus', 'skipped_tus',
            'skipped_commands', 'failed_commands', 'incomplete_functions'}
 ROW_NUMERIC = {'commands', 'analyzed_commands', 'skipped_commands',
                'failed_commands', 'recovery_commands'}
+EVIDENCE_FLAGS = {'no_inputs', 'no_rules', 'tool_failed', 'summary_load_failed',
+                  'summary_stale', 'summary_save_failed', 'baseline_load_failed',
+                  'baseline_write_failed', 'baseline_recorded', 'report_write_failed'}
 
 
 def require(condition, message):
@@ -91,11 +94,25 @@ def parse_time(text, exit_code):
     return values
 
 
-def summarize_report(report, exit_code, project):
+def parse_version(stdout, revision):
+    require(type(stdout) is str and type(revision) is str
+            and re.fullmatch('[0-9a-f]{40}', revision), 'invalid version identity')
+    match = re.fullmatch(r'CodeSkeptic ([0-9]+\.[0-9]+\.[0-9]+-dev\+g' + revision[:12] + r')\n?', stdout)
+    require(match is not None, 'binary/source version mismatch')
+    return match.group(1)
+
+
+def summarize_report(report, exit_code, project, expected_version):
     require(type(report) is dict and report.get('schema') == 'codeskeptic-report/v1'
             and report.get('complete') is True and type(exit_code) is int
             and exit_code in (0, 1) and type(report.get('exit_code')) is int
             and report['exit_code'] == exit_code, 'unavailable or inconsistent report')
+    require(type(expected_version) is str and bool(expected_version)
+            and report.get('tool') == 'CodeSkeptic'
+            and report.get('tool_version') == expected_version, 'report/binary identity mismatch')
+    evidence = report.get('evidence')
+    require(type(evidence) is dict and set(evidence) == EVIDENCE_FLAGS
+            and all(value is False for value in evidence.values()), 'failed or invalid report evidence')
     commands, skipped = project['commands'], project['skipped']
     require(type(commands) is dict and commands and type(skipped) is dict
             and set(skipped) < set(commands)
@@ -158,6 +175,9 @@ def summarize_report(report, exit_code, project):
             and all(type(n) is int for n in counts.values())
             and counts == {'total': total, 'blocking': blocking, 'report_only': total-blocking}
             and exit_code == int(blocking > 0), 'finding verdict/counters mismatch')
+    expected_status = ('partial-accepted' if skipped else 'findings' if blocking
+                       else 'report-only' if total else 'clean')
+    require(report.get('status') == expected_status, 'report status/verdict mismatch')
     identity = json.dumps(sorted((list(key), count) for key, count in identities.items()), separators=(',', ':'))
     return {'coverage_class': 'predeclared-partial' if skipped else 'complete-selected-inputs',
             'coverage': coverage, 'findings': total, 'blocking': blocking, 'report_only': total-blocking,
@@ -248,9 +268,8 @@ def run(plan_path, binary, revision, output):
         version = capture([str(binary), '--version'], output, 10)
         save(output / 'version-execution.json', version)
         valid_execution(version)
-        require(version['returncode'] == 0 and re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+-dev\+g' + revision[:12],
-                                                        version['stdout'].strip()), 'binary/source version mismatch')
-        result['version'] = version['stdout'].strip()
+        require(version['returncode'] == 0, 'version command failed')
+        result['version'] = parse_version(version['stdout'], revision)
         for project in plan['projects']:
             runs = []
             for repetition in range(1, plan['repetitions'] + 1):
@@ -270,7 +289,7 @@ def run(plan_path, binary, revision, output):
                 require(time_path.stat().st_size <= 4096, 'time record size')
                 metrics = parse_time(time_path.read_text(), observed['returncode'])
                 raw_report = load_json(report_path)
-                semantic = summarize_report(raw_report, observed['returncode'], project)
+                semantic = summarize_report(raw_report, observed['returncode'], project, result['version'])
                 require(all(item['file'] in plan['inputs'] for item in raw_report['diagnostics']),
                         'diagnostic source missing from input freeze')
                 verify_inputs(plan['inputs'])
