@@ -2,6 +2,23 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH05-S02-U001 — Sınırlı sanitizer/fuzz ve bozuk girdi kabulünü tamamla
+
+- Commit: `9a9ccdda5c44f0b0a7c02cede8334510fa8edac8`
+- Dal: `agent/cs3-ch05-s02-u001-resilience-qualification`
+- Implementer: `root-cs3-ch05-s02-u001-20260908`
+- Bağımsız denetçi: `/root/ownership_model_verifier`
+- İnceleme SHA-256: `c6babaccd85607d93737707187c4f0bf48ef6d6e4d89ed63d16e49e3fa8d8100`
+- Tarih: 2026-09-08T04:52:37.436390+00:00
+- Sonuç: Parser/worker/cache sınırları hedefli adversarial testlerden geçer.
+- linux-suite: PASS; SHA-256 `4e03d501ef3559ec6305c13511af54224e20305f329eef8b3818a476ef859d8f`; `bash scripts/local_test.sh full && python3 -B tests/cwe_corpus/test_catalog.py && python3 -B fuzz/test_runner.py && python3 -B fuzz/test_lane_join.py`
+- relevant-corpus: PASS; SHA-256 `6dfd236e381df9ab130998ef625fd57bea96968abf888f51ae60d15ea336d260`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S02-U001/qualify_normal.sh 5651192dc150f0ea51c0e07f81d42f494b4087d1`
+- queue-check: PASS; SHA-256 `14e3e1b365c1c824e05e6d1863ebd359cb193a53a541601a562ff621117f0760`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S02-U001/final_checks.sh`
+- windows-hosted: PASS; SHA-256 `94fcd0a587208cfe21ee1db6dee71f541fb9a14308f58e9df6432028446a2e8d`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S02-U001/collect_windows_5651192.sh 34157079471 1`
+- artifact-equivalence: PASS; SHA-256 `80ec2007bb4b910adec850ff3fa3ca32cbc36cb15cc677128416ba2213b3805c`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S02-U001/verify_results_transition.py`
+- combined-lanes: PASS; SHA-256 `5a39ad2fdf473547d33aaf642138be8a1336c2de05e4737989c5aca4d03c65cb`; `python3 -B fuzz/verify_lanes.py --revision 5651192dc150f0ea51c0e07f81d42f494b4087d1 --asan /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S02-U001/5651192dc150f0ea51c0e07f81d42f494b4087d1/asan --ubsan /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S02-U001/5651192dc150f0ea51c0e07f81d42f494b4087d1/ubsan --native /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S02-U001/5651192dc150f0ea51c0e07f81d42f494b4087d1/native --out /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S02-U001/5651192dc150f0ea51c0e07f81d42f494b4087d1/combined.json`
+- linux-hosted: PASS; SHA-256 `78c2dddd6dad90977a9c64a7838007c2c47d1652a3bdd99af2bc940c098045b5`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH05-S02-U001/collect_linux_5651192.sh 34157079481 1`
+
 ## CS3-CH05-S01-U003 — Yeni experimental CWE ailelerinin destek kararını kanıtla
 
 - Commit: `b32cdd162fc1a8b7e5e4a60ed18762b7bfe54dee`
