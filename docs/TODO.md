@@ -16,7 +16,7 @@ Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter aç
 
 **Test bütçesi:** T3
 **Kontroller:** release-qualification, queue-check
-**Kapsam:** scripts/package_release.sh, CMakeLists.txt, src/CMakeLists.txt, docs/release-checklist.md, tests/PackageTest.py
+**Kapsam:** scripts/package_release.sh, CMakeLists.txt, src/CMakeLists.txt, docs/release-checklist.md, tests/PackageTest.py, scripts/test_package.py
 **Bağımlılıklar:** Yok
 
 ### CS3-CH06-S01-U002 — Container ve Action paketinde analiz paritesini doğrula
