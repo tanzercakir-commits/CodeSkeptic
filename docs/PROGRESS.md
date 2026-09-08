@@ -2,6 +2,18 @@
 
 Yalnız bağımsız doğrulanmış yerel tamamlamalar; GitHub yayını veya release anlamına gelmez. Eski programın kayıtları referans arşivinde korunmuştur.
 
+## CS3-CH06-S02-U002 — Desteklenen platform sözünü gerçek paket testine bağla
+
+- Commit: `85cbb8fbbc725dd0a0192dd83f0ac851d47c74be`
+- Dal: `agent/cs3-ch06-s02-u002-platform-support`
+- Implementer: `/root`
+- Bağımsız denetçi: `/root/gtest_measurement_verifier`
+- İnceleme SHA-256: `09cfa0a998fdd9ce715bc760b86539038ea6c3779421cdaf79dec0bd028174d7`
+- Tarih: 2026-09-08T16:34:10.382681+00:00
+- Sonuç: Linux dışı platformların destek durumu fiilen çalışan artifact testine göre açıklanır.
+- release-qualification: PASS; SHA-256 `2c8658cd375f88b68bdd8fb1b8e42cb981f7cc2ec584a431899eebbce1df24cd`; `python3 -B /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH06-S02-U002/final-native-evidence.py 85cbb8fbbc725dd0a0192dd83f0ac851d47c74be`
+- queue-check: PASS; SHA-256 `e383ed307c5e224cfe8cbeacc61f07b3c406f5381fe53f161c0f39ff59b73153`; `bash /home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH06-S02-U002/final-doc-checks.sh 85cbb8fbbc725dd0a0192dd83f0ac851d47c74be`
+
 ## CS3-CH06-S02-U001 — Sürüm, checksum, SBOM ve provenance üret
 
 - Commit: `f0f348faa3944a3c152173f9ef027a81f90f6422`
