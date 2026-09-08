@@ -388,7 +388,7 @@
     },
     {
       "path": "tests/test_project_queue.py",
-      "sha256": "11c9e2ef8c32d7eb13afb84f02ad206038e68d50f5106560e2e81b5ff7465dc5"
+      "sha256": "c64cbb55bb2750c5e8be896861418f313d38809fd4be34e69e72f9d5867c1ec6"
     },
     {
       "path": "tests/test_review_diff.sh",

@@ -1,5 +1,30 @@
 # Candidate acceptance and artifact qualification
 
+## Second-act product completion — CH08 through CH14
+
+The [approved product plan](PRODUCT_COMPLETION_PLAN.md) and
+[G1–G8 quality contract](product-quality-contract.md) define 51 new tasks in the
+same FIFO. The old 46-task local dossier below is preserved historical evidence,
+not evidence for an unmeasured later source or permission for local-only closure
+of the new product. Installed capabilities remain distinct from the planned
+16 CWE families / 19 diagnostics / 26 bounded CWE IDs; no new rule ships here.
+
+CH14 first freezes a product SOURCE and verifies G1–G4, G7 and candidate G5.
+Actual tag binding and publisher signing/notary G6 remain pending until the
+owner's exact-source/tag/signing authorization. Real tagged builds and signed
+packages then require full G1–G7 requalification. The exact signed artifact
+manifest needs a separate public-release approval; actual publication, consumer
+download verification and the final reviewed ledger transition close G8.
+Unsigned local artifacts, a draft release, a green wrapper or an unexecuted SKIP
+cannot substitute for those gates. Missing external authority blocks FRONT.
+
+Only allowlisted, non-packaged evidence/ledger changes may follow SOURCE freeze.
+Any product/build/workflow/packaged-document change means a new SOURCE and fresh
+qualification/approval; later documentation HEAD must not relabel an old binary.
+No main merge, tag, signing identity use or public release is authorized by the
+plan alone. The single [TODO](TODO.md) remains the executable queue; this section
+records the completion contract, not a second task/status system.
+
 ## Candidate acceptance matrix
 
 This CH07 dossier assembles independently accepted development profiles; it

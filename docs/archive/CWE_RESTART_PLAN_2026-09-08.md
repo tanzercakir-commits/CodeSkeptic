@@ -1,0 +1,775 @@
+# CodeSkeptic — CWE Ürün Planı
+
+Sürüm: 59. Eski planın devamı değil; main tabanlı yeni program.
+
+PLAN/TODO/PROGRESS aynı BOOK.json kaydından üretilir; elle değiştirilmez. Gelecek işler kontrollü olarak eklenebilir/güncellenebilir. Aktif işin kabulü ve tamamlanmış kayıtlar değiştirilmez.
+
+## CH00 — Tek seferlik yeniden başlangıç ve FIFO
+
+### CH00-S01 — Yürütme sözleşmesi
+
+#### CS3-CH00-S01-U001 — Main tabanlı kitabı ve çalışan FIFO/POP sistemini kur
+
+**Sonuç:** Eski dallar referans olarak saklanır; bağımsız doğrulama olmadan kuyruk ilerleyemez.
+
+**Kabul:**
+
+- Main ve src ağacı değişmez; eski yerel dal uçları geri yüklenebilir arşivde doğrulanır.
+- PLAN tam chapter–section katalogdur; TODO yalnız aktif chapter'ın tam görevlerini gösterir.
+- 30 veya daha fazla odaklı test FIFO, chapter geçişi, terminal durum, stale/missing kanıt, yanlış dal, scope ihlali, rollback ve gerçek süreç kesintisinden recovery'yi sınar.
+- Gelecek iş ekleme/güncelleme mevcut front'u, eski görev sırasını ve tamamlanmış kayıtları bozmaz.
+- Yerel kanıt kriptografik imza/remote destek diye sunulmaz; bağımsız exact-head PASS sonrası gerçek ilk POP yapılır.
+
+**Test bütçesi:** T0
+**Kontroller:** queue-tests, queue-check
+**Kapsam:** AGENTS.md, INVARIANTS.md, MASTER_PROMPT.md, CONTRIBUTING.md, docs/BOOK.json, docs/PLAN.md, docs/TODO.md, docs/PROGRESS.md, docs/RESTART.md, docs/QUEUE_GUIDE.md, docs/CWE_SCOPE.md, scripts/project_queue.py, scripts/local_test.sh, scripts/check_docs_sync.sh, tests/test_project_queue.py, tests/CMakeLists.txt, .github/workflows/project-queue.yml, scripts/progress_status.py, tests/StatusAutomationTest.py
+**Bağımlılıklar:** Yok
+
+## CH01 — CWE çekirdeğini somut eksiklerle geliştirme
+
+### CH01-S01 — Tamsayı ve ayırma boyutu
+
+#### CS3-CH01-S01-U001 — 64-bit signed çıkarma taşmasını doğru hesapla
+
+**Sonuç:** Çıkarma toplama gibi hesaplanmaz; kanıtlanabilir 64-bit overflow/underflow doğru raporlanır.
+
+**Kabul:**
+
+- Mevcut davranış önce değişikliksiz RED fixture ile doğrulanır; kaynak şüphesi tek başına hata/PASS sayılmaz.
+- LLONG_MIN−1 ve LLONG_MAX−(−1) bulunur; LLONG_MAX−1 ve LLONG_MIN−(−1) temiz kalır.
+- Unknown değerler, guard'lar ve 32-bit arithmetic davranışı korunur; ilgili IntOverflow regression ve gerçek CLI smoke geçer.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** src/rules/IntOverflowRule.cpp, tests/IntOverflowRuleTest.cpp, scripts/local_test.sh
+**Bağımlılıklar:** CS3-CH00-S01-U001
+
+#### CS3-CH01-S01-U002 — 64-bit allocation-size toplamayı denetle
+
+**Sonuç:** n+header gibi allocation boyutlarında unsigned sarma mevcut çarpım modeline eklenir.
+
+**Kabul:**
+
+- SIZE_MAX sınırı, exact fit, korumalı toplam ve taşan toplam karşılaştırılır.
+- Mevcut 64-bit multiplication ve trusted/unknown kaynak sınırları bozulmaz.
+- CWE-131/190 bulgusu gerçek ayırma boyutuna bağlıdır; bütün unsigned toplamalar uyarılmaz.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** src/rules/AllocSizeOverflowRule.cpp, tests/AllocSizeOverflowRuleTest.cpp
+**Bağımlılıklar:** Yok
+
+#### CS3-CH01-S01-U003 — Checked-add overflow sonucunun kullanımını izle
+
+**Sonuç:** Checked-add çağrısının başarısızlık sonucu yok sayıldığında güvensiz boyut kullanımı yakalanır.
+
+**Kabul:**
+
+- Builtin add overflow kontrolsüz kullanım pozitif, doğrulanmış success branch negatiftir.
+- Status/output reassignment ve escape önceki kanıtı geçersiz kılar.
+- Checked-mul regresyonları ve ilgisiz arithmetic bulguları değişmez.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** src/rules/AllocSizeOverflowRule.cpp, tests/AllocSizeOverflowRuleTest.cpp
+**Bağımlılıklar:** CS3-CH01-S01-U002
+
+### CH01-S02 — Bellek okuma ve yazma sınırları
+
+#### CS3-CH01-S02-U001 — memcpy/memmove kaynak okuma kapasitesini denetle
+
+**Sonuç:** Hedef yeterli olsa bile küçük kaynaktan taşan okuma CWE-125 olarak ayrılır.
+
+**Kabul:**
+
+- Büyük hedef/küçük kaynak, exact fit, zero length ve unknown source kapsanır.
+- memset için kaynak okuması üretilmez; strncpy farklı semantiğiyle bu işin dışında kalır.
+- Mevcut destination write sınırı ve güvenli corpus sonuçları korunur.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** src/rules/BoundsRule.cpp, src/rules/BoundsRule.h, tests/BoundsRuleTest.cpp
+**Bağımlılıklar:** Yok
+
+#### CS3-CH01-S02-U002 — Sabit pointer-offset kalan kapasitesini izle
+
+**Sonuç:** buf+k ve &buf[k] için bilinen kalan kapasite okuma/yazma denetimine girer.
+
+**Kabul:**
+
+- Son byte, taşma, negatif offset ve one-past ile zero length ayrı fixture'lardır.
+- Bilinmeyen veya değiştirilmiş alias için kapasite uydurulmaz.
+- Kaynak okuma ve hedef yazma bulguları doğru ayrılır; integer hesap taşması güvenli kalır.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** src/rules/BoundsRule.cpp, src/rules/BoundsRule.h, src/engine/ExtentMap.cpp, src/engine/ExtentMap.h, tests/BoundsRuleTest.cpp
+**Bağımlılıklar:** CS3-CH01-S02-U001
+
+### CH01-S03 — Başlatılmamış scalar okumaları
+
+#### CS3-CH01-S03-U001 — Yerel scalar uninitialized-read kuralını ekle
+
+**Sonuç:** Yerel integer/bool değerinin atama öncesi gerçek okuması yeni experimental kimlikle raporlanır.
+
+**Kabul:**
+
+- int x; return x; ve arithmetic read pozitif; initializer, assignment-first, sizeof ve yalnız adres alma negatiftir.
+- Static/thread-local sıfır başlangıcı yanlış bulgu üretmez.
+- Pointer-only mevcut kuralın tüm CWE-457'yi kapsadığı iddia edilmez; kuralın kimliği ve registration'ı tutarlıdır.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** src/rules/UninitScalarRule*, src/analyzer/StaticAnalyzer.cpp, src/main.cpp, src/server/McpServer.cpp, src/core/RuleCapabilities.def, src/core/Capabilities.cpp, src/CMakeLists.txt, tests/UninitScalarRuleTest.cpp, tests/CMakeLists.txt, docs/capabilities.md, README.md, scripts/check_capabilities_sync.py, tests/CapabilitiesTest.cpp, tests/CapabilitiesCliTest.py
+**Bağımlılıklar:** Yok
+
+#### CS3-CH01-S03-U002 — Scalar initialization durumunu CFG birleşimlerinde koru
+
+**Sonuç:** Branch/loop birleşimlerinde definitely-initialized ile possibly-uninitialized ayrılır.
+
+**Kabul:**
+
+- Her iki branch atama güvenlidir; yalnız bir branch atama gerçek okumada bulgu üretir.
+- Loop zero-iteration, break/continue ve erken dönüş fixture'ları vardır.
+- Kapsam yerel integer/bool'dur; struct/heap/exception tam desteği iddia edilmez.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** src/rules/UninitScalarRule*, tests/UninitScalarRuleTest.cpp
+**Bağımlılıklar:** CS3-CH01-S03-U001
+
+### CH01-S04 — Kaynak sahipliği
+
+#### CS3-CH01-S04-U001 — accept/accept4 descriptor sahipliğini modelle
+
+**Sonuç:** Başarılı accept ailesi çağrısından dönen descriptor için close/transfer/leak takibi yapılır.
+
+**Kabul:**
+
+- Başarı sonrası kapatma, dönüşle ownership transferi ve leak ayrılır.
+- −1 hata yolu kaynak yaratmaz; aynı isimli kullanıcı metodu yanlış eşleşmez.
+- Mevcut open/socket/dup ve FILE/DIR modelleri korunur.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** src/rules/FdResourceRule.cpp, src/rules/FdResourceRule.h, tests/FdResourceRuleTest.cpp
+**Bağımlılıklar:** Yok
+
+#### CS3-CH01-S04-U002 — pipe/pipe2 çift descriptor çıkışını modelle
+
+**Sonuç:** Başarılı iki out-param descriptor bağımsız kaynak olarak izlenir.
+
+**Kabul:**
+
+- Başarıda iki kapatma, tek kapatma ve hiç kapatmama sonuçları ayrılır.
+- Hatalı dönüş ve yeniden atanmış out-param sahte ownership yaratmaz.
+- İki kaynak tek bulguda kaybolmaz; mevcut descriptor dönüş modeli bozulmaz.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** src/rules/FdResourceRule.cpp, src/rules/FdResourceRule.h, tests/FdResourceRuleTest.cpp
+**Bağımlılıklar:** CS3-CH01-S04-U001
+
+### CH01-S05 — Sayısal dönüşüm
+
+#### CS3-CH01-S05-U001 — Uzunluk ve index sink'lerinde kanıtlı narrowing kaybını raporla
+
+**Sonuç:** Implicit sayısal daraltmada hedef türe sığmayan kanıtlı aralık sink'e bağlanır.
+
+**Kabul:**
+
+- Exact fit, promotion, explicit intentional cast, enum/dependent ve unknown sınırları açıktır.
+- Allocator dışındaki uzunluk/index sink'leri dar kapsamlı fixture'larla sınanır.
+- Mevcut signed-overflow/narrowing ile çift rapor üretilmez; genel cast uyarıcısına dönüşmez.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** src/rules/SignConversionRule.cpp, src/rules/SignConversionRule.h, tests/SignConversionRuleTest.cpp
+**Bağımlılıklar:** Yok
+
+### CH01-S06 — Beyan edilmiş boyut kaynağının genişlik sınırı
+
+#### CS3-CH01-S06-U001 — uint64 out-param kaynak kökenini sayısal aralıktan ayır
+
+**Sonuç:** Beyan edilmiş kaynağın doğrudan uint64 pointer/reference çıktısı, signed interval üst sınırı gösterilemiyor diye güvenilir kabul edilmez.
+
+**Kabul:**
+
+- U002 sırasında kaynak incelemesinde görülen doğrudan uint64 out-param eksikliği önce değişikliksiz RED ile doğrulanır; C &n ve C++ non-const reference ayrı sınanır.
+- n+header ve n*constant için taşan pozitif ile gerçek SIZE_MAX korumalı negatif örnekler vardır; origin işareti ile top/finite aralık birbirine karıştırılmaz.
+- 32-bit kaynak, signed kaynak, scanf, return-value/alias kökeni ve unknown mutation sınırları korunur; desteklenmeyen pointer-alias kaynağı çözüldü diye sunulmaz.
+- Ortak transfer değişikliği tam Linux suite ve ilgili allocation/source corpus dilimi ile doğrulanır; eksik araç veya koşturulmayan kontrol PASS değildir.
+
+**Test bütçesi:** T2
+**Kontroller:** linux-suite, relevant-corpus, queue-check
+**Kapsam:** src/engine/IntervalEval.cpp, src/engine/IntervalEval.h, tests/IntervalAnalysisTest.cpp, tests/AllocSizeOverflowRuleTest.cpp, tests/IntOverflowRuleTest.cpp, tests/SignConversionRuleTest.cpp, src/rules/AllocSizeOverflowRule.cpp
+**Bağımlılıklar:** CS3-CH01-S01-U002
+
+#### CS3-CH01-S06-U002 — Ortak integer literal ve guard çözümünde unsigned değeri koru
+
+**Sonuç:** Paylaşılan interval literal/guard çözümünde unsigned sabitin gerçek değeri korunur; sahte negatif değerle erişilebilirlik veya kapasite kanıtı üretilmez.
+
+**Kabul:**
+
+- Unsigned 32-bit literal ve local initializer zincirinin negatif signed değere dönüştüğü hata önce değişikliksiz RED ile doğrulanır; doğrudan değer ve consumer branch guard ayrı sınanır.
+- Signed/unsigned 32/64/128 literal ve cast sınırları gerçek AST türüyle değerlendirilir; int64 modeline sığmayan değer unknown kalır, düşük bitlere veya negatif değere sessiz daraltılmaz.
+- INT64_MIN/MAX, karşılaştırma guard'ı, allocation boyutu ve kaynak/hedef bounds kontrollerinde mevcut pozitif ve güvenli negatifler korunur; bütün unsigned aritmetiğin çözüldüğü iddia edilmez.
+- Ortak literal/guard üreticisi değişikliği tam Linux suite ve ilgili sayı/bounds corpus dilimi ile doğrulanır; gerçek CLI kapsamı ve bağımsız exact-head PASS gereklidir.
+
+**Test bütçesi:** T2
+**Kontroller:** linux-suite, relevant-corpus, queue-check
+**Kapsam:** src/engine/IntervalEval.cpp, src/engine/IntervalEval.h, tests/IntervalAnalysisTest.cpp, tests/BoundsRuleTest.cpp, tests/IntOverflowRuleTest.cpp, tests/AllocSizeOverflowRuleTest.cpp, src/engine/ConditionWalk.h, src/rules/BoundsRule.cpp
+**Bağımlılıklar:** CS3-CH01-S02-U002
+
+#### CS3-CH01-S06-U003 — accept ailesinin wrapper sahipliğini ortak özette koru
+
+**Sonuç:** accept/accept4 çağrısından dönen sahiplik ortak function summary üzerinden caller'a taşınır; wrapper arkasındaki sızıntı kaybolmaz.
+
+**Kabul:**
+
+- S04-U001 sırasında gerçek CLI ile görülen accept-returning wrapper eksikliği önce değişikliksiz RED ile doğrulanır; doğrudan native çağrı pozitif kontrolü aynı fixture'da bulunur.
+- Gerçek C/C++ accept/accept4 imzaları, tek ve çok katlı return wrapper'ları ve caller close/leak ayrımı modellenir; dinlenen descriptor borrowed kalır, -1 yalnız başarısızlıktır.
+- Yalnız isim eşleşen method/namespace/yanlış prototip ve owned olmayan constant-return fonksiyonlar otomatik owned sayılmaz; ortak producer tanımı ile FdResourceRule sözleşmesi ayrışmaz.
+- Mevcut open/socket/dup, FILE/DIR, summary model/conflict ve cross-TU davranışları tam Linux suite ve ilgili ownership corpus/gerçek CLI diliminde korunur; çalışma dışı kod donor olarak kopyalanmaz.
+
+**Test bütçesi:** T2
+**Kontroller:** linux-suite, relevant-corpus, queue-check
+**Kapsam:** src/engine/FunctionSummary*, src/rules/FdResourceRule*, tests/InterproceduralTest.cpp, tests/FdResourceRuleTest.cpp, tests/MemoryLeakRuleExTest.cpp
+**Bağımlılıklar:** CS3-CH01-S04-U001
+
+### CH01-S07 — Hosted regresyon kapılarını yeni dal akışına bağla
+
+#### CS3-CH01-S07-U001 — Mevcut CI kapılarını agent dalı push olayına bağla
+
+**Sonuç:** Yeni görev dalları mevcut Linux, Windows ve ilgili Juliet kontrollerini tetikleyebilir; FIFO yeşili ürün yeterliliğiyle karıştırılmaz.
+
+**Kabul:**
+
+- agent/cs3-* push olayları Linux ve Windows işlerini; kaynak/test veya ci/regression-checkpoint.json değişikliği varsa Juliet'i seçer. Mevcut main, phase*, PR ve schedule davranışları korunur.
+- build-and-test adı, self-scan, corpus, thesis ve Juliet adımları korunur; eski pin, tolerans, quality floor ve destek kararları değiştirilmez.
+- Yeni agent olayları eski refs/status veya refs/ci-logs force-push adımlarını çalıştırmaz; normal job sonucu ve artifact kullanılır. Main ruleset değişimi, yeni PR veya merge yapılmaz.
+- Dal/olay/yol matrisi ve seçilmemesi gereken negatifler yerel testle, workflow yapısı ayrı doğrulamayla sınanır; varsayılan dalda olmayan dispatch kaydına güvenilmez.
+- Bu bir yerel tetikleme bağlantısı teslimidir; hosted PASS ve gerçek dünya yeterliliği sonraki exact-head checkpoint görevinin kabulüdür.
+
+**Test bütçesi:** T0
+**Kontroller:** workflow-policy-tests, workflow-validation, queue-check
+**Kapsam:** .github/workflows/ci.yml, .github/workflows/windows.yml, .github/workflows/juliet.yml, tests/WorkflowPolicyTest.py, docs/CI_GATES.md
+**Bağımlılıklar:** CS3-CH01-S06-U003
+
+#### CS3-CH01-S07-U002 — Exact base-head checkpoint ve kanıt doğrulayıcısını kur
+
+**Sonuç:** Açıkça seçilen feature checkpoint'i sabit girdilerde kesin base/head analyzer sürümlerini karşılaştırır; eksik veya farklı kimlikte kanıt kabul edilmez.
+
+**Kabul:**
+
+- Checkpoint tam base SHA'yı belirtir; head olayın kesin SHA'sıdır. Kanıt workflow SHA, binary ve manifest digest, proje revision, run ID/attempt ve kapsamı taşır.
+- Mevcut PR measurement ve manuel/zamanlanmış real-world yolları korunur. Yeni yol push ile açık checkpoint seçer; sıradan ledger push'ları ağır kampanyayı yeniden başlatmaz.
+- Mevcut measurement ve real-world runner'ları ile aynı immutable manifest/proje girdileri iki analyzer için kullanılır; eski kalite koşulları ve pinler aynen uygulanır.
+- Doğrulayıcı yanlış SHA/manifest, eksik proje/tekrar, skipped/cancelled/unavailable iş, coverage kaybı ve bozuk artifact/digest'i reddeder. Başarılı kontrol yanında bu negatifler ayrı test edilir.
+- Süre/fingerprint raporu ile gerçekten engelleyen kalite koşulları ayrılır. Yerel fixture ve gerçek CLI dilimi çalışır; sentetik receipt veya hazırlanmış workflow hosted başarı sayılmaz.
+
+**Test bütçesi:** T2
+**Kontroller:** checkpoint-tests, workflow-validation, linux-suite, checkpoint-cli-smoke, queue-check
+**Kapsam:** .github/workflows/measurement.yml, .github/workflows/realworld.yml, scripts/run_regression_checkpoint.py, scripts/verify_regression_checkpoint.py, tests/RegressionCheckpointTest.py, ci/regression-checkpoint.json, docs/CI_GATES.md
+**Bağımlılıklar:** CS3-CH01-S07-U001
+
+#### CS3-CH01-S07-U003 — İlk hosted regresyon checkpoint'ini gerçek exact-head kanıtıyla kapat
+
+**Sonuç:** Yeni kuyruk hattının eski ürün ve gerçek dünya kontrollerindeki durumu gerçek GitHub sonuçlarıyla doğrulanır; main entegrasyonu yapılmaz.
+
+**Kabul:**
+
+- Primary temiz feature commit'ini bağımsız yayın ön-kontrolünden sonra yalnız fast-forward push eder; ön-kontrol ürün PASS/POP değildir ve hosted kanıt gereğini kaldırmaz. Yeni PR, main yazma/merge, koruma değişimi, tag/release veya force-push yoktur.
+- Aynı aday head için Linux build-and-test, Windows, Juliet ve base-head measurement gerçekten başarılıdır; yalnız Project FIFO veya başka SHA'nın yeşili yeterli değildir.
+- Tek toplu T3 profili: mevcut nightly ve weekend manifestlerinin toplam sekiz projesi, proje başına üç tekrar, kesin base ve head analyzer ile tamamlanır. Mevcut proje timeout'ları ve en fazla altı paralel shard korunur; profil her atomik görevde tekrarlanmaz.
+- Artifact eksikliği, erişilemeyen kayıt, başarısız proje, eşik ihlali veya açıklanmamış bulgu kaybı başarısızlıktır. Eski başarılı main koşusu, yerel PASS veya baseline düşürme yerine kullanılamaz.
+- Maddi regresyon önce yeniden üretilir; aynı kabul için gerekli dar dosya eklemesi bağımsız kapsam geçişi ister. Yeni özellik ekleme, kuyruk atlama veya kabul zayıflatma yoktur.
+- Bağımsız denetçi gerçek hosted sonuçları ve checksum'lı receipt'leri doğrulamadan POP olmaz; yerel tamamlanma, hosted yeterlilik ve main entegrasyonu ayrı raporlanır.
+- Sahibin 2026-09-05 açık onayıyla, sabit base beklentileri değiştirilmeden yalnız head için kaynak ve regresyon kanıtına bağlı bağımsız incelenmiş kesin semantik fark kaydı kullanılabilir. Yanlış pozitif olduğu kanıtlanan eski bulgunun kaldırılması veya doğrulanmış yeni bulgunun eklenmesi proje/revision, eski beklenti ve tam fingerprint çoklu kümesiyle tek tek gerekçelendirilir; tolerans aralığı, genel bastırma ve açıklanmamış fark kabul edilmez. Base özgün manifestle, head ayrıca adlandırılmış ve hash'lenmiş kesin etkin beklentiyle doğrulanır; kaynaklar, tarifler, kapsam/kalite eşikleri, üç tekrar ve 48 shard şartı değişmez. Eski başarısız kayıtlar korunur; kabul ancak yeni exact-head başarılı hosted koşu ve bağımsız raw base/head fark denetimiyle sağlanır.
+
+**Test bütçesi:** T3
+**Kontroller:** hosted-regressions, hosted-realworld-base-head, checkpoint-receipt-validation, queue-check
+**Kapsam:** ci/regression-checkpoint.json, docs/CI_GATES.md, tests/FdResourceRuleTest.cpp, src/rules/FdResourceRule.cpp, src/rules/UninitScalarRule.cpp, tests/UninitScalarRuleTest.cpp, scripts/run_regression_checkpoint.py, scripts/verify_regression_checkpoint.py, tests/RegressionCheckpointTest.py, ci/regression-adjudications.json
+**Bağımlılıklar:** CS3-CH01-S07-U002
+
+## CH02 — Güvenilir analiz girdisi ve kapsam
+
+### CH02-S01 — Derleme gerçeği
+
+#### CS3-CH02-S01-U001 — Compilation database keşfi ve doctor komutunu yeniden uygula
+
+**Sonuç:** Kullanıcı doğru database'i veya düzeltilebilir açık hatayı görür.
+
+**Kabul:**
+
+- Eski 060bf4b yalnız fikir/dar kod kaynağıdır; dosyalar topluca kopyalanmaz.
+- CMake/Ninja fixture, boş repo, iki database, bozuk JSON ve single-file kapsanır.
+- Sessiz yanlış database/fallback yoktur; doctor ile gerçek analiz aynı seçim sonucunu kullanır.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** src/source_manager/CompilationDatabaseDiscovery*, src/source_manager/SourceManager*, src/config/Config*, src/analyzer/StaticAnalyzer*, src/core/Messages*, src/main.cpp, src/CMakeLists.txt, tests/CompilationDatabaseCliTest.py, tests/ConfigTest.cpp, tests/CMakeLists.txt, docs/first-scan.md, .github/workflows/windows.yml, tests/WorkflowPolicyTest.py, docs/windows-support.md
+**Bağımlılıklar:** Yok
+
+#### CS3-CH02-S01-U002 — Config ve target-scope güncellemelerini işlemsel yap
+
+**Sonuç:** Geçersiz config/scope girdisi önceki geçerli durumu kısmen değiştirmez.
+
+**Kabul:**
+
+- Malformed, overflow, delimiter-only ve conflict girdilerinde state byte-equivalent kalır.
+- Bozuk kapsam analizi genişletmez veya güvenilir temiz hüküm üretmez.
+- CLI ve MCP girişleri aynı structured reason sözleşmesini uygular.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** src/config/Config*, src/source_manager/SourceManager*, src/core/Messages*, src/server/McpServer*, tests/ConfigTest.cpp, tests/SourceManagerTest.cpp, tests/McpServerTest.cpp, tests/CMakeLists.txt
+**Bağımlılıklar:** Yok
+
+#### CS3-CH02-S01-U003 — Çoklu producer kural seçimini diagnostic ID ile tutarlı uygula
+
+**Sonuç:** Kural kapatma işlemi yalnız sınıf adını değil yayımlanan diagnostic ID sözleşmesini bütün ilgili producer'larda uygular.
+
+**Kabul:**
+
+- S04-U001 CLI keşfi önce RED ile yeniden doğrulanır: --disable-rule resource-leak sonrasında FILE/DIR aynı ID ile hâlâ raporlanıyor; yalnız native FD producer'ının kaldırılması yeterli değildir.
+- Bilinen diagnostic ID kapatıldığında o ID'yi üreten bütün producer'ların bulguları tutarlı seçilir; farklı ID'lerin etkinliği, varsayılan kalite/tier ve kapsam sayaçları sessiz değişmez.
+- CLI ve MCP'nin mevcut yapılandırma yüzeyleri aynı seçim sözleşmesini uygular; kapalı/açık/kapalı ardışık kullanımda istekler arasında durum sızmaz, var olmayan seçenek çalıştı sayılmaz.
+- Native FD, FILE/DIR ve memory-leak pozitif/negatifleri gerçek CLI/MCP ve focused analyzer/config testleriyle sınanır; JSON/SARIF/verdict sayımları etkin bulgularla tutarlıdır.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** src/analyzer/StaticAnalyzer*, src/config/Config*, src/engine/RuleEngine*, src/core/Capabilities*, src/core/RuleCapabilities.def, src/server/McpServer*, src/main.cpp, tests/McpServerTest.cpp, tests/ConfigTest.cpp, tests/CapabilitiesTest.cpp, tests/CapabilitiesCliTest.py, tests/AnalysisResultTest.cpp, tests/MemoryLeakRuleExTest.cpp, tests/FdResourceRuleTest.cpp, tests/VerdictIntegrityTest.cpp
+**Bağımlılıklar:** CS3-CH01-S04-U001
+
+### CH02-S02 — Kalıcı ve dış girdiler
+
+#### CS3-CH02-S02-U001 — Fonksiyon özeti/model parser sınırlarını sağlamlaştır
+
+**Sonuç:** Bozuk, sürümü uyumsuz veya aşırı büyük özet/model dosyası güvenli reddedilir.
+
+**Kabul:**
+
+- Arity/index, CRLF, embedded NUL, count/size ve version fixture'ları vardır.
+- Hata kısmi model/state yayımlamaz; normal geçerli dosyalar korunur.
+- Dar donor fikirleri yeni baseline üzerinde yeniden test edilir.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** src/engine/FunctionSummary*, src/contracts/*, tests/InterproceduralTest.cpp, tests/ContractRuleTest.cpp, tests/PolicyRuleTest.cpp, tests/ContractTest.cpp, tests/SummaryDiffTest.cpp
+**Bağımlılıklar:** Yok
+
+#### CS3-CH02-S02-U002 — MCP istek zarfını ve yaşam döngüsünü sınırla
+
+**Sonuç:** Malformed JSON-RPC istekleri ve işlem hataları sunucuyu veya sonraki isteği bozmaz.
+
+**Kabul:**
+
+- Eksik/yanlış ID/version/method ve boyut sınırı deterministik hata üretir.
+- Başarısız istek sonrası geçerli istek temiz state ile çalışır.
+- CLI ile aynı analiz davranışı korunur; yeni ağ/cloud servisi eklenmez.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** src/server/McpServer*, src/config/Config*, tests/McpServerTest.cpp, src/source_manager/SourceManager.cpp, src/analyzer/StaticAnalyzer.cpp
+**Bağımlılıklar:** Yok
+
+### CH02-S03 — Eksik analizden sahte temiz sonuç üretmeme
+
+#### CS3-CH02-S03-U001 — İstenen/analiz edilen/atlanan/başarısız dosyaları uzlaştır
+
+**Sonuç:** Her istenen kaynak tek kimlikle sonuç sınıfına ve gerekçeye sahip olur.
+
+**Kabul:**
+
+- Tekrarlanan AST callback dosya sayısını artırmaz; eksik TU kaybolmaz.
+- Kapsam eksikse sonuç güvenilir temiz olamaz; exit 0/1/2 sözleşmesi fixture'larla sınanır.
+- JSON/SARIF ve CLI aynı kapsam özetini taşır.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** src/analyzer/StaticAnalyzer*, src/source_manager/SourceManager*, src/core/AnalysisResult.h, src/core/ExitPolicy.h, src/core/Messages*, src/reporter/*, tests/StaticAnalyzerTest.cpp, tests/SourceManagerTest.cpp, tests/ExitPolicyTest.cpp, tests/ReporterTest.cpp, src/source_manager/CompilationDatabaseDiscovery.cpp, tests/VerdictIntegrityTest.cpp, tests/AnalysisResultTest.cpp, tests/JsonReporterTest.cpp, tests/SarifReporterTest.cpp, tests/HtmlReporterTest.cpp, tests/CompilationDatabaseCliTest.py, docs/usage.md, tests/ConfigTest.cpp, tests/CapabilitiesCliTest.py, scripts/run_realworld_campaign.py, tests/RealworldCampaignTest.py, docs/reproduce.md, scripts/verify_regression_checkpoint.py, tests/RegressionCheckpointTest.py, src/server/McpServer.cpp, tests/McpServerTest.cpp, scripts/run_regression_checkpoint.py
+**Bağımlılıklar:** Yok
+
+#### CS3-CH02-S03-U002 — Frontend ve CFG düşmanca geçerli girdilerde sonlansın
+
+**Sonuç:** Template/macro/CFG köşeleri crash/hang yerine sınırları belirli sonuç verir.
+
+**Kabul:**
+
+- Küçük, repository-contained template/macro/high-CFG fixture'ları kullanılır.
+- Hata veya timeout eksik kapsama nedeni olarak korunur.
+- Ortak motor değişirse tam Linux suite ve yalnız ilgili sanitizer/stress dilimi çalışır.
+- Zaten gerekli Linux suite için ReviewDiffFlow önkoşulu da tamamlanır: 611edab hosted expected-1/got-2 hatası gerçek analyzer stderr ve base/head komut kimlikleriyle RED olarak doğrulanır. Yalnız review girdi hazırlama/remap ve fixture uyumluluğu düzeltilir; repo-root database, rename ve yeni dosya kapsamı sınanır. Gerçek build/generated-header koruması, exact-command reddi, new/fixed/weakened sayımları, shift/rename bağışıklığı, gate ladder, exclude ve malformed/missing-input negatifleri korunur; hiçbir kalite kapısı, pin veya suite kapsamı azaltılmaz. Frontend/CFG kabulleri aynen geçerlidir; ikisi de tamamlanmadan POP yoktur.
+
+**Test bütçesi:** T2
+**Kontroller:** linux-suite, relevant-corpus, queue-check
+**Kapsam:** src/analyzer/StaticAnalyzer*, src/source_manager/SourceManager*, src/engine/*, tests/stress_corpus/*, tests/StressMatrixTest.py, scripts/run_stress_matrix.py, scripts/test_review_diff.sh, scripts/review_diff.sh, scripts/review_report.py, tests/CMakeLists.txt, tests/ReviewInputTest.py
+**Bağımlılıklar:** Yok
+
+### CH02-S04 — Hosted derleyici uyumluluğu
+
+#### CS3-CH02-S04-U001 — Compilation discovery için native LLVM/MSVC uyumluluğunu doğrula
+
+**Sonuç:** Mevcut Windows toolchain compilation discovery kodunu derler; komut kimliği doğrulaması ve ürün kapıları korunur.
+
+**Kabul:**
+
+- 611edab Windows hosted LLVM 20.1.8/MSVC OPT_ redefinition hatası kanıt olarak korunur, nedeni teşhis edilip yalnız gerekli uyumluluk düzeltmesi uygulanır.
+- Geçerli compilation-command ve wrong-input/response-file negatifleri korunur; driver doğrulaması devre dışı bırakılamaz.
+- Exact-head native Windows build, test, smoke, SDK ve relocation kapıları başarılı olmalıdır; atlanan adım başarı değildir. Main, mevcut toolchain pinleri ve kalite kapıları değişmez.
+
+**Test bütçesi:** T2
+**Kontroller:** linux-suite, compilation-database-cli, hosted-windows, queue-check
+**Kapsam:** src/source_manager/CompilationDatabaseDiscovery.cpp, tests/CompilationDatabaseCliTest.py, src/CMakeLists.txt, tests/SourceManagerTest.cpp, scripts/review_report.py, tests/ReviewInputTest.py, src/windows_utf8.manifest, docs/windows-support.md, scripts/run_corpus.sh, scripts/corpus_compile_commands.cpp, tests/CMakeLists.txt, src/source_manager/SourceManager.cpp, docs/usage.md
+**Bağımlılıklar:** CS3-CH02-S01-U001
+
+## CH03 — CWE bulgularını kullanılabilir ürüne dönüştürme
+
+### CH03-S01 — Rapor sözleşmesi
+
+#### CS3-CH03-S01-U001 — Kural ve CWE eşlemesini tek sözleşmede yayınla
+
+**Sonuç:** Bulguların stable rule ID, doğru CWE ve açıklama bağlantısı vardır.
+
+**Kabul:**
+
+- CWE-125 okuma ile CWE-787 yazma farklı açıklanır; her bounds bulgusu aynı CWE'ye yanlış eşlenmez.
+- Existing supported/experimental durumu ölçümsüz yükseltilmez.
+- JSON/SARIF metadata ve CLI capability listesi registry ile tutarlıdır.
+- Aritmetik pozitif taşma ile negatif sınır taşması doğru mesajla ayrılır; 64-bit çıkarmada upward overflow underflow diye sunulmaz.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** src/core/RuleCapabilities.def, src/core/Capabilities*, src/core/Diagnostic.h, src/core/AnalysisResult.h, src/reporter/*, src/rules/*, tests/SarifReporterTest.cpp, tests/CapabilitiesTest.cpp, docs/capabilities.md, src/core/Messages.*, tests/IntOverflowRuleTest.cpp, tests/JsonReporterTest.cpp, tests/CapabilitiesCliTest.py, README.md, scripts/check_capabilities_sync.py, tests/BoundsRuleTest.cpp, src/analyzer/StaticAnalyzer.cpp
+**Bağımlılıklar:** Yok
+
+#### CS3-CH03-S01-U002 — CLI/JSON/SARIF/HTML bulgu ve verdict tutarlılığını sabitle
+
+**Sonuç:** Aynı analiz bütün çıktı yüzeylerinde aynı normalize bulguyu ve kapsamı verir.
+
+**Kabul:**
+
+- Rule/CWE, konum, trace, severity, tool/schema version ve verdict karşılaştırılır.
+- Malformed option/config deterministik hatadır; makine çıktısına log karışmaz.
+- Path component sınırları ve Windows path fixture'ları korunur.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** src/reporter/*, src/core/Capabilities*, src/core/Messages*, src/main.cpp, src/config/Config*, tests/*ReporterTest.cpp, tests/CapabilitiesTest.cpp, tests/ConfigTest.cpp, src/analyzer/StaticAnalyzer.cpp, tests/OutputParityCliTest.py, tests/CMakeLists.txt
+**Bağımlılıklar:** Yok
+
+### CH03-S02 — Günlük geliştirme kullanımı
+
+#### CS3-CH03-S02-U001 — Baseline/suppression ile yalnız yeni bulguyu ayır
+
+**Sonuç:** Yeni kod kontrolü legacy bulguları gizlice yeni veya yok sayılmış göstermeden çalışır.
+
+**Kabul:**
+
+- Stable fingerprint, moved lines, changed function ve malformed baseline/suppression kapsanır.
+- Bastırma kaydı gerekçe/kapsam içerir; suppression analiz kapsamını değiştirmez.
+- Eski bulgu yükü yeni yüksek güvenli bulguyu engellemez veya saklamaz.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** src/analyzer/Baseline*, src/analyzer/SuppressionFilter*, src/core/FindingFingerprint*, scripts/review_diff.sh, scripts/review_report.py, tests/BaselineTest.cpp, tests/SuppressionFilterTest.cpp, tests/test_review_diff.sh, src/core/AnalysisResult.h, src/analyzer/StaticAnalyzer.cpp, src/reporter/ReportContract.h, tests/HtmlReporterTest.cpp, scripts/test_review_diff.sh, src/core/Diagnostic.h, src/reporter/SarifReporter.cpp, tests/OutputParityCliTest.py
+**Bağımlılıklar:** Yok
+
+#### CS3-CH03-S02-U002 — Minimal ilk tarama ve CI kullanımını doğrula
+
+**Sonuç:** Temiz bir örnek projede kurulmuş araçla ilk tarama ve rapor-only CI akışı tekrarlanır.
+
+**Kabul:**
+
+- En az bir küçük C ve bir C++ fixture yeni kullanıcı komutlarıyla çalışır.
+- Eksik derleme girdisinde uygulanabilir düzeltme adımı vardır.
+- Canlı GitHub yazma/bot devreye alma şart değildir; yerel örnek hazır olmadan destek iddiası yoktur.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** docs/first-scan.md, docs/usage.md, docs/integrations.md, README.md, tests/FirstScanTest.py, scripts/test_first_scan.sh
+**Bağımlılıklar:** Yok
+
+## CH04 — Sınırlı kaynakla dayanıklı çalışma
+
+### CH04-S01 — İşlem izolasyonu
+
+#### CS3-CH04-S01-U001 — Dosya başına taşınabilir worker protokolü kur
+
+**Sonuç:** Bir dosyanın çökmesi diğer dosyaların sonuçlarını kaybettirmez.
+
+**Kabul:**
+
+- Aynı binary ile sürümlü child protocol ve deterministik TU sırası vardır.
+- Crash/malformed child result ayrı failure olur; parent güvenilir temiz diyemez.
+- Eski worker dalı topluca taşınmaz; sudo, broker, systemd/cgroup bağımlılığı yoktur.
+
+**Test bütçesi:** T2
+**Kontroller:** linux-suite, relevant-corpus, queue-check
+**Kapsam:** src/analyzer/*, src/core/AnalysisResult.h, src/main.cpp, src/CMakeLists.txt, tests/WorkerProtocolTest.cpp, tests/AnalysisCoordinatorTest.cpp, tests/CMakeLists.txt, tests/HtmlReporterTest.cpp
+**Bağımlılıklar:** Yok
+
+#### CS3-CH04-S01-U002 — Timeout/bellek/iptal bütçesini uygula
+
+**Sonuç:** Kaynak bütçesi aşan worker sonlandırılır; süreç ve descriptor sızıntısı bırakılmaz.
+
+**Kabul:**
+
+- Timeout, memory limit ve cancellation negatifleri gerçek subprocess ile sınanır.
+- Partial failure sonuç ve kapsamda görünür; diğer sonuçlar deterministik toplanır.
+- Host-wide/root authority yoktur; yalnız başlatılan çocuk süreçler yönetilir.
+
+**Test bütçesi:** T2
+**Kontroller:** linux-suite, relevant-corpus, queue-check
+**Kapsam:** src/analyzer/*, src/core/Resource*, src/config/Config*, src/main.cpp, src/CMakeLists.txt, tests/ResourceBudgetTest.cpp, tests/AnalysisCoordinatorTest.cpp, tests/CMakeLists.txt, docs/usage.md, src/server/McpServer.cpp
+**Bağımlılıklar:** CS3-CH04-S01-U001
+
+### CH04-S02 — Güvenli yeniden kullanım
+
+#### CS3-CH04-S02-U001 — Cache kimliğini gerçek girdilere bağla
+
+**Sonuç:** Cache yalnız aynı araç/ayar/girdi/header bağımlılıkları için kullanılabilir.
+
+**Kabul:**
+
+- Değişen header/compiler flag/profile/tool veya volatile input eski kaydı reddeder.
+- Cache'siz ve cache'li normalize sonuç aynı olur.
+- Eski a79c375 yardımcı fikir kaynağıdır; kanıt veya dosya paketi olarak taşınmaz.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** src/analyzer/*, src/source_manager/*, src/config/Config*, tests/UnitEvidenceStoreTest.cpp, tests/AnalysisCoordinatorTest.cpp, src/CMakeLists.txt, tests/CMakeLists.txt, tests/SourceManagerTest.cpp, src/contracts/Sidecar.cpp, src/server/McpServer.cpp, docs/usage.md
+**Bağımlılıklar:** Yok
+
+#### CS3-CH04-S02-U002 — Cache yazımı ve saklama sınırını güvenli yap
+
+**Sonuç:** Kısmi/bozuk/symlink kayıt kullanılmaz; disk kullanımı tanımlı tavanda kalır.
+
+**Kabul:**
+
+- Atomic temp-to-final, concurrent writers, truncated entry ve tamper fixture'ları vardır.
+- Failed write önceki geçerli entry'yi bozmaz; retention sonucu analiz doğruluğu değişmez.
+- Saklama tavanı aşılırsa açık durum verir; sınırsız cache oluşturulmaz.
+
+**Test bütçesi:** T2
+**Kontroller:** linux-suite, relevant-corpus, queue-check
+**Kapsam:** src/analyzer/*, tests/UnitEvidenceStoreTest.cpp, src/config/Config.cpp, src/config/Config.h, tests/ConfigTest.cpp, tests/AnalysisCoordinatorTest.cpp, docs/usage.md
+**Bağımlılıklar:** CS3-CH04-S02-U001
+
+#### CS3-CH04-S02-U003 — Checkpoint yalnız aynı geçerli analizi sürdürsün
+
+**Sonuç:** Kesilen çalışma tam girdi kimliği doğrulandıktan sonra devam eder.
+
+**Kabul:**
+
+- Changed source/header/config/corrupt manifest resume'u reddeder.
+- Resume ve fresh run sonuç/kapsam eşittir; eksik worker sonucu DONE sayılmaz.
+- Disk ve süreç sınırları cache/worker sözleşmesini aşmaz.
+
+**Test bütçesi:** T2
+**Kontroller:** linux-suite, relevant-corpus, queue-check
+**Kapsam:** src/analyzer/*, src/config/Config*, src/main.cpp, tests/UnitEvidenceStoreTest.cpp, tests/AnalysisCoordinatorTest.cpp, tests/ConfigTest.cpp, docs/usage.md, tests/McpServerTest.cpp
+**Bağımlılıklar:** CS3-CH04-S02-U002
+
+### CH04-S03 — Yerel ve hosted platform tutarlılığı
+
+#### CS3-CH04-S03-U001 — Windows fixture taşınabilirliğini gerçek hosted kapılarla doğrula
+
+**Sonuç:** Windows testleri canonical path, size_t ve fiziksel kaynak byte sözleşmesini doğru sınar; mevcut ürün beklentileri ve hosted kapılar korunur.
+
+**Kabul:**
+
+- cab9493306752fa15e4fc74273678f674a5442d0 Windows run34045241136/job101519028589 içindeki dört gerçek RED saklanır: coordinator canonical yol, Bounds memcpy size_t, suppression CRLF ve baseline CRLF. Başarısız tarihsel sonuç yeniden PASS diye etiketlenmez.
+- Dört test fixture'ının platform varsayımları düzeltilir; tüm bulgu sayıları, source/destination ayrımı, strong identity ve marker/target beklentileri korunur. Canonical beklenen yollar, hedefin gerçek __SIZE_TYPE__ prototipi ve byte-exact binary kaynak yazımı pozitif/negatif kontrollerle kanıtlanır; ürün kuralları veya assertion'lar gevşetilmez.
+- Aynı aday exact head için native Windows build, CTest, tek-süreç suite, CLI smoke, SDK ve relocation dahil mevcut workflow gerçekten başarılıdır; atlanan adım başarı değildir. Linux suite ve ilgili sabit corpus tekrar geçer. Workflow, toolchain pinleri, kalite floor'ları, main ve tamamlanmış sözleşmeler değişmez.
+- Bu dört fixture düzeltmesine ek olarak yalnız 94c83277b566813af3b6a3f5d916631900992492 Windows run34055351372 Build aşamasında kaydedilmiş MSVC C3861 _get_environ tanımsızlığı için ortam listeleme uyumluluğu düzeltilir; bu tarihsel RED ve testlerin o koşuda çalışmadığı kaydı korunur. src/source_manager/InputIdentity.cpp içindeki tam ortam kimliği, mevcut byte/entry sınırları ve fail-closed davranış korunur; ortam sessizce boş/filtrelenmiş sayılmaz. tests/SourceManagerTest.cpp içinde aynı ortamın sabit kimliği ve değişken ekleme/değiştirme/silmenin kimliği değiştirmesi ile geri yükleme gerçek platform API'si üzerinden sınanır. Bu dar derleme uyumluluğu dışında ürün davranışı, kurallar, worker/cache doğrulaması ve diğer platformların semantiği değiştirilmez; mevcut exact-head Windows ve Linux kapılarının tamamı yine gereklidir.
+- Sahibin 2026-09-07 açık onayıyla, yukarıdaki ürün/kural değişikliği yasağına yalnız şu dar istisna eklenir: e4d52748937b39d5b72dd91d64a04d9a85c59fe8 self-scan kaydında teşhis edilen RAII yapıcı/yıkıcı sahipliği ve başarıya bağlı fdopendir tanıtıcı aktarımı analizde doğru modellenir. Gerçek sahiplik ve kapanış kanıtlanmadan her yapıcıya veya her fdopendir çağrısına koşulsuz tüketim/kaçış atanmaz; başarısız fdopendir çağrısında tanıtıcı çağıranın sorumluluğunda kalır. Aynı fonksiyondaki ilgisiz gerçek sızıntı, sahiplenmeyen yapıcı, eksik/koşullu kapanış ve başarısız aktarım negatifleri korunur; fonksiyon sonu resource-leak bastırmasıyla gerçek sızıntıyı gizlemek yasaktır. Mevcut cache/worker çalışma semantiği, ilgisiz kural davranışları, FIFO sırası, bitmiş kayıtlar, test bütçesi/kontrol adları, pinler, kalite eşikleri ve main değişmez. Eski başarısız kanıtlar korunur; dar RED/GREEN regresyonları, tam self-scan kapsamı, mevcut Linux/Windows hosted kapılarının yeni exact-head başarısı ve bağımsız inceleme yine zorunludur. Bu yalnız kabul istisnasıdır; gerekli uygulama dosyaları ayrıca bağımsız kapsam geçişiyle eklenir.
+
+**Test bütçesi:** T2
+**Kontroller:** linux-suite, relevant-corpus, windows-hosted, queue-check
+**Kapsam:** tests/AnalysisCoordinatorTest.cpp, tests/BoundsRuleTest.cpp, tests/SuppressionFilterTest.cpp, tests/BaselineTest.cpp, src/source_manager/InputIdentity.cpp, tests/SourceManagerTest.cpp, tests/UnitEvidenceStoreTest.cpp, tests/ConfigTest.cpp, src/rules/FdResourceRule.cpp, tests/FdResourceRuleTest.cpp, src/analyzer/RuntimeIdentity.cpp
+**Bağımlılıklar:** CS3-CH04-S02-U003
+
+## CH05 — Toplu doğrulama ve endüstriyel kabul
+
+### CH05-S01 — Kapsam ve kalite kanıtı
+
+#### CS3-CH05-S01-U001 — Kural bazlı pozitif/negatif doğrulama kataloğunu dondur
+
+**Sonuç:** Ölçüm girdileri sonucu görmeden seçilir ve hangi CWE altkümesinin desteklendiği açıktır.
+
+**Kabul:**
+
+- Her desteklenecek kural için güvenli/buggy fixture kimliği ve beklenen bulgu kayıtlıdır.
+- Yeni çekirdek testleri corpus dışında bırakılarak başarı şişirilmez; eski source/corpus floor'ları düşürülmez.
+- Unknown/unsupported örnekler false negative veya clean ile karıştırılmaz.
+
+**Test bütçesi:** T1
+**Kontroller:** focused-tests, cli-smoke, queue-check
+**Kapsam:** tests/cwe_corpus/*, scripts/cwe_quality.py, docs/CWE_SCOPE.md, docs/quality_protocol.md
+**Bağımlılıklar:** Yok
+
+#### CS3-CH05-S01-U002 — Mevcut supported aileleri yeni motor üzerinde yeniden doğrula
+
+**Sonuç:** Memory/lifetime/null/arithmetic/resource ailelerinin ölçümü mevcut executable'a bağlıdır.
+
+**Kabul:**
+
+- Tam Linux suite ve ilgili checksummed corpus çalışır; eski receipt'ler PASS yerine kullanılmaz.
+- Mevcut Juliet ve corpus floor'larının hiçbiri düşürülmez; her yeni bulgu fixture ile açıklanır.
+- Clean corpus'ta yeni yanlış pozitif veya sessiz bulgu kaybı çözülmeden iş kapanmaz.
+
+**Test bütçesi:** T2
+**Kontroller:** linux-suite, relevant-corpus, queue-check
+**Kapsam:** tests/cwe_corpus/*, scripts/cwe_quality.py, docs/quality_results.md, src/rules/*, tests/*Rule*Test.cpp
+**Bağımlılıklar:** CS3-CH05-S01-U001
+
+#### CS3-CH05-S01-U003 — Yeni experimental CWE ailelerinin destek kararını kanıtla
+
+**Sonuç:** Ölçülen altküme dışında destek veya blocking terfisi yapılmaz.
+
+**Kabul:**
+
+- Her yeni kuralın pozitif/negatif ve sınır fixture'ları ayrı raporlanır.
+- Declared supported altkümesinde precision en az %90, addressable recall en az %70 ve deterministic safe fixture'larda sıfır FP gerekir; daha sıkı mevcut floor korunur.
+- Başaramayan kural experimental/report-only kalır; teslim kapsamından çıkarma veya daha düşük hedef ayrıca kullanıcı kararı gerektirir.
+
+**Test bütçesi:** T2
+**Kontroller:** linux-suite, relevant-corpus, queue-check
+**Kapsam:** src/core/RuleCapabilities.def, scripts/cwe_quality.py, tests/cwe_corpus/*, docs/CWE_SCOPE.md, docs/capabilities.md, docs/quality_results.md, README.md, scripts/check_capabilities_sync.py, tests/CapabilitiesTest.cpp, tests/CapabilitiesCliTest.py
+**Bağımlılıklar:** CS3-CH05-S01-U002
+
+### CH05-S02 — Gerçek kullanım sınırları
+
+#### CS3-CH05-S02-U001 — Sınırlı sanitizer/fuzz ve bozuk girdi kabulünü tamamla
+
+**Sonuç:** Parser/worker/cache sınırları hedefli adversarial testlerden geçer.
+
+**Kabul:**
+
+- Yalnız ilgili sanitizer ve bounded fuzz seed'leri çalıştırılır; süreç/süre/bellek sınırı kayıtlıdır.
+- Crash, hang, OOM, partial commit ve false-clean varsa PASS yoktur.
+- Eksik araç veya koşmayan kontrol success sayılmaz; testler sırf yeşil için silinmez.
+- Korunan c395903 Windows run34098971513 tek-süreç RED kaydındaki 300ms survivor timeout ayrıca teşhis edilir. Kaynak/bütçe fault-injection fixture zamanlaması düzeltilirse gerçek üretim timeout/bellek sınırları ve 150ms sleeping-child kill/reap regresyonu gevşetilmez; survivor bulguları, incomplete exit2 ve bütün mevcut assertions korunur. Eski başarısız koşu başarısız kalır; kontrollü RED/GREEN ve yeni exact-head Windows suite/tek-süreç/package hosted başarısı olmadan bu worker sınırı tamamlandı sayılmaz.
+- Yalnız bu görevde gerekçeli test girdisi değişirse önce eski/yeni path-digest farkı bağımsız incelenir; regression_inventory ve catalog bağlantısı yeni ölçümden önce kontrollü successor freeze ile güncellenir. Hiçbir CWE fixture, beklenen bulgu, Juliet/corpus floor veya başarısız geçmiş sonuç değiştirilmez.
+
+**Test bütçesi:** T2
+**Kontroller:** linux-suite, relevant-corpus, queue-check, windows-hosted
+**Kapsam:** tests/stress_corpus/*, fuzz/*, scripts/test_resilience.sh, docs/quality_results.md, tests/AnalysisCoordinatorTest.cpp, tests/ResourceBudgetTest.cpp, tests/cwe_corpus/catalog.json, tests/cwe_corpus/regression_inventory.json, CMakeLists.txt, src/analyzer/AnalysisCoordinator.cpp, src/analyzer/RuntimeIdentity.cpp, src/analyzer/RuntimeIdentity.h, tests/UnitEvidenceStoreTest.cpp
+**Bağımlılıklar:** Yok
+
+#### CS3-CH05-S02-U002 — Gerçek proje ve performans kabulünü ölç
+
+**Sonuç:** Sabit girdilerde kullanılabilirlik, latency ve false positive yükü ölçülür.
+
+**Kabul:**
+
+- En az üç küçük/orta gerçek C/C++ proje veya önceden edinilmiş checksummed örnek kullanılır; kaynaklar izinsiz upload edilmez.
+- Donanım, girdi, komut, sürüm ve süre/bellek ölçümleri kayıtlıdır.
+- Ölçülmeyen performans/market başarısı iddia edilmez; blocker varsa aynı chapter kapanmaz.
+
+**Test bütçesi:** T2
+**Kontroller:** linux-suite, relevant-corpus, queue-check
+**Kapsam:** scripts/measure_product.py, docs/quality_results.md, docs/benchmarks.md, tests/ProductMeasurementTest.py, scripts/test_measure_product.py
+**Bağımlılıklar:** Yok
+
+## CH06 — Paketleme ve dağıtım
+
+### CH06-S01 — Çalıştırılabilir paket
+
+#### CS3-CH06-S01-U001 — Linux kurulabilir artifact üret
+
+**Sonuç:** Temiz ortamda açılıp çalışan sürümlü Linux paketi üretilir.
+
+**Kabul:**
+
+- CLI ve bütün temel çıktı biçimleri kaynak build ile aynı normalize sonucu verir.
+- LLVM/runtime bağımlılıkları ve lisanslar eksiksizdir; geliştirme build'i release gibi adlandırılmaz.
+- Paket first-scan smoke'tan geçer; normal kullanım sudo gerektirmez.
+
+**Test bütçesi:** T3
+**Kontroller:** release-qualification, queue-check
+**Kapsam:** scripts/package_release.sh, CMakeLists.txt, src/CMakeLists.txt, docs/release-checklist.md, tests/PackageTest.py, scripts/test_package.py, scripts/package_linux.py
+**Bağımlılıklar:** Yok
+
+#### CS3-CH06-S01-U002 — Container ve Action paketinde analiz paritesini doğrula
+
+**Sonuç:** Container/Action aynı binary sözleşmesiyle güvenilir sonucu taşır.
+
+**Kabul:**
+
+- Kaynak kod/secret izinsiz dışarı gönderilmez; runtime varsayılan izinler minimaldir.
+- Aynı fixture için CLI/container/Action exit ve SARIF sonuçları eşittir.
+- Canlı destek iddiası yalnız gerçekten koşmuş platform/check kanıtına dayanır.
+
+**Test bütçesi:** T3
+**Kontroller:** release-qualification, queue-check
+**Kapsam:** Dockerfile, action.yml, scripts/action*, tests/ActionArgsTest.py, docs/integrations.md, .github/workflows/action-selftest.yml, .dockerignore
+**Bağımlılıklar:** CS3-CH06-S01-U001
+
+### CH06-S02 — Dağıtım güveni
+
+#### CS3-CH06-S02-U001 — Sürüm, checksum, SBOM ve provenance üret
+
+**Sonuç:** Artifact hangi kaynak ve bağımlılıklardan üretildiğini kanıtlarıyla taşır.
+
+**Kabul:**
+
+- Tek authored version source vardır; source SHA ve tool/schema version raporları tutarlıdır.
+- Artifact checksum, bağımlılık/lisans listesi ve yeniden üretim komutu kayıtlıdır.
+- İmza kimliği yoksa imzalı release iddiası yapılmaz; secret aranmaz veya uydurulmaz.
+
+**Test bütçesi:** T3
+**Kontroller:** release-qualification, queue-check
+**Kapsam:** scripts/package_release.sh, scripts/generate_sbom.py, docs/release-checklist.md, RELEASE_NOTES.md, .github/workflows/release.yml, scripts/test_generate_sbom.py
+**Bağımlılıklar:** CS3-CH06-S01-U001
+
+#### CS3-CH06-S02-U002 — Desteklenen platform sözünü gerçek paket testine bağla
+
+**Sonuç:** Linux dışı platformların destek durumu fiilen çalışan artifact testine göre açıklanır.
+
+**Kabul:**
+
+- Windows/macOS dahil destek ilan edilen her platform exact artifact first-scan çalıştırır.
+- Eksik runner/signer/authorization başarılı sayılmaz; açık blocker olarak kalır.
+- Yerel branch senkronizasyonu main merge veya release yetkisi değildir.
+
+**Test bütçesi:** T3
+**Kontroller:** release-qualification, queue-check
+**Kapsam:** .github/workflows/windows.yml, .github/workflows/release.yml, docs/windows-support.md, README.md, docs/release-checklist.md, scripts/package_release.sh, scripts/platform_first_scan.py, scripts/test_platform_workflow.py, src/analyzer/StaticAnalyzer.cpp, src/analyzer/CheckpointTime.h, src/core/ResourceBudget.cpp, tests/CompilationDatabaseCliTest.py, tests/cwe_corpus/regression_inventory.json, tests/cwe_corpus/catalog.json, docs/quality_protocol.md, src/core/DarwinMemoryBudget.h, src/core/ResourceBudget.h, tests/ResourceBudgetTest.cpp, docs/usage.md
+**Bağımlılıklar:** Yok
+
+## CH07 — Teslim ve kapanış
+
+### CH07-S01 — Release adayı
+
+#### CS3-CH07-S01-U001 — Release adayını kullanıcı iş akışlarıyla kabul et
+
+**Sonuç:** Kurulum, ilk tarama, CI, triage ve destek belgeleri aynı ürünü anlatır.
+
+**Kabul:**
+
+- Kabul matrisi her teslim sözü için exact source/artifact ve PASS kanıtı gösterir.
+- Açık blocker, eksik platform veya karşılanmayan kalite hedefi gizlenmez.
+- Main merge/release gerekiyorsa exact aday için ayrı kullanıcı yetkisi alınır.
+
+**Test bütçesi:** T3
+**Kontroller:** release-qualification, queue-check
+**Kapsam:** docs/release-checklist.md, docs/usage.md, docs/first-scan.md, README.md, RELEASE_NOTES.md
+**Bağımlılıklar:** Yok
+
+#### CS3-CH07-S01-U002 — Yetkili teslimi ve son FIFO kapanışını doğrula
+
+**Sonuç:** Tüm kabul edilmiş işler PROGRESS'te bulunur; TODO terminal boş duruma geçer.
+
+**Kabul:**
+
+- Yetkili yayın veya yalnız yerel teslim ayrımı açıkça kayıtlıdır; main izinsiz değiştirilmez.
+- Görev/commit/bağımsız review kanıtları korunur; TODO'da sahte DONE/gizli yan kuyruk bulunmaz.
+- Eksik required dış eylem varsa iş kapanmaz; tamamlandı denilerek kuyruk boşaltılmaz.
+
+**Test bütçesi:** T3
+**Kontroller:** release-qualification, queue-check
+**Kapsam:** docs/release-checklist.md, RELEASE_NOTES.md
+**Bağımlılıklar:** CS3-CH07-S01-U001

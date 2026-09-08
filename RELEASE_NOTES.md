@@ -1,5 +1,19 @@
 # Unreleased CWE restart — bounded candidate dossier
 
+## Second-act status — targets, not a release claim
+
+The owner-approved [CH08–CH14 plan](docs/PRODUCT_COMPLETION_PLAN.md) continues the
+same FIFO with 51 additional tasks; the old 46 local-completion records remain
+unchanged. Its [G1–G8 completion contract](docs/product-quality-contract.md)
+requires actual wider quality, one-source signed native artifacts and an
+authorized public release verified from consumer downloads. No such result,
+new installed rule, promotion, version or tag is claimed by this documentation.
+The local-only delivery boundary below is the historical CH07 contract, **not**
+a fallback that can close the second act. Separate exact tag/signing/publication
+approval remains mandatory; main is unchanged.
+
+## Historical first-act candidate
+
 This is an unsigned, unpublished development candidate dossier, not v0.4.8,
 a new version/tag, or one rebuilt same-source cross-platform release. The
 [acceptance matrix](docs/release-checklist.md#candidate-acceptance-matrix)

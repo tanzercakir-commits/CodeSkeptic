@@ -22,6 +22,17 @@ formal safety proof. Unknowns, assumptions and false positives remain possible.
 The [candidate acceptance matrix](docs/release-checklist.md#candidate-acceptance-matrix)
 separates measured workflows, rule-quality limits and unqualified promises.
 
+The owner-approved [second-act product plan](docs/PRODUCT_COMPLETION_PLAN.md)
+adds 51 FIFO tasks after the preserved 46-task local dossier. Its **targets**, not
+installed capabilities, are 16 supported CWE families / 19 public diagnostics /
+26 bounded CWE IDs, including four new injection families and proven stack/heap
+write-overflow subtypes. The [G1–G8 contract](docs/product-quality-contract.md)
+requires wider frozen quality evidence, one-source native Release packages,
+publisher signatures and an actually authorized, consumer-verified public release.
+The current [capability registry](docs/capabilities.md) and historical measurements
+below retain their original meaning; plan activation does not qualify that product.
+Progress remains in the single [FIFO](docs/TODO.md), never a second checklist here.
+
 The long-term goal is a fast, embeddable **semantic verification layer
 for AI-assisted development**: an analyzer that sits inside the
 code-generation loop, re-checking each edit in milliseconds and

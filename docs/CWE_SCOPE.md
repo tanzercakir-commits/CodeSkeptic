@@ -1,5 +1,34 @@
 # Ürün sınırı ve ölçülü kalite hedefi
 
+## İkinci perde — onaylı hedef ile kurulu davranış ayrımı
+
+2026-09-08 onaylı [ürün planı](PRODUCT_COMPLETION_PLAN.md), eski 46 kaydı koruyarak
+aynı FIFO'ya CH08–CH14 kapsamında 51 görev ekler. [Bitiş sözleşmesi](product-quality-contract.md)
+hedefi 16 supported/blocking CWE ailesi, 19 public diagnostic ve 26 bounded CWE-ID'dir;
+bu paragraf capability registry'ye kural eklemez veya mevcut experimental aileyi terfi ettirmez.
+
+Mevcut 12 CWE ailesinin yedisi supported, beşi experimental; assumption/contract/policy
+ile toplam 15 public diagnostic vardır. Yeni format-string/CWE-134, command-injection/CWE-78,
+sql-injection/CWE-89 (ilk SQLite API profili) ve path-traversal/CWE-22 (açık restricted-root)
+önce experimental uygulanır, sonra ayrı kanıtlı terfi görevinden geçer. Bounds ayrıca
+kanıtlı destination write + stack/heap provenance ile CWE-121/122 kazanır.
+Eski beş experimental terfi de zorunludur; üç project diagnostic report-only kalır.
+
+[MITRE kaynaklı öncelik matrisi](market-cwe-priorities.md) ticari kabul veya bütün Top25
+garantisi değildir. Yeni flow kapsamı intraprocedural locals, modellenmiş copy/concat ve
+sonlu TU-local direct-helper özetleridir. Whole-program/indirect/virtual/dış-TU/persisted
+taint, keyfi heap/container graph, symlink/TOCTOU garantisi, race, IDE/cloud ve tüm-CWE
+bu sürümün dışında kalır. Unknown akış safe diye sayılmaz.
+
+Yeni frozen profile aile başına >=30 buggy + >=30 safe, ayrı CWE-121/122 altprofilleriyle
+>=1020 benzersiz örnek / her aile-altprofil >=3 köken gerekir. Precision >=0.90,
+addressable recall >=0.70, deterministik safe FP=0 ve daha sıkı eski floors korunur.
+Sonuçlardan önce freeze, bağımsız etiketler, all-rule kalite ve gerçek signed public
+release G1–G8'in zorunlu parçalarıdır. Eski 52 fixture/124 input snapshot'ı ve aşağıdaki
+tarihsel ölçümler aynı anlamla korunur; büyük korpus bunların yerine geçmez.
+
+## İlk perde — tarihsel uygulama ve ölçüm sınırı
+
 Hedef mevcut C/C++ analiz çekirdeğine gerçekten eksik, pratikte kullanılabilir
 davranışlar eklemek; her CWE'nin her varyantını çözdüğünü iddia etmek değildir.
 Kapsam araştırması main kodu üzerinden yapıldı; kaynakta görülen boşluklar
