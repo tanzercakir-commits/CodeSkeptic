@@ -223,8 +223,9 @@ farkının I/O veya scheduling'den kaynaklandığı kanıtlanmadı. Beş saniyel
 reusable admission koşulları değiştirilmedi; bu keşif U003 içine cache düzeltmesi
 olarak alınmaz. Ham genel-CI paket özeti SHA-256
 `af2c996b00deb1580a9dd82eb1903710fe15ba32d7bf02b845aa52693df90d7b`.
-Otomatik push concurrency nedeniyle iptal olan eski genel CI run'ları da PASS
-değildir. `b5579bc` genel CI sonuçları metadata run'ından ayrı değerlendirilir.
+Önceki genel CI run'larının iptal sonuçları da PASS değildir. Workflow aynı ref için
+otomatik iptal yapılandırır; run metadata'sı tek başına iptal nedenini kanıtlamaz.
+`b5579bc` genel CI sonuçları metadata run'ından ayrı değerlendirilir.
 
 U003 hâlâ FRONT'tur. Üç gözlem 0/1020 bağımsız korpus açığını, dört yeni ailenin
 eksik gerçek security-fix çiftlerini, dondurulmamış native/API profilini veya
