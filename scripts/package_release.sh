@@ -23,6 +23,12 @@ CLANG="${3:-}"
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
+# Linux has strict dependency/license validation and non-overwriting assembly.
+# Keep the existing macOS/Windows entry points and layout unchanged.
+if [ "$(uname -s)" = Linux ]; then
+    exec python3 -B scripts/package_linux.py "$BIN" "$OUT" "$CLANG"
+fi
+
 if [ -z "$CLANG" ]; then
     for c in clang-20 clang-19 clang-18 clang; do
         if command -v "$c" >/dev/null 2>&1; then CLANG="$c"; break; fi
