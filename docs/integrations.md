@@ -377,3 +377,76 @@ The packaged composite Action accepts `extra-args` with shell-style quoting.
 Environment references such as `$GITHUB_WORKSPACE/src` are expanded, while
 command substitutions and glob patterns remain literal data and are never
 executed by a shell.
+
+## Qualified artifact integration profiles
+
+The current composite Action expects the native `codeskeptic-report/v1` and
+`codeskeptic-source-coverage/v1` contracts; older releases are not automatically
+compatible. Pin a reviewed Action revision and a matching qualified artifact.
+Local `artifact-path` plus its required `artifact-sha256` installs without any
+download; do not combine these inputs with `version`. A checksum verifies byte
+integrity, not the producer's authenticity: packages are trusted executable code.
+Extraction is bounded and rejects traversal, links, special files and ambiguous
+paths. Installation uses a fresh directory and checks the actual binary version.
+
+Alternatively, `version` selects a release tag or explicitly floating `latest`.
+An omitted version only derives from a release-tag Action ref; branch/SHA/local
+refs never silently float. Downloading is restricted to the public project
+repository with isolated acquisition credentials/configuration. Analyzer
+processes receive a minimal environment without runner tokens. This native
+execution is **not an OS sandbox**: use trusted binaries/project configuration
+on an appropriately isolated runner. Checkout/download traffic is distinct from
+uploading source-containing reports.
+
+`upload-sarif` defaults to `false`; enabling it requires explicit consumer intent
+and that job's `security-events: write` permission. Ordinary analysis requires
+no repository write permission. Use a **new** `sarif` destination each run.
+Missing, malformed, stale or contradictory reports and timeouts fail both gates.
+Valid incomplete reports are retained with exit `2`. Explicit partial/recovery
+options preserve CLI semantics, never falsely claim full coverage. `gate: error`
+preserves the process exit; `report-only` maps valid supported findings to step
+exit `0` while retaining raw `exit-code: 1` and unchanged SARIF. `sarif-valid`
+means fresh validated publication, not absence of defects or complete coverage.
+The analysis timeout is configurable with `timeout-seconds` (1–3600, default300).
+
+`Dockerfile` separates the explicit `artifact-runtime` target from the final
+default source-backed release rebuild. Both runtime images default to nonroot
+UID/GID65532. The artifact profile consumes a previously verified package and a
+caller-pinned cached base; it does not install packages or invent target SDKs.
+The default networked rebuild retains its version override and is **not**
+qualified by testing the offline target. `.dockerignore` defaults to excluding
+context, with authored build/package inputs explicitly admitted. The helper
+below additionally stages only the verified package and exact recipe into a
+fresh minimal context, never the working checkout. Historical release source
+contexts have their own context policy and are outside this claim.
+
+Use a trusted Linux x86_64 package, Python, new output paths, and a working
+rootless Podman with a cached compatible Linux amd64 base for the second step:
+
+```bash
+python3 -B scripts/action_local_smoke.py \
+  --artifact /absolute/package.tar.gz --sha256 <exact-artifact-sha256> \
+  --out /absolute/new-local-evidence
+python3 -B scripts/action_container.py \
+  --artifact /absolute/package.tar.gz --sha256 <exact-artifact-sha256> \
+  --base-image <exact-cached-image-id> \
+  --local-evidence /absolute/new-local-evidence --out /absolute/new-container-evidence
+```
+
+The container profile forbids pulls and build/run network, uses read-only root
+and source mounts, drops capabilities, disables new privileges and checks the
+nonroot caller identity. Only a new report bind is writable, plus restricted
+1GiB temporary storage. Limits are two CPUs, 6GiB RAM/12GiB RAM+swap, 256 PIDs,
+and a 120-second outer process wait. Created/terminal runtime settings and actual
+binary hash/version are recorded. Cleanup removes only invocation-owned exact
+container IDs; local image/context/evidence remain inspectable. Intrinsic-header
+fixtures do not establish arbitrary target-header or platform support.
+
+Actual local CLI/composite shell-step qualification passed 13 scans using the
+U001 `0.4.9-dev+ga23cf3192648` package. Independent review confirmed six complete
+SARIF comparisons and preserved raw report-only verdicts. This is not a hosted
+Action run; actual container qualification remains pending at this checkpoint.
+The self-test workflow separates offline feature-push tests from successful
+Release/explicit-manual asset checks, uses read-only repository permissions and
+does not write status refs. A workflow edit is not successful hosted execution
+or permission to publish a release.

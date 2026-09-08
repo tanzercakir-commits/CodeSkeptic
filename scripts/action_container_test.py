@@ -172,5 +172,27 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(len(run.call_args_list), 1)
 
 
+class HostedBoundaryTests(unittest.TestCase):
+    def test_selftest_is_read_only_and_release_is_a_separate_lane(self):
+        root = Path(__file__).resolve().parents[1]
+        workflow = (root / ".github/workflows/action-selftest.yml").read_text()
+        self.assertIn("permissions:\n  contents: read\n", workflow)
+        self.assertNotIn("contents: write", workflow)
+        self.assertNotIn("security-events: write", workflow)
+        self.assertNotIn("git push", workflow)
+        self.assertNotIn("refs/status", workflow)
+        self.assertIn("if: github.event_name == 'push'", workflow)
+        self.assertIn("github.event.workflow_run.conclusion == 'success'", workflow)
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertEqual(workflow.count("version: ${{ env.SELECTED_VERSION }}"), 2)
+        self.assertEqual(workflow.count("persist-credentials: false"), 2)
+
+    def test_integration_docs_do_not_claim_hosted_or_pending_container_success(self):
+        root = Path(__file__).resolve().parents[1]
+        document = (root / "docs/integrations.md").read_text()
+        self.assertIn("This is not a hosted", document)
+        self.assertIn("native\nexecution is **not an OS sandbox**", document)
+
+
 if __name__ == "__main__":
     unittest.main()
