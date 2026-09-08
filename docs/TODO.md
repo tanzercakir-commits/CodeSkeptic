@@ -16,7 +16,7 @@ Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter aç
 
 **Test bütçesi:** T3
 **Kontroller:** release-qualification, queue-check
-**Kapsam:** .github/workflows/windows.yml, .github/workflows/release.yml, docs/windows-support.md, README.md, docs/release-checklist.md, scripts/package_release.sh, scripts/platform_first_scan.py, scripts/test_platform_workflow.py
+**Kapsam:** .github/workflows/windows.yml, .github/workflows/release.yml, docs/windows-support.md, README.md, docs/release-checklist.md, scripts/package_release.sh, scripts/platform_first_scan.py, scripts/test_platform_workflow.py, src/analyzer/StaticAnalyzer.cpp, src/analyzer/CheckpointTime.h
 **Bağımlılıklar:** Yok
 
 ## Sonraki chapter kuyruğu — henüz yürütülemez
