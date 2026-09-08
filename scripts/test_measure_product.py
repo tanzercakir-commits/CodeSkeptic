@@ -29,6 +29,7 @@ def report():
     return {'schema': 'codeskeptic-report/v1', 'complete': True, 'exit_code': 0,
             'tool': 'CodeSkeptic', 'tool_version': VERSION,
             'evidence': dict.fromkeys(EVIDENCE_FLAGS, False),
+            'baseline': None, 'suppressions': [],
             'status': 'clean', 'total': 0, 'diagnostics': [],
             'finding_counts': {'total': 0, 'blocking': 0, 'report_only': 0},
             'coverage': {'schema': 'codeskeptic-source-coverage/v1', 'complete': True,
@@ -165,6 +166,18 @@ class ProductMeasurementTest(unittest.TestCase):
             measurement.summarize_report(report(), 0, profile(), '0.4.9-dev+g000000000000')
         with self.assertRaises(ValueError):
             measurement.summarize_report(report(), 0, profile(), None)
+
+    def test_hidden_baseline_or_suppression_is_not_raw_burden(self):
+        for key, value in (('baseline', {}), ('baseline', False),
+                           ('suppressions', [{}]), ('suppressions', None)):
+            raw = report()
+            raw[key] = value
+            with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                measurement.summarize_report(raw, 0, profile(), VERSION)
+        raw = report()
+        del raw['baseline']
+        with self.assertRaises(ValueError):
+            measurement.summarize_report(raw, 0, profile(), VERSION)
 
     def test_bad_failure_evidence_rejected(self):
         for name in EVIDENCE_FLAGS:

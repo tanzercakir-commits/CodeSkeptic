@@ -113,6 +113,8 @@ def summarize_report(report, exit_code, project, expected_version):
     evidence = report.get('evidence')
     require(type(evidence) is dict and set(evidence) == EVIDENCE_FLAGS
             and all(value is False for value in evidence.values()), 'failed or invalid report evidence')
+    require('baseline' in report and report['baseline'] is None
+            and report.get('suppressions') == [], 'baseline or suppressed findings are outside this profile')
     commands, skipped = project['commands'], project['skipped']
     require(type(commands) is dict and commands and type(skipped) is dict
             and set(skipped) < set(commands)
