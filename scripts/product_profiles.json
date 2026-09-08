@@ -29,6 +29,8 @@
     "worker_timeout_ms": 120000
   },
   "native_environment_state": "PROSPECTIVE_REQUIREMENTS_ONLY_ACTUAL_IDENTITY_CAPTURE_PENDING",
+  "native_api_model": "tests/product_corpus/native-api-models.json",
+  "native_api_model_sha256": "c2caba2a15fef514c81af282c7fd8e1667b141698829f9354cd14118415873f4",
   "projects": [
     {
       "archive_bytes": 354948,

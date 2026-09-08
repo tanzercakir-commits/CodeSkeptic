@@ -55,10 +55,18 @@ memory-leak ailesi için safe etiket önerisidir; tam bağımlılık ve bağıms
 incelemesi bitmediğinden kabul edilmedi. İkisi de analiz edilmedi ve **0/1020**
 sayısı değişmedi. GCC 16.1.1 ile C++17 syntax-only kontrolü ürün ölçümü değildir.
 
-Tarihsel indeksin manifestteki exact yol/hash bağı artık bütün profile CLI
+Tarihsel indeksin manifestteki exact yol/hash bağı artık manifest okuyan profile CLI
 komutlarında gerçek byte'lara karşı sınanır. Eksik/değişmiş/symlink indeks ve
 geçersiz manifest bağı reddedilir; aynı JSON'a eklenen boş satır da hash farkıdır.
 Bu ret testleri ve kaynak hazırlık testleri başarılı olsa da U003 bitmiş değildir.
+
+Native API taslağı da manifestte exact hash'e bağlandı: sekiz source rolü ve dört
+yeni ailede 14 sink/argüman rolü. Yeni `api-check`, şema ve bu rollerin tutarlılığını
+denetler; `installed=false`, `native_headers_verified=false`, `product_qualified=false`
+çıktıları bilinçlidir. Fake API, yanlış argüman/signature/platform, genel sanitizer,
+unknown'u safe sayma, değişmiş bütçe ve root/containment karışıklıklarının metadata
+negatifleri eklendi. Bu testler analyzer davranışı değildir. Copy/concat/C++ overload
+seçimi, gerçek header/ABI kanıtları ve bağımsız örnekler hâlâ tamamlanmalıdır.
 
 Zorunlu dört yeni ailenin gerçek security-fix çiftlerini araştıran dış araç
 güvenlik engeli döndürdü; aynı istek başka araç veya ajan üzerinden tekrarlanmadı.

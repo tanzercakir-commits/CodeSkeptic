@@ -1,0 +1,751 @@
+{
+  "schema": "codeskeptic-product-native-api-models/v1",
+  "state": "DRAFT_NOT_FROZEN",
+  "argument_indexing": "zero-based-call-arguments-not-SQL-parameter-numbers",
+  "boundary": "Prospective source-review contract only. No analyzer capability, actual SDK/header qualification, dataset admission or product PASS is asserted.",
+  "qualification": {
+    "installed": false,
+    "native_headers_verified": false,
+    "corpus_accepted": false,
+    "measurements_performed": false
+  },
+  "references": {
+    "glibc-format": "https://sourceware.org/glibc/manual/2.42/html_node/Formatted-Output-Functions.html",
+    "glibc-system": "https://sourceware.org/glibc/manual/2.42/html_node/Running-a-Command.html",
+    "glibc-popen": "https://sourceware.org/glibc/manual/2.42/html_node/Pipe-to-a-Subprocess.html",
+    "glibc-environment": "https://sourceware.org/glibc/manual/2.42/html_node/Environment-Access.html",
+    "glibc-line-input": "https://sourceware.org/glibc/manual/2.42/html_node/Line-Input.html",
+    "glibc-read": "https://sourceware.org/glibc/manual/2.42/html_node/I_002fO-Primitives.html",
+    "glibc-fopen": "https://sourceware.org/glibc/manual/2.42/html_node/Opening-Streams.html",
+    "glibc-open": "https://sourceware.org/glibc/manual/2.42/html_node/Opening-and-Closing-Files.html",
+    "ms-system": "https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/system-wsystem?view=msvc-170",
+    "ms-popen": "https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/popen-wpopen?view=msvc-170",
+    "ms-fread": "https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/fread?view=msvc-170",
+    "ms-read": "https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/read?view=msvc-170",
+    "ms-recv": "https://learn.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-recv",
+    "ms-paths": "https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file",
+    "cpp-canonical": "https://eel.is/c++draft/fs.op.canonical",
+    "sqlite-prepare": "https://www.sqlite.org/c3ref/prepare.html",
+    "sqlite-bind": "https://www.sqlite.org/c3ref/bind_blob.html",
+    "sqlite-exec": "https://www.sqlite.org/c3ref/exec.html",
+    "glibc-arguments": "https://sourceware.org/glibc/manual/2.42/html_node/Program-Arguments.html",
+    "glibc-recv": "https://sourceware.org/glibc/manual/2.42/html_node/Receiving-Data.html",
+    "ms-open": "https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/open-wopen?view=msvc-170"
+  },
+  "reference_boundary": "Documentation was consulted for semantic design, not copied as an SDK inventory. GNU 2.42 and Microsoft Learn references do not establish the actual native runner or SDK version. Exact three-platform header/ABI identities remain required before freeze.",
+  "declaration_identity": {
+    "name_only_allowed": false,
+    "system_header_marker_alone_allowed": false,
+    "user_body_may_inherit_native_model": false,
+    "invented_forward_declaration_allowed": false,
+    "required_evidence": [
+      "platform/library version",
+      "resolved canonical declaration and linkage",
+      "complete target-resolved signature and variadic arity",
+      "actual defining header path and content digest",
+      "included header closure and compilation-command identity",
+      "no conflicting user implementation or unsupported interposition"
+    ],
+    "alias_boundary": "C++ namespace imports and macro/fortify redirections require canonical-declaration/header linkage; textual names and fake matching prototypes do not establish library semantics.",
+    "native_header_inventory_state": "PENDING_ACTUAL_THREE_PLATFORM_CAPTURE",
+    "entry_boundary": "The argv intrinsic requires the actual declared program entry and parameter identity. It is not a native library call and does not require main to originate in a library header."
+  },
+  "flow": {
+    "limits": {
+      "call_depth": 4,
+      "states_per_function": 256,
+      "transfer_steps_per_function": 65536
+    },
+    "required_behaviors": [
+      "local assignment and complete overwrite",
+      "branch joins preserving origin alternatives",
+      "alias-aware current object/version",
+      "byte-region copy and concatenation",
+      "partial buffer mutation and termination",
+      "direct same-TU parameter/return/output-buffer/sink summaries",
+      "category-specific validation on the checked branch and value"
+    ],
+    "states": [
+      "CONSTANT",
+      "EXPLICITLY_TRUSTED",
+      "UNTRUSTED",
+      "UNKNOWN"
+    ],
+    "unknown_is_safe": false,
+    "unknown_mutation_preserves_validation": false,
+    "existing_integer_or_nullness_domain_is_string_origin": false,
+    "identity": "Every origin and validation fact binds a value/object version, call context, declaration and body where applicable.",
+    "overwrite_boundary": "A complete proven text overwrite may kill prior content origins. Partial writes retain unaffected origins; zero-length writes do not create transferred content. Unsupported ranges or uncertain termination stay unknown, not clean.",
+    "formatting_boundary": "Constant-format data interpolation can propagate untrusted text into an output buffer without making that format argument untrusted. Consumed arguments, limits, termination and output mutation need actual modeling; a function name or nonliteral operand is insufficient.",
+    "helper_boundary": "Only direct, nonrecursive same-TU bodies with exact declaration/body identities. Preserve caller/callee source locations, parameter/return/output/sink relations and aliases.",
+    "excluded_helpers": [
+      "recursive",
+      "mutually-recursive",
+      "indirect",
+      "virtual",
+      "external-TU",
+      "persisted string summaries",
+      "arbitrary heap/field/container graph"
+    ],
+    "budget_exhaustion": "INCOMPLETE_NOT_SAFE",
+    "trace_required": [
+      "source location and model",
+      "propagation locations and consumed byte/value relation",
+      "caller and callee locations for summaries",
+      "sink location and exact argument",
+      "validation context or explicit unsupported reason"
+    ],
+    "output_boundary": "Unknown relevant flow cannot acquire a safe label or disappear from an already frozen denominator; incomplete analysis is not a zero-finding PASS."
+  },
+  "sources": [
+    {
+      "id": "entry.argv",
+      "entry_argument_index": 1,
+      "symbol": "main argv",
+      "kind": "entry-argument-content",
+      "output_argument": null,
+      "signature": {
+        "result": "int",
+        "parameters": [
+          "int",
+          "char**"
+        ],
+        "variadic": false
+      },
+      "header": null,
+      "platforms": [
+        "linux-x86_64",
+        "windows-x64",
+        "macos-arm64"
+      ],
+      "references": ["glibc-arguments"],
+      "success": "A declared program entry and an in-range non-null argument element; an arbitrary function/parameter name is not an entry source.",
+      "extent": "The selected argument's string content; no implicit external-caller parameter taint.",
+      "failure": "Out-of-range/null/unknown entry context is not a fabricated string origin."
+    },
+    {
+      "id": "c.getenv",
+      "entry_argument_index": null,
+      "symbol": "getenv",
+      "kind": "returned-content",
+      "output_argument": null,
+      "signature": {
+        "result": "char*",
+        "parameters": [
+          "const char*"
+        ],
+        "variadic": false
+      },
+      "header": "stdlib.h",
+      "platforms": [
+        "linux-x86_64",
+        "windows-x64",
+        "macos-arm64"
+      ],
+      "references": [
+        "glibc-environment"
+      ],
+      "success": "Non-null result supplies environment content, not the name argument.",
+      "extent": "Returned string; subsequent mutation/lifetime follows the selected native model.",
+      "failure": "Null result contributes no string; secure_getenv is not a universal category sanitizer."
+    },
+    {
+      "id": "c.fgets",
+      "entry_argument_index": null,
+      "symbol": "fgets",
+      "kind": "output-buffer",
+      "output_argument": 0,
+      "signature": {
+        "result": "char*",
+        "parameters": [
+          "char*",
+          "int",
+          "FILE*"
+        ],
+        "variadic": false
+      },
+      "header": "stdio.h",
+      "platforms": [
+        "linux-x86_64",
+        "windows-x64",
+        "macos-arm64"
+      ],
+      "references": [
+        "glibc-line-input"
+      ],
+      "success": "Successful input with a valid writable extent and count at least two.",
+      "extent": "Received characters and the established terminator; distinguish capacity from actual content.",
+      "failure": "EOF/error and small-count cases require their actual native behavior; failure cannot manufacture initialized or clean content."
+    },
+    {
+      "id": "c.fread",
+      "entry_argument_index": null,
+      "symbol": "fread",
+      "kind": "output-buffer",
+      "output_argument": 0,
+      "signature": {
+        "result": "size_t",
+        "parameters": [
+          "void*",
+          "size_t",
+          "size_t",
+          "FILE*"
+        ],
+        "variadic": false
+      },
+      "header": "stdio.h",
+      "platforms": [
+        "linux-x86_64",
+        "windows-x64",
+        "macos-arm64"
+      ],
+      "references": [
+        "ms-fread"
+      ],
+      "success": "Read item count and item size establish the completed region; zero size/count is distinct.",
+      "extent": "Completed items are not bytes unless item size is one. Partial items, text translation and content past the returned region remain separately unknown.",
+      "failure": "Zero completed items can coexist with a partial item; return zero is not a general unchanged-buffer proof."
+    },
+    {
+      "id": "posix.read",
+      "entry_argument_index": null,
+      "symbol": "read",
+      "kind": "output-buffer",
+      "output_argument": 1,
+      "signature": {
+        "result": "ssize_t",
+        "parameters": [
+          "int",
+          "void*",
+          "size_t"
+        ],
+        "variadic": false
+      },
+      "header": "unistd.h",
+      "platforms": [
+        "linux-x86_64",
+        "macos-arm64"
+      ],
+      "references": [
+        "glibc-read"
+      ],
+      "success": "A positive byte-count result on valid input.",
+      "extent": "Only actual written bytes are established; no implicit NUL termination.",
+      "failure": "EOF, errors and unknown mutation are distinguished from fresh content and do not create validation."
+    },
+    {
+      "id": "ucrt._read",
+      "entry_argument_index": null,
+      "symbol": "_read",
+      "kind": "output-buffer",
+      "output_argument": 1,
+      "signature": {
+        "result": "int",
+        "parameters": [
+          "int",
+          "void*",
+          "unsigned int"
+        ],
+        "variadic": false
+      },
+      "header": "io.h",
+      "platforms": [
+        "windows-x64"
+      ],
+      "references": [
+        "ms-read"
+      ],
+      "success": "A positive returned count on a valid descriptor/buffer.",
+      "extent": "Counted bytes under the captured native text/binary mode; no implicit NUL termination.",
+      "failure": "EOF/error is not positive source evidence or a generic buffer reset."
+    },
+    {
+      "id": "posix.recv",
+      "entry_argument_index": null,
+      "symbol": "recv",
+      "kind": "output-buffer",
+      "output_argument": 1,
+      "signature": {
+        "result": "ssize_t",
+        "parameters": [
+          "int",
+          "void*",
+          "size_t",
+          "int"
+        ],
+        "variadic": false
+      },
+      "header": "sys/socket.h",
+      "platforms": [
+        "linux-x86_64",
+        "macos-arm64"
+      ],
+      "references": ["glibc-recv"],
+      "success": "Valid socket input, with flags and return semantics explicitly covered by the selected native model.",
+      "extent": "Actual buffer region, not blindly the requested length or a message-size return; no implicit NUL termination.",
+      "failure": "Unmodeled flags/partial/error behavior is visible unknown and must be resolved before a case is admitted."
+    },
+    {
+      "id": "winsock.recv",
+      "entry_argument_index": null,
+      "symbol": "recv",
+      "kind": "output-buffer",
+      "output_argument": 1,
+      "signature": {
+        "result": "int",
+        "parameters": [
+          "SOCKET",
+          "char*",
+          "int",
+          "int"
+        ],
+        "variadic": false
+      },
+      "header": "winsock2.h",
+      "platforms": [
+        "windows-x64"
+      ],
+      "references": [
+        "ms-recv"
+      ],
+      "success": "Valid initialized Winsock socket and covered flags/result behavior.",
+      "extent": "Actual received buffer bytes; no implicit NUL termination.",
+      "failure": "WSAEMSGSIZE can accompany buffer writes, so a SOCKET_ERROR result alone does not establish no mutation."
+    }
+  ],
+  "sinks": [
+    {
+      "id": "c.printf",
+      "family": "format-string",
+      "symbol": "printf",
+      "header": "stdio.h",
+      "argument_index": 0,
+      "signature": {
+        "result": "int",
+        "parameters": [
+          "const char*"
+        ],
+        "variadic": true
+      },
+      "platforms": [
+        "linux-x86_64",
+        "windows-x64",
+        "macos-arm64"
+      ],
+      "references": [
+        "glibc-format"
+      ]
+    },
+    {
+      "id": "c.fprintf",
+      "family": "format-string",
+      "symbol": "fprintf",
+      "header": "stdio.h",
+      "argument_index": 1,
+      "signature": {
+        "result": "int",
+        "parameters": [
+          "FILE*",
+          "const char*"
+        ],
+        "variadic": true
+      },
+      "platforms": [
+        "linux-x86_64",
+        "windows-x64",
+        "macos-arm64"
+      ],
+      "references": [
+        "glibc-format"
+      ]
+    },
+    {
+      "id": "c.sprintf",
+      "family": "format-string",
+      "symbol": "sprintf",
+      "header": "stdio.h",
+      "argument_index": 1,
+      "signature": {
+        "result": "int",
+        "parameters": [
+          "char*",
+          "const char*"
+        ],
+        "variadic": true
+      },
+      "platforms": [
+        "linux-x86_64",
+        "windows-x64",
+        "macos-arm64"
+      ],
+      "references": [
+        "glibc-format"
+      ]
+    },
+    {
+      "id": "c.snprintf",
+      "family": "format-string",
+      "symbol": "snprintf",
+      "header": "stdio.h",
+      "argument_index": 2,
+      "signature": {
+        "result": "int",
+        "parameters": [
+          "char*",
+          "size_t",
+          "const char*"
+        ],
+        "variadic": true
+      },
+      "platforms": [
+        "linux-x86_64",
+        "windows-x64",
+        "macos-arm64"
+      ],
+      "references": [
+        "glibc-format"
+      ]
+    },
+    {
+      "id": "c.system",
+      "family": "command-injection",
+      "symbol": "system",
+      "header": "stdlib.h",
+      "argument_index": 0,
+      "signature": {
+        "result": "int",
+        "parameters": [
+          "const char*"
+        ],
+        "variadic": false
+      },
+      "platforms": [
+        "linux-x86_64",
+        "windows-x64",
+        "macos-arm64"
+      ],
+      "references": [
+        "glibc-system",
+        "ms-system"
+      ]
+    },
+    {
+      "id": "posix.popen",
+      "family": "command-injection",
+      "symbol": "popen",
+      "header": "stdio.h",
+      "argument_index": 0,
+      "signature": {
+        "result": "FILE*",
+        "parameters": [
+          "const char*",
+          "const char*"
+        ],
+        "variadic": false
+      },
+      "platforms": [
+        "linux-x86_64",
+        "macos-arm64"
+      ],
+      "references": [
+        "glibc-popen"
+      ]
+    },
+    {
+      "id": "ucrt._popen",
+      "family": "command-injection",
+      "symbol": "_popen",
+      "header": "stdio.h",
+      "argument_index": 0,
+      "signature": {
+        "result": "FILE*",
+        "parameters": [
+          "const char*",
+          "const char*"
+        ],
+        "variadic": false
+      },
+      "platforms": [
+        "windows-x64"
+      ],
+      "references": [
+        "ms-popen"
+      ]
+    },
+    {
+      "id": "sqlite.exec",
+      "family": "sql-injection",
+      "symbol": "sqlite3_exec",
+      "header": "sqlite3.h",
+      "argument_index": 1,
+      "signature": {
+        "result": "int",
+        "parameters": [
+          "sqlite3*",
+          "const char*",
+          "int(*)(void*,int,char**,char**)",
+          "void*",
+          "char**"
+        ],
+        "variadic": false
+      },
+      "platforms": [
+        "linux-x86_64",
+        "windows-x64",
+        "macos-arm64"
+      ],
+      "references": [
+        "sqlite-exec"
+      ]
+    },
+    {
+      "id": "sqlite.prepare_v2",
+      "family": "sql-injection",
+      "symbol": "sqlite3_prepare_v2",
+      "header": "sqlite3.h",
+      "argument_index": 1,
+      "signature": {
+        "result": "int",
+        "parameters": [
+          "sqlite3*",
+          "const char*",
+          "int",
+          "sqlite3_stmt**",
+          "const char**"
+        ],
+        "variadic": false
+      },
+      "platforms": [
+        "linux-x86_64",
+        "windows-x64",
+        "macos-arm64"
+      ],
+      "references": [
+        "sqlite-prepare"
+      ]
+    },
+    {
+      "id": "sqlite.prepare_v3",
+      "family": "sql-injection",
+      "symbol": "sqlite3_prepare_v3",
+      "header": "sqlite3.h",
+      "argument_index": 1,
+      "signature": {
+        "result": "int",
+        "parameters": [
+          "sqlite3*",
+          "const char*",
+          "int",
+          "unsigned int",
+          "sqlite3_stmt**",
+          "const char**"
+        ],
+        "variadic": false
+      },
+      "platforms": [
+        "linux-x86_64",
+        "windows-x64",
+        "macos-arm64"
+      ],
+      "references": [
+        "sqlite-prepare"
+      ]
+    },
+    {
+      "id": "c.fopen",
+      "family": "path-traversal",
+      "symbol": "fopen",
+      "header": "stdio.h",
+      "argument_index": 0,
+      "signature": {
+        "result": "FILE*",
+        "parameters": [
+          "const char*",
+          "const char*"
+        ],
+        "variadic": false
+      },
+      "platforms": [
+        "linux-x86_64",
+        "windows-x64",
+        "macos-arm64"
+      ],
+      "references": [
+        "glibc-fopen"
+      ]
+    },
+    {
+      "id": "posix.open",
+      "family": "path-traversal",
+      "symbol": "open",
+      "header": "fcntl.h",
+      "argument_index": 0,
+      "signature": {
+        "result": "int",
+        "parameters": [
+          "const char*",
+          "int"
+        ],
+        "variadic": true
+      },
+      "platforms": [
+        "linux-x86_64",
+        "macos-arm64"
+      ],
+      "references": [
+        "glibc-open"
+      ]
+    },
+    {
+      "id": "posix.openat",
+      "family": "path-traversal",
+      "symbol": "openat",
+      "header": "fcntl.h",
+      "argument_index": 1,
+      "signature": {
+        "result": "int",
+        "parameters": [
+          "int",
+          "const char*",
+          "int"
+        ],
+        "variadic": true
+      },
+      "platforms": [
+        "linux-x86_64",
+        "macos-arm64"
+      ],
+      "references": [
+        "glibc-open"
+      ]
+    },
+    {
+      "id": "ucrt._open",
+      "family": "path-traversal",
+      "symbol": "_open",
+      "header": "io.h",
+      "argument_index": 0,
+      "signature": {
+        "result": "int",
+        "parameters": [
+          "const char*",
+          "int"
+        ],
+        "variadic": true
+      },
+      "platforms": [
+        "windows-x64"
+      ],
+      "references": ["ms-open"]
+    }
+  ],
+  "category_validation": {
+    "shared": {
+      "generic_sanitizer_allowed": false,
+      "required_binding": [
+        "category",
+        "platform and exact grammar/context",
+        "checked object/version",
+        "successful branch/result",
+        "consuming sink"
+      ],
+      "mutation_invalidates": true,
+      "ignored_or_failed_result_validates": false,
+      "one_branch_validates_join": false
+    },
+    "format-string": {
+      "nonliteral_alone_is_defect": false,
+      "condition": "Proven untrusted content must reach the format argument. Trusted/nonliteral format and untrusted data under a fixed format are different roles.",
+      "safe_controls": [
+        "fixed format with untrusted data argument",
+        "trusted nonliteral format",
+        "wrong argument not treated as format",
+        "same-named fake API"
+      ],
+      "unmodeled": "Unlisted va_list, wide-character, locale-specific and other variants do not inherit support by family name."
+    },
+    "command-injection": {
+      "generic_quoting_allowed": false,
+      "separate_argv_is_automatic_shell_injection": false,
+      "condition": "Proven untrusted command-string content reaches a modeled shell interpreter context; mode and other arguments are separate.",
+      "platform_boundary": "POSIX shell and Windows command-processor semantics are not interchangeable. No quoting sanitizer is accepted by name or globally across shells.",
+      "safe_controls": [
+        "constant command",
+        "fixed executable with separate argv and no shell interpretation",
+        "wrong mode argument",
+        "fake API"
+      ],
+      "unmodeled": "User-chosen executable, tool option injection, unlisted launch APIs and shell wrappers require separate explicit threat/model evidence."
+    },
+    "sql-injection": {
+      "database": "SQLite UTF-8 SQL text only",
+      "prepare_sanitizes_constructed_query": false,
+      "bind_sanitizes_original_source": false,
+      "sql_argument_index": 1,
+      "bind_value_argument_index": 2,
+      "sql_parameter_index_base": 1,
+      "condition": "Track proven untrusted SQL-text content into sqlite3_exec/prepare_v2/prepare_v3. Preparing already-constructed text does not separate its data from syntax.",
+      "safe_controls": [
+        "trusted query text with parameter values supplied by bind",
+        "untrusted bind value does not become query syntax",
+        "prepare flags do not cleanse query text",
+        "fake SQLite declaration"
+      ],
+      "boundary": "A bind call changes a selected statement parameter, not the original input string or SQL text. Exact statement, parameter, types/lifetime and success remain required; this is not all-rule safety or support for other DB/ORM/UTF-16 APIs.",
+      "references": [
+        "sqlite-exec",
+        "sqlite-prepare",
+        "sqlite-bind"
+      ]
+    },
+    "path-traversal": {
+      "explicit_root_policy_required": true,
+      "user_filename_alone_is_defect": false,
+      "canonicalization_alone_is_containment": false,
+      "string_prefix_alone_is_containment": false,
+      "symlink_or_toctou_guarantee": false,
+      "condition": "A frozen trusted restricted-root policy must bind the path value/version and filesystem sink. A variable name, concatenated root-looking prefix or ordinary user filename is not that policy.",
+      "safe_controls": [
+        "correct checked component containment for the declared platform/root",
+        "trusted path under the explicit policy",
+        "no invented root policy for ordinary file access"
+      ],
+      "required_boundaries": [
+        "absolute path",
+        "parent components",
+        "prefix collision",
+        "separator and platform differences",
+        "canonicalization failure",
+        "ignored check result",
+        "post-check mutation",
+        "symlink/TOCTOU not proven"
+      ],
+      "references": [
+        "ms-paths",
+        "cpp-canonical"
+      ]
+    }
+  },
+  "required_negative_classes": [
+    "fake same-name/signature API",
+    "wrong argument position",
+    "trusted nonliteral input",
+    "unknown source",
+    "partial or failed output mutation",
+    "ignored/failed validation",
+    "post-validation mutation",
+    "validation on only one branch",
+    "unsupported helper target",
+    "flow budget exhaustion",
+    "cross-category sanitizer reuse",
+    "cross-platform quoting or path reuse"
+  ],
+  "selection_gaps": [
+    "actual three-platform native header/ABI inventory",
+    "named copy/concatenation/formatting APIs and exact C++ overload selection",
+    "complete source-attributed evaluation and security-fix pairs",
+    "concrete per-case restricted-root contracts and native semantics",
+    "independent exact-source model/admission review"
+  ],
+  "no_hidden_scope_extension": "The documented table is a draft selection within the approved CH08/CH11 outcome; it cannot admit cases, classify a later miss as unsupported, reduce the frozen denominator, or amend BOOK. Final freeze still requires every U003 acceptance item."
+}

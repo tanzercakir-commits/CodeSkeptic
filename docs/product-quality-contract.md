@@ -97,6 +97,40 @@ Bu ilk belge sayı uydurmaz ve ölçülmemiş donanım performansı vaat etmez. 
 sonrası yeni temiz Release baseline ölçer. Yeni aile yoksa PLANNED_NOT_IMPLEMENTED/RED;
 bilinmeyen CLI seçeneğiyle çalıştırılan komut gerçek aile analizi diye raporlanmaz.
 
+### Native API taslağı — henüz dondurulmuş veya kurulmuş model değil
+
+[`native-api-models.json`](../tests/product_corpus/native-api-models.json), manifestin
+exact byte hash'iyle bağlı bir seçim taslağıdır: sekiz kaynak rolü ve dört yeni ailede
+14 çağrı/argüman rolü. `api-check` yalnız bu taslağın şema, rol ve sınır tutarlılığını
+sınar; gerçek header/ABI doğrulaması, Clang veri akışı veya korpus kabulü yapmaz.
+Native header closure/hashleri, copy/concat ve C++ overload seçimi, gerçek örnekler ve
+bağımsız etiket incelemesi tamamlanmadan U003 için freeze/PASS yoktur.
+
+Argüman indeksleri sıfır tabanlıdır: `printf` format=0, `fprintf`/`sprintf` format=1,
+`snprintf` format=2; formatla veri argümanı ayrıdır. Bu roller
+[glibc çağrı sözleşmelerine](https://sourceware.org/glibc/manual/2.42/html_node/Formatted-Output-Functions.html)
+dayanır; aynı isimli kullanıcı fonksiyonu veya yalnız system-header işareti gerçek
+API kimliğini kanıtlamaz. Kimlik, native platform/header/complete signature ve varsa
+gerçek callee body ilişkisine bağlanmalıdır; `argv` ise ayrı entry-point modelidir.
+
+SQLite'ta `exec`/`prepare_v2`/`prepare_v3` SQL metni argümanı=1, bind değeri argümanı=2,
+SQL parametre numarası ise bir tabanlıdır. [Prepare](https://www.sqlite.org/c3ref/prepare.html)
+önceden kurulmuş SQL metnini temizlemez; [bind](https://www.sqlite.org/c3ref/bind_blob.html)
+değeri sorgu metninden ayrı taşır ve kaynak string'i diğer kullanımlar için temizlemez.
+Bu dar SQL ayrımı lifetime/return-code/all-rule güvenliği veya başka DB desteği değildir.
+
+Shell modeli [POSIX `system`](https://sourceware.org/glibc/manual/2.42/html_node/Running-a-Command.html)
+ile [Windows command processor](https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/system-wsystem?view=msvc-170)
+bağlamlarını ayırır; genel quoting sanitizer değildir. Path modeli önceden kaydedilmiş
+restricted-root sözleşmesi ister: sıradan dosya adı, string prefix veya
+[canonicalization](https://eel.is/c++draft/fs.op.canonical) tek başına containment değildir.
+Platform/path-component kontrolü, başarılı dal ve değişmemiş değer korunur;
+symlink/TOCTOU garantisi üretilmez.
+
+Unknown mutation eski doğrulamayı geçersiz kılar. Kısmi okuma/yazma, byte/item sayısı,
+sonlandırma, yardımcı fonksiyon ve bütçe sınırları ayrı kalır; metadata negatiflerinin
+geçmesi bu davranışların analyzer'da uygulanmış olduğunu kanıtlamaz.
+
 Tam kalite hem isolated aile/subprofile hem all-rule ürün modunda sağlanmalıdır;
 eski 52 fixture/124 korumalı input ve ayrı Juliet/thesis/real-world/sanitizer kapıları
 bu büyük korpusla değiştirilmez. Katalog sürüm geçişi U002'dir, bu ilk görev değildir.

@@ -240,9 +240,176 @@ the ten unknowns or imply that any reported production vulnerability exists.
     return {**result, "raw_evidence_verified": True, "source_snapshots_verified": True}
 
 
+# Prospective role constraints, not native-header authentication or analyzer models.
+NATIVE_SOURCE_CORE = {
+    "entry.argv": ["main argv", "entry-argument-content", None, None, 1, "int", ["int", "char**"], False, ["linux-x86_64", "windows-x64", "macos-arm64"]],
+    "c.getenv": ["getenv", "returned-content", "stdlib.h", None, None, "char*", ["const char*"], False, ["linux-x86_64", "windows-x64", "macos-arm64"]],
+    "c.fgets": ["fgets", "output-buffer", "stdio.h", 0, None, "char*", ["char*", "int", "FILE*"], False, ["linux-x86_64", "windows-x64", "macos-arm64"]],
+    "c.fread": ["fread", "output-buffer", "stdio.h", 0, None, "size_t", ["void*", "size_t", "size_t", "FILE*"], False, ["linux-x86_64", "windows-x64", "macos-arm64"]],
+    "posix.read": ["read", "output-buffer", "unistd.h", 1, None, "ssize_t", ["int", "void*", "size_t"], False, ["linux-x86_64", "macos-arm64"]],
+    "ucrt._read": ["_read", "output-buffer", "io.h", 1, None, "int", ["int", "void*", "unsigned int"], False, ["windows-x64"]],
+    "posix.recv": ["recv", "output-buffer", "sys/socket.h", 1, None, "ssize_t", ["int", "void*", "size_t", "int"], False, ["linux-x86_64", "macos-arm64"]],
+    "winsock.recv": ["recv", "output-buffer", "winsock2.h", 1, None, "int", ["SOCKET", "char*", "int", "int"], False, ["windows-x64"]],
+}
+
+NATIVE_SINK_CORE = {
+    "c.printf": ["format-string", "printf", "stdio.h", 0, "int", ["const char*"], True, ["linux-x86_64", "windows-x64", "macos-arm64"]],
+    "c.fprintf": ["format-string", "fprintf", "stdio.h", 1, "int", ["FILE*", "const char*"], True, ["linux-x86_64", "windows-x64", "macos-arm64"]],
+    "c.sprintf": ["format-string", "sprintf", "stdio.h", 1, "int", ["char*", "const char*"], True, ["linux-x86_64", "windows-x64", "macos-arm64"]],
+    "c.snprintf": ["format-string", "snprintf", "stdio.h", 2, "int", ["char*", "size_t", "const char*"], True, ["linux-x86_64", "windows-x64", "macos-arm64"]],
+    "c.system": ["command-injection", "system", "stdlib.h", 0, "int", ["const char*"], False, ["linux-x86_64", "windows-x64", "macos-arm64"]],
+    "posix.popen": ["command-injection", "popen", "stdio.h", 0, "FILE*", ["const char*", "const char*"], False, ["linux-x86_64", "macos-arm64"]],
+    "ucrt._popen": ["command-injection", "_popen", "stdio.h", 0, "FILE*", ["const char*", "const char*"], False, ["windows-x64"]],
+    "sqlite.exec": ["sql-injection", "sqlite3_exec", "sqlite3.h", 1, "int", ["sqlite3*", "const char*", "int(*)(void*,int,char**,char**)", "void*", "char**"], False, ["linux-x86_64", "windows-x64", "macos-arm64"]],
+    "sqlite.prepare_v2": ["sql-injection", "sqlite3_prepare_v2", "sqlite3.h", 1, "int", ["sqlite3*", "const char*", "int", "sqlite3_stmt**", "const char**"], False, ["linux-x86_64", "windows-x64", "macos-arm64"]],
+    "sqlite.prepare_v3": ["sql-injection", "sqlite3_prepare_v3", "sqlite3.h", 1, "int", ["sqlite3*", "const char*", "int", "unsigned int", "sqlite3_stmt**", "const char**"], False, ["linux-x86_64", "windows-x64", "macos-arm64"]],
+    "c.fopen": ["path-traversal", "fopen", "stdio.h", 0, "FILE*", ["const char*", "const char*"], False, ["linux-x86_64", "windows-x64", "macos-arm64"]],
+    "posix.open": ["path-traversal", "open", "fcntl.h", 0, "int", ["const char*", "int"], True, ["linux-x86_64", "macos-arm64"]],
+    "posix.openat": ["path-traversal", "openat", "fcntl.h", 1, "int", ["int", "const char*", "int"], True, ["linux-x86_64", "macos-arm64"]],
+    "ucrt._open": ["path-traversal", "_open", "io.h", 0, "int", ["const char*", "int"], True, ["windows-x64"]],
+}
+
+NATIVE_BOUNDARY_LISTS = {
+    "flow.required_behaviors": ["local assignment and complete overwrite", "branch joins preserving origin alternatives", "alias-aware current object/version", "byte-region copy and concatenation", "partial buffer mutation and termination", "direct same-TU parameter/return/output-buffer/sink summaries", "category-specific validation on the checked branch and value"],
+    "flow.states": ["CONSTANT", "EXPLICITLY_TRUSTED", "UNTRUSTED", "UNKNOWN"],
+    "flow.excluded_helpers": ["recursive", "mutually-recursive", "indirect", "virtual", "external-TU", "persisted string summaries", "arbitrary heap/field/container graph"],
+    "flow.trace_required": ["source location and model", "propagation locations and consumed byte/value relation", "caller and callee locations for summaries", "sink location and exact argument", "validation context or explicit unsupported reason"],
+    "declaration_identity.required_evidence": ["platform/library version", "resolved canonical declaration and linkage", "complete target-resolved signature and variadic arity", "actual defining header path and content digest", "included header closure and compilation-command identity", "no conflicting user implementation or unsupported interposition"],
+    "category_validation.shared.required_binding": ["category", "platform and exact grammar/context", "checked object/version", "successful branch/result", "consuming sink"],
+    "category_validation.path-traversal.required_boundaries": ["absolute path", "parent components", "prefix collision", "separator and platform differences", "canonicalization failure", "ignored check result", "post-check mutation", "symlink/TOCTOU not proven"],
+    "required_negative_classes": ["fake same-name/signature API", "wrong argument position", "trusted nonliteral input", "unknown source", "partial or failed output mutation", "ignored/failed validation", "post-validation mutation", "validation on only one branch", "unsupported helper target", "flow budget exhaustion", "cross-category sanitizer reuse", "cross-platform quoting or path reuse"],
+}
+
+NATIVE_BOUNDARY_VALUES = {
+    "qualification": {"installed": False, "native_headers_verified": False, "corpus_accepted": False, "measurements_performed": False},
+    "declaration_identity": {"name_only_allowed": False, "system_header_marker_alone_allowed": False, "user_body_may_inherit_native_model": False, "invented_forward_declaration_allowed": False},
+    "flow": {"unknown_is_safe": False, "unknown_mutation_preserves_validation": False, "existing_integer_or_nullness_domain_is_string_origin": False},
+    "category_validation.shared": {"generic_sanitizer_allowed": False, "mutation_invalidates": True, "ignored_or_failed_result_validates": False, "one_branch_validates_join": False},
+    "category_validation.format-string": {"nonliteral_alone_is_defect": False},
+    "category_validation.command-injection": {"generic_quoting_allowed": False, "separate_argv_is_automatic_shell_injection": False},
+    "category_validation.sql-injection": {"prepare_sanitizes_constructed_query": False, "bind_sanitizes_original_source": False, "sql_argument_index": 1, "bind_value_argument_index": 2, "sql_parameter_index_base": 1},
+    "category_validation.path-traversal": {"explicit_root_policy_required": True, "user_filename_alone_is_defect": False, "canonicalization_alone_is_containment": False, "string_prefix_alone_is_containment": False, "symlink_or_toctou_guarantee": False},
+}
+
+def native_api_metadata(model):
+    """Check draft role/shape consistency, never source semantics or actual ABI."""
+    fields(model, "schema state argument_indexing boundary qualification references reference_boundary "
+           "declaration_identity flow sources sinks category_validation required_negative_classes "
+           "selection_gaps no_hidden_scope_extension", "native API model")
+    require(model["schema"] == "codeskeptic-product-native-api-models/v1"
+            and model["state"] == "DRAFT_NOT_FROZEN"
+            and model["argument_indexing"] == "zero-based-call-arguments-not-SQL-parameter-numbers",
+            "native API draft identity")
+    for key in ("boundary", "reference_boundary", "no_hidden_scope_extension"):
+        require(nonempty(model[key]), "native API boundary")
+    fields(model["qualification"], "installed native_headers_verified corpus_accepted measurements_performed",
+           "native API qualification")
+    fields(model["declaration_identity"], "name_only_allowed system_header_marker_alone_allowed "
+           "user_body_may_inherit_native_model invented_forward_declaration_allowed required_evidence "
+           "alias_boundary native_header_inventory_state entry_boundary", "native declaration identity")
+    require(model["declaration_identity"]["native_header_inventory_state"] ==
+            "PENDING_ACTUAL_THREE_PLATFORM_CAPTURE", "native header identity not yet realized")
+    for key in ("alias_boundary", "entry_boundary"):
+        require(nonempty(model["declaration_identity"][key]), "native declaration boundary")
+    flow = model["flow"]
+    fields(flow, "limits required_behaviors states unknown_is_safe unknown_mutation_preserves_validation "
+           "existing_integer_or_nullness_domain_is_string_origin identity overwrite_boundary formatting_boundary "
+           "helper_boundary excluded_helpers budget_exhaustion trace_required output_boundary", "native string flow")
+    require(canonical(flow["limits"]) == canonical({
+        "call_depth": LIMITS["string_flow_call_depth_max"],
+        "states_per_function": LIMITS["string_flow_states_per_function_max"],
+        "transfer_steps_per_function": LIMITS["string_flow_transfer_steps_per_function_max"]}),
+        "native flow budget changed")
+    require(flow["budget_exhaustion"] == "INCOMPLETE_NOT_SAFE", "budget failure cannot become safe")
+    for key in ("identity", "overwrite_boundary", "formatting_boundary", "helper_boundary", "output_boundary"):
+        require(nonempty(flow[key]), "native flow boundary")
+    references = model["references"]
+    require(type(references) is dict and 1 <= len(references) <= 64
+            and all(nonempty(key) and type(url) is str and url.startswith("https://")
+                    for key, url in references.items()), "native API documentation references")
+
+    def texts(values, what):
+        require(type(values) is list and values and all(nonempty(value) for value in values)
+                and len(values) == len(set(values)), what)
+
+    def refs(values):
+        texts(values, "native API row references")
+        require(all(value in references for value in values), "unknown native API reference")
+
+    for group, pins in (("sources", NATIVE_SOURCE_CORE), ("sinks", NATIVE_SINK_CORE)):
+        rows = model[group]
+        require(type(rows) is list and len(rows) == len(pins), "native API table membership")
+        names = []
+        for row in rows:
+            extra = ("kind output_argument entry_argument_index success extent failure" if group == "sources"
+                     else "family argument_index")
+            fields(row, "id symbol header signature platforms references " + extra, "native API row")
+            name = row["id"]
+            require(type(name) is str and name in pins, "native API row identity")
+            names.append(name)
+            signature = row["signature"]
+            fields(signature, "result parameters variadic", "native API signature")
+            if group == "sources":
+                prefix = [row["symbol"], row["kind"], row["header"],
+                          row["output_argument"], row["entry_argument_index"]]
+                for key in ("success", "extent", "failure"):
+                    require(nonempty(row[key]), "native source success/extent/failure boundary")
+            else:
+                prefix = [row["family"], row["symbol"], row["header"], row["argument_index"]]
+            core = prefix + [signature["result"], signature["parameters"], signature["variadic"], row["platforms"]]
+            require(canonical(core) == canonical(pins[name]), "native API role/signature/platform changed")
+            refs(row["references"])
+        require(names == list(pins), "duplicate/missing/reordered native APIs")
+
+    validation = model["category_validation"]
+    fields(validation, "shared format-string command-injection sql-injection path-traversal",
+           "category-specific validation")
+    fields(validation["shared"], "generic_sanitizer_allowed required_binding mutation_invalidates "
+           "ignored_or_failed_result_validates one_branch_validates_join", "validation binding")
+    fields(validation["format-string"], "nonliteral_alone_is_defect condition safe_controls unmodeled",
+           "format-string boundary")
+    fields(validation["command-injection"], "generic_quoting_allowed separate_argv_is_automatic_shell_injection "
+           "condition platform_boundary safe_controls unmodeled", "command-injection boundary")
+    fields(validation["sql-injection"], "database prepare_sanitizes_constructed_query bind_sanitizes_original_source "
+           "sql_argument_index bind_value_argument_index sql_parameter_index_base condition safe_controls boundary "
+           "references", "SQLite boundary")
+    fields(validation["path-traversal"], "explicit_root_policy_required user_filename_alone_is_defect "
+           "canonicalization_alone_is_containment string_prefix_alone_is_containment symlink_or_toctou_guarantee "
+           "condition safe_controls required_boundaries references", "restricted-root boundary")
+    require(validation["sql-injection"]["database"] == "SQLite UTF-8 SQL text only", "SQLite-only native profile")
+    for name in ("format-string", "command-injection", "sql-injection", "path-traversal"):
+        require(nonempty(validation[name]["condition"]), "category-specific condition")
+        texts(validation[name]["safe_controls"], "category-specific safe controls")
+    for name, key in (("format-string", "unmodeled"), ("command-injection", "unmodeled"),
+                      ("command-injection", "platform_boundary"), ("sql-injection", "boundary")):
+        require(nonempty(validation[name][key]), "category-specific model boundary")
+    for name in ("sql-injection", "path-traversal"):
+        refs(validation[name]["references"])
+
+    def at(path):
+        value = model
+        for part in path.split("."):
+            require(type(value) is dict and part in value, "missing native model boundary")
+            value = value[part]
+        return value
+
+    for path, expected in NATIVE_BOUNDARY_LISTS.items():
+        require(canonical(at(path)) == canonical(expected), "native model coverage boundary changed")
+    for path, expected in NATIVE_BOUNDARY_VALUES.items():
+        actual = at(path)
+        require(canonical({key: actual[key] for key in expected}) == canonical(expected),
+                "native model trust boundary changed")
+    texts(model["selection_gaps"], "native API selection gaps")
+    return {"state": model["state"], "sources": len(model["sources"]), "sinks": len(model["sinks"]),
+            "families": sorted({row["family"] for row in model["sinks"]}),
+            "installed": False, "native_headers_verified": False, "product_qualified": False,
+            "metadata_only": True}
+
+
 def source_metadata(manifest):
     fields(manifest, "schema state selection_base limits projects historical_index historical_index_sha256 "
-           "evaluation_state independent_quota_examples native_environment_state boundary", "profile manifest")
+           "evaluation_state independent_quota_examples native_environment_state native_api_model "
+           "native_api_model_sha256 boundary", "profile manifest")
     require(manifest["schema"] == "codeskeptic-product-profiles/v1"
             and manifest["selection_base"] == "de642695c96224ab11c5add000c7ad9c996d0a50"
             and nonempty(manifest["boundary"]), "profile source identity")
@@ -251,6 +418,11 @@ def source_metadata(manifest):
             and SHA.fullmatch(manifest["historical_index_sha256"])
             and manifest["historical_index_sha256"] != "0" * 64,
             "historical index path/digest linkage")
+    require(manifest["native_api_model"] == "tests/product_corpus/native-api-models.json"
+            and type(manifest["native_api_model_sha256"]) is str
+            and SHA.fullmatch(manifest["native_api_model_sha256"])
+            and manifest["native_api_model_sha256"] != "0" * 64,
+            "native API model path/digest linkage")
     validate_limits(manifest["limits"])
     require(type(manifest["projects"]) is list and len(manifest["projects"]) == 3, "source projects")
     names, total = [], 0
@@ -330,6 +502,16 @@ def linked_historical_index(manifest, root):
     return index
 
 
+def linked_native_api_model(manifest, root):
+    """Read the selected draft API bytes; do not authenticate actual native APIs."""
+    source_metadata(manifest)
+    path = Path(root) / manifest["native_api_model"]
+    require(file_sha(path) == manifest["native_api_model_sha256"], "native API model digest mismatch")
+    model = read_json(path)
+    native_api_metadata(model)
+    return model
+
+
 def draft_readiness(manifest):
     metadata = source_metadata(manifest)
     require(manifest["state"] == "DRAFT_NOT_FROZEN"
@@ -343,13 +525,14 @@ def draft_readiness(manifest):
             "gaps": ["independent evaluation selection and source-label review missing",
                      "1020 independent quota sources and three origins per bucket not established",
                      "required supplemental source-attributed security-fix pair review incomplete",
+                     "native API draft lacks actual header/ABI and complete per-case model qualification",
                      "prospective native environment realization and exact identity capture pending"],
             "boundary": "An honest incomplete draft, not an activated evaluation freeze or permission to skip FRONT."}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "readiness"))
+    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--historical-sources", type=Path, default=Path(
         "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S04-U001/corpus-diagnostic-comparison"))
@@ -361,10 +544,13 @@ def main():
         else:
             manifest = read_json(args.root / "scripts/product_profiles.json")
             index = linked_historical_index(manifest, args.root)
+            model = linked_native_api_model(manifest, args.root)
             if args.command == "historical-check":
                 result = verify_historical(index, args.root, args.historical_sources)
             elif args.command == "sources-check":
                 result = verify_sources(manifest)
+            elif args.command == "api-check":
+                result = native_api_metadata(model)
             else:
                 result = draft_readiness(manifest)
         print(canonical(result), end="")
