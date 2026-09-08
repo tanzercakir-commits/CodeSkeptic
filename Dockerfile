@@ -8,7 +8,8 @@ FROM ${CODESKEPTIC_RUNTIME_BASE} AS artifact-runtime
 COPY package/ /opt/codeskeptic/
 ENV PATH="/opt/codeskeptic/bin:${PATH}"
 USER 65532:65532
-WORKDIR /work
+# This directory physically exists from COPY, even under a read-only runtime.
+WORKDIR /opt/codeskeptic
 ENTRYPOINT ["codeskeptic"]
 
 # Preserve the default source-backed release build, including historical source

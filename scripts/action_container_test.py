@@ -18,7 +18,7 @@ class RuntimeGuardTests(unittest.TestCase):
         self.output = Path("/owned/output")
         self.container = {
             "Image": "sha256:" + self.image,
-            "Config": {"User": "1000:1000", "Env": ["PATH=/opt/codeskeptic/bin:/usr/bin:/bin", "HOME=/tmp", "TMPDIR=/tmp", "LANG=C.UTF-8"]},
+            "Config": {"User": "1000:1000", "WorkingDir": "/opt/codeskeptic", "Env": ["PATH=/opt/codeskeptic/bin:/usr/bin:/bin", "HOME=/tmp", "TMPDIR=/tmp", "LANG=C.UTF-8"]},
             "HostConfig": {"NetworkMode": "none", "ReadonlyRootfs": True, "Privileged": False, "CapAdd": [],
                            "Memory": 6 * 1024**3, "MemorySwap": 12 * 1024**3, "PidsLimit": 256,
                            "CpuPeriod": 100000, "CpuQuota": 200000,
@@ -52,6 +52,11 @@ class RuntimeGuardTests(unittest.TestCase):
 
     def test_wrong_image_is_rejected(self):
         self.container["Image"] = "b" * 64
+        with self.assertRaises(ActionError):
+            self.check()
+
+    def test_workdir_must_be_the_existing_package_directory(self):
+        self.container["Config"]["WorkingDir"] = "/work"
         with self.assertRaises(ActionError):
             self.check()
 

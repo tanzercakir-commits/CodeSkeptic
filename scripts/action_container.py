@@ -44,6 +44,7 @@ def validate_runtime(container, image, fixture_root, output):
              "CAP_SETUID", "CAP_SYS_CHROOT"} <= set(host["CapDrop"]), "runtime capabilities not dropped")
     require({"no-new-privileges", "label=disable"} <= set(host["SecurityOpt"]), "runtime security options missing")
     require(os.getuid() != 0 and container["Config"]["User"] == f"{os.getuid()}:{os.getgid()}", "runtime must use nonroot caller identity")
+    require(container["Config"]["WorkingDir"] == "/opt/codeskeptic", "runtime working directory mismatch")
     tmp = set(host["Tmpfs"]["/tmp"].split(","))
     require(set(host["Tmpfs"]) == {"/tmp"}, "unexpected runtime tmpfs mounts")
     require({"nosuid", "nodev", "noexec"} <= tmp and bool({"size=1g", "size=1073741824"} & tmp), "temporary filesystem is not bounded/restricted")
@@ -144,7 +145,7 @@ def main():
                   "--tmpfs=/tmp:rw,nosuid,nodev,noexec,size=1g,mode=1777", "--env=HOME=/tmp", "--env=TMPDIR=/tmp", "--env=LANG=C.UTF-8",
                   "--mount", f"type=bind,source={fixture_root},destination={fixture_root},ro",
                   "--mount", f"type=bind,source={bind_path(reports)},destination=/out,rw",
-                  "--workdir=/work", "--entrypoint=/bin/sh", image, "-eu", "-c",
+                  "--workdir=/opt/codeskeptic", "--entrypoint=/bin/sh", image, "-eu", "-c",
                   'sha256sum /opt/codeskeptic/bin/codeskeptic; /opt/codeskeptic/bin/codeskeptic --version; exec /opt/codeskeptic/bin/codeskeptic "$@"', "--",
                   str(source), "--build-path", str(source), "--lang", "en", *extra, "--sarif", "/out/result.sarif"]
         with created_container(create, case, environment, output) as cid:
