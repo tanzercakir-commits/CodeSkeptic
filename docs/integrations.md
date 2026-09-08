@@ -445,7 +445,14 @@ fixtures do not establish arbitrary target-header or platform support.
 Actual local CLI/composite shell-step qualification passed 13 scans using the
 U001 `0.4.9-dev+ga23cf3192648` package. Independent review confirmed six complete
 SARIF comparisons and preserved raw report-only verdicts. This is not a hosted
-Action run; actual container qualification remains pending at this checkpoint.
+Action run. The rootless/offline artifact profile subsequently passed six real
+container scans with full CLI/Action/SARIF parity, measured binary hash/version,
+created/terminal isolation checks and exact owned-container cleanup. The cached
+base was Ubuntu24.04.4 amd64 (image ID
+`045183670ef29ce21bc22a8d4f62511ce472679ca8fc9774f04181f7f383ca62`).
+The first attempt failed before analysis because `/work` was absent under the
+read-only profile; its failed records remain preserved. The corrected profile
+uses the package directory already created by `COPY`.
 The self-test workflow separates offline feature-push tests from successful
 Release/explicit-manual asset checks, uses read-only repository permissions and
 does not write status refs. A workflow edit is not successful hosted execution
