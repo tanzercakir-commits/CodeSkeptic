@@ -20,7 +20,7 @@ Tek yürütülebilir iş aşağıdaki FRONT'tur. İç kuyruk chapter chapter aç
 
 **Test bütçesi:** T1
 **Kontroller:** focused-tests, cli-smoke, queue-check
-**Kapsam:** scripts/product_profiles.py, scripts/product_profiles.json, scripts/test_product_profiles.py, docs/product-quality-contract.md, scripts/product_quality.py, scripts/test_product_quality.py, tests/product_corpus/**, docs/product-quality-results.md, tests/cwe_corpus/regression_inventory.json, tests/cwe_corpus/catalog.json
+**Kapsam:** scripts/product_profiles.py, scripts/product_profiles.json, scripts/test_product_profiles.py, docs/product-quality-contract.md, scripts/product_quality.py, scripts/test_product_quality.py, tests/product_corpus/**, docs/product-quality-results.md, tests/cwe_corpus/regression_inventory.json, tests/cwe_corpus/catalog.json, .github/workflows/product-identity.yml, scripts/product_identity.py, scripts/test_product_identity.py
 **Bağımlılıklar:** CS3-CH08-S01-U002
 
 ### CS3-CH08-S01-U004 — Temiz Release profilinde yeni exact-source RED başlangıcını ölç
