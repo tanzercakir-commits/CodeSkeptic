@@ -843,3 +843,63 @@ ortam genişletme veya yeniden case denemesi yoktur. Tanı her iki aşamadan son
 mock eder. Mevcut capture-output sınırları hard RSS/descendant/output-production
 garantisine dönüşmez. Bu prospective gözlem henüz yeni hosted sonuç değildir;
 native/task/product qualification false, U003 açık ve kaynak sayacı 1/1020'dir.
+
+### Windows v3 gerçek gözlemi — politika hipotezi desteklenmedi, uzun import sürdü
+
+Bağımsız exact-head PASS alan `3fcf06a35c1b2ac8cca6c48168cbc96675090007`
+üzerine yalnız cache durumuna ilişkin kanıtsız “cold” sözcüğü düzeltildi.
+Yeni temiz `7cfec2d51385377ce5d50d3392246d9b49a974e7` tekrar bağımsız PASS ve
+224 test/13 kontrol ile doğrulandı. Normal feature push'un gerçek
+[34343205581 koşusu](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34343205581)
+üç platformda **success** oldu. Windows'ta 88 identity ve 26 external-input testi,
+beş sabit girdinin staging'i, v1 capture, dört case syntax/ABI probe'u ve v3
+tanısı tamamlandı. Önceki başarısız koşular başarısız olarak korunur; yeni başarı
+onların yeniden etiketlenmesi değildir.
+
+V3 tanısında stage süreci exit 0/22546 ms, ayrı policy süreci exit 0/235 ms
+döndü. Her iki kayıt tam ve sıralı, bütün malformed/trailing/stderr/output-limit
+flag'leri false'tur. Stage clock değerleri ve kendi sürecindeki farklar:
+
+| Tamamlanan aşama | Clock başlangıcından ms | Önceki marker'dan ms |
+| --- | --- | --- |
+| STARTED | 1 | — |
+| CIM_LOADED | 22275 | 22274 |
+| UTILITY_LOADED | 22279 | 4 |
+| CIM_QUERY_DONE | 22321 | 42 |
+| QUERY_DONE | 22343 | 22 |
+
+`PSExecutionPolicyPreference`, Python parent'ında da dar case ortamında da
+`absent/null` çıktı. Gerçek Windows PowerShell child engine'i
+`5.1.26100.33296`, effective policy `Unrestricted` olarak gözlendi. MachinePolicy,
+UserPolicy, Process ve CurrentUser `Undefined`; LocalMachine `Unrestricted` idi.
+Bunlar runner'dan okunmuş değerlerdir: collector/workflow hiçbir policy ayarı
+yapmadı. Effective sonucu parent değişkeninden veya parent PowerShell 7'den
+türetilmedi.
+
+Bu koşu, filtrelemenin mevcut bir process-policy değişkenini sildiği hipotezini
+desteklemez: gözlem sırasında parent'ta silinecek değişken yoktu. Önceki koşularda
+bu değer ölçülmediği için onlar hakkında geriye dönük politika sonucu kurulmaz.
+235 ms, Security modülünü yükleme ve policy sorgularını kapsayan ayrı sürecin
+süresidir; signature verification veya CimCmdlets yükleme maliyetini ölçmez.
+
+Asıl case/OS query kodu, dar ortam ve 30 saniyelik sınır değişmeden Windows bu
+kez tamamlandı; buna rağmen post-attempt CimCmdlets import'u 22,274 saniye sürdü.
+Başarılı tek koşu kalıcı timeout düzeltmesi veya determinizm kanıtı değildir.
+Image `20260824.214.3` idi; hemen önceki `34340950607` koşusu
+`20260907.229.1` bildirmişti. Aynı host/cache/image üzerinde kontrollü A/B sonucu
+veya kök neden iddiası yoktur; policy gevşetme/timeout artırma gerekçesi üretilmedi.
+
+`windows-policy-diagnostic-v3/hosted-34343205581` paketi gerçek run/jobs/logs,
+yedi provider-digest-bound ZIP ve içlerindeki tek JSON dosyalarını saklar.
+Hepsi aynı tested kaynak head/tree ve committed collector/workflow/profile/API
+hashlerine bağlandı; üç native case ayrıca dört case-helper hashini taşır.
+Windows v3 JSON SHA-256
+`691ac2d932f9aa93028c712990ae9df856f09e4ddd7914ac9dbbabccf07ad1b1`;
+Windows native case JSON SHA-256
+`9df30f27f9c26d39d8f80a056d1ce67ff21a80b0d3e2315a4783b9eeb9b12e42`;
+paket summary SHA-256
+`ac5110f79f0c59b63ce9bf0268e107e692a5bf41c2b987939b590602eba3fbd8`.
+Primary host native SDK/source byte'larını yeniden açmış sayılmaz. Bu metadata
+ve syntax gözlemleri frozen korpus, native/product/task qualification veya POP
+değildir; kaynak sayacı 1/1020 ve U003 açık kalır. Bu raporun belge HEAD'i tested
+`7cfec2d` değildir.
