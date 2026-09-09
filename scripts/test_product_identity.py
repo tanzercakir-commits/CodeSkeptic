@@ -799,6 +799,27 @@ class CaseCaptureTests(unittest.TestCase):
         self.assertLess(workflow.index('--output "$env:RUNNER_TEMP/codeskeptic-product-identity.json"'), workflow.index(selected))
         self.assertLess(workflow.index(selected), workflow.index('& $identityPython -B scripts/product_identity.py capture-case'))
 
+    def test_windows_first_dependency_accepts_equivalent_separators_and_case(self):
+        for name in ('candidate', 'abi'):
+            for style in ('separator', 'case'):
+                value = self.case_document('Windows')
+                probe = value['probes'][name]
+                original = probe['command']['argv'][-1]
+                equivalent = original.replace('/', '\\') if style == 'separator' else original.swapcase()
+                probe['dependencies']['stdout'] = probe['dependencies']['stdout'].replace(original, equivalent, 1)
+                with self.subTest(name=name, style=style):
+                    identity.validate_case_document(value)
+
+    def test_first_dependency_rejects_different_translation_unit(self):
+        for system in ('Linux', 'Windows', 'Darwin'):
+            for name in ('candidate', 'abi'):
+                value = self.case_document(system)
+                probe = value['probes'][name]
+                original = probe['command']['argv'][-1]
+                probe['dependencies']['stdout'] = probe['dependencies']['stdout'].replace(original, original + '.different.c', 1)
+                with self.subTest(system=system, name=name), self.assertRaisesRegex(identity.IdentityError, 'case dependency closure'):
+                    identity.validate_case_document(value)
+
 
 class WorkflowTests(unittest.TestCase):
     def test_each_lane_uses_one_explicit_python_for_tests_and_capture(self):

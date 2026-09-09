@@ -392,7 +392,8 @@ eski Xcode gözlemi yeniden etiketlenmez. Windows gözlenen vcvars64 toolset/SDK
 köklerinden ayrı bir case-only VC/UCRT/Windows SDK INCLUDE profili seçer; özgün
 tam vcvars ortamı yeniden etiketlenmez. x64 MSVC target ve gerçek header alt
 ağaçları bu yeni child ortamına bağlanır. Yapısal safe/ret
-testleri gerçek native çalışmanın yerine geçmez: yeni hosted sonuçlar henüz yoktur.
+testleri gerçek native çalışmanın yerine geçmez; gerçek hosted denemeler aşağıda
+ayrıca kaydedilir.
 Bu hazırlık kaynak lisansını, runtime ABI'yi veya nihai LLVM-20 frontend modelini
 tamamlamaz; `native_qualified/license_qualified/task_ready/product_qualified=false`,
 kota **0/1020**, FRONT U003 ve bütün gerçek tamamlanma kapıları değişmeden kalır.
@@ -415,3 +416,10 @@ ve gizlilik kontrolü korunarak yalnız testin CRLF taşıma farkı normalleşti
 Git source/helper byte kontrolü değiştirilmedi. Bu başarısız hosted denemesi,
 ham üç job logu ve dört oluşmuş metadata artifact'iyle dış kanıtta korunur.
 Windows için yeni native çalıştırma hâlâ gereklidir; eski başarısızlık PASS değildir.
+
+`3ea26de2` tekrar incelemesi, ilk dependency TU yolunda ham string karşılaştırmasının
+eşdeğer Windows slash/case yazımlarını reddettiğini buldu. İki probe ve iki yazım
+için dört RED korunur; diğer header kayıtları gibi platform path eşdeğerliğiyle
+karşılaştırılırken ham argv/dependency yazımı saklanır. Gerçekten farklı TU'lar
+üç platformdaki altı negatifte reddedilmeye devam eder. Bu düzeltme de yeni
+exact-head incelemesi ve gerçek Windows çalıştırması gerektirir.

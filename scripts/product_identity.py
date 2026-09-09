@@ -704,7 +704,7 @@ def validate_case_document(value):
                 and dependency['stderr'] == '', 'case dependency command')
         paths = dependency_paths(dependency['stdout'], flavor)
         require(type(probe['headers']) is list and len(paths) == len(probe['headers'])
-                and paths[0] == source_path, 'case dependency closure')
+                and path_type(paths[0]) == path_type(source_path), 'case dependency closure')
         for record, path in zip(probe['headers'], paths):
             validate_file(record, flavor)
             require(path_type(record['path']) == path_type(path), 'case dependency path')
