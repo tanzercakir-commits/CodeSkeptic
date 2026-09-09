@@ -388,9 +388,20 @@ yalnız byte sayısı/hashleri ve sabit negatif marker kaydedilir. Child environ
 allowlist'tir; credential ve ambient compiler/include override'ları taşınmaz.
 
 macOS case lane'i açık standalone CLT compiler/SDK ve arm64 macOS 14 hedefi seçer;
-eski Xcode gözlemi yeniden etiketlenmez. Windows aynı vcvars64 seçimini, x64 MSVC
-target'ını ve seçili VC/UCRT INCLUDE/header alt ağaçlarını bağlar. Yapısal safe/ret
+eski Xcode gözlemi yeniden etiketlenmez. Windows gözlenen vcvars64 toolset/SDK
+köklerinden ayrı bir case-only VC/UCRT/Windows SDK INCLUDE profili seçer; özgün
+tam vcvars ortamı yeniden etiketlenmez. x64 MSVC target ve gerçek header alt
+ağaçları bu yeni child ortamına bağlanır. Yapısal safe/ret
 testleri gerçek native çalışmanın yerine geçmez: yeni hosted sonuçlar henüz yoktur.
 Bu hazırlık kaynak lisansını, runtime ABI'yi veya nihai LLVM-20 frontend modelini
 tamamlamaz; `native_qualified/license_qualified/task_ready/product_qualified=false`,
 kota **0/1020**, FRONT U003 ve bütün gerçek tamamlanma kapıları değişmeden kalır.
+
+`fdaba601` bağımsız incelemesi başarısızdır: özgün Windows INCLUDE'daki ek
+Auxiliary VS/NETFXSDK yolları yeni seçime uymuyordu; beklenen assertion yanında
+ilgisiz hata kabul ediliyordu; iç include probe'larının stderr'i case çıktısında
+kalabiliyordu. Üç odaklı testte beş RED assertion korunmuştur. Yeni case kaydı
+tek beklenen assertion hatası ve sıfır ek hata/warning ister; iç header tanılarını
+reddeder. Eski v1 reader geçmiş belgeleri aynı anlamla okumayı sürdürür. Seçilen
+Windows INCLUDE eski gözlemin 188 C/427 C++ dependency'sini kapsar, ancak bu
+geçmiş karşılaştırma yeni native çalışmanın kanıtı değildir.

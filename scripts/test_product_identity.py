@@ -608,7 +608,7 @@ class CaseCaptureTests(unittest.TestCase):
                                                            'sha256': hashlib.sha256(source).hexdigest()}
             marker = {'bad-width': 'selected int width', 'bad-signature': 'selected malloc declaration'}.get(name)
             command = {'argv': identity.case_command(native, path), 'exit_code': 1 if marker else 0, 'stdout': '',
-                       'stderr': 'static assertion failed: ' + marker if marker else ''}
+                       'stderr': 'probe.c:4:1: error: static assertion failed: ' + marker + '\n1 error generated.\n' if marker else ''}
             headers = [] if marker else [copy.deepcopy(source_file), {'path': header_path, 'resolved_path': header_path,
                                                                      'bytes': 4, 'sha256': 'd' * 64}]
             dependency = None if marker else {'argv': identity.case_command(native, path, dependencies=True), 'exit_code': 0,
@@ -745,7 +745,7 @@ class CaseCaptureTests(unittest.TestCase):
 
     def test_case_streams_never_retain_compiler_source_diagnostics(self):
         command = {'argv': ['/clang', 'probe.c'], 'exit_code': 1, 'stdout': '',
-                   'stderr': 'static assertion failed selected int width\nPRIVATE_SOURCE_SENTINEL'}
+                   'stderr': 'probe.c:4:1: error: static assertion failed: selected int width\nPRIVATE_SOURCE_SENTINEL\n1 error generated.\n'}
         record = identity.case_record(command, 'selected int width')
         self.assertNotIn('PRIVATE_SOURCE_SENTINEL', json.dumps(record))
         with tempfile.TemporaryDirectory() as directory:
@@ -774,6 +774,30 @@ class CaseCaptureTests(unittest.TestCase):
             if probe['dependencies']:
                 probe['dependencies']['argv'] = [sdk_alias if arg == old_sdk else arg for arg in probe['dependencies']['argv']]
         identity.validate_case_document(value)
+
+    def test_negative_probe_rejects_unrelated_errors_or_warnings(self):
+        intended = 'probe.c:4:1: error: static assertion failed: selected int width\n'
+        for contamination in ('probe.c:1:1: fatal error: unrelated header missing\n',
+                              'probe.c:2:1: error: unrelated name\n',
+                              'probe.c:2:1: warning: unrelated warning\n'):
+            command = {'argv': ['/clang', 'probe.c'], 'exit_code': 1, 'stdout': '',
+                       'stderr': intended + contamination + '1 error generated.\n'}
+            with self.subTest(contamination=contamination), self.assertRaises(identity.IdentityError):
+                identity.case_record(command, 'selected int width')
+
+    def test_new_case_rejects_nested_include_diagnostics_legacy_stays_readable(self):
+        value = self.case_document('Linux')
+        value['native_identity']['probes']['c']['command']['stderr'] = 'header: warning: PRIVATE_SDK_SOURCE_SENTINEL\n'
+        identity.validate_document(value['native_identity'])
+        with self.assertRaises(identity.IdentityError):
+            identity.validate_case_document(value)
+
+    def test_windows_workflow_explicitly_selects_case_only_include(self):
+        workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/product-identity.yml').read_text()
+        selected = "$env:INCLUDE = $identityCaseIncludes -join ';'"
+        self.assertIn(selected, workflow)
+        self.assertLess(workflow.index('--output "$env:RUNNER_TEMP/codeskeptic-product-identity.json"'), workflow.index(selected))
+        self.assertLess(workflow.index(selected), workflow.index('& $identityPython -B scripts/product_identity.py capture-case'))
 
 
 class WorkflowTests(unittest.TestCase):

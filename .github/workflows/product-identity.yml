@@ -121,7 +121,25 @@ jobs:
           & $identityPython -B scripts/product_profiles.py stage-gcc-inputs `
             --root "$env:GITHUB_WORKSPACE" --external-root "$env:RUNNER_TEMP/codeskeptic-gcc-case"
           if ($LASTEXITCODE -ne 0) { throw 'Pinned GCC source staging failed' }
-          # This process still holds the exact vcvars64 selection observed above.
+          # Select a separate case-only standard-library include profile from the
+          # observed VC/SDK roots. Do not relabel the original full vcvars record.
+          $identityCaseSdk = Join-Path $env:WindowsSdkDir ('Include\' + $env:WindowsSDKVersion.TrimEnd('\', '/'))
+          $identityCaseUcrt = Join-Path $env:UniversalCRTSdkDir ('Include\' + $env:UCRTVersion.TrimEnd('\', '/'))
+          $identityCaseIncludes = @(
+            (Join-Path $env:VCToolsInstallDir 'include'),
+            (Join-Path $env:VCToolsInstallDir 'ATLMFC\include'),
+            (Join-Path $identityCaseUcrt 'ucrt'),
+            (Join-Path $identityCaseSdk 'shared'),
+            (Join-Path $identityCaseSdk 'um'),
+            (Join-Path $identityCaseSdk 'winrt'),
+            (Join-Path $identityCaseSdk 'cppwinrt')
+          )
+          foreach ($identityCaseInclude in $identityCaseIncludes) {
+            if (-not (Test-Path -LiteralPath $identityCaseInclude -PathType Container)) {
+              throw 'Selected case include directory is missing'
+            }
+          }
+          $env:INCLUDE = $identityCaseIncludes -join ';'
           & $identityPython -B scripts/product_identity.py capture-case `
             --root "$env:GITHUB_WORKSPACE" --source-sha "$env:GITHUB_SHA" `
             --external-root "$env:RUNNER_TEMP/codeskeptic-gcc-case" `

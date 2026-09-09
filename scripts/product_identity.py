@@ -574,6 +574,8 @@ def resolve_case_resources(native):
 def validate_case_selection(native, environment):
     """Bind the effective case selection; legacy v1 remains observational."""
     validate_document(native)
+    require(all(probe['command']['stderr'] == '' for probe in native['probes'].values()),
+            'case nested header diagnostics may contain source text')
     host, tools = native['platform'], native['tools']
     system, metadata = host['system'], host['metadata']
     require(type(environment) is dict and all(type(value) is str for value in environment.values())
@@ -629,6 +631,12 @@ def case_record(command, marker=None):
     require(command['exit_code'] == (1 if marker else 0) and command['stdout'] == ''
             and (('static assertion failed' in command['stderr'] and marker in command['stderr'])
                  if marker else command['stderr'] == ''), 'case syntax/negative probe failed')
+    if marker:
+        diagnostics = re.findall(r'(?m)^(?:.*?: )?(fatal error|error|warning): (.*)$', command['stderr'])
+        require(len(diagnostics) == 1 and diagnostics[0][0] == 'error'
+                and diagnostics[0][1].startswith('static assertion failed') and marker in diagnostics[0][1]
+                and command['stderr'].rstrip().endswith('1 error generated.'),
+                'case negative contains unrelated or unrecognized diagnostics')
     return {'argv': command['argv'], 'exit_code': command['exit_code'], 'expected_negative_marker': marker,
             **{key: {'bytes': len(command[key].encode()), 'sha256': hashlib.sha256(command[key].encode()).hexdigest()}
                for key in ('stdout', 'stderr')}}
