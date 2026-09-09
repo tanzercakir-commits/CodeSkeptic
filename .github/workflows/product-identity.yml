@@ -93,6 +93,7 @@ jobs:
           VSLANG: "1033"
         run: |
           $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $false
           # Select once, before vcvars can change PATH; tests and capture share it.
           $identityPython = (Get-Command python.exe -ErrorAction Stop).Source
           & $identityPython -B -c 'import sys; assert sys.version_info >= (3, 10), "Python 3.10+ required"'
@@ -151,9 +152,18 @@ jobs:
             --cc "$identityCl" --cxx "$identityCl" `
             --clang "$identityClang" --clangxx "$identityClangxx" `
             --output "$env:RUNNER_TEMP/codeskeptic-native-case.json"
-          if ($LASTEXITCODE -ne 0) { throw 'Native case observation failed' }
+          $identityCaseExit = $LASTEXITCODE
+          # Only after the actual case: these probes can warm native module caches.
+          # No retry of capture-case, no full environment forwarding or SDK export.
+          & $identityPython -B scripts/product_identity.py diagnose-windows `
+            --root "$env:GITHUB_WORKSPACE" --source-sha "$env:GITHUB_SHA" `
+            --output "$env:RUNNER_TEMP/codeskeptic-windows-query-diagnostic.json"
+          $identityDiagnosticExit = $LASTEXITCODE
+          if ($identityCaseExit -ne 0) { throw 'Native case observation failed; post-attempt diagnostics do not replace it' }
+          if ($identityDiagnosticExit -ne 0) { throw 'Post-attempt diagnostic collection failed' }
 
       - name: Retain only observed metadata, never SDK headers or compiler binaries
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: product-identity-${{ matrix.runner }}-${{ github.sha }}
@@ -162,10 +172,20 @@ jobs:
           retention-days: 30
 
       - name: Retain case syntax and ABI metadata without source or SDK bytes
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: native-case-${{ matrix.runner }}-${{ github.sha }}
           path: ${{ runner.temp }}/codeskeptic-native-case.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Retain bounded Windows post-attempt diagnostic markers
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-query-diagnostic-windows-2025-${{ github.sha }}
+          path: ${{ runner.temp }}/codeskeptic-windows-query-diagnostic.json
           if-no-files-found: error
           retention-days: 30
 

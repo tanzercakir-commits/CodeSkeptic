@@ -2,6 +2,7 @@
 """Focused metadata tests; no analyzer or native qualification is performed."""
 import copy
 import hashlib
+import io
 import json
 from pathlib import Path
 import subprocess
@@ -849,6 +850,206 @@ class CaseCaptureTests(unittest.TestCase):
                 probe['dependencies']['stdout'] = probe['dependencies']['stdout'].replace(original, original + '.different.c', 1)
                 with self.subTest(system=system, name=name), self.assertRaisesRegex(identity.IdentityError, 'case dependency closure'):
                     identity.validate_case_document(value)
+
+
+class WindowsDiagnosticTests(unittest.TestCase):
+    def document(self):
+        return {'schema': 'codeskeptic-windows-query-diagnostic/v1',
+                'source': {key: 'a' * (40 if key in ('head', 'tree') else 64) for key in
+                           ('head', 'tree', *identity.SOURCE_FILES)},
+                'shell': {'path': 'C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe',
+                          'resolved_path': 'C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe',
+                          'bytes': 123, 'sha256': 'a' * 64},
+                'module_directory': 'C:/Windows/System32/WindowsPowerShell/v1.0/Modules',
+                'runner': {'run_id': '123', 'attempt': '1', 'head': 'a' * 40,
+                           'image_os': 'win25', 'image_version': '20260824.214.3'},
+                'probes': [{'variant': variant, 'probe': probe, 'outcome': 'OK', 'exit_code': 0,
+                            'elapsed_ms': 12, 'markers': identity.WINDOWS_DIAGNOSTIC_MARKERS[probe][:],
+                            'unexpected_output': False} for variant, probe in identity.WINDOWS_DIAGNOSTIC_ORDER],
+                'diagnostic_only': True, 'timeout_seconds': 30, 'task_ready': False,
+                'native_qualified': False, 'product_qualified': False}
+
+    def test_original_failure_kind_never_exports_exception_text(self):
+        for cause, expected in ((subprocess.TimeoutExpired('PRIVATE_SENTINEL', 30), 'TIMEOUT'),
+                                (OSError('PRIVATE_SENTINEL'), 'OS_ERROR'),
+                                (ValueError('PRIVATE_SENTINEL'), 'INVALID')):
+            wrapper = identity.IdentityError('PRIVATE_SENTINEL')
+            wrapper.__context__ = cause
+            self.assertEqual(identity.case_failure_kind(wrapper), expected)
+        wrapper.__context__ = wrapper
+        self.assertEqual(identity.case_failure_kind(wrapper), 'INVALID')
+
+    def test_fixed_probe_records_timeout_and_allowlisted_markers_only(self):
+        failure = subprocess.TimeoutExpired('PRIVATE_SENTINEL', 30,
+                    output=b'STARTED\r\nPRIVATE_SENTINEL\nCIM_LOADED\n', stderr=b'PRIVATE_SENTINEL')
+        with mock.patch.object(identity.subprocess, 'run', side_effect=failure) as execute:
+            result = identity.windows_diagnostic_probe('C:/Windows/powershell.exe', 'modules', {'PATH': 'C:/bin'})
+        self.assertEqual(result['outcome'], 'TIMEOUT')
+        self.assertEqual(result['markers'], ['STARTED', 'CIM_LOADED'])
+        self.assertTrue(result['unexpected_output'])
+        self.assertNotIn('PRIVATE_SENTINEL', identity.canonical(result))
+        self.assertEqual(execute.call_args.kwargs['timeout'], 30)
+        self.assertEqual(execute.call_args.kwargs['env'], {'PATH': 'C:/bin'})
+        self.assertNotIn('shell', execute.call_args.kwargs)
+
+    def test_fixed_probe_outcomes_and_empty_partial_timeout(self):
+        for response, expected in (
+                (subprocess.CompletedProcess([], 0, b'STARTED\r\n', b''), 'OK'),
+                (subprocess.CompletedProcess([], 21, b'STARTED\n', b''), 'NONZERO'),
+                (subprocess.CompletedProcess([], 0, b'STARTED\n', b'PRIVATE_SENTINEL'), 'UNEXPECTED_OUTPUT'),
+                (subprocess.CompletedProcess([], 0, b'', b''), 'UNEXPECTED_OUTPUT'),
+                (subprocess.CompletedProcess([], 0, b'\xffPRIVATE_SENTINEL', b''), 'UNEXPECTED_OUTPUT'),
+                (subprocess.CompletedProcess([], 0, b'x' * (identity.MAX_OUTPUT + 1), b''), 'OUTPUT_LIMIT'),
+                (subprocess.TimeoutExpired('PRIVATE_SENTINEL', 30), 'TIMEOUT'),
+                (OSError('PRIVATE_SENTINEL'), 'OS_ERROR')):
+            option = {'side_effect': response} if isinstance(response, Exception) else {'return_value': response}
+            with self.subTest(outcome=expected), mock.patch.object(identity.subprocess, 'run', **option) as execute:
+                result = identity.windows_diagnostic_probe('C:/Windows/powershell.exe', 'startup', {})
+            self.assertEqual(result['outcome'], expected)
+            self.assertNotIn('PRIVATE_SENTINEL', identity.canonical(result))
+            self.assertEqual(execute.call_count, 1)
+        with mock.patch.object(identity.subprocess, 'run') as execute, self.assertRaises(identity.IdentityError):
+            identity.windows_diagnostic_probe('C:/Windows/powershell.exe', 'unregistered', {})
+        execute.assert_not_called()
+
+    def test_only_fixed_scripts_and_system_module_contrast_are_admitted(self):
+        self.assertEqual(len(identity.WINDOWS_DIAGNOSTIC_ORDER), 6)
+        self.assertEqual(set(identity.WINDOWS_DIAGNOSTIC_PROBES), {'startup', 'modules', 'query'})
+        self.assertIn('Import-Module CimCmdlets', identity.WINDOWS_DIAGNOSTIC_PROBES['modules'])
+        self.assertIn('Import-Module Microsoft.PowerShell.Utility', identity.WINDOWS_DIAGNOSTIC_PROBES['modules'])
+        self.assertIn(identity.WINDOWS_OS_QUERY, identity.WINDOWS_DIAGNOSTIC_PROBES['query'])
+        for script in identity.WINDOWS_DIAGNOSTIC_PROBES.values():
+            for forbidden in ('Install-Module', 'Get-ChildItem', '$env:', 'Restart-Service', 'Remove-Item'):
+                self.assertNotIn(forbidden, script)
+
+    def test_variants_differ_only_by_local_system_module_path_and_drop_secrets(self):
+        source = {'PATH': 'C:/bin', 'SystemRoot': 'C:/Windows', 'USERPROFILE': 'C:/Users/runner',
+                  'PSModulePath': r'\\foreign\modules', 'GITHUB_TOKEN': 'PRIVATE_SENTINEL',
+                  'UNKNOWN_SECRET': 'PRIVATE_SENTINEL'}
+        modules = 'C:/Windows/System32/WindowsPowerShell/v1.0/Modules'
+        variants = identity.windows_diagnostic_variants(source, modules)
+        self.assertEqual(variants['selected'], identity.case_environment(source, 'Windows'))
+        self.assertEqual(variants['system_module_path_only'], {**variants['selected'], 'PSModulePath': modules})
+        self.assertNotIn('PRIVATE_SENTINEL', identity.canonical(variants))
+        self.assertNotIn('foreign', identity.canonical(variants))
+        self.assertEqual(source['GITHUB_TOKEN'], 'PRIVATE_SENTINEL')
+        for root, selected in ((r'\\server\share', r'\\server\share\System32\WindowsPowerShell\v1.0\Modules'),
+                               ('relative', 'relative/System32/WindowsPowerShell/v1.0/Modules'),
+                               ('C:/Windows/../other', modules), ('C:/Windows', 'C:/other/Modules')):
+            with self.subTest(root=root), self.assertRaises(identity.IdentityError):
+                identity.windows_diagnostic_variants({**source, 'SystemRoot': root}, selected)
+        with self.assertRaises(identity.IdentityError):
+            identity.windows_diagnostic_variants({**source, 'CPATH': 'unreviewed'}, modules)
+
+    def test_diagnostic_validation_never_promotes_or_accepts_raw_streams(self):
+        value = self.document()
+        self.assertEqual(identity.validate_windows_diagnostic(value),
+                         {'diagnostic_only': True, 'task_ready': False, 'native_qualified': False,
+                          'product_qualified': False})
+        for mutation in ('qualified', 'source', 'runner', 'count', 'order', 'raw-stream', 'raw-marker',
+                         'timeout', 'code', 'boolean-code', 'missing-marker', 'unexpected', 'module-root'):
+            value = self.document()
+            if mutation == 'qualified': value['native_qualified'] = True
+            elif mutation == 'source': value['source']['head'] = '0' * 40
+            elif mutation == 'runner': value['runner']['head'] = 'b' * 40
+            elif mutation == 'count': value['probes'].pop()
+            elif mutation == 'order': value['probes'].reverse()
+            elif mutation == 'raw-stream': value['probes'][0]['stderr'] = 'PRIVATE_SENTINEL'
+            elif mutation == 'raw-marker': value['probes'][0]['markers'] = ['PRIVATE_SENTINEL']
+            elif mutation == 'timeout': value['timeout_seconds'] = 60
+            elif mutation == 'code': value['probes'][0]['exit_code'] = None
+            elif mutation == 'boolean-code': value['probes'][0]['exit_code'] = False
+            elif mutation == 'missing-marker': value['probes'][0]['markers'] = []
+            elif mutation == 'unexpected': value['probes'][0]['unexpected_output'] = True
+            elif mutation == 'module-root': value['module_directory'] = 'C:/foreign'
+            with self.subTest(mutation=mutation), self.assertRaises(identity.IdentityError):
+                identity.validate_windows_diagnostic(value)
+
+    def test_failed_probes_are_observations_not_a_green_native_gate(self):
+        for outcome in ('TIMEOUT', 'OS_ERROR', 'NONZERO', 'OUTPUT_LIMIT', 'UNEXPECTED_OUTPUT'):
+            value = self.document()
+            row = value['probes'][0]
+            row.update(outcome=outcome, exit_code=None if outcome in ('TIMEOUT', 'OS_ERROR') else (21 if outcome == 'NONZERO' else 0),
+                       markers=[], unexpected_output=outcome != 'OS_ERROR')
+            with self.subTest(outcome=outcome):
+                self.assertFalse(identity.validate_windows_diagnostic(value)['native_qualified'])
+        for outcome, code, markers, unexpected in (('OS_ERROR', None, ['STARTED'], False),
+                 ('NONZERO', 0, [], False), ('OUTPUT_LIMIT', 21, [], True),
+                 ('OUTPUT_LIMIT', 0, [], False), ('UNEXPECTED_OUTPUT', 0, ['STARTED'], False)):
+            value = self.document()
+            value['probes'][0].update(outcome=outcome, exit_code=code, markers=markers, unexpected_output=unexpected)
+            with self.subTest(outcome=outcome), self.assertRaises(identity.IdentityError):
+                identity.validate_windows_diagnostic(value)
+
+    def test_collector_rejects_non_windows_before_executing_anything(self):
+        with mock.patch.object(identity.platform, 'system', return_value='Linux'), \
+             mock.patch.object(identity, 'source_identity') as source, \
+             mock.patch.object(identity.subprocess, 'run') as execute, self.assertRaises(identity.IdentityError):
+            identity.capture_windows_diagnostic(None)
+        source.assert_not_called()
+        execute.assert_not_called()
+
+    def test_diagnostic_cli_is_read_only_and_duplicate_keys_fail(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary).resolve() / 'diagnostic.json'
+            path.write_text(identity.canonical(self.document()), encoding='utf-8')
+            result = subprocess.run([sys.executable, '-B', identity.__file__, 'check-windows-diagnostic', str(path)],
+                                    capture_output=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(json.loads(result.stdout)['native_qualified'])
+            path.write_text('{"schema":"PRIVATE_SENTINEL","schema":null}', encoding='utf-8')
+            result = subprocess.run([sys.executable, '-B', identity.__file__, 'check-windows-diagnostic', str(path)],
+                                    capture_output=True, timeout=10)
+            self.assertEqual(result.returncode, 2)
+            self.assertNotIn(b'PRIVATE_SENTINEL', result.stderr)
+
+    def test_workflow_diagnostics_follow_case_and_never_replace_failure(self):
+        workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/product-identity.yml').read_text()
+        case = workflow.index('& $identityPython -B scripts/product_identity.py capture-case')
+        save = workflow.index('$identityCaseExit = $LASTEXITCODE')
+        diagnostic = workflow.index('& $identityPython -B scripts/product_identity.py diagnose-windows')
+        failure = workflow.index("if ($identityCaseExit -ne 0) { throw 'Native case observation failed;")
+        self.assertLess(case, save)
+        self.assertLess(save, diagnostic)
+        self.assertLess(diagnostic, failure)
+        self.assertIn('$PSNativeCommandUseErrorActionPreference = $false', workflow)
+        self.assertIn("if: always() && runner.os == 'Windows'", workflow)
+        self.assertEqual(workflow.count('if: always()'), 3)
+
+    def test_case_cli_retains_failure_with_fixed_cause_and_no_output_artifact(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve() / 'repo'
+            root.mkdir()
+            output = root.parent / 'case.json'
+            error = identity.IdentityError('PRIVATE_SENTINEL')
+            error.__context__ = subprocess.TimeoutExpired('PRIVATE_SENTINEL', 30)
+            argv = ['capture-case', '--root', str(root), '--source-sha', 'a' * 40,
+                    '--external-root', str(root.parent), '--output', str(output)]
+            for role in identity.TOOL_ROLES:
+                argv += ['--' + role, '/compiler']
+            stream = io.StringIO()
+            with mock.patch.object(identity, 'capture_case', side_effect=error), \
+                 mock.patch.object(identity.sys, 'stderr', stream), \
+                 mock.patch.object(identity.subprocess, 'run') as execute:
+                self.assertEqual(identity.main(argv), 2)
+            self.assertIn('CASE_FAILURE_KIND TIMEOUT', stream.getvalue())
+            self.assertNotIn('PRIVATE_SENTINEL', stream.getvalue())
+            self.assertFalse(output.exists())
+            execute.assert_not_called()
+
+    def test_diagnostic_cli_refuses_existing_or_in_checkout_output_before_collection(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve() / 'repo'
+            root.mkdir()
+            existing = root.parent / 'keep.json'
+            existing.write_text('preserve', encoding='utf-8')
+            for output in (existing, root / 'forbidden.json'):
+                with mock.patch.object(identity, 'capture_windows_diagnostic') as collect, \
+                     mock.patch.object(identity.sys, 'stderr', io.StringIO()):
+                    self.assertEqual(identity.main(['diagnose-windows', '--root', str(root),
+                             '--source-sha', 'a' * 40, '--output', str(output)]), 2)
+                collect.assert_not_called()
+            self.assertEqual(existing.read_text(encoding='utf-8'), 'preserve')
 
 
 class WorkflowTests(unittest.TestCase):

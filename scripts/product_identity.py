@@ -19,6 +19,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 
 
 MAX_OUTPUT = 2 * 1024 * 1024
@@ -817,6 +818,153 @@ def case_observation_failure(error):
     return 'case observation rejected; checks=' + (','.join(checks) if checks else 'unknown')
 
 
+def case_failure_kind(error):
+    """Fixed categories from the bounded cause chain; never exception text."""
+    seen = set()
+    while error is not None and id(error) not in seen and len(seen) < 8:
+        seen.add(id(error))
+        if isinstance(error, subprocess.TimeoutExpired):
+            return 'TIMEOUT'
+        if isinstance(error, OSError):
+            return 'OS_ERROR'
+        error = error.__context__
+    return 'INVALID'
+
+
+WINDOWS_DIAGNOSTIC_PREFIX = ("$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; "
+                             "[Console]::WriteLine('STARTED'); ")
+WINDOWS_DIAGNOSTIC_PROBES = {
+    'startup': WINDOWS_DIAGNOSTIC_PREFIX,
+    'modules': WINDOWS_DIAGNOSTIC_PREFIX + "try { Import-Module CimCmdlets -ErrorAction Stop; "
+               "[Console]::WriteLine('CIM_LOADED'); "
+               "Import-Module Microsoft.PowerShell.Utility -ErrorAction Stop; "
+               "[Console]::WriteLine('UTILITY_LOADED') } catch { exit 21 }",
+    'query': WINDOWS_DIAGNOSTIC_PREFIX + 'try { $identityOs = & { ' + WINDOWS_OS_QUERY
+             + " }; if (-not $identityOs) { exit 22 }; [Console]::WriteLine('QUERY_DONE') } catch { exit 21 }"}
+WINDOWS_DIAGNOSTIC_MARKERS = {'startup': ['STARTED'], 'modules': ['STARTED', 'CIM_LOADED', 'UTILITY_LOADED'],
+                             'query': ['STARTED', 'QUERY_DONE']}
+WINDOWS_DIAGNOSTIC_ORDER = [(variant, probe) for probe in WINDOWS_DIAGNOSTIC_PROBES
+                          for variant in ('selected', 'system_module_path_only')]
+
+
+def windows_diagnostic_probe(shell, probe, environment):
+    """One fixed installed-tool probe, no retry and no raw native output export.
+
+    Like run(), the 30s subprocess timeout and post-capture bound are not hard
+    descendant-process/RSS/output-production limits. This is not a product worker.
+    """
+    require(probe in WINDOWS_DIAGNOSTIC_PROBES, 'unknown Windows diagnostic probe')
+    argv = [shell, '-NoProfile', '-NonInteractive', '-Command', WINDOWS_DIAGNOSTIC_PROBES[probe]]
+    started = time.monotonic()
+    code, outcome, stdout, stderr = None, 'OK', b'', b''
+    try:
+        result = subprocess.run(argv, capture_output=True, timeout=30, check=False,
+                                env=checked_environment(environment))
+        code, stdout, stderr = result.returncode, result.stdout, result.stderr
+        if code != 0:
+            outcome = 'NONZERO'
+    except subprocess.TimeoutExpired as error:
+        outcome, stdout, stderr = 'TIMEOUT', error.stdout or b'', error.stderr or b''
+    except OSError:
+        outcome = 'OS_ERROR'
+    elapsed = max(0, round((time.monotonic() - started) * 1000))
+    lines = stdout[:MAX_OUTPUT].splitlines()
+    accepted = [marker.encode('ascii') for marker in WINDOWS_DIAGNOSTIC_MARKERS[probe]]
+    markers = [line.decode('ascii') for line in lines if line in accepted][:8]
+    unexpected = bool(stderr) or any(line not in accepted for line in lines)
+    if len(stdout) > MAX_OUTPUT or len(stderr) > MAX_OUTPUT:
+        if outcome == 'OK':
+            outcome = 'OUTPUT_LIMIT'
+        unexpected = True
+    if outcome == 'OK' and (unexpected or markers != WINDOWS_DIAGNOSTIC_MARKERS[probe]):
+        outcome = 'UNEXPECTED_OUTPUT'
+    return {'probe': probe, 'outcome': outcome, 'exit_code': code, 'elapsed_ms': elapsed,
+            'markers': markers, 'unexpected_output': unexpected}
+
+
+def validate_windows_diagnostic(value):
+    fields(value, 'schema source shell module_directory runner probes diagnostic_only task_ready '
+           'native_qualified product_qualified timeout_seconds', 'Windows diagnostic')
+    require(value['schema'] == 'codeskeptic-windows-query-diagnostic/v1'
+            and value['diagnostic_only'] is True and value['timeout_seconds'] == 30
+            and type(value['timeout_seconds']) is int
+            and all(value[key] is False for key in ('task_ready', 'native_qualified', 'product_qualified')),
+            'diagnostic is not qualification')
+    fields(value['source'], 'head tree collector_sha256 workflow_sha256 profiles_sha256 api_models_sha256', 'source')
+    require(all(digest(item, 40 if key in ('head', 'tree') else 64)
+                for key, item in value['source'].items()), 'diagnostic source identity')
+    validate_file(value['shell'], 'windows')
+    module = PureWindowsPath(value['module_directory'])
+    require(module == PureWindowsPath(value['shell']['path']).parent / 'Modules', 'diagnostic system modules')
+    fields(value['runner'], 'run_id attempt head image_os image_version', 'diagnostic runner')
+    require(all(nonempty(item) for item in value['runner'].values())
+            and value['runner']['head'] == value['source']['head'], 'diagnostic runner identity')
+    require(type(value['probes']) is list and len(value['probes']) == len(WINDOWS_DIAGNOSTIC_ORDER),
+            'diagnostic probe matrix')
+    for row, (variant, probe) in zip(value['probes'], WINDOWS_DIAGNOSTIC_ORDER):
+        fields(row, 'variant probe outcome exit_code elapsed_ms markers unexpected_output', 'diagnostic probe')
+        require(row['variant'] == variant and row['probe'] == probe
+                and row['outcome'] in ('OK', 'NONZERO', 'TIMEOUT', 'OS_ERROR', 'OUTPUT_LIMIT', 'UNEXPECTED_OUTPUT')
+                and type(row['elapsed_ms']) is int and 0 <= row['elapsed_ms'] <= 300000
+                and type(row['unexpected_output']) is bool and type(row['markers']) is list
+                and len(row['markers']) <= 8
+                and all(marker in WINDOWS_DIAGNOSTIC_MARKERS[probe] for marker in row['markers']),
+                'diagnostic fixed observations')
+        require((row['exit_code'] is None) == (row['outcome'] in ('TIMEOUT', 'OS_ERROR'))
+                and (row['exit_code'] is None or type(row['exit_code']) is int), 'diagnostic process status')
+        if row['outcome'] == 'OK':
+            require(row['exit_code'] == 0 and row['markers'] == WINDOWS_DIAGNOSTIC_MARKERS[probe]
+                    and row['unexpected_output'] is False, 'diagnostic success markers')
+        if row['outcome'] == 'NONZERO':
+            require(row['exit_code'] != 0, 'diagnostic failed exit')
+        if row['outcome'] == 'OS_ERROR':
+            require(row['markers'] == [] and row['unexpected_output'] is False, 'unstarted diagnostic output')
+        if row['outcome'] in ('OUTPUT_LIMIT', 'UNEXPECTED_OUTPUT'):
+            require(row['exit_code'] == 0, 'diagnostic output-only failure exit')
+            require(row['unexpected_output'] or (row['outcome'] == 'UNEXPECTED_OUTPUT'
+                    and row['markers'] != WINDOWS_DIAGNOSTIC_MARKERS[probe]), 'diagnostic output-only failure')
+    return {'diagnostic_only': True, 'task_ready': False, 'native_qualified': False, 'product_qualified': False}
+
+
+def windows_diagnostic_variants(environment, module_directory):
+    environment = case_environment(environment, 'Windows')
+    native_root = PureWindowsPath(environment['SystemRoot'])
+    require(native_root.is_absolute() and re.fullmatch('[A-Za-z]:', native_root.drive)
+            and '..' not in native_root.parts, 'diagnostic requires a local Windows system root')
+    require(PureWindowsPath(module_directory) == native_root / 'System32/WindowsPowerShell/v1.0/Modules',
+            'only installed system module search is contrasted')
+    return {'selected': environment,
+            'system_module_path_only': {**environment, 'PSModulePath': str(module_directory)}}
+
+
+def capture_windows_diagnostic(args):
+    require(platform.system() == 'Windows', 'diagnostic requires actual Windows')
+    source = source_identity(args.root, args.source_sha)
+    environment = case_environment(os.environ, 'Windows')
+    modules = Path(environment['SystemRoot']) / 'System32/WindowsPowerShell/v1.0/Modules'
+    variants = windows_diagnostic_variants(os.environ, modules)
+    system_root = Path(environment['SystemRoot']).resolve(strict=True)
+    shell = system_root / 'System32/WindowsPowerShell/v1.0/powershell.exe'
+    require(modules.is_dir() and not modules.is_symlink() and modules.resolve() == modules,
+            'installed Windows system module directory')
+    require(Path(shutil.which('powershell.exe', path=environment.get('PATH', '')) or '').resolve(strict=True)
+            == shell.resolve(strict=True), 'diagnostic must use the original Windows shell')
+    shell_identity = file_identity(shell)
+    rows = [{**windows_diagnostic_probe(str(shell), probe, variants[variant]), 'variant': variant}
+            for variant, probe in WINDOWS_DIAGNOSTIC_ORDER]
+    value = {'schema': 'codeskeptic-windows-query-diagnostic/v1', 'source': source,
+             'shell': shell_identity, 'module_directory': str(modules),
+             'runner': {field: environment.get(key, '') for field, key in
+                        (('run_id', 'GITHUB_RUN_ID'), ('attempt', 'GITHUB_RUN_ATTEMPT'), ('head', 'GITHUB_SHA'),
+                         ('image_os', 'ImageOS'), ('image_version', 'ImageVersion'))},
+             'probes': rows, 'diagnostic_only': True, 'timeout_seconds': 30,
+             'task_ready': False, 'native_qualified': False, 'product_qualified': False}
+    validate_windows_diagnostic(value)
+    require(file_identity(shell) == shell_identity and source_identity(args.root, args.source_sha) == source,
+            'diagnostic shell/source changed')
+    return value
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
@@ -837,14 +985,22 @@ def main(argv=None):
     case_collect.add_argument('--output', type=Path, required=True)
     for role in TOOL_ROLES:
         case_collect.add_argument('--' + role, type=Path, required=True)
+    diagnostic = commands.add_parser('diagnose-windows', help='post-attempt startup/module/query observations, not a retry')
+    diagnostic.add_argument('--root', type=Path, required=True)
+    diagnostic.add_argument('--source-sha', required=True)
+    diagnostic.add_argument('--output', type=Path, required=True)
+    diagnostic_check = commands.add_parser('check-windows-diagnostic', help='structural diagnostic check only')
+    diagnostic_check.add_argument('input', type=Path)
     args = parser.parse_args(argv)
     try:
         validator = validate_case_document if args.command in ('check-case', 'capture-case') else validate_document
-        if args.command in ('check', 'check-case'):
+        if args.command in ('diagnose-windows', 'check-windows-diagnostic'):
+            validator = validate_windows_diagnostic
+        if args.command in ('check', 'check-case', 'check-windows-diagnostic'):
             require(not args.input.is_symlink() and args.input.resolve() == args.input
                     and args.input.is_file() and args.input.stat().st_size <= 16 * MAX_OUTPUT,
                     'metadata input must be a bounded absolute regular file')
-            if args.command == 'check-case':
+            if args.command in ('check-case', 'check-windows-diagnostic'):
                 from product_profiles import parse_json
                 result = validator(parse_json(args.input.read_text(encoding='utf-8')))
             else:
@@ -854,14 +1010,19 @@ def main(argv=None):
             require(args.output.is_absolute() and args.output.parent.resolve(strict=True) == args.output.parent
                     and not args.output.exists() and not args.output.is_symlink()
                     and not args.output.is_relative_to(root), 'output must be new and outside the checkout')
-            value = capture_case(args) if args.command == 'capture-case' else capture(args)
+            collector = {'capture-case': capture_case, 'capture': capture,
+                         'diagnose-windows': capture_windows_diagnostic}[args.command]
+            value = collector(args)
             with args.output.open('x', encoding='utf-8', newline='\n') as stream:
                 stream.write(canonical(value))
             result = {**validator(value), 'output_sha256': file_identity(args.output)['sha256']}
         print(canonical(result), end='')
         return 0
     except (IdentityError, OSError, ValueError, KeyError, TypeError, RuntimeError) as error:
-        print('IDENTITY_INVALID ' + (case_observation_failure(error) if args.command in ('check-case', 'capture-case') else str(error)), file=sys.stderr)
+        private = args.command in ('check-case', 'capture-case', 'diagnose-windows', 'check-windows-diagnostic')
+        print('IDENTITY_INVALID ' + (case_observation_failure(error) if private else str(error)), file=sys.stderr)
+        if args.command == 'capture-case':
+            print('CASE_FAILURE_KIND ' + case_failure_kind(error), file=sys.stderr)
         return 2
 
 

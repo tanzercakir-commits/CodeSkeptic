@@ -636,3 +636,51 @@ ortamı karşılaştırmalıdır; kör env genişletme, timeout gevşetme veya s
 çalıştırıp yeşili kabul etme yoktur. Bu OS metadata başarısızlığı, bağımsız Linux
 tarifine bağlı tek kaynak kararını değiştirmez; Windows/final native freeze ve
 U003 zaten açık kalır. Yeni doküman HEAD'i bu koşunun tested HEAD'i değildir.
+
+### Tekrarın ardından bounded Windows tanısı — henüz neden kanıtı değil
+
+`34329928158` başarılı koşusu ile `34335727168` başarısız koşusunun collector ve
+workflow byte'ları aynıdır; ikisi de `20260824.214.3` runner image etiketini bildirir.
+Bu aynı host/cache/provider durumunu kanıtlamaz. Başarılı case ortamında da
+`PSModulePath` bulunmadığı için bu değişkenin yokluğu tek başına zorunlu hata nedeni
+olarak sunulmaz.
+
+Ek `diagnose-windows`, gerçek case denemesinden **sonra** çalışır. Özgün case hata
+zincirinden yalnız `TIMEOUT`, `OS_ERROR` veya `INVALID` kategorisi loglanır; native
+diagnostic veya exception metni basılmaz. Case başarısızsa sonraki tanı ne döndürürse
+döndürsün workflow o başarısız exit'i korur. Windows tanısının kendi başarılı çıkışı
+yalnız altı gözlem kaydının üretildiği anlamına gelir; içindeki probe başarısızlıkları
+saklanır ve native/product/task qualification daima false'tur.
+
+Üç sabit PowerShell probe'u startup, `CimCmdlets` ve `Microsoft.PowerShell.Utility`
+import'u, ardından özgün OS sorgusunu gözler. Her probe ayrı süreçte, önce mevcut
+dar ortam sonra yalnız yerel Windows sistem `Modules` dizini `PSModulePath` olarak
+eklenmiş ortamda çalışır: toplam altı süreç, her biri 30 saniye timeout, retry yok.
+Özgün ambient module path, credential veya bütün legacy ortamı aktarılmaz. Bu
+**system-module-path-only** karşılaştırmasıdır, full-environment eşdeğerliği değildir.
+Asıl v1 OS komutu/şeması, case ortam allowlist'i, compiler/SDK seçimi ve timeout'u
+değişmez. Tanı, asıl OS sorgusunu yeniden başarılı ilan etmez.
+
+Tanı JSON'u source/collector/workflow ve gerçek shell hash'i, runner/run kimliği,
+sabit marker'lar, exit kategorisi ve süre taşır; raw stdout/stderr, genel ortam dökümü,
+kaynak/SDK içerikleri veya exception metinleri taşımaz. Beklenmeyen çıktı yalnız
+boolean ile belirtilir. Exported system executable/module path'leri kimlik alanıdır;
+credential veya module-path environment dökümü değildir. Output ancak repo dışındaki
+yeni dosyaya yazılır. Upload adımları artık failure sonrasında da mevcut v1/case/tanı
+dosyalarını saklamayı dener; eksik artifact hata olarak kalır.
+
+[PowerShell'in resmi ortam belgesi](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_environment_variables?view=powershell-5.1)
+modül araması ve modül analiz cache'inin startup/import ile ilişkisini açıklar.
+Bu nedenle tanı ilk case öncesinde yapılmaz; cache silme, WMI restart, modül
+kurma veya full environment ekleme yoktur. Probe sırası/cache etkisi yine vardır:
+iki ortamın geçmesi nedenin çözüldüğünü kanıtlamaz; yalnız sistem-module-path
+varyantının geçmesi de tek başına nedenselliği ispatlamaz. Subprocess timeout ve
+post-capture çıktı boyutu kontrolü hard RSS/descendant-process/output-production
+sınırı değildir; ürün worker bütçesi burada sınanmıyor.
+
+Eksik tanı API'leri için korunmuş iki RED testten sonra yerel testler fixed cause,
+timeout/OS-error/nonzero/bozuk veya aşırı çıktı, secret/ambient-module dışlama,
+network/relative module-root reddi, marker/schema tahrifi, asıl case exit'ini koruma,
+repo-içi/mevcut output reddi ve read-only CLI sınırlarını kapsar. Gerçek Windows
+kanıtı ve bağımsız exact-head inceleme olmadan bu ekleme bir çözüm veya U003 PASS'i
+sayılmaz. Önceki başarısız ve başarılı hosted kayıtlar aynen korunur.
