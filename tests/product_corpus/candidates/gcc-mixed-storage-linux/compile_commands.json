@@ -1,0 +1,19 @@
+[
+  {
+    "directory": "/input",
+    "file": "/input/case.c",
+    "arguments": [
+      "/usr/bin/clang-20",
+      "--no-default-config",
+      "-fno-modules",
+      "--target=x86_64-pc-linux-gnu",
+      "-resource-dir",
+      "/usr/lib/llvm-20/lib/clang/20",
+      "-x",
+      "c",
+      "-std=c17",
+      "-fsyntax-only",
+      "/input/case.c"
+    ]
+  }
+]

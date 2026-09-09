@@ -329,3 +329,44 @@ güven çapası exact Git manifesti ve onu inceleyen hakemdir. Kaynak/manifest b
 değişirse başka bir kimlik oluşur, geçmiş karar yeni kaynağa taşınmış olmaz.
 Nihai native komut/header/ABI/ortam ve occurrence yeterliliği hâlâ dondurulmamıştır.
 Önceki başarısızlıklar, FRONT, ledger ve tamamlanma kapıları değişmez.
+
+### Aynı GCC adayı için gerçek Linux kaynak/komut önkontrolü
+
+[`gcc-mixed-storage-linux.json`](../tests/product_corpus/candidates/gcc-mixed-storage-linux.json)
+aynı 636 byte'lık dış kaynağı yeni, gerçek bir Ubuntu 24.04.4 kullanıcı-alanı
+kontrolüne bağlar. Önceden mevcut CodeSkeptic image'ı `25640c190484…` pull/kurulum
+yapılmadan, ağsız ve salt-okunur root/input ile kullanıldı. Varsayılan installer
+CMD çalıştırılmadı; yalnız açık Python observer başlatıldı. Fedora host çekirdeği
+`6.19.10-300.fc44.x86_64` ayrıca kaydedildi: bu, hosted Ubuntu veya tam native
+platform yeterliliği değildir.
+
+GCC 13.3 ve Clang 20.1.2, C17 adayını ve ayrı `malloc`/veri-genişliği probe'unu
+derledi. `CHAR_BIT=8`, `int/size_t/pointer=4/8/8` ve uyumlu `void *(*)(size_t)`
+bildirimi doğrulandı; yanlış int genişliği ve yanlış malloc dönüş tipi iki
+derleyicide de static assertion ile ret aldı. On altı komutun 12'si beklenen
+exit 0, dördü beklenen exit 1'dir. Aday girdi listeleri 16/19, ABI probe listeleri
+19/21 kayıt içerir. Cgroup readback 2 CPU kota, 6 GiB RAM, 6 GiB ek swap ve 256
+PID sınırını doğruladı; bunlar ayrılmış kaynak veya performans kararlılığı değildir.
+Bağımsız kaynak/kanıt incelemesinde paket içi maddi tutarsızlık bulunmadı.
+
+Seçilen tek kaynak/tek komut [compilation database](../tests/product_corpus/candidates/gcc-mixed-storage-linux/compile_commands.json)
+ayrıca gerçek Clang ile çalıştırıldı. C17/target/resource-dir bilgisi database'e
+bağlıdır; olmayan CLI passthrough seçeneği uydurulmadı. Aynı resource-dir hem
+prospektif child environment'ta hem database'de seçildi. Mevcut frontend'in
+eklediği resource-dir ve `-fparse-all-comments` argümanlarıyla yapılan ayrı native
+syntax kontrolü de geçti; 19 girdilik liste aynı kaldı. Bu ikinci paket yedi
+başarılı compiler komutudur, CodeSkeptic invocation gözlemi değildir.
+
+Henüz çalıştırılmayan iki analyzer argv'si önceden kaydedildi: memory-leak-only
+ve varsayım raporlaması dâhil bütün mevcut kurallar. Diğer kuralların temiz
+olacağı varsayılmadı; dört yeni aile ayrı PLANNED_NOT_IMPLEMENTED/RED kalır.
+`test_2:28:1`, tek CWE-401 occurrence için kaynak-tabanlı beklentidir; gözlenmiş
+diagnostic veya fingerprint değildir. Gerçek Release executable kimliği ve
+analyzer sonuçları U004'e aittir; bu kayıt ölçümü öne çekmez.
+
+Kaynağa özgü lisans, runtime/calling-ABI/noninterposition, bütün compiler bağımlılıkları,
+Windows/macOS per-case kanıtı ve tam profil/korpus freeze hâlâ açık kapılardır.
+Image içi header/driver byte kayıtları observer metadata'sıdır; bağımsız denetçi
+bunları image içinde yeniden açmış gibi sunulmaz. Önceki Fedora ve hosted include
+gözlemleriyle bu yeni Linux per-case kanıtı birbirinin yerine geçirilmez.
+Kabul edilmiş kota **0/1020**; U003 için completion receipt veya POP yoktur.
