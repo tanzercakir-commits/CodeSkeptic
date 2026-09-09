@@ -684,3 +684,47 @@ network/relative module-root reddi, marker/schema tahrifi, asıl case exit'ini k
 repo-içi/mevcut output reddi ve read-only CLI sınırlarını kapsar. Gerçek Windows
 kanıtı ve bağımsız exact-head inceleme olmadan bu ekleme bir çözüm veya U003 PASS'i
 sayılmaz. Önceki başarısız ve başarılı hosted kayıtlar aynen korunur.
+
+### 772d332 gerçek Windows tanısı — TIMEOUT doğrulandı, çözüm doğrulanmadı
+
+Bağımsız read-only inceleme `772d332172c2576f93da4b87b0a628f0891d324e` tanı
+implementasyonuna material finding olmadan PASS verdi. Exact-head 205 ürün testi,
+13 kaynak/CLI/queue/guard kontrolü ve önceki üç native JSON'un yapısal replay'i
+geçti. Bu sayılar runtime ürün qualification veya U003 tamamlanması değildir.
+
+Normal feature push'un başlattığı yeni
+[34338848236 koşusu](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34338848236)
+**failure** olarak tamamlandı: Linux/macOS başarılı, Windows başarısız. Windows'ta
+69 kimlik testi, özgün v1 identity capture, beş hash-sabitli kaynak girdisinin
+staging'i ve 26 external-input testi geçti. İlk case capture yine OS sorgusunda
+durdu; bu kez `CASE_FAILURE_KIND TIMEOUT` gerçek exception türünü doğruluyor.
+Sonraki tanı, başarısız case'in yerine kullanılmadı; workflow özgün başarısızlığı
+korudu ve eksik case artifact'ini de hata olarak bildirdi.
+
+Tanının aynı shell hash'ine bağlı altı probe'u aşağıdaki gibi sonuçlandı:
+
+| Ayrı süreç probe'u | Mevcut dar ortam | Yalnız sistem module path ekli |
+| --- | --- | --- |
+| Startup | OK, 172 ms | OK, 188 ms |
+| CimCmdlets + Utility import | OK, 24562 ms | OK, 22438 ms |
+| OS sorgusu, otomatik modül yüklemeli | OK, 23375 ms | OK, 22625 ms |
+
+Altı kayıtta da beklenmeyen output false ve beklenen son marker mevcuttur.
+Tanı öncesindeki özgün timeout başarısız olarak kalır. Bu gözlem hızlı boş
+PowerShell startup'ını yavaş modül/sorgu yolundan ayırır; iki import'un hangisinin
+geciktiğini veya ilk 30 saniyelik timeout'un tam nedenini henüz ayırmaz. İki ortam
+da geçtiği ve probe sırası/cache/provider durumu kontrol edilmediği için
+`PSModulePath` eklemesi bir düzeltme veya nedensellik kanıtı değildir. Sonraki dar
+teşhis, bu iki modülün yükleme aşamalarını ayrı zamanlamalıdır; kör timeout/ortam
+genişletme, cache temizliği, servis restart veya sırf yeşil tekrar kabulü yoktur.
+
+Yeni `windows-query-diagnostic-v1/hosted-34338848236` paketi run/jobs/logs ve
+altı ZIP/JSON artifact'i saklar: iki başarılı lane'in v1/case kayıtları, Windows
+v1 kaydı ve Windows tanısı. Tanı JSON SHA-256
+`24586b0e85401ca191866c2522bea86a3dae96b50f62da26518ffd002b3efdf5`;
+paket summary SHA-256
+`2f1d1ece8d7b527c2d3f0107e66f8ee1b6c2fb4cf86919fe890eaae10c8558a9`.
+Kaynak/SDK dosyaları upload edilmedi. Native input byte'ları primary Linux host'ta
+yeniden açılmış sayılmaz. Kaynak kabulü hâlâ **1/1020**, tüm native/task/product
+qualification ve full freeze false; U003 için POP yoktur. Bu raporun belge HEAD'i
+koşunun tested HEAD'i değildir.
