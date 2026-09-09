@@ -687,7 +687,6 @@ class ExternalInputTests(unittest.TestCase):
                 nonlocal changed
                 result = original_read(path, capture)
                 if path == self.source / "origin.c":
-                    changed = True
                     if operation == "earlier-file":
                         case.write_bytes(b"x" * len(original_case))
                     elif operation == "manifest":
@@ -696,6 +695,7 @@ class ExternalInputTests(unittest.TestCase):
                         (self.source / "extra").write_bytes(b"x")
                     else:
                         (self.source / "extra").mkdir()
+                    changed = True
                 return result
             with self.subTest(operation=operation), mock.patch.object(profiles, "external_read", side_effect=mutate):
                 with self.assertRaises(ValueError):
@@ -771,26 +771,70 @@ class ExternalInputTests(unittest.TestCase):
     def test_growth_rewrite_and_replacement_during_read_rejected(self):
         leaf = self.source / "case.c"
         original = leaf.read_bytes()
+        self.mutation_outcomes = {}
         for operation in ("growth", "rewrite", "replace"):
             leaf.write_bytes(original)
+            before = profiles.external_identity(leaf.lstat())
             read = os.read
-            changed = False
+            outcome = {"attempted": False, "completed": False, "os_denied": False}
             def mutate(fd, size):
-                nonlocal changed
                 data = read(fd, size)
-                if not changed and data == original:
-                    changed = True
-                    if operation == "replace":
-                        replacement = self.base / "replacement"
-                        replacement.write_bytes(original)
-                        replacement.replace(leaf)
-                    else:
-                        leaf.write_bytes(original + b"x" if operation == "growth" else b"x" * len(original))
+                if not outcome["attempted"] and data == original:
+                    outcome["attempted"] = True
+                    try:
+                        if operation == "replace":
+                            replacement = self.base / "replacement"
+                            replacement.write_bytes(original)
+                            replacement.replace(leaf)
+                        else:
+                            leaf.write_bytes(original + b"x" if operation == "growth" else b"x" * len(original))
+                    except PermissionError:
+                        outcome["os_denied"] = True
+                        raise
+                    outcome["completed"] = True
                 return data
             with self.subTest(operation=operation), mock.patch.object(os, "read", side_effect=mutate):
-                with self.assertRaises(ValueError):
+                with self.assertRaises(ValueError) as caught:
                     self.check()
-            self.assertTrue(changed)
+            self.assertTrue(outcome["attempted"])
+            if outcome["os_denied"]:
+                # Windows can prohibit replacing an open file. That is I/O
+                # rejection evidence, never completed-mutation guard coverage.
+                self.assertFalse(outcome["completed"])
+                self.assertIsInstance(caught.exception.__context__, PermissionError)
+                self.assertEqual(leaf.read_bytes(), original)
+                self.assertEqual(profiles.external_identity(leaf.lstat()), before)
+            else:
+                self.assertTrue(outcome["completed"])
+            self.mutation_outcomes[operation] = outcome
+
+    def test_os_denied_replacement_is_not_counted_as_completed_mutation(self):
+        with mock.patch.object(Path, "replace", side_effect=PermissionError("synthetic denied replacement")) as denied:
+            self.test_growth_rewrite_and_replacement_during_read_rejected()
+        denied.assert_called_once()
+        self.assertEqual(self.mutation_outcomes["replace"],
+                         {"attempted": True, "completed": False, "os_denied": True})
+
+    def test_actual_replacement_between_lstat_and_open_is_rejected(self):
+        leaf = self.source / "case.c"
+        original, before, completed = leaf.read_bytes(), leaf.lstat(), False
+        open_file = os.open
+        def replace_then_open(path, flags, *args, **kwargs):
+            nonlocal completed
+            if path == leaf and not completed:
+                replacement = self.base / "replacement-before-open"
+                replacement.write_bytes(original)
+                replacement.replace(leaf)
+                completed = True
+            return open_file(path, flags, *args, **kwargs)
+        with mock.patch.object(os, "open", side_effect=replace_then_open):
+            with self.assertRaises(ValueError) as caught:
+                self.check()
+        self.assertTrue(completed)
+        self.assertIsInstance(caught.exception.__context__, profiles.ExternalIdentityError)
+        self.assertIn("inode", caught.exception.__context__.changed_fields)
+        self.assertNotEqual(before.st_ino, leaf.lstat().st_ino)
+        self.assertEqual(leaf.read_bytes(), original)
 
     def test_cli_success_and_failure_do_not_echo_source_or_parser_payload(self):
         script = Path(__file__).resolve().with_name("product_profiles.py")

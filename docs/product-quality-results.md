@@ -457,3 +457,13 @@ Bu paket geçersiz olarak korunur. Ayrı v2 paket gerçek fonksiyon adlarını
 bulup ham dosya digest'iyle doğru alıntıları bağlar; kaynak bağlantıları buna
 göre düzeltildi. Bu kaynak sürümü runner Python sürümünün bağımsız attestation'ı
 değildir. Kod ve testler aynı kalır; yeni exact-head incelemesi zorunludur.
+
+`61688d6` incelemesinde test-evidence açığı ayrıca doğrulandı: bir değişiklik
+denemesi, işlem başarıyla tamamlanmadan `changed` sayılıyordu. Enjekte edilen
+PermissionError altında sıfır tamamlanmış replacement ile test geçiyordu.
+Artık attempted/completed/OS-denied ayrı tutulur; OS reddinde özgün byte ve
+kimliğin korunduğu sınanır, bu sonuç mutation guard kanıtı sayılmaz. Gerçek
+replacement ayrıca lstat ile open arasında uygulanır ve inode reddi doğrulanır;
+böylece Windows'un açık dosya değiştirme yasağına bağlı olmayan gerçek negatif
+vardır. Okuma sonrası diğer mutation bayrağı da ancak başarılı işlemden sonra
+işaretlenir. Yeni odaklı RED/GREEN kaydı önceki yanıltıcı PASS'i değiştirmez.
