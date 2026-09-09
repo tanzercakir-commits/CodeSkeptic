@@ -758,3 +758,46 @@ qualification=false anlamı aynen geçerlidir.
 maliyetidir; cold host, yalnız modül CPU zamanı veya ilk timeout'un kök nedeni
 değildir. Code/CLI negatifleri başarılı olsa da gerçek Windows gözlemi olmadan
 bu v2 tanısı sonuç üretmiş, hata çözülmüş veya U003 tamamlanmış sayılmaz.
+
+### 146bd12 gerçek v2 gözlemi — yavaş aşama CimCmdlets import'u
+
+`146bd125084a84070a86a7400020f37873e67cba` bağımsız exact-head incelemeden geçti;
+214 yerel ürün testi ve 13 kaynak/CLI/queue kontrolü başarılıdır. Normal feature
+push ile başlayan [34340950607 koşusu](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34340950607)
+**failure**: Linux/macOS başarılı, Windows başarısız. Windows'ta 78 kimlik testi,
+v1 capture, beş sabit kaynak girdisinin staging'i ve 26 external-input testi geçti;
+asıl case yine OS sorgusunda `CASE_FAILURE_KIND TIMEOUT` ile durdu. Case derlemesine
+ulaşılmadı; sonradan tanı dosyası üretilmesi bu başarısızlığı değiştirmedi.
+
+V2 tanısı aynı dar ortamda tek süreçte 25453 ms sonunda exit 0 döndü. Beş marker
+sıralı/tam, bütün bozuk/yarım/aşırı çıktı ve stderr flag'leri false'tur:
+
+| Tamamlanan aşama | Clock başlangıcından ms | Önceki marker'dan ms |
+| --- | --- | --- |
+| STARTED | 1 | — |
+| CIM_LOADED | 25187 | 25186 |
+| UTILITY_LOADED | 25192 | 5 |
+| CIM_QUERY_DONE | 25238 | 46 |
+| QUERY_DONE | 25263 | 25 |
+
+Bu post-attempt süreçteki büyük gecikme CimCmdlets import aşamasındadır; sonraki
+Utility import'u, gerçek CIM sorgusu ve JSON dönüşümü çok daha kısadır. Import
+aşaması bağımlılık/initialization ve eşzamanlı runtime işlerini de içerebilir;
+bu exclusive CPU süresi veya özgün timeout'un kök nedeni değildir. Module-path
+veya execution policy değiştirilmedi, cache/servis müdahalesi yapılmadı.
+
+Yeni runner image `20260907.229.1` bildirir; önceki `34338848236` tanısı
+`20260824.214.3` kullanmıştı. Bu nedenle koşular aynı image/host/cache üzerindeymiş
+gibi karşılaştırılmaz; yeni gözlemdeki süre ayrımı kendi tek sürecine aittir.
+Sonraki teşhis CimCmdlets yükleme yolunu ve etkili runtime/policy gözlemlerini
+daraltmalıdır; henüz policy gevşetme veya timeout artırma gerekçesi oluşmamıştır.
+
+`windows-stage-diagnostic-v2/hosted-34340950607` paketi run/jobs/logs ve altı
+ZIP/JSON artifact'ini korur. Windows case artifact'i eksik ve upload hatalıdır;
+Windows v1 ve v2 tanı dosyaları saklanmıştır. V2 JSON SHA-256
+`9e1f644b98bbb1495c1e0ad81ee7951e962c73b78704f532700fa80b76c6b821`;
+paket summary SHA-256
+`c5ab20a724db7f4852c6cc1bde741bab925b41ee522b2f030d7c02ecc474033b`.
+Kaynak/SDK içerikleri upload edilmedi; primary host native byte'ları yeniden
+açmış sayılmaz. Kaynak sayacı 1/1020, freeze/native/task/product qualification
+false ve U003 açık kalır. Bu raporun belge HEAD'i tested `146bd12` değildir.
