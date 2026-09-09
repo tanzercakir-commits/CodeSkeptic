@@ -440,8 +440,8 @@ descriptor/pathname karşılaştırmalarını kapsıyor gibi sunulmaz.
 [`34326603690`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34326603690)
 `ae6ac13b` kaynağında Windows staging reddini `descriptor-open:ctime_ns` olarak
 yerelleştirdi; diğer altı alan eşleşti. Ubuntu/macOS case'leri geçti, run yine
-başarısızdır. CPython 3.12.10'un [pathname sorgusu](https://github.com/python/cpython/blob/v3.12.10/Modules/posixmodule.c#L2009)
-`ctime` alanını creation time ile doldururken [descriptor sorgusu](https://github.com/python/cpython/blob/v3.12.10/Python/fileutils.c#L1147)
+başarısızdır. CPython 3.12.10'un [pathname sorgusu](https://github.com/python/cpython/blob/v3.12.10/Modules/posixmodule.c#L2139)
+`ctime` alanını creation time ile doldururken [descriptor sorgusu](https://github.com/python/cpython/blob/v3.12.10/Python/fileutils.c#L1233)
 ChangeTime dönüşümünü korur. Bu API anlam farkı, dosya değişikliği kanıtı değildir.
 Yeni dar karşılaştırma yalnız Windows cross-query çiftinde iki gerçek integer
 `birthtime_ns` varsa creation/creation kullanır. Eksik/asimetrik alan ret alır;
@@ -450,3 +450,10 @@ ve ek fstat/fstat kontrolleri `ctime_ns` değişimini korur; dosya kimliği, byt
 link ve alias kontrolleri kaldırılmadı. Windows biçimli pozitif RED ve timestamp,
 diğer kimlik alanları, POSIX/eksik-alan negatifleri ayrı kayıtta tutulur. Bu
 düzeltmenin gerçek Windows sonucu yeni exact-head run ile kanıtlanmalıdır.
+
+`01e483a` incelemesi ilk CPython kanıt paketini reddetti: tarayıcının görüntü
+satırları ham kaynak satırları sanıldığı için ilgisiz alıntılar seçilmişti.
+Bu paket geçersiz olarak korunur. Ayrı v2 paket gerçek fonksiyon adlarını
+bulup ham dosya digest'iyle doğru alıntıları bağlar; kaynak bağlantıları buna
+göre düzeltildi. Bu kaynak sürümü runner Python sürümünün bağımsız attestation'ı
+değildir. Kod ve testler aynı kalır; yeni exact-head incelemesi zorunludur.
