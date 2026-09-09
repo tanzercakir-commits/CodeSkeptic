@@ -231,3 +231,21 @@ U003 hâlâ FRONT'tur. Üç gözlem 0/1020 bağımsız korpus açığını, dör
 eksik gerçek security-fix çiftlerini, dondurulmamış native/API profilini veya
 korumalı inventory RED'ini kapatmaz. Plan, FIFO ve kalite eşikleri değişmedi;
 canonical completion receipt ya da POP oluşturulmadı.
+
+### Yerel kaynak hakemliği — bağımsız kotaya girmeyen güvenli örnek
+
+`llvm-derived-return-matching-delete.cpp` için bağımsız kaynak incelemesi,
+açık standalone C++17 / ordinary global new-delete varsayımları altında
+memory-leak hedef etiketini **SAFE** olarak doğruladı. Gerçek GCC ve Clang
+syntax kontrolleri standart include araması kapalıyken geçti; bunlar native
+ürün profili veya analyzer ölçümü değildir. İncelenmemiş upstream simulator
+harness'ine eşdeğerlik iddiası yoktur.
+
+Aynı inceleme bağımsız kota için **SUPPLEMENTAL_NONQUOTA** kararı verdi:
+mevcut `SummaryOwnedReturnHasNoInventedFamily` eğitimi zaten allocation wrapper,
+caller cast ve matching release birleşimini içerir. Farklı allocator ve sonraki
+kullanım nedeniyle karşılaştırma yalnız memory-leak ailesi içindir; bütün kurallar
+açısından güvenli olduğu söylenmez. Typed Base/Derived eklemesi bağımsız kota için
+yeterli ayrım değildir. Karar, exact kaynak/inceleme/ham syntax hash'leriyle
+`candidates/selection-record.json` içinde tutulur. Önceki held öneri korunur;
+receiver-after-delete eğitim kopyası da dışarıda kalır. Kota hâlâ **0/1020**'dir.

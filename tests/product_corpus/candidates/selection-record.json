@@ -71,13 +71,32 @@
       "function": "shouldNotReportLeak",
       "line": null,
       "rationale": "Visible allocate() creates exactly Derived. The Base-pointer return and downcast preserve that object's identity; matching delete releases it. Empty visible destructors introduce no owned resources. Ordinary allocation failure precedes a returned owned object.",
-      "selection_decision": "HELD_UNACCEPTED_DEPENDENCY_AND_INDEPENDENCE_REVIEW_PENDING",
+      "selection_decision": "SOURCE_REVIEWED_SUPPLEMENTAL_NONQUOTA_TRAINING_NEAR_VARIANT",
       "quota": false,
       "duplicate_evidence": {
-        "reason": "Bounded local search found related owned-return and matching-delete coverage, not this exact derived-return/downcast combination. Absence of an exact match is not independence proof."
+        "path": "tests/MemoryLeakRuleExTest.cpp",
+        "test": "AllocatorPairTest.SummaryOwnedReturnHasNoInventedFamily",
+        "lines": "1113-1126",
+        "reason": "Existing training already combines a visible allocation wrapper, caller-side pointer cast and matching release. The configured allocator and later use differ, so this is a memory-leak-family overlap, not an all-rule-safe comparison. The empty Base/Derived round-trip adds typed integration coverage but does not establish a separate ownership obligation or release path for independent quota."
+      },
+      "source_adjudication": {
+        "reviewer": "/root/product_plan_verifier",
+        "repository_head": "fb6b23cd1fc713ea4003c4da74ad20b006e74cc3",
+        "source_sha256": "d5a3f2fe861ccce2f3d684e2b203f64cc66c1701443892b4f0def1005d53d0cc",
+        "target_label": "SAFE_FOR_MEMORY_LEAK",
+        "independence_verdict": "SUPPLEMENTAL_NONQUOTA",
+        "standalone_dependency_boundary": "Select this header-free C++17 translation unit with ordinary global single-object new/delete, no replacement allocator or interposition, and the visible helper and empty destructor bodies. The C-style cast recovers the actual Derived object from its public, unambiguous, non-virtual Base subobject. This is an explicit standalone adaptation, not a claim of equivalence to the uninspected upstream simulator harness.",
+        "upstream_harness_equivalence_verified": false,
+        "syntax_evidence": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/derived-source-admission-v1/proof/summary.json",
+        "syntax_evidence_sha256": "2a07064422494bd9686f38580546e2f3d48f11931991e5b689c07ecd3337e7be",
+        "review_evidence": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/derived-source-admission-v1/independent-source-review.txt",
+        "review_evidence_sha256": "48e6e592802761bbc6656eff25ed300a0d8347ef356a0ba55686e624efe1b415",
+        "analyzer_run": false,
+        "native_product_qualified": false,
+        "unit_pass": false
       },
       "addressability": "NOT_MEASURED",
-      "future_boundary": "Narrow source label proposal only; no all-rule safe claim, global semantic-cluster certification or accepted evaluation credit."
+      "future_boundary": "Independently source-reviewed target-family-safe supplemental evidence only; no all-rule safe claim, accepted independent quota, analyzer addressability, native qualification or evaluation freeze. The prior held proposal and its earlier review remain preserved in Git history."
     }
   ]
 }
