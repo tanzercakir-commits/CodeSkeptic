@@ -994,3 +994,36 @@ drive içeren sentetik yol kabulünü kontrol eder. Native lane seçiminde artı
 yerine geçmez; ilk hosted failure değişmeden korunur ve yeni exact-head inceleme
 ile yeni hosted sonuç ayrıca gerekir. Korpus 1/1020 ve bütün qualification
 bayrakları false kalır.
+
+### All-rule fixture native GREEN; Windows kimlik sorgusu ayrı RED
+
+Fixture/report commit'i `dd7f0ab3b63528f2b8632565cb8722df81d7cbe6` bağımsız
+exact-head PASS aldı; 235 yerel test, 37 seçili test, üç workflow testi ve 15
+kayıtlı kontrol doğrulandı. [Yeni native koşu 34348054597](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34348054597)
+attempt 1'de üç platformun her birinde 88 identity ve 37 external-input/staging/
+all-rule testi geçti. Böylece önceki Windows fixture hatası için gerçek native
+GREEN vardır; bu sonuç tüm Windows job'unun başarısı değildir.
+
+Ubuntu/macOS job'ları ve case/ABI gözlemleri başarılıdır. Windows case capture
+daha sonra değişmemiş `windows_sdk_identity` PowerShell OS sorgusunda 30 saniye
+timeout verdi (`CASE_FAILURE_KIND TIMEOUT`; exact producer kodundaki
+`identity:286` → `identity:112`). Windows case artifact'i oluşmadı ve bütün koşu
+**failure** kaldı. Önceki koşu `34346981841` de failure olarak korunur.
+
+Altı mevcut metadata JSON'u, loglar, run/job/artifact kayıtları ve ZIP/JSON
+SHA-256'ları checkout dışındaki `gcc-all-rule-ground-truth-v1/hosted-34348054597`
+paketinde saklandı; summary SHA-256
+`1053f6a1fdb32b52cbcd30c05c1c570e3a99398cb0ec52dffbdf1f5f10db2b73`.
+Case denemesinden sonraki staged sorgu 22562 ms'de tamamlandı, `CIM_LOADED`
+22303 ms'de gözlendi. Ayrı policy gözlemi effective `Unrestricted`, MachinePolicy/
+UserPolicy/Process/CurrentUser `Undefined`, LocalMachine `Unrestricted` bildirdi;
+inherited/case execution-policy preference yoktu. Bunlar timeout sonrasındaki
+diagnostic gözlemleridir: ilk sorgunun kök nedenini, kalıcı çözümü veya native
+qualification'ı kanıtlamaz; ilk başarısız sonucu değiştirmez.
+
+Yeni timeout için collector, süre sınırı, ortam veya workflow değiştirilmedi;
+aynı head körlemesine yeniden çalıştırılmadı. Bağımsız kabul edilmiş kaynak
+etiketleri 16 aile + üç project-diagnostic olarak bağlıdır, ancak tek kaynak
+1/1020 ve ek kota 0 kalır. Windows native kapısı, eksik diğer değerlendirme
+kaynakları ve platform analiz tarifleri açık; evaluation freeze, task/product
+qualification ve U003 POP hâlâ yoktur.
