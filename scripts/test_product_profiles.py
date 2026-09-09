@@ -30,6 +30,239 @@ def quota_rows():
     return rows
 
 
+class AllRuleGroundTruthTests(unittest.TestCase):
+    def setUp(self):
+        self.repo = Path(__file__).resolve().parents[1]
+        self.value = profiles.read_json(self.repo / 'tests/product_corpus/candidates/gcc-mixed-storage-ground-truth.json')
+        self.candidate = profiles.read_json(self.repo / profiles.GCC_SOURCE_CANDIDATE)
+
+    def test_complete_source_labels_remain_unmeasured_and_add_no_quota(self):
+        result = profiles.gcc_ground_truth_metadata(self.value, self.candidate)
+        self.assertEqual(result['family_labels'], 16)
+        self.assertEqual(result['project_diagnostics'], 3)
+        self.assertEqual(result['expected_occurrences'], 1)
+        self.assertEqual(result['additional_quota_examples'], 0)
+        self.assertFalse(result['source_labels_independently_reviewed'])
+        self.assertFalse(result['evaluation_frozen'])
+
+    def test_source_labels_reject_omitted_family_or_changed_target(self):
+        for mutation in ('missing-family', 'wrong-target'):
+            value = copy.deepcopy(self.value)
+            if mutation == 'missing-family':
+                value['families'].pop()
+            else:
+                next(row for row in value['families'] if row['rule'] == 'memory-leak')['expected'][0]['cwes'] = [476]
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                profiles.gcc_ground_truth_metadata(value, self.candidate)
+
+    def test_label_metadata_rejects_forged_coverage_status_counts_and_occurrences(self):
+        for mutation in ('family-duplicate', 'family-order', 'unknown-family', 'planned-installed', 'safe-buggy',
+                         'unknown-role', 'safe-expected', 'target-line', 'target-column', 'target-multiplicity',
+                         'bool-line', 'bool-column', 'bool-multiplicity', 'source-hash', 'source-lines', 'model-bool',
+                         'model-width', 'model-limit', 'reference-missing', 'reference-path', 'reference-hash',
+                         'project-missing', 'project-duplicate', 'project-cwe', 'project-observed', 'raw-observed',
+                         'qualified', 'quota', 'quota-bool', 'empty-basis', 'bad-ref-line', 'duplicate-ref-line'):
+            value = copy.deepcopy(self.value)
+            target = next(row for row in value['families'] if row['rule'] == 'memory-leak')
+            first = value['families'][0]
+            if mutation == 'family-duplicate': value['families'][-1] = first
+            elif mutation == 'family-order': value['families'].reverse()
+            elif mutation == 'unknown-family': first['rule'] = 'PRIVATE_SENTINEL'
+            elif mutation == 'planned-installed':
+                next(row for row in value['families'] if row['rule'] == 'sql-injection')['availability'] = 'INSTALLED_AT_REFERENCE_HEAD'
+            elif mutation == 'safe-buggy': first['role'] = 'buggy'
+            elif mutation == 'unknown-role': target['role'] = 'unsupported'
+            elif mutation == 'safe-expected': first['expected'] = target['expected']
+            elif mutation == 'target-line': target['expected'][0]['line'] = 21
+            elif mutation == 'target-column': target['expected'][0]['column'] = 2
+            elif mutation == 'target-multiplicity': target['expected'][0]['multiplicity'] = 2
+            elif mutation == 'bool-line': target['expected'][0]['line'] = True
+            elif mutation == 'bool-column': target['expected'][0]['column'] = True
+            elif mutation == 'bool-multiplicity': target['expected'][0]['multiplicity'] = True
+            elif mutation == 'source-hash': value['source']['sha256'] = 'e' * 64
+            elif mutation == 'source-lines': value['source']['line_count'] = 29
+            elif mutation == 'model-bool': value['data_model']['char_bit'] = True
+            elif mutation == 'model-width': value['data_model']['size_t_bits'] = 32
+            elif mutation == 'model-limit': value['data_model']['allocation_bytes_max'] += 1
+            elif mutation == 'reference-missing': value['references'].pop()
+            elif mutation == 'reference-path': value['references'][0]['path'] = '../PRIVATE_SENTINEL'
+            elif mutation == 'reference-hash': value['references'][0]['sha256'] = '0' * 64
+            elif mutation == 'project-missing': value['project_diagnostics'].pop()
+            elif mutation == 'project-duplicate': value['project_diagnostics'][1] = value['project_diagnostics'][0]
+            elif mutation == 'project-cwe': value['project_diagnostics'][0]['expected'] = target['expected']
+            elif mutation == 'project-observed': value['project_diagnostics'][0]['observed'] = []
+            elif mutation == 'raw-observed': value['observed'] = []
+            elif mutation == 'qualified': value['qualification']['evaluation_frozen'] = True
+            elif mutation == 'quota': value['additional_quota_examples'] = 15
+            elif mutation == 'quota-bool': value['additional_quota_examples'] = False
+            elif mutation == 'empty-basis': first['rationale'] = ''
+            elif mutation == 'bad-ref-line': first['source_lines'] = [True]
+            elif mutation == 'duplicate-ref-line': first['source_lines'] = [20, 20]
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                profiles.gcc_ground_truth_metadata(value, self.candidate)
+
+    def review_fixture(self, value=None, record_sha='d' * 64):
+        value = value or self.value
+        return {'schema': 'codeskeptic-all-rule-source-review/v1', 'repository_head': 'd' * 40,
+                'record': {'path': profiles.GCC_GROUND_TRUTH, 'sha256': record_sha},
+                'candidate': value['candidate'], 'source_sha256': value['source']['sha256'],
+                'implementer': '/root', 'verifier': '/root/synthetic_source_reviewer',
+                'verdict': 'ACCEPT_SOURCE_LABELS', 'findings': [], 'rationale': 'Synthetic schema test, not source review.',
+                'additional_quota_examples': 0, 'qualification': value['qualification']}
+
+    def test_source_review_is_separate_exact_and_nonqualifying(self):
+        review = self.review_fixture()
+        profiles.ground_truth_review_metadata(review, self.value, 'd' * 64)
+        for key, replacement in (('repository_head', 'HEAD'), ('verifier', '/root'), ('verdict', 'HOLD'),
+                                 ('source_sha256', 'e' * 64), ('findings', ['unresolved']),
+                                 ('additional_quota_examples', True), ('additional_quota_examples', 1),
+                                 ('rationale', ''), ('record', {'path': profiles.GCC_GROUND_TRUTH, 'sha256': 'e' * 64}),
+                                 ('candidate', {'path': profiles.GCC_SOURCE_CANDIDATE, 'sha256': 'e' * 64})):
+            forged = copy.deepcopy(review)
+            forged[key] = replacement
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                profiles.ground_truth_review_metadata(forged, self.value, 'd' * 64)
+
+    def staged_fixture(self, native_size_t_bytes=8):
+        temporary = tempfile.TemporaryDirectory(prefix='codeskeptic-all-rule-source-')
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        repo, inputs = base / 'repo', base / 'inputs'
+        inputs.mkdir()
+        source = b'/* Synthetic IO fixture, not an evaluation source. */\n' * 28
+        (inputs / 'case.c').write_bytes(source)
+        source_sha = hashlib.sha256(source).hexdigest()
+        candidate, value = copy.deepcopy(self.candidate), copy.deepcopy(self.value)
+        candidate['source'].update(sha256=source_sha, snapshot_root=str(inputs))
+        def write(path, document):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(profiles.canonical(document), encoding='utf-8')
+            return profiles.file_sha(path)
+        recipe = {'native_evidence': {'char_bit': 8, 'int_bytes': 4,
+                                      'size_t_bytes': native_size_t_bytes, 'pointer_bytes': 8}}
+        candidate['links']['analysis_profile']['sha256'] = write(
+            repo / candidate['links']['analysis_profile']['path'], recipe)
+        candidate_sha = write(repo / profiles.GCC_SOURCE_CANDIDATE, candidate)
+        value['candidate']['sha256'] = candidate_sha
+        value['source']['sha256'] = source_sha
+        record_sha = write(repo / profiles.GCC_GROUND_TRUTH, value)
+        review = self.review_fixture(value, record_sha)
+        review_path = base / 'review.json'
+        review_sha = write(review_path, review)
+        index = {'schema': 'codeskeptic-product-reviewed-ground-truth/v1',
+                 'state': 'PARTIAL_REVIEWED_SOURCE_LABELS_NOT_FROZEN',
+                 'entries': [{'record': {'path': profiles.GCC_GROUND_TRUTH, 'sha256': record_sha},
+                              'review': {'path': str(review_path), 'sha256': review_sha}}],
+                 'boundary': 'Synthetic metadata test, no source admission.'}
+        write(repo / profiles.GROUND_TRUTH_INDEX, index)
+        selection_sha = write(repo / profiles.SOURCE_SELECTION, {'admissions': [{'candidate': value['candidate']}]})
+        manifest = profiles.read_json(self.repo / 'scripts/product_profiles.json')
+        manifest['source_selection']['sha256'] = selection_sha
+        write(repo / 'scripts/product_profiles.json', manifest)
+        return SimpleNamespace(repo=repo, inputs=inputs, source_sha=source_sha, candidate_sha=candidate_sha,
+                               value=value, record_sha=record_sha, index=index, review_path=review_path, write=write)
+
+    def test_actual_reader_uses_bound_source_and_reference_objects_without_native_execution(self):
+        staged = self.staged_fixture()
+        with mock.patch.object(profiles, 'GCC_CASE_SHA', staged.source_sha), \
+             mock.patch.object(profiles, 'verify_gcc_source_candidate', return_value={'candidate_sha256': staged.candidate_sha}), \
+             mock.patch.object(profiles, 'verify_reviewed_files') as objects, \
+             mock.patch.object(profiles.subprocess, 'run') as execute:
+            result = profiles.verify_gcc_ground_truth(staged.repo)
+        self.assertEqual(result['record_sha256'], staged.record_sha)
+        self.assertTrue(result['source_bytes_verified'])
+        self.assertFalse(result['source_labels_independently_reviewed'])
+        objects.assert_called_once_with(staged.repo, self.value['reference_head'], self.value['references'])
+        execute.assert_not_called()
+
+    def test_bound_native_recipe_cannot_disagree_with_label_arithmetic_model(self):
+        for width in (4, True, 8.0):
+            staged = self.staged_fixture(native_size_t_bytes=width)
+            with mock.patch.object(profiles, 'GCC_CASE_SHA', staged.source_sha), \
+                 mock.patch.object(profiles, 'verify_gcc_source_candidate', return_value={'candidate_sha256': staged.candidate_sha}), \
+                 mock.patch.object(profiles, 'verify_reviewed_files'), \
+                 self.subTest(width=width), self.assertRaisesRegex(ValueError, '^GCC all-rule source binding rejected$'):
+                profiles.verify_gcc_ground_truth(staged.repo)
+
+    def test_reader_rejects_changed_source_candidate_reference_or_final_identity(self):
+        for mutation in ('source', 'source-symlink', 'candidate', 'reference', 'final-identity'):
+            staged = self.staged_fixture()
+            def check_refs(*args):
+                if mutation == 'reference':
+                    raise ValueError('PRIVATE_SENTINEL')
+                if mutation == 'final-identity':
+                    (staged.repo / profiles.GCC_GROUND_TRUTH).write_text('PRIVATE_SENTINEL')
+            if mutation == 'source': (staged.inputs / 'case.c').write_text('PRIVATE_SENTINEL')
+            elif mutation == 'source-symlink':
+                target = staged.inputs / 'case.c'
+                target.rename(staged.inputs / 'saved.c')
+                try:
+                    target.symlink_to(staged.inputs / 'saved.c')
+                except OSError:
+                    continue
+            elif mutation == 'candidate': (staged.repo / profiles.GCC_SOURCE_CANDIDATE).write_text('PRIVATE_SENTINEL')
+            with mock.patch.object(profiles, 'GCC_CASE_SHA', staged.source_sha), \
+                 mock.patch.object(profiles, 'verify_gcc_source_candidate', return_value={'candidate_sha256': staged.candidate_sha}), \
+                 mock.patch.object(profiles, 'verify_reviewed_files', side_effect=check_refs), \
+                 self.subTest(mutation=mutation), self.assertRaisesRegex(ValueError, '^GCC all-rule source binding rejected$'):
+                profiles.verify_gcc_ground_truth(staged.repo)
+
+    def test_reviewed_reader_binds_procedural_review_without_extra_quota(self):
+        staged = self.staged_fixture()
+        with mock.patch.object(profiles, 'GCC_CASE_SHA', staged.source_sha), \
+             mock.patch.object(profiles, 'verify_gcc_source_candidate', return_value={'candidate_sha256': staged.candidate_sha}), \
+             mock.patch.object(profiles, 'verify_reviewed_files') as objects, \
+             mock.patch.object(profiles, 'verify_source_selection', return_value={'quota_examples': 1}):
+            result = profiles.verify_ground_truth_index(staged.repo)
+        self.assertTrue(result['source_labels_independently_reviewed'])
+        self.assertEqual(result['source_selection_quota_examples'], 1)
+        self.assertEqual(result['additional_quota_examples'], 0)
+        self.assertFalse(result['evaluation_frozen'])
+        self.assertEqual(objects.call_args_list[0].args,
+                         (staged.repo, 'd' * 40, [staged.index['entries'][0]['record'], staged.value['candidate']]))
+        self.assertEqual(objects.call_count, 2)
+
+    def test_reviewed_reader_rejects_missing_stale_changed_duplicate_or_unadmitted_links(self):
+        for mutation in ('missing-review', 'changed-review', 'in-repo-review', 'duplicate-entry', 'held-review',
+                         'stale-head', 'unadmitted', 'index-final-change'):
+            staged = self.staged_fixture()
+            def check_refs(repo, head, links):
+                if mutation == 'stale-head': raise ValueError('PRIVATE_SENTINEL')
+                if mutation == 'index-final-change':
+                    (staged.repo / profiles.GROUND_TRUTH_INDEX).write_text('PRIVATE_SENTINEL')
+            if mutation == 'missing-review': staged.review_path.unlink()
+            elif mutation == 'changed-review': staged.review_path.write_text('PRIVATE_SENTINEL')
+            elif mutation == 'in-repo-review':
+                staged.index['entries'][0]['review']['path'] = str(staged.repo / 'review.json')
+            elif mutation == 'duplicate-entry': staged.index['entries'] *= 2
+            elif mutation == 'held-review':
+                review = self.review_fixture(staged.value, staged.record_sha)
+                review['verdict'] = 'HOLD'
+                staged.index['entries'][0]['review']['sha256'] = staged.write(staged.review_path, review)
+            staged.write(staged.repo / profiles.GROUND_TRUTH_INDEX, staged.index)
+            with mock.patch.object(profiles, 'GCC_CASE_SHA', staged.source_sha), \
+                 mock.patch.object(profiles, 'verify_gcc_source_candidate', return_value={'candidate_sha256': staged.candidate_sha}), \
+                 mock.patch.object(profiles, 'verify_reviewed_files', side_effect=check_refs), \
+                 mock.patch.object(profiles, 'verify_source_selection', return_value={'quota_examples': 0 if mutation == 'unadmitted' else 1}), \
+                 self.subTest(mutation=mutation), self.assertRaisesRegex(ValueError, '^reviewed all-rule source labels rejected$'):
+                profiles.verify_ground_truth_index(staged.repo)
+
+    def test_cli_missing_or_duplicate_key_record_fails_privately(self):
+        with tempfile.TemporaryDirectory(prefix='codeskeptic-all-rule-cli-') as temporary:
+            repo = Path(temporary).resolve()
+            record = repo / profiles.GCC_GROUND_TRUTH
+            record.parent.mkdir(parents=True)
+            for command in ('ground-truth-candidate-check', 'ground-truth-check'):
+                for data in (None, '{"schema":"PRIVATE_SENTINEL","schema":null}'):
+                    path = repo / (profiles.GCC_GROUND_TRUTH if command == 'ground-truth-candidate-check' else profiles.GROUND_TRUTH_INDEX)
+                    if data is not None: path.write_text(data)
+                    result = subprocess.run([sys.executable, '-B', str(self.repo / 'scripts/product_profiles.py'),
+                                             command, '--root', str(repo)], capture_output=True, timeout=10)
+                    self.assertEqual(result.returncode, 2)
+                    self.assertEqual(result.stdout, b'')
+                    self.assertNotIn(b'PRIVATE_SENTINEL', result.stderr)
+
+
 class ProfileV2Tests(unittest.TestCase):
     def setUp(self):
         self.repo = Path(__file__).resolve().parents[1]

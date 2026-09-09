@@ -116,6 +116,25 @@ bu yola kabul edilmez. Aynı global hash/cluster ikinci rol, köken veya platfor
 adıyla tekrar sayılamaz. Kısmi v2 seçim de `DRAFT_NOT_FROZEN` ve exit 2 kalır;
 native v1 zero/false observation bayrakları bu karardan bağımsızdır.
 
+Kaynak sayımı ile all-rule etiket tamamlama da ayrıdır. Eklemeli
+`codeskeptic-product-source-all-rule-ground-truth/v1` sidecar'ı aynı exact GCC
+girdisi için 16 hedef aileyi ve üç CWE-dışı report-only diagnostic'i ayrı kaydeder.
+Kaynak hükmü, referans commit'indeki installed/planned durumu ve ölçüm/qualification
+birbirinden türetilmez. Guarded size arithmetic'in veri modeli, bağlı native
+tarifle aynı olmalıdır; bir ailedeki safe hüküm başka bağımsız kaynak sayılmaz.
+Orijinal candidate, source-admission kararı, selection ve eski unadjudicated
+snapshot'ları yeniden yazılmaz. Yeni bilgi ayrı belge ve ayrı inceleme bağı taşır.
+
+`ground-truth-candidate-check` kaynak/candidate/referans Git byte'larını ve dar
+etiket şemasını doğrular; semantik hakemlik yapmaz. `ground-truth-check`, ayrıca
+ayrı indeksin gerçek read-only hakem receipt'ini, distinct implementer/verifier,
+exact reviewed commit ve record/source/candidate hashlerini doğrulamadan reviewed
+sonucu vermez. Bu ortak hesapta prosedürel bağımsızlıktır, imza veya kötü niyetli
+root'a karşı güven garantisi değildir. Ek kota daima sıfırdır; tüm cohort freeze,
+native tarifler, ölçüm ve U003 kabulü tamamlanmış sayılmaz. Planlanan aileler
+ölçümde hâlâ PLANNED_NOT_IMPLEMENTED/RED olmak zorundadır; source-safe etiketi
+çalıştırılmamış bir kuralı MEASURED/PASS yapamaz.
+
 ### Native API taslağı — henüz dondurulmuş veya kurulmuş model değil
 
 [`native-api-models.json`](../tests/product_corpus/native-api-models.json), manifestin

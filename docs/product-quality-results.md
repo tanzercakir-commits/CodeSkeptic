@@ -903,3 +903,39 @@ Primary host native SDK/source byte'larını yeniden açmış sayılmaz. Bu meta
 ve syntax gözlemleri frozen korpus, native/product/task qualification veya POP
 değildir; kaynak sayacı 1/1020 ve U003 açık kalır. Bu raporun belge HEAD'i tested
 `7cfec2d` değildir.
+
+### GCC tek girdisi — kaynak temelli all-rule etiket önerisi
+
+`gcc-mixed-storage-ground-truth.json`, aynı 28 satırlık C17 girdisinin
+`5c5563b8ed6e5715cb1913e223276146bc4c8799c11ee4dace55cf6e8a5e4b0a`
+byte kimliğine eklemeli bağlanır. Eski candidate/selection/admission/recipe
+hashleri değişmez. Kaynakta `n > 10` ve başarılı ordinary native malloc yolunda
+tek memory-leak/CWE-401 beklentisi `test_2:28:1`, multiplicity 1 olarak korunur.
+Görünür helper parametreleri okumadan sıfır döndürür; heap pointer'ını tüketmez,
+saklamaz veya dışarı taşımaz. Allocation failure ile automatic-array yolları
+ayrı kota kaynağı değildir.
+
+Diğer 15 aile için kaynakta neden ek ihlal beklenmediği satır referanslarıyla
+ayrı kaydedildi. Pointer her iki branch'te atanır; array elemanları okunmaz ve
+malloc failure sonucu null pointer dereference edilmez. Ayırma dalında int32
+`n` aralığı 11..2147483647'dir; `sizeof(int) * n` size_t64 üzerinde en çok
+8589934588 byte olur ve sarmaz. Etiketin veri modeli bağlı Linux native tarifinin
+char/int/size_t/pointer boyutlarıyla çapraz kontrol edilir; farklı width/profile'a
+sessizce taşınmaz. Sadece çağrı bulunmayan dört yeni aileyi bu kaynaktan safe
+etiketlemek, o aileler için bağımsız safe quota veya kurulmuş detector kanıtı değildir.
+
+Assumption, contract ve policy, CWE precision/recall satırlarına sokulmaz.
+Referans kodda assumption için dereference edilen pointer parametresi; contract
+için seçilmiş deklarasyon/sidecar; policy için deklarasyon/profile tetikleyicisi
+yoktur. Bu üç report-only diagnostic için de prospective boş beklenti gerekçesi
+saklanır; gelecekteki ham çıktılar atılmaz. Kaynak etiketlemesi analyzer'ın
+fiilen ne raporlayacağını veya ürün kalitesini önceden gözlemiş değildir.
+
+Referans contract/registry/CWE eşleme ve üç project-rule kodu exact
+`ff7ae4ca69be751e9d0301cf87c08b9cf577cb07` Git nesnelerine bağlandı. Bu kaynak
+etiketleme işi detector kodunu, current/planned ayrımını veya native collector'ı
+değiştirmez. `ground-truth-candidate-check` yalnız öneri byte/şema bağını denetler;
+gerçek ayrı source-review receipt'i ve indeks olmadan `ground-truth-check`
+başarılı reviewed sonuç üretemez. Etiket ve entegrasyon için bağımsız exact-head
+inceleme ayrıca gerekir. Korpus sayacı 1/1020, ek kota 0, bütün freeze/native/
+analyzer/license/distribution/product/task qualification bayrakları false kalır.

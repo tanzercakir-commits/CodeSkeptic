@@ -1,0 +1,379 @@
+{
+  "schema": "codeskeptic-product-source-all-rule-ground-truth/v1",
+  "state": "SOURCE_DERIVED_LABELS_FOR_INDEPENDENT_REVIEW",
+  "id": "gcc-mixed-storage-local-loss",
+  "candidate": {
+    "path": "tests/product_corpus/candidates/gcc-mixed-storage-source-candidate.json",
+    "sha256": "4edbf766d3e65fb76c0c33786c7ab31e3c38451e9e377b12ad0b2a351f5d4a52"
+  },
+  "source": {
+    "path": "/input/case.c",
+    "sha256": "5c5563b8ed6e5715cb1913e223276146bc4c8799c11ee4dace55cf6e8a5e4b0a",
+    "language": "C17",
+    "line_count": 28
+  },
+  "reference_head": "ff7ae4ca69be751e9d0301cf87c08b9cf577cb07",
+  "references": [
+    {
+      "path": "src/core/RuleCapabilities.def",
+      "sha256": "17bd1d76e01534b6afd98ad04c105c656c8ed45a2778be8f4ed842716afcaadc"
+    },
+    {
+      "path": "src/core/Capabilities.cpp",
+      "sha256": "933cb3ebe6e7b3606903303029f8f8912d9d48086ab896732cdd92ca8a44180f"
+    },
+    {
+      "path": "src/rules/AssumptionRule.cpp",
+      "sha256": "98b82bf4d418137c72f3fd6b9c33bc05d672bea4e3ea7047bea4a478c957e2b8"
+    },
+    {
+      "path": "src/rules/ContractRule.cpp",
+      "sha256": "c0aab1979e70ebe128eaa23941f462efc0b37f7b5dc5536e90af14dc83346ec2"
+    },
+    {
+      "path": "src/rules/PolicyRule.cpp",
+      "sha256": "9b9a57d65b1520f388352c30e174595a6434060f0409a23adf0ebf8d4c9d00bd"
+    },
+    {
+      "path": "scripts/cwe_quality.py",
+      "sha256": "c888bef1c2ebe1535a771758c2db58e18e1bafb3f7f06404c652104a02741108"
+    },
+    {
+      "path": "scripts/product_quality.py",
+      "sha256": "e98ff3acddd7fb5b16b28acc15ef9c5cf79cce5424bb969e45e7156d86ceff69"
+    },
+    {
+      "path": "docs/product-quality-contract.md",
+      "sha256": "04401409bfe57b2175b14a3fd3dd2021e06aade872fdaf63cc903897608cf9d7"
+    }
+  ],
+  "data_model": {
+    "char_bit": 8,
+    "int_bits": 32,
+    "size_t_bits": 64,
+    "pointer_bits": 64,
+    "int_max": 2147483647,
+    "allocation_n_min": 11,
+    "allocation_bytes_max": 8589934588
+  },
+  "assumptions": [
+    "Ordinary native malloc semantics and the previously bound Linux C17 recipe; no replacement allocator, interposition, custom sidecar, model, policy profile, or undeclared configuration.",
+    "Both source function bodies are the complete selected translation unit. Runtime library internals and unselected upstream sibling functions are not separate analyzed source samples.",
+    "The previously observed native int32, size_t64 and pointer64 data model is a condition of this source label, not proof that every compiler/platform recipe is frozen.",
+    "Source labels are derived before analyzer results. A missing expected memory-leak remains a miss; it cannot be relabeled unsupported after measurement."
+  ],
+  "families": [
+    {
+      "rule": "alloc-size-overflow",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        20,
+        21
+      ],
+      "rationale": "On the allocating branch n is in [11,2147483647]. sizeof(int) is the size_t value 4, so the size_t64 product is at most 8589934588 and cannot wrap. No smaller allocation followed by a write exists."
+    },
+    {
+      "rule": "bounds",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        9,
+        11,
+        16,
+        21,
+        23,
+        25
+      ],
+      "rationale": "The array has ten int elements and the heap result may be null, but neither pointee is read or written. Array-to-pointer decay and passing the initialized pointer to a visible unused parameter do not access array elements. No offset, copy, or write-overflow subtype is present."
+    },
+    {
+      "rule": "command-injection",
+      "availability": "PLANNED_NOT_IMPLEMENTED",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        6,
+        9,
+        11,
+        14,
+        20,
+        21,
+        25,
+        27
+      ],
+      "rationale": "The complete selected translation unit only calls native malloc and its visible do_stuff_2 helper. There is no command interpreter, process-launch API, command string or shell sink. This is source absence, not an installed-model or runtime safety result."
+    },
+    {
+      "rule": "div-by-zero",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        11,
+        20,
+        21,
+        27
+      ],
+      "rationale": "There is no division or remainder. The sole nontrivial arithmetic expression is the guarded size_t multiplication at line 21."
+    },
+    {
+      "rule": "double-free",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        9,
+        11,
+        21,
+        25,
+        27,
+        28
+      ],
+      "rationale": "Neither the caller nor the visible helper invokes any deallocator or resource-release operation, so no repeated release occurs. The missing release is the separate memory-leak defect, not a double release."
+    },
+    {
+      "rule": "format-string",
+      "availability": "PLANNED_NOT_IMPLEMENTED",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        6,
+        9,
+        11,
+        14,
+        21,
+        25,
+        27
+      ],
+      "rationale": "No formatted-output API or format-string sink is called. malloc receives an integer byte count and the helper ignores both parameters. No installed format-string implementation or measurement is claimed."
+    },
+    {
+      "rule": "int-overflow",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        14,
+        20,
+        21
+      ],
+      "rationale": "n is an initialized signed int32 parameter. The n > 10 comparison performs no overflow-prone arithmetic; sizeof(int) makes multiplication unsigned size_t64. For reachable allocation operands the maximum product is 8589934588, within size_t64. No signed arithmetic or narrowing result occurs."
+    },
+    {
+      "rule": "memory-leak",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "buggy",
+      "expected": [
+        {
+          "rule": "memory-leak",
+          "function": "test_2",
+          "line": 28,
+          "column": 1,
+          "cwes": [
+            401
+          ],
+          "multiplicity": 1
+        }
+      ],
+      "source_lines": [
+        9,
+        11,
+        20,
+        21,
+        25,
+        27,
+        28
+      ],
+      "rationale": "For example n=11 with successful ordinary native malloc creates a heap obligation. The visible helper returns zero without reading, storing, escaping or releasing ptr. Returning the integer result loses the sole local owner at the closing brace. Failure to allocate and the automatic-array branch acquire no heap obligation."
+    },
+    {
+      "rule": "null-deref",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        9,
+        11,
+        21,
+        25
+      ],
+      "rationale": "malloc failure can produce a null ptr. Passing that initialized null value to do_stuff_2 is permitted: its body only returns zero and never dereferences p. No other dereference or pointer-based access exists."
+    },
+    {
+      "rule": "path-traversal",
+      "availability": "PLANNED_NOT_IMPLEMENTED",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        6,
+        9,
+        11,
+        14,
+        21,
+        25,
+        27
+      ],
+      "rationale": "No path is constructed or used and no filesystem/path sink or restricted-root contract is present. The source contains only allocation and a non-consuming helper; planned path-traversal behavior is not treated as implemented or measured."
+    },
+    {
+      "rule": "resource-leak",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        6,
+        9,
+        11,
+        21,
+        25,
+        28
+      ],
+      "rationale": "The only acquisition is malloc-owned heap storage, already adjudicated as memory-leak/CWE-401. There is no FILE, directory stream, descriptor, socket or handle acquisition requiring a separate resource-leak occurrence."
+    },
+    {
+      "rule": "sign-conversion",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        14,
+        20,
+        21
+      ],
+      "rationale": "The conversion of n to size_t occurs only when n > 10, so its value is positive and exactly representable in size_t64. sizeof(int) is already size_t. There is no negative-to-unsigned conversion on a reachable allocation branch or narrowing destination."
+    },
+    {
+      "rule": "sql-injection",
+      "availability": "PLANNED_NOT_IMPLEMENTED",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        6,
+        9,
+        11,
+        14,
+        21,
+        25,
+        27
+      ],
+      "rationale": "There is no SQL text, SQLite call, database handle or SQL execution/preparation sink in the complete selected source. Source-level absence is not evidence that the planned SQLite model is installed or that its runtime checks passed."
+    },
+    {
+      "rule": "uninit-ptr",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        17,
+        20,
+        21,
+        22,
+        23,
+        25
+      ],
+      "rationale": "ptr is assigned on both exhaustive branches before its value is passed to the helper. malloc failure supplies an initialized null pointer, not an indeterminate pointer. The helper does not dereference its pointer parameter."
+    },
+    {
+      "rule": "uninit-scalar",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        9,
+        11,
+        14,
+        16,
+        18,
+        20,
+        25,
+        27
+      ],
+      "rationale": "Function parameters are initialized on entry. result is assigned the helper's constant zero before return. buf elements are uninitialized but never read; array-to-pointer decay and passing ptr do not read those integer elements."
+    },
+    {
+      "rule": "use-after-free",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        9,
+        11,
+        21,
+        25,
+        27,
+        28
+      ],
+      "rationale": "No object is released and then accessed. The helper does not inspect the pointer. The automatic buffer remains alive throughout the call, and its address is neither returned nor stored beyond test_2."
+    }
+  ],
+  "project_diagnostics": [
+    {
+      "rule": "assumption",
+      "role": "no-trigger",
+      "expected": [],
+      "source_lines": [
+        9,
+        11,
+        14,
+        25
+      ],
+      "rationale": "The selected source has no dereferenced pointer parameter. Under the bound AssumptionRule's report-only --assumptions contract, the unused p parameter supplies no inferred nonnull precondition to report. This is a prospective source expectation, not observed output."
+    },
+    {
+      "rule": "contract",
+      "role": "no-trigger",
+      "expected": [],
+      "source_lines": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        9,
+        11,
+        14,
+        21,
+        25,
+        27,
+        28
+      ],
+      "rationale": "No cs: contract annotation, attribute, or sidecar is selected, and the explicit recipe admits no undeclared contract input. There is no declared contract to violate or parse. Contract syntax/unsupported aliases remain part of this report-only diagnostic and are not silently dropped from future raw reports."
+    },
+    {
+      "rule": "policy",
+      "role": "no-trigger",
+      "expected": [],
+      "source_lines": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        9,
+        11,
+        14,
+        21,
+        25,
+        27,
+        28
+      ],
+      "rationale": "There is no cs:policy declaration or selected project/idiom policy profile, and no runtime string literal representing an absolute path. The provenance comment is not a program string or policy declaration. No project-policy trigger is present."
+    }
+  ],
+  "boundary": "One already admitted global source/cluster remains one. Other-family safe labels, project diagnostics, branches, helpers, platform/compiler variants and supplemental controls supply zero additional quota or origins. This sidecar leaves the original candidate/admission/selection and historical unadjudicated records unchanged. It is not a frozen cohort, an analyzer run, a claim of installed planned rules, or native/license/distribution/product qualification.",
+  "additional_quota_examples": 0,
+  "qualification": {
+    "evaluation_frozen": false,
+    "native_product_qualified": false,
+    "license_qualified": false,
+    "redistribution_approved": false,
+    "analyzer_run": false,
+    "task_ready": false,
+    "product_qualified": false
+  }
+}

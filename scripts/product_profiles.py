@@ -728,6 +728,197 @@ def verify_source_selection(repo, link):
         raise ValueError("reviewed source selection rejected") from None
 
 
+GCC_GROUND_TRUTH = "tests/product_corpus/candidates/gcc-mixed-storage-ground-truth.json"
+GROUND_TRUTH_INDEX = "tests/product_corpus/ground_truth.json"
+GROUND_TRUTH_REFERENCES = (
+    "src/core/RuleCapabilities.def", "src/core/Capabilities.cpp", "src/rules/AssumptionRule.cpp",
+    "src/rules/ContractRule.cpp", "src/rules/PolicyRule.cpp", "scripts/cwe_quality.py",
+    "scripts/product_quality.py", "docs/product-quality-contract.md",
+)
+GROUND_TRUTH_PLANNED = frozenset(("format-string", "command-injection", "sql-injection", "path-traversal"))
+
+
+def gcc_ground_truth_metadata(value, candidate):
+    """Check one exact source's proposed labels; human source review is separate."""
+    gcc_candidate_metadata(candidate)
+    fields(value, "schema state id candidate source reference_head references data_model assumptions "
+           "families project_diagnostics boundary additional_quota_examples qualification", "all-rule source labels")
+    require(value["schema"] == "codeskeptic-product-source-all-rule-ground-truth/v1"
+            and value["state"] == "SOURCE_DERIVED_LABELS_FOR_INDEPENDENT_REVIEW"
+            and value["id"] == candidate["id"], "all-rule source identity")
+    fields(value["candidate"], "path sha256", "all-rule candidate link")
+    require(value["candidate"]["path"] == GCC_SOURCE_CANDIDATE, "all-rule candidate path")
+    external_digest(value["candidate"]["sha256"])
+    fields(value["source"], "path sha256 language line_count", "all-rule source")
+    require({key: value["source"][key] for key in ("path", "sha256", "language")}
+            == {key: candidate["source"][key] for key in ("path", "sha256", "language")}
+            and type(value["source"]["line_count"]) is int and value["source"]["line_count"] == 28,
+            "all-rule source binding")
+    require(type(value["reference_head"]) is str and re.fullmatch(r"[0-9a-f]{40}", value["reference_head"])
+            and value["reference_head"] != "0" * 40, "all-rule reference commit")
+    references = value["references"]
+    require(type(references) is list and len(references) == len(GROUND_TRUTH_REFERENCES), "all-rule reference coverage")
+    for link, path in zip(references, GROUND_TRUTH_REFERENCES):
+        fields(link, "path sha256", "all-rule reference")
+        require(link["path"] == path, "all-rule reference path/order")
+        external_digest(link["sha256"])
+    require(canonical(value["data_model"]) == canonical({
+        "char_bit": 8, "int_bits": 32, "size_t_bits": 64, "pointer_bits": 64,
+        "int_max": 2**31 - 1, "allocation_n_min": 11, "allocation_bytes_max": 4 * (2**31 - 1)}),
+        "all-rule conditional data model")
+    require(type(value["assumptions"]) is list and 1 <= len(value["assumptions"]) <= 16
+            and all(nonempty(item) and len(item) <= 2048 for item in value["assumptions"])
+            and nonempty(value["boundary"]) and len(value["boundary"]) <= 8192,
+            "all-rule assumptions/boundary")
+    require(type(value["additional_quota_examples"]) is int and value["additional_quota_examples"] == 0
+            and canonical(value["qualification"]) == canonical(candidate["qualification"]),
+            "all-rule labels cannot add quota or qualification")
+
+    def source_basis(row):
+        lines = row["source_lines"]
+        require(type(lines) is list and lines and all(type(line) is int and 1 <= line <= 28 for line in lines)
+                and lines == sorted(set(lines)) and nonempty(row["rationale"]) and len(row["rationale"]) <= 8192,
+                "all-rule bounded source rationale")
+
+    rows = value["families"]
+    require(type(rows) is list and len(rows) == len(FAMILIES), "all-rule family coverage")
+    for row, family in zip(rows, sorted(FAMILIES)):
+        fields(row, "rule availability role expected source_lines rationale", "all-rule family")
+        require(row["rule"] == family and row["availability"] == (
+                "PLANNED_NOT_IMPLEMENTED" if family in GROUND_TRUTH_PLANNED else "INSTALLED_AT_REFERENCE_HEAD"),
+                "all-rule family order/availability")
+        # This is the already-bound 28-line GCC source, not a generic labeler.
+        # Any different label needs new independently reviewed source evidence.
+        expected = candidate["expected"] if family == "memory-leak" else []
+        require(row["role"] == ("buggy" if expected else "safe")
+                and canonical(row["expected"]) == canonical(expected), "all-rule source expectation")
+        source_basis(row)
+    projects = value["project_diagnostics"]
+    require(type(projects) is list and len(projects) == 3, "all-rule project diagnostic coverage")
+    for row, rule in zip(projects, ("assumption", "contract", "policy")):
+        fields(row, "rule role expected source_lines rationale", "all-rule project diagnostic")
+        require(row["rule"] == rule and row["role"] == "no-trigger" and row["expected"] == [],
+                "all-rule report-only expectation")
+        source_basis(row)
+    return {"family_labels": len(rows), "project_diagnostics": len(projects), "expected_occurrences": 1,
+            "additional_quota_examples": 0, "source_labels_independently_reviewed": False,
+            **candidate["qualification"]}
+
+
+def verify_gcc_ground_truth(repo):
+    """Read actual candidate/source/reference bytes without running an analyzer."""
+    try:
+        repo = Path(repo)
+        require(repo.is_absolute() and repo.resolve(strict=True) == repo, "all-rule checkout root")
+        observations = {}
+
+        def read(path, expected=None):
+            info, before, raw = external_read(path, capture=True)
+            require(expected is None or info["sha256"] == expected, "all-rule input changed")
+            observations[path] = before
+            return info, raw
+
+        info, raw = read(repo / GCC_GROUND_TRUTH)
+        require(info["size_bytes"] <= 65536, "all-rule record size")
+        value = parse_json(raw.decode("utf-8"))
+        candidate_info, candidate_raw = read(repo / GCC_SOURCE_CANDIDATE, value["candidate"]["sha256"])
+        candidate = parse_json(candidate_raw.decode("utf-8"))
+        result = gcc_ground_truth_metadata(value, candidate)
+        actual = verify_gcc_source_candidate(repo)
+        require(actual["candidate_sha256"] == candidate_info["sha256"], "all-rule candidate evidence changed")
+        recipe_link = candidate["links"]["analysis_profile"]
+        _, recipe_raw = read(repo / recipe_link["path"], recipe_link["sha256"])
+        native = parse_json(recipe_raw.decode("utf-8"))["native_evidence"]
+        require(type(native["char_bit"]) is int and native["char_bit"] == value["data_model"]["char_bit"]
+                and all(type(native[role + "_bytes"]) is int
+                        and native[role + "_bytes"] * native["char_bit"] == value["data_model"][role + "_bits"]
+                        for role in ("int", "size_t", "pointer")), "all-rule recipe data model mismatch")
+        _, source = read(Path(candidate["source"]["snapshot_root"]) / "case.c", candidate["source"]["sha256"])
+        require(len(source.decode("utf-8").splitlines()) == value["source"]["line_count"], "all-rule source line count")
+        verify_reviewed_files(repo, value["reference_head"], value["references"])
+        for path, before in observations.items():
+            require(path.resolve(strict=True) == path and external_identity(path.lstat()) == external_identity(before),
+                    "all-rule final input identity changed")
+        return {**result, "record_sha256": info["sha256"], "candidate_sha256": candidate_info["sha256"],
+                "source_sha256": candidate["source"]["sha256"], "reference_head": value["reference_head"],
+                "source_bytes_verified": True}
+    except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError, subprocess.SubprocessError):
+        raise ValueError("GCC all-rule source binding rejected") from None
+
+
+def ground_truth_review_metadata(review, value, record_sha):
+    external_digest(record_sha)
+    fields(review, "schema repository_head record candidate source_sha256 implementer verifier verdict findings "
+           "rationale additional_quota_examples qualification", "all-rule source review")
+    require(review["schema"] == "codeskeptic-all-rule-source-review/v1"
+            and type(review["repository_head"]) is str and re.fullmatch(r"[0-9a-f]{40}", review["repository_head"])
+            and review["repository_head"] != "0" * 40
+            and review["record"] == {"path": GCC_GROUND_TRUTH, "sha256": record_sha}
+            and review["candidate"] == value["candidate"] and review["source_sha256"] == value["source"]["sha256"]
+            and review["verdict"] == "ACCEPT_SOURCE_LABELS" and review["findings"] == [], "all-rule reviewed identity/verdict")
+    for key in ("implementer", "verifier"):
+        require(type(review[key]) is str and re.fullmatch(r"/[a-z0-9_]+(?:/[a-z0-9_]+)*", review[key])
+                and len(review[key]) <= 128, "all-rule review agent identity")
+    require(review["implementer"] != review["verifier"] and nonempty(review["rationale"])
+            and len(review["rationale"]) <= 8192 and type(review["additional_quota_examples"]) is int
+            and review["additional_quota_examples"] == 0
+            and canonical(review["qualification"]) == canonical(value["qualification"]),
+            "all-rule review independence/boundaries")
+    fields(review["qualification"], "evaluation_frozen native_product_qualified license_qualified "
+           "redistribution_approved analyzer_run task_ready product_qualified", "all-rule review qualification")
+    require(all(item is False for item in review["qualification"].values()), "source review is not qualification")
+
+
+def verify_ground_truth_index(repo):
+    """Read a separately reviewed label sidecar; never amend source admission."""
+    try:
+        repo = Path(repo)
+        observations = {}
+
+        def read(path, expected=None):
+            info, before, raw = external_read(path, capture=True)
+            require(info["size_bytes"] <= 65536 and (expected is None or info["sha256"] == expected),
+                    "all-rule reviewed evidence size/hash")
+            observations[path] = before
+            return parse_json(raw.decode("utf-8"))
+
+        index = read(repo / GROUND_TRUTH_INDEX)
+        fields(index, "schema state entries boundary", "all-rule label index")
+        require(index["schema"] == "codeskeptic-product-reviewed-ground-truth/v1"
+                and index["state"] == "PARTIAL_REVIEWED_SOURCE_LABELS_NOT_FROZEN"
+                and nonempty(index["boundary"]) and type(index["entries"]) is list and len(index["entries"]) == 1,
+                "all-rule label index state")
+        entry = index["entries"][0]
+        fields(entry, "record review", "all-rule index entry")
+        for link in entry.values():
+            fields(link, "path sha256", "all-rule index link")
+            external_digest(link["sha256"])
+        require(entry["record"]["path"] == GCC_GROUND_TRUTH, "all-rule indexed record path")
+        value = read(repo / GCC_GROUND_TRUTH, entry["record"]["sha256"])
+        review_path = Path(entry["review"]["path"])
+        require(review_path.is_absolute() and repo not in review_path.parents, "all-rule review must be external")
+        review = read(review_path, entry["review"]["sha256"])
+        ground_truth_review_metadata(review, value, entry["record"]["sha256"])
+        verify_reviewed_files(repo, review["repository_head"], [entry["record"], value["candidate"]])
+        actual = verify_gcc_ground_truth(repo)
+        require(actual["record_sha256"] == entry["record"]["sha256"], "all-rule reviewed record changed")
+        manifest = read_json(repo / "scripts/product_profiles.json")
+        source_metadata(manifest)
+        selection = verify_source_selection(repo, manifest["source_selection"])
+        selected = read(repo / SOURCE_SELECTION, manifest["source_selection"]["sha256"])
+        require(selection["quota_examples"] >= 1
+                and selection["quota_examples"] == manifest["independent_quota_examples"]
+                and any(item["candidate"] == value["candidate"] for item in selected["admissions"]),
+                "all-rule record requires its original source admission")
+        for path, before in observations.items():
+            require(path.resolve(strict=True) == path and external_identity(path.lstat()) == external_identity(before),
+                    "all-rule reviewed evidence final identity changed")
+        return {**actual, "source_labels_independently_reviewed": True,
+                "source_selection_quota_examples": selection["quota_examples"], "review_head": review["repository_head"]}
+    except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError, subprocess.SubprocessError):
+        raise ValueError("reviewed all-rule source labels rejected") from None
+
+
 def adapt_gcc_source(raw):
     """Replay the reviewed line selection; the caller binds input/output hashes."""
     lines = raw.decode("utf-8").splitlines()
@@ -1171,7 +1362,7 @@ def draft_readiness(manifest, root=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check"))
+    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check", "ground-truth-candidate-check", "ground-truth-check"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--historical-sources", type=Path, default=Path(
         "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S04-U001/corpus-diagnostic-comparison"))
@@ -1183,7 +1374,12 @@ def main():
         if args.command == "selection-check":
             require(args.binding is None and args.evidence_root is None and args.external_root is None,
                     "reviewed selection uses its explicit tracked roots")
-        if args.command == "source-candidate-check":
+        if args.command in ("ground-truth-candidate-check", "ground-truth-check"):
+            require(args.binding is None and args.evidence_root is None and args.external_root is None,
+                    "all-rule source labels use their fixed tracked roots")
+            result = (verify_gcc_ground_truth(args.root) if args.command == "ground-truth-candidate-check"
+                      else verify_ground_truth_index(args.root))
+        elif args.command == "source-candidate-check":
             require(args.binding is None and args.evidence_root is None and args.external_root is None,
                     "source candidate uses its explicit tracked roots")
             result = verify_gcc_source_candidate(args.root)
