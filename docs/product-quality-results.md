@@ -405,3 +405,13 @@ tek beklenen assertion hatası ve sıfır ek hata/warning ister; iç header tan�
 reddeder. Eski v1 reader geçmiş belgeleri aynı anlamla okumayı sürdürür. Seçilen
 Windows INCLUDE eski gözlemin 188 C/427 C++ dependency'sini kapsar, ancak bu
 geçmiş karşılaştırma yeni native çalışmanın kanıtı değildir.
+
+İlk gerçek per-case hosted çalışması
+[`34324181485`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34324181485),
+bağımsız kısmi hazırlık PASS alan `4cc3fe7` kaynağında Ubuntu ve macOS lane'lerini
+geçirdi; Windows lane'i başarısızdır. Windows native capture'a ulaşmadan testteki
+LF-only stderr beklentisi, Python'ın normal CRLF çıktısını reddetti. İleti içeriği
+ve gizlilik kontrolü korunarak yalnız testin CRLF taşıma farkı normalleştirildi;
+Git source/helper byte kontrolü değiştirilmedi. Bu başarısız hosted denemesi,
+ham üç job logu ve dört oluşmuş metadata artifact'iyle dış kanıtta korunur.
+Windows için yeni native çalıştırma hâlâ gereklidir; eski başarısızlık PASS değildir.

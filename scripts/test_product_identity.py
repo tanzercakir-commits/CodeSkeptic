@@ -754,7 +754,7 @@ class CaseCaptureTests(unittest.TestCase):
             result = subprocess.run([sys.executable, '-B', identity.__file__, 'check-case', str(path)], capture_output=True, timeout=10)
             self.assertEqual(result.returncode, 2)
             self.assertEqual(result.stdout, b'')
-            self.assertEqual(result.stderr, b'IDENTITY_INVALID case observation rejected\n')
+            self.assertEqual(result.stderr.replace(b'\r\n', b'\n'), b'IDENTITY_INVALID case observation rejected\n')
 
     def test_clt_sdk_alias_and_compiler_alias_preserve_resolved_identity(self):
         value = self.case_document('Darwin')
