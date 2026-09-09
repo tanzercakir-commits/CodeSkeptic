@@ -432,3 +432,6 @@ sonra reddedildi. Bu run başarısız kalır; generic hata kök nedeni kanıtlam
 Kaynak/SDK metni veya exception içeriği yazdırmadan aşama, script kontrol satırı
 ve varsa uyuşmayan stat alanının sabit adı eklendi. Ret koşulları gevşetilmedi;
 Windows'taki gerçek reddin kaynağı yeni kanıtla ayrıca belirlenmelidir.
+Her native lane başarılı staging sonrasında ayrıca gerçek tempfile kullanan
+dış-girdi ve staging güvenlik testlerini çalıştırır; eski 54 identity testi
+descriptor/pathname karşılaştırmalarını kapsıyor gibi sunulmaz.

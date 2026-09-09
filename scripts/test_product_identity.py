@@ -822,6 +822,11 @@ class CaseCaptureTests(unittest.TestCase):
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_every_native_lane_runs_external_input_and_staging_safety_tests(self):
+        workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/product-identity.yml').read_text()
+        self.assertEqual(workflow.count('-k GccStaging -k ExternalInput -q'), 2)
+        self.assertIn("throw 'External input safety tests failed'", workflow)
+
     def test_each_lane_uses_one_explicit_python_for_tests_and_capture(self):
         workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/product-identity.yml').read_text()
         self.assertIn('identity_python="$(command -v python3)"', workflow)
