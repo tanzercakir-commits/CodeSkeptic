@@ -435,3 +435,18 @@ Windows'taki gerçek reddin kaynağı yeni kanıtla ayrıca belirlenmelidir.
 Her native lane başarılı staging sonrasında ayrıca gerçek tempfile kullanan
 dış-girdi ve staging güvenlik testlerini çalıştırır; eski 54 identity testi
 descriptor/pathname karşılaştırmalarını kapsıyor gibi sunulmaz.
+
+Üçüncü hosted deneme
+[`34326603690`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34326603690)
+`ae6ac13b` kaynağında Windows staging reddini `descriptor-open:ctime_ns` olarak
+yerelleştirdi; diğer altı alan eşleşti. Ubuntu/macOS case'leri geçti, run yine
+başarısızdır. CPython 3.12.10'un [pathname sorgusu](https://github.com/python/cpython/blob/v3.12.10/Modules/posixmodule.c#L2009)
+`ctime` alanını creation time ile doldururken [descriptor sorgusu](https://github.com/python/cpython/blob/v3.12.10/Python/fileutils.c#L1147)
+ChangeTime dönüşümünü korur. Bu API anlam farkı, dosya değişikliği kanıtı değildir.
+Yeni dar karşılaştırma yalnız Windows cross-query çiftinde iki gerçek integer
+`birthtime_ns` varsa creation/creation kullanır. Eksik/asimetrik alan ret alır;
+iki tarafta da yoksa eski raw timestamp karşılaştırması sürer. Ham lstat/lstat
+ve ek fstat/fstat kontrolleri `ctime_ns` değişimini korur; dosya kimliği, byte/hash,
+link ve alias kontrolleri kaldırılmadı. Windows biçimli pozitif RED ve timestamp,
+diğer kimlik alanları, POSIX/eksik-alan negatifleri ayrı kayıtta tutulur. Bu
+düzeltmenin gerçek Windows sonucu yeni exact-head run ile kanıtlanmalıdır.

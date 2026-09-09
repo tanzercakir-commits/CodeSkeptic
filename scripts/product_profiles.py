@@ -236,17 +236,29 @@ def external_identity(info):
 
 class ExternalIdentityError(ValueError):
     """Only static check/field names, never input bytes, paths or stat values."""
-    def __init__(self, phase, actual, expected):
+    def __init__(self, phase, actual, expected, birthtime=False):
         super().__init__("external input identity changed")
         self.phase = phase
-        names = ("device", "inode", "mode", "links", "size", "mtime_ns", "ctime_ns")
+        names = ("device", "inode", "mode", "links", "size", "mtime_ns",
+                 "birthtime_ns" if birthtime else "ctime_ns")
         self.changed_fields = tuple(name for name, left, right in zip(names, actual, expected) if left != right)
 
 
-def check_external_identity(actual, expected, phase):
-    actual, expected = external_identity(actual), external_identity(expected)
-    if actual != expected:
-        raise ExternalIdentityError(phase, actual, expected)
+def check_external_identity(actual, expected, phase, *, cross_query=False):
+    left, right = external_identity(actual), external_identity(expected)
+    birthtime = cross_query and sys.platform == "win32" and (
+        hasattr(actual, "st_birthtime_ns") or hasattr(expected, "st_birthtime_ns"))
+    if birthtime:
+        # CPython 3.12 Windows lstat aliases ctime to birthtime, while fstat
+        # can expose ChangeTime. Compare creation with creation only here;
+        # raw same-query ctime checks remain mandatory before/after reading.
+        require(type(getattr(actual, "st_birthtime_ns", None)) is int
+                and type(getattr(expected, "st_birthtime_ns", None)) is int,
+                "external creation timestamp unavailable")
+        left = left[:6] + (actual.st_birthtime_ns,)
+        right = right[:6] + (expected.st_birthtime_ns,)
+    if left != right:
+        raise ExternalIdentityError(phase, left, right, birthtime)
 
 
 def external_read(path, capture=False):
@@ -265,7 +277,8 @@ def external_read(path, capture=False):
     descriptor = os.open(path, flags)
     digest, size, chunks = hashlib.sha256(), 0, []
     try:
-        check_external_identity(os.fstat(descriptor), before, "descriptor-open")
+        opened = os.fstat(descriptor)
+        check_external_identity(opened, before, "descriptor-open", cross_query=True)
         while True:
             chunk = os.read(descriptor, min(1024 * 1024, before.st_size + 1 - size))
             if not chunk:
@@ -275,7 +288,9 @@ def external_read(path, capture=False):
             digest.update(chunk)
             if capture:
                 chunks.append(chunk)
-        check_external_identity(os.fstat(descriptor), before, "descriptor-final")
+        final = os.fstat(descriptor)
+        check_external_identity(final, opened, "descriptor-final")
+        check_external_identity(final, before, "descriptor-final", cross_query=True)
         require(size == before.st_size and path.resolve(strict=True) == path
                 and external_identity(path.lstat()) == external_identity(before), "external input changed")
     finally:

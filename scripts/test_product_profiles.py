@@ -808,6 +808,78 @@ class ExternalInputTests(unittest.TestCase):
 
 
 class GccStagingTests(unittest.TestCase):
+    @staticmethod
+    def stat_fixture(**changes):
+        values = dict(st_dev=1, st_ino=2, st_mode=0o100600, st_nlink=1,
+                      st_size=3, st_mtime_ns=5, st_ctime_ns=6, st_birthtime_ns=6)
+        values.update(changes)
+        return SimpleNamespace(**values)
+
+    def read_stat_fixture(self, platform, before, opened, final=None, path_final=None):
+        path = mock.Mock(spec=Path)
+        path.is_absolute.return_value = True
+        path.resolve.return_value = path
+        path.lstat.side_effect = [before, path_final or before]
+        with mock.patch.object(profiles.sys, 'platform', platform), \
+                mock.patch.object(profiles.os, 'open', return_value=47), \
+                mock.patch.object(profiles.os, 'fstat', side_effect=[opened, final or opened]), \
+                mock.patch.object(profiles.os, 'read', side_effect=[b'abc', b'']), \
+                mock.patch.object(profiles.os, 'close') as close:
+            try:
+                return profiles.external_read(path)
+            finally:
+                close.assert_called_once_with(47)
+
+    def test_windows_creation_and_change_timestamps_are_distinct_queries(self):
+        # CPython 3.12 Windows lstat exposes creation time as deprecated ctime;
+        # fstat exposes ChangeTime. Both independently expose birthtime_ns.
+        result = self.read_stat_fixture('win32', self.stat_fixture(),
+                                       self.stat_fixture(st_ctime_ns=17))
+        self.assertEqual(result[0], {'size_bytes': 3, 'sha256': hashlib.sha256(b'abc').hexdigest()})
+        self.assertEqual(result[2], b'')
+
+    def test_cross_query_normalization_keeps_all_other_identity_guards(self):
+        for field in ('st_dev', 'st_ino', 'st_mode', 'st_nlink', 'st_size', 'st_mtime_ns', 'st_birthtime_ns'):
+            opened = self.stat_fixture(st_ctime_ns=17, **{field: 99})
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                self.read_stat_fixture('win32', self.stat_fixture(), opened)
+
+    def test_raw_descriptor_and_path_ctime_drift_remain_rejected(self):
+        for platform in ('win32', 'linux', 'darwin'):
+            opened = self.stat_fixture(st_ctime_ns=17 if platform == 'win32' else 6)
+            for query in ('descriptor', 'path'):
+                changes = {'final': self.stat_fixture(st_ctime_ns=29)} if query == 'descriptor' else {
+                    'path_final': self.stat_fixture(st_ctime_ns=29)}
+                with self.subTest(platform=platform, query=query), self.assertRaises(ValueError):
+                    self.read_stat_fixture(platform, self.stat_fixture(), opened, **changes)
+
+    def test_final_descriptor_birthtime_drift_and_its_redacted_label(self):
+        with self.assertRaises(profiles.ExternalIdentityError) as caught:
+            self.read_stat_fixture('win32', self.stat_fixture(), self.stat_fixture(st_ctime_ns=17),
+                                   final=self.stat_fixture(st_ctime_ns=17, st_birthtime_ns=876543210))
+        message = profiles.gcc_stage_failure(caught.exception, 'verification')
+        self.assertIn('identity=descriptor-final:birthtime_ns', message)
+        self.assertNotIn('876543210', message)
+
+    def test_birthtime_normalization_is_windows_only_and_requires_both_fields(self):
+        for platform in ('linux', 'darwin'):
+            with self.subTest(platform=platform), self.assertRaises(ValueError):
+                self.read_stat_fixture(platform, self.stat_fixture(), self.stat_fixture(st_ctime_ns=17))
+        for field in ('before', 'opened', 'both'):
+            before, opened = self.stat_fixture(), self.stat_fixture()
+            if field in ('before', 'both'):
+                del before.st_birthtime_ns
+            if field in ('opened', 'both'):
+                del opened.st_birthtime_ns
+            if field == 'both':
+                self.read_stat_fixture('win32', before, opened)
+                opened.st_ctime_ns = 17
+            with self.subTest(missing=field), self.assertRaises(ValueError):
+                self.read_stat_fixture('win32', before, opened)
+        for value in (None, True, '6'):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                self.read_stat_fixture('win32', self.stat_fixture(), self.stat_fixture(st_birthtime_ns=value))
+
     def test_stat_rejection_diagnostics_contain_only_fixed_field_names(self):
         values = dict(st_dev=1, st_ino=2, st_mode=3, st_nlink=1, st_size=4, st_mtime_ns=5, st_ctime_ns=6)
         before = SimpleNamespace(**values)
