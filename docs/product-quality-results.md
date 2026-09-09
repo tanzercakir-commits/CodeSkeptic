@@ -301,3 +301,31 @@ Yerel GCC 16.1.1 ve Clang 22.1.8 ile sekiz syntax/ABI/dependency kontrolü geçt
 Bunlar runtime closure, Windows/macOS yeterliliği veya analyzer sonucu değildir.
 Prospektif rapor yeri `test_2` kapanışıdır (satır 28). Bağımsız seçim çalışması
 ilerlemiş olsa da kabul edilmiş kota hâlâ **0/1020** ve U003 tamamlanmamıştır.
+
+### Dış kaynak girdilerinin yerel byte bağı
+
+[`gcc-mixed-storage-binding.json`](../tests/product_corpus/candidates/gcc-mixed-storage-binding.json)
+636 byte'lık adayı, upstream kaynağını, parent dosyasını ve iki korunmuş notice
+dosyasını ayrı roller/yollar/boyutlar/SHA-256 kimlikleriyle bağlar: beş dosya,
+toplam 43.256 byte. Önceki bağımsız karar kaydı da exact digest ile bağlanır;
+aday ve upstream source digest'leri o kayıtla karşılaştırılır. Notice dosyalarının
+korunması kaynağa özgü lisans hakkının çözüldüğü anlamına gelmez.
+
+`product_profiles.py external-source-check`, açıkça verilen `--binding` ve
+`--external-root` ile bu küçük snapshot'ı okur; download, compiler/analyzer
+çalıştırma veya kaynak metnini stdout/stderr'e yazma yapmaz. Repo dışında,
+canonical absolute bir kök ister; eksik/fazla/değişmiş dosyaları, traversal,
+symlink/hardlink, dosya/dizin çakışması, geçersiz JSON ve sonlu boyut ihlallerini
+reddeder. Descriptor ve final kimlik kontrolleri olağan okuma yarışlarını yakalar;
+kötücül root'a karşı atomik filesystem snapshot veya izolasyon iddiası yoktur.
+Başka makinede aynı exact beş dosya aynı göreli yollara hazırlanmalıdır; otomatik
+edinim veya yayın politikası bu kontrolün parçası değildir. Yerel hazırlık ve
+RED/GREEN kanıtları repo dışındaki U003 `external-binding-v1` dizinindedir.
+
+Başarı yalnız `source_bytes_verified=true` üretir. `native_commands_bound`,
+`license_qualified`, `task_ready` ve `product_qualified` false kalır; kabul edilmiş
+kota **0/1020**'dir. Bu kaydın kendi hashleri bağımsız hakemliğin yerine geçmez:
+güven çapası exact Git manifesti ve onu inceleyen hakemdir. Kaynak/manifest birlikte
+değişirse başka bir kimlik oluşur, geçmiş karar yeni kaynağa taşınmış olmaz.
+Nihai native komut/header/ABI/ortam ve occurrence yeterliliği hâlâ dondurulmamıştır.
+Önceki başarısızlıklar, FRONT, ledger ve tamamlanma kapıları değişmez.

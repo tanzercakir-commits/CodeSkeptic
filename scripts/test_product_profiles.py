@@ -3,11 +3,13 @@
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 import product_profiles as profiles
 
@@ -544,6 +546,263 @@ class NativeApiProfileTests(unittest.TestCase):
             model.symlink_to(self.root / manifest["native_api_model"])
             with self.assertRaises(ValueError):
                 profiles.linked_native_api_model(manifest, staged)
+
+
+class ExternalInputTests(unittest.TestCase):
+    """Synthetic file binding, never independent sample admission."""
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="codeskeptic-external-input-")
+        self.addCleanup(temporary.cleanup)
+        self.base = Path(temporary.name).resolve()
+        self.repo, self.source = self.base / "repo", self.base / "source"
+        self.repo.mkdir()
+        self.source.mkdir()
+        self.rows = []
+        for role, path in (("candidate", "case.c"), ("origin", "origin.c"),
+                           ("lineage", "lineage/parent.c"), ("notice", "notices/COPYING")):
+            data = ("SOURCE_SENTINEL_" + role + "\n").encode()
+            target = self.source / path
+            target.parent.mkdir(exist_ok=True)
+            target.write_bytes(data)
+            self.rows.append({"role": role, "path": path, "size_bytes": len(data),
+                              "sha256": hashlib.sha256(data).hexdigest()})
+        self.rows.sort(key=lambda row: row["path"])
+        self.review = {"id": "synthetic-held-case",
+                       "source": {"sha256": self.rows[0]["sha256"]},
+                       "origin": {"sha256": next(r["sha256"] for r in self.rows if r["role"] == "origin")}}
+        review_bytes = profiles.canonical(self.review).encode()
+        (self.repo / "review.json").write_bytes(review_bytes)
+        self.manifest = {"schema": "codeskeptic-product-external-inputs/v1",
+                         "state": "SOURCE_BINDING_ONLY_NOT_FROZEN",
+                         "id": self.review["id"],
+                         "adjudication": {"path": "review.json", "sha256": hashlib.sha256(review_bytes).hexdigest()},
+                         "inputs": self.rows}
+        self.path = self.repo / "binding.json"
+        self.save()
+
+    def save(self):
+        self.path.write_text(profiles.canonical(self.manifest), encoding="utf-8")
+
+    def check(self):
+        return profiles.verify_external_inputs(self.path, self.repo, self.source)
+
+    def test_actual_bytes_bound_without_execution_or_admission(self):
+        with mock.patch.object(subprocess, "run", side_effect=AssertionError("must not execute")):
+            result = self.check()
+        self.assertEqual(set(result), {"schema", "id", "binding_sha256", "adjudication_sha256",
+                                     "source_bytes_verified", "verified_inputs", "verified_bytes",
+                                     "independent_quota_examples", "task_ready", "product_qualified",
+                                     "native_commands_bound", "license_qualified", "state"})
+        self.assertTrue(result["source_bytes_verified"])
+        self.assertEqual(result["verified_inputs"], 4)
+        self.assertEqual(result["independent_quota_examples"], 0)
+        for key in ("task_ready", "product_qualified", "native_commands_bound", "license_qualified"):
+            self.assertIs(result[key], False)
+        self.assertNotIn("SOURCE_SENTINEL", profiles.canonical(result))
+
+    def test_missing_changed_and_extra_file_rejected(self):
+        case = self.source / "case.c"
+        original = case.read_bytes()
+        for data in (None, b"x" * len(original), original + b"x"):
+            if case.exists():
+                case.unlink()
+            if data is not None:
+                case.write_bytes(data)
+            with self.subTest(data=data), self.assertRaises(ValueError):
+                self.check()
+        case.write_bytes(original)
+        (self.source / "extra.c").write_bytes(b"x")
+        with self.assertRaises(ValueError):
+            self.check()
+
+    def test_paths_roles_sizes_and_claims_reject_tampering(self):
+        original = copy.deepcopy(self.manifest)
+        for key, values in (("path", ("../escape", "/abs", "a/../case.c", "a//b", "a\\b", "a:stream", "CON.c", "case.c/child")),
+                            ("role", ("header", "origin")), ("size_bytes", (True, -1, 16777217)),
+                            ("sha256", ("0" * 64, "bad"))):
+            for value in values:
+                self.manifest = copy.deepcopy(original)
+                self.manifest["inputs"][0][key] = value
+                self.save()
+                with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                    self.check()
+        for key, value in (("state", "FROZEN"), ("quota", True), ("id", "SOURCE_SENTINEL_BAD")):
+            self.manifest = copy.deepcopy(original)
+            self.manifest[key] = value
+            self.save()
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                self.check()
+
+    def test_duplicate_reordered_and_case_alias_inputs_rejected(self):
+        original = copy.deepcopy(self.manifest)
+        for operation in ("duplicate", "reorder", "case-alias"):
+            self.manifest = copy.deepcopy(original)
+            rows = self.manifest["inputs"]
+            if operation == "duplicate":
+                rows.append(copy.deepcopy(rows[0]))
+            elif operation == "reorder":
+                rows.reverse()
+            else:
+                row = copy.deepcopy(rows[0])
+                row.update(path="CASE.c", role="lineage")
+                rows.append(row)
+                rows.sort(key=lambda item: item["path"])
+            self.save()
+            with self.subTest(operation=operation), self.assertRaises(ValueError):
+                self.check()
+
+    def test_changed_adjudication_or_candidate_origin_binding_rejected(self):
+        for key in ("id", "source", "origin"):
+            review = copy.deepcopy(self.review)
+            review[key] = "different" if key == "id" else {"sha256": "e" * 64}
+            data = profiles.canonical(review).encode()
+            (self.repo / "review.json").write_bytes(data)
+            self.manifest["adjudication"]["sha256"] = hashlib.sha256(data).hexdigest()
+            self.save()
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                self.check()
+
+    def test_stale_adjudication_digest_and_missing_cli_arguments_fail_closed(self):
+        (self.repo / "review.json").write_bytes(b"changed")
+        with self.assertRaises(ValueError):
+            self.check()
+        script = Path(__file__).resolve().with_name("product_profiles.py")
+        result = subprocess.run([sys.executable, "-B", str(script), "external-source-check"],
+                                capture_output=True, text=True, timeout=10, check=False)
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(result.stderr, "PRODUCT_PROFILE_FAIL: external input binding rejected\n")
+
+    def test_later_read_cannot_hide_change_to_earlier_input_or_manifest(self):
+        original_read = profiles.external_read
+        case = self.source / "case.c"
+        original_case, original_manifest = case.read_bytes(), self.path.read_bytes()
+        for operation in ("earlier-file", "manifest", "extra-file", "extra-directory"):
+            case.write_bytes(original_case)
+            self.path.write_bytes(original_manifest)
+            changed = False
+            def mutate(path, capture=False):
+                nonlocal changed
+                result = original_read(path, capture)
+                if path == self.source / "origin.c":
+                    changed = True
+                    if operation == "earlier-file":
+                        case.write_bytes(b"x" * len(original_case))
+                    elif operation == "manifest":
+                        self.path.write_bytes(original_manifest + b"\n")
+                    elif operation == "extra-file":
+                        (self.source / "extra").write_bytes(b"x")
+                    else:
+                        (self.source / "extra").mkdir()
+                return result
+            with self.subTest(operation=operation), mock.patch.object(profiles, "external_read", side_effect=mutate):
+                with self.assertRaises(ValueError):
+                    self.check()
+            self.assertTrue(changed)
+            extra = self.source / "extra"
+            if extra.is_dir():
+                extra.rmdir()
+            elif extra.exists():
+                extra.unlink()
+
+    def test_duplicate_json_nonfinite_and_invalid_utf8_rejected(self):
+        for payload in (b'{"state":1,"state":2}', b'{"x":NaN}', b'{"x":1e999}', b'\xff'):
+            self.path.write_bytes(payload)
+            with self.subTest(payload=payload), self.assertRaises(ValueError):
+                self.check()
+
+    def test_root_containment_and_aliases_rejected(self):
+        for source in (self.repo, self.base, self.repo / "absent", Path("source")):
+            with self.subTest(source=source), self.assertRaises(ValueError):
+                profiles.verify_external_inputs(self.path, self.repo, source)
+        alias = self.base / "source-link"
+        try:
+            alias.symlink_to(self.source, target_is_directory=True)
+        except OSError:
+            self.skipTest("symlink creation unavailable")
+        with self.assertRaises(ValueError):
+            profiles.verify_external_inputs(self.path, self.repo, alias)
+
+    def test_leaf_intermediate_and_manifest_symlinks_rejected(self):
+        leaf = self.source / "case.c"
+        moved = self.base / "moved.c"
+        leaf.rename(moved)
+        try:
+            leaf.symlink_to(moved)
+        except OSError:
+            self.skipTest("symlink creation unavailable")
+        with self.assertRaises(ValueError):
+            self.check()
+        leaf.unlink()
+        moved.rename(leaf)
+        directory = self.source / "lineage"
+        directory.rename(self.base / "moved-dir")
+        directory.symlink_to(self.base / "moved-dir", target_is_directory=True)
+        with self.assertRaises(ValueError):
+            self.check()
+        directory.unlink()
+        (self.base / "moved-dir").rename(directory)
+        self.path.rename(self.repo / "moved.json")
+        self.path.symlink_to(self.repo / "moved.json")
+        with self.assertRaises(ValueError):
+            self.check()
+
+    def test_hardlinks_and_nonregular_files_rejected(self):
+        leaf = self.source / "case.c"
+        try:
+            os.link(leaf, self.base / "hardlink")
+        except OSError:
+            self.skipTest("hardlinks unavailable")
+        with self.assertRaises(ValueError):
+            self.check()
+        (self.base / "hardlink").unlink()
+        leaf.unlink()
+        leaf.mkdir()
+        with self.assertRaises(ValueError):
+            self.check()
+        leaf.rmdir()
+        if hasattr(os, "mkfifo"):
+            os.mkfifo(leaf)
+            with self.assertRaises(ValueError):
+                self.check()
+
+    def test_growth_rewrite_and_replacement_during_read_rejected(self):
+        leaf = self.source / "case.c"
+        original = leaf.read_bytes()
+        for operation in ("growth", "rewrite", "replace"):
+            leaf.write_bytes(original)
+            read = os.read
+            changed = False
+            def mutate(fd, size):
+                nonlocal changed
+                data = read(fd, size)
+                if not changed and data == original:
+                    changed = True
+                    if operation == "replace":
+                        replacement = self.base / "replacement"
+                        replacement.write_bytes(original)
+                        replacement.replace(leaf)
+                    else:
+                        leaf.write_bytes(original + b"x" if operation == "growth" else b"x" * len(original))
+                return data
+            with self.subTest(operation=operation), mock.patch.object(os, "read", side_effect=mutate):
+                with self.assertRaises(ValueError):
+                    self.check()
+            self.assertTrue(changed)
+
+    def test_cli_success_and_failure_do_not_echo_source_or_parser_payload(self):
+        script = Path(__file__).resolve().with_name("product_profiles.py")
+        argv = [sys.executable, "-B", str(script), "external-source-check", "--root", str(self.repo),
+                "--binding", str(self.path), "--external-root", str(self.source)]
+        result = subprocess.run(argv, capture_output=True, text=True, timeout=10, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(json.loads(result.stdout)["source_bytes_verified"])
+        self.path.write_text('{"x":SOURCE_SENTINEL_PRIVATE_PAYLOAD}', encoding="utf-8")
+        result = subprocess.run(argv, capture_output=True, text=True, timeout=10, check=False)
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(result.stderr, "PRODUCT_PROFILE_FAIL: external input binding rejected\n")
+        self.assertNotIn("SOURCE_SENTINEL", result.stdout + result.stderr)
 
 
 if __name__ == "__main__":

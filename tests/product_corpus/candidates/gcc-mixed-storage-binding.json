@@ -1,0 +1,41 @@
+{
+  "schema": "codeskeptic-product-external-inputs/v1",
+  "state": "SOURCE_BINDING_ONLY_NOT_FROZEN",
+  "id": "gcc-mixed-storage-local-loss",
+  "adjudication": {
+    "path": "tests/product_corpus/candidates/gcc-mixed-storage-selection.json",
+    "sha256": "ed7760f92740f868486ab303c7b72d87c12f46811b261aaf28ee884826b5b0bd"
+  },
+  "inputs": [
+    {
+      "role": "candidate",
+      "path": "case.c",
+      "size_bytes": 636,
+      "sha256": "5c5563b8ed6e5715cb1913e223276146bc4c8799c11ee4dace55cf6e8a5e4b0a"
+    },
+    {
+      "role": "lineage",
+      "path": "lineage/malloc-vs-local-2.c",
+      "size_bytes": 3729,
+      "sha256": "cfe4ed67d6b52d58ce794f7b8a806940000a447b206aac27ba25b0c6caf6a02a"
+    },
+    {
+      "role": "notice",
+      "path": "notices/COPYING3",
+      "size_bytes": 35147,
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+    },
+    {
+      "role": "notice",
+      "path": "notices/README",
+      "size_bytes": 2317,
+      "sha256": "68ec1c84d14cbf715ee0747436af5b66b2901eb3cf1bd829cf8678fd88cae5a2"
+    },
+    {
+      "role": "origin",
+      "path": "origin/malloc-vs-local-3.c",
+      "size_bytes": 1427,
+      "sha256": "6606b3996702fe727da53e66d2a025b744a896a82080f1e85caa092a275106a6"
+    }
+  ]
+}

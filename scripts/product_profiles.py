@@ -11,8 +11,10 @@ from collections import Counter
 import hashlib
 import json
 import math
+import os
 from pathlib import Path, PurePosixPath
 import re
+import stat
 import sys
 
 from product_quality import FAMILIES, fields, nonempty, require
@@ -188,7 +190,7 @@ def file_sha(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def read_json(path):
+def parse_json(text):
     def pairs(items):
         result = {}
         for key, value in items:
@@ -199,8 +201,171 @@ def read_json(path):
         value = float(text)
         require(math.isfinite(value), "nonfinite JSON")
         return value
-    return json.loads(regular_file(path).read_text(encoding="utf-8"),
+    return json.loads(text,
                       object_pairs_hook=pairs, parse_float=number, parse_constant=number)
+
+
+def read_json(path):
+    return parse_json(regular_file(path).read_text(encoding="utf-8"))
+
+
+def external_relative(value):
+    """Small portable filename subset, not arbitrary host path interpretation."""
+    require(type(value) is str and 0 < len(value) <= 512, "external relative path")
+    parts = value.split("/")
+    reserved = {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)),
+                *(f"LPT{i}" for i in range(1, 10))}
+    require(len(parts) <= 8 and all(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", part)
+            and not part.endswith(".") and part.split(".")[0].upper() not in reserved for part in parts),
+            "external relative path")
+    return Path(*parts)
+
+
+def external_digest(value):
+    require(type(value) is str and SHA.fullmatch(value) and value != "0" * 64,
+            "external digest")
+    return value
+
+
+def external_identity(info):
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_nlink,
+            info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+
+
+def external_read(path, capture=False):
+    """Bounded descriptor read with ordinary-race checks, not hostile-root isolation.
+
+    No source text is returned unless explicitly reading the two JSON records.
+    O_NOFOLLOW is supplementary where available; canonical paths, lstat, fstat
+    and final identities are checked on every host. This does not provide an
+    atomic snapshot against malicious ancestor replacement/restoration.
+    """
+    require(path.is_absolute() and path.resolve(strict=True) == path, "external path alias")
+    before = path.lstat()
+    require(stat.S_ISREG(before.st_mode) and before.st_nlink == 1
+            and 0 < before.st_size <= 16 * 1024 * 1024, "external input type/size/link")
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    descriptor = os.open(path, flags)
+    digest, size, chunks = hashlib.sha256(), 0, []
+    try:
+        require(external_identity(os.fstat(descriptor)) == external_identity(before), "external open changed")
+        while True:
+            chunk = os.read(descriptor, min(1024 * 1024, before.st_size + 1 - size))
+            if not chunk:
+                break
+            size += len(chunk)
+            require(size <= before.st_size, "external input grew")
+            digest.update(chunk)
+            if capture:
+                chunks.append(chunk)
+        require(size == before.st_size and external_identity(os.fstat(descriptor)) == external_identity(before)
+                and path.resolve(strict=True) == path
+                and external_identity(path.lstat()) == external_identity(before), "external input changed")
+    finally:
+        os.close(descriptor)
+    return {"sha256": digest.hexdigest(), "size_bytes": size}, before, b"".join(chunks)
+
+
+def external_tree(root, expected):
+    """Exact bounded directory/file set; reject even empty unexpected directories."""
+    directories = {root}
+    for path in expected:
+        directories.update(parent for parent in path.parents if parent == root or root in parent.parents)
+    remaining, pending, identities = set(expected), [root], {}
+    while pending:
+        directory = pending.pop()
+        info = directory.lstat()
+        require(stat.S_ISDIR(info.st_mode) and directory.resolve(strict=True) == directory,
+                "external directory alias/type")
+        identities[directory] = external_identity(info)
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                path = directory / entry.name
+                require(not entry.is_symlink(), "external symlink")
+                if entry.is_dir(follow_symlinks=False):
+                    require(path in directories, "unexpected external directory")
+                    pending.append(path)
+                else:
+                    require(path in remaining, "unexpected external file")
+                    remaining.remove(path)
+    require(not remaining, "missing external file")
+    return identities
+
+
+def verify_external_inputs(binding_path, repo, source_root):
+    """Verify reviewed source bytes only; never execute, download or admit a case.
+
+    The tracked binding plus exact-head human review is the trust anchor, not
+    self-reported hashes. A caller changing both manifest and bytes obtains a
+    different manifest identity, not proof that the changed source was reviewed.
+    """
+    try:
+        repo, root, binding_path = Path(repo), Path(source_root), Path(binding_path)
+        for directory in (repo, root):
+            require(directory.is_absolute() and directory.resolve(strict=True) == directory
+                    and directory.is_dir(), "external root alias/type")
+        require(repo != root and repo not in root.parents and root not in repo.parents,
+                "external root overlaps checkout")
+        require(repo in binding_path.parents, "external manifest outside checkout")
+        binding_hash, binding_info, raw = external_read(binding_path, capture=True)
+        manifest = parse_json(raw.decode("utf-8"))
+        fields(manifest, "schema state id adjudication inputs", "external binding")
+        require(manifest["schema"] == "codeskeptic-product-external-inputs/v1"
+                and manifest["state"] == "SOURCE_BINDING_ONLY_NOT_FROZEN"
+                and type(manifest["id"]) is str and re.fullmatch(r"[a-z][a-z0-9-]{0,95}", manifest["id"]),
+                "external binding identity/state")
+        link = manifest["adjudication"]
+        fields(link, "path sha256", "external adjudication")
+        review_path = repo / external_relative(link["path"])
+        external_digest(link["sha256"])
+        review_hash, review_info, raw = external_read(review_path, capture=True)
+        require(review_hash["sha256"] == link["sha256"], "external adjudication changed")
+        review = parse_json(raw.decode("utf-8"))
+        rows = manifest["inputs"]
+        require(type(rows) is list and 4 <= len(rows) <= 64, "external input inventory size")
+        expected, roles, names, total = {}, Counter(), [], 0
+        for row in rows:
+            fields(row, "role path size_bytes sha256", "external input")
+            require(type(row["role"]) is str and row["role"] in ("candidate", "origin", "lineage", "notice"),
+                    "external role")
+            relative = external_relative(row["path"])
+            external_digest(row["sha256"])
+            require(type(row["size_bytes"]) is int and 0 < row["size_bytes"] <= 16 * 1024 * 1024,
+                    "external declared size")
+            total += row["size_bytes"]
+            expected[root / relative] = row
+            names.append(row["path"])
+            roles[row["role"]] += 1
+        require(names == sorted(names) and len(set(name.casefold() for name in names)) == len(names)
+                and total <= 64 * 1024 * 1024 and roles["candidate"] == roles["origin"] == 1
+                and roles["lineage"] >= 1 and roles["notice"] >= 1, "external inventory ordering/roles/budget")
+        for path in expected:
+            require(not any(parent in expected for parent in path.parents), "external file/directory collision")
+        require(type(review) is dict and review["id"] == manifest["id"], "external review case identity")
+        for role, field in (("candidate", "source"), ("origin", "origin")):
+            require(type(review[field]) is dict and review[field]["sha256"] ==
+                    next(row["sha256"] for row in rows if row["role"] == role), "external reviewed bytes mismatch")
+        before_tree = external_tree(root, expected)
+        files, inodes = {binding_path: binding_info, review_path: review_info}, set()
+        for path, row in expected.items():
+            actual, info, _ = external_read(path)
+            require(actual == {key: row[key] for key in ("size_bytes", "sha256")}, "external source changed")
+            require((info.st_dev, info.st_ino) not in inodes, "external duplicate inode")
+            inodes.add((info.st_dev, info.st_ino))
+            files[path] = info
+        require(external_tree(root, expected) == before_tree, "external tree changed")
+        for path, before in files.items():
+            require(path.resolve(strict=True) == path and external_identity(path.lstat()) == external_identity(before),
+                    "external final identity changed")
+        return {"schema": "codeskeptic-product-external-input-check/v1", "id": manifest["id"],
+                "binding_sha256": binding_hash["sha256"], "adjudication_sha256": review_hash["sha256"],
+                "source_bytes_verified": True, "verified_inputs": len(rows), "verified_bytes": total,
+                "independent_quota_examples": 0, "task_ready": False, "product_qualified": False,
+                "native_commands_bound": False, "license_qualified": False,
+                "state": "SOURCE_BINDING_ONLY_NOT_FROZEN"}
+    except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError):
+        # Parser/OS exception text can contain private paths or input fragments.
+        raise ValueError("external input binding rejected") from None
 
 
 def verify_historical(index, repo, frozen):
@@ -532,13 +697,17 @@ def draft_readiness(manifest):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness"))
+    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--historical-sources", type=Path, default=Path(
         "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S04-U001/corpus-diagnostic-comparison"))
+    parser.add_argument("--binding", type=Path, help="tracked binding manifest (absolute path)")
+    parser.add_argument("--external-root", type=Path, help="explicit external snapshot root (absolute canonical path)")
     args = parser.parse_args()
     try:
-        if args.command == "limits":
+        if args.command == "external-source-check":
+            result = verify_external_inputs(args.binding, args.root, args.external_root)
+        elif args.command == "limits":
             result = {"limits": validate_limits(LIMITS), "measured": False,
                       "boundary": "Prospective limits only; not environment realization, dataset freeze or product PASS."}
         else:
