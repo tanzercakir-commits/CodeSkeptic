@@ -769,6 +769,23 @@ class CaseCaptureTests(unittest.TestCase):
         self.assertNotIn('PRIVATE_SOURCE_SENTINEL', result)
         self.assertNotIn('/private', result)
 
+    def test_windows_runtime_profile_paths_survive_without_secrets_or_overrides(self):
+        paths = {'USERPROFILE': r'C:\Users\runner', 'APPDATA': r'C:\Users\runner\AppData\Roaming',
+                 'LOCALAPPDATA': r'C:\Users\runner\AppData\Local'}
+        source = {**paths, 'GITHUB_TOKEN': 'PRIVATE_CREDENTIAL_SENTINEL', 'UNRELATED_SECRET': 'private'}
+        selected = identity.case_environment(source, 'Windows')
+        self.assertEqual({key: selected.get(key) for key in paths}, paths)
+        self.assertNotIn('PRIVATE_CREDENTIAL_SENTINEL', json.dumps(selected))
+        self.assertNotIn('UNRELATED_SECRET', selected)
+        for system in ('Linux', 'Darwin'):
+            self.assertTrue(set(paths).isdisjoint(identity.case_environment(source, system)))
+        for field in paths:
+            for value in ('', 'relative', r'C:\Users\runner\..\other', None):
+                with self.subTest(field=field, value=value), self.assertRaises(identity.IdentityError):
+                    identity.case_environment({**source, field: value}, 'Windows')
+        with self.assertRaises(identity.IdentityError):
+            identity.case_environment({**source, 'CPATH': 'unreviewed'}, 'Windows')
+
     def test_clt_sdk_alias_and_compiler_alias_preserve_resolved_identity(self):
         value = self.case_document('Darwin')
         native = value['native_identity']

@@ -477,3 +477,20 @@ run başarısız kaldı. Yeni hata iletisi yalnız sabit script adları ve kontr
 satırlarını verir; native tanı, exception metni veya kaynak/SDK byte'ı içermez.
 Bu tanılama eklemesi hiçbir kabul koşulunu değiştirmez; sonraki gerçek run
 reddin yerini kanıtlamadan kök neden veya native Windows PASS iddiası yoktur.
+
+Beşinci run
+[`34328908820`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34328908820)
+`cde0b84d` üzerinde aynı staging/26-test başarısından sonra native metadata'nın
+PowerShell işletim sistemi sorgusunda kaldı. Kaynak konumları capture →
+native_metadata → subprocess çizgisini ve yaklaşık 30 saniyelik süreyi gösterir;
+henüz aday compiler komutuna ulaşılmadı. Normal ortamda aynı sorgu geçmiştir.
+
+Case allowlist'i Windows profil/önbellek yollarını düşürüyordu. Microsoft'un
+[ortam belgesi](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_environment_variables)
+ve [PowerShell konum testleri](https://github.com/PowerShell/PowerShell/blob/master/test/powershell/Host/Base-Directory.Tests.ps1)
+bu native yolların kullanımını açıklar. Yeni dar değişiklik yalnız Windows için
+gözlenen `USERPROFILE`, `APPDATA`, `LOCALAPPDATA` absolute yollarını korur;
+relative/parent-traversal/boş değerler reddedilir. Linux/macOS ortamı, secret ve
+compiler-override retleri ile 30 saniyelik sınır aynı kalır. Bu üç-yol değişikliğinin
+gerçek timeout'u gidermesi henüz kanıtlanmamıştır; odaklı RED/GREEN native sonuç
+yerine geçmez. Önceki run'lar ve U003'ün bütün açık kapıları korunur.

@@ -505,6 +505,7 @@ CASE_TARGETS = {'Linux': 'x86_64-unknown-linux-gnu', 'Windows': 'x86_64-pc-windo
                 'Darwin': 'arm64-apple-macos14.0'}
 CASE_ENV_KEYS = (*ENV_KEYS, 'PATH', 'SystemRoot', 'SystemDrive', 'WINDIR', 'COMSPEC',
                  'TEMP', 'TMP', 'TMPDIR', 'ProgramFiles', 'ProgramFiles(x86)', 'LANG', 'LC_ALL', 'VSLANG')
+CASE_WINDOWS_ENV_KEYS = ('USERPROFILE', 'APPDATA', 'LOCALAPPDATA')
 CASE_SOURCE_FILES = ('scripts/product_profiles.py', 'scripts/product_quality.py',
                      'tests/product_corpus/candidates/gcc-mixed-storage-binding.json',
                      'tests/product_corpus/candidates/gcc-mixed-storage-selection.json')
@@ -513,18 +514,26 @@ CASE_SOURCE_FILES = ('scripts/product_profiles.py', 'scripts/product_quality.py'
 def case_environment(environment, system):
     """Only this opt-in capture uses a minimal environment, never ambient secrets."""
     require(system in CASE_TARGETS, 'case platform')
+    keys = CASE_ENV_KEYS + (CASE_WINDOWS_ENV_KEYS if system == 'Windows' else ())
     if system == 'Windows':
         folded = {}
         for key, value in environment.items():
             require(key.upper() not in folded or folded[key.upper()] == value, 'conflicting environment keys')
             folded[key.upper()] = value
-        environment = {key: folded[key.upper()] for key in (*CASE_ENV_KEYS, *FORBIDDEN_ENV,
+        environment = {key: folded[key.upper()] for key in (*keys, *FORBIDDEN_ENV,
                        'LIBRARY_PATH', 'LD_PRELOAD', 'DYLD_INSERT_LIBRARIES', 'DYLD_LIBRARY_PATH') if key.upper() in folded}
+        # Windows PowerShell uses the native profile/cache paths even with
+        # -NoProfile. Preserve these paths, not the caller's full environment.
+        for key in CASE_WINDOWS_ENV_KEYS:
+            if key in environment:
+                value = environment[key]
+                require(nonempty(value) and PureWindowsPath(value).is_absolute()
+                        and '..' not in PureWindowsPath(value).parts, 'case Windows runtime profile path')
     checked_environment(environment)
     require(not any(environment.get(key) for key in
                     ('LIBRARY_PATH', 'LD_PRELOAD', 'DYLD_INSERT_LIBRARIES', 'DYLD_LIBRARY_PATH')),
             'case loader/library override')
-    result = {key: environment[key] for key in CASE_ENV_KEYS if key in environment}
+    result = {key: environment[key] for key in keys if key in environment}
     result.update(LANG='C', LC_ALL='C', VSLANG='1033')
     return result
 
