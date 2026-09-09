@@ -423,3 +423,12 @@ için dört RED korunur; diğer header kayıtları gibi platform path eşdeğerl
 karşılaştırılırken ham argv/dependency yazımı saklanır. Gerçekten farklı TU'lar
 üç platformdaki altı negatifte reddedilmeye devam eder. Bu düzeltme de yeni
 exact-head incelemesi ve gerçek Windows çalıştırması gerektirir.
+
+İkinci hosted deneme
+[`34325058939`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34325058939)
+`5ab1d2c` kaynağında yine Ubuntu/macOS case'lerini geçti. Windows'ta 54 test ile
+eski native kimlik capture'ı (188 C/427 C++ header) geçti; sabit kaynak staging'i
+sonra reddedildi. Bu run başarısız kalır; generic hata kök nedeni kanıtlamaz.
+Kaynak/SDK metni veya exception içeriği yazdırmadan aşama, script kontrol satırı
+ve varsa uyuşmayan stat alanının sabit adı eklendi. Ret koşulları gevşetilmedi;
+Windows'taki gerçek reddin kaynağı yeni kanıtla ayrıca belirlenmelidir.

@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest import mock
 
 import product_profiles as profiles
@@ -807,6 +808,28 @@ class ExternalInputTests(unittest.TestCase):
 
 
 class GccStagingTests(unittest.TestCase):
+    def test_stat_rejection_diagnostics_contain_only_fixed_field_names(self):
+        values = dict(st_dev=1, st_ino=2, st_mode=3, st_nlink=1, st_size=4, st_mtime_ns=5, st_ctime_ns=6)
+        before = SimpleNamespace(**values)
+        after = SimpleNamespace(**{**values, 'st_ino': 876543210})
+        with self.assertRaises(profiles.ExternalIdentityError) as caught:
+            profiles.check_external_identity(after, before, 'descriptor-open')
+        message = profiles.gcc_stage_failure(caught.exception, 'verification')
+        self.assertIn('identity=descriptor-open:inode', message)
+        self.assertNotIn('876543210', message)
+        forged = profiles.ExternalIdentityError('PRIVATE_SOURCE_SENTINEL', (1,), (2,))
+        self.assertNotIn('PRIVATE_SOURCE_SENTINEL', profiles.gcc_stage_failure(forged, 'verification'))
+        profiles.check_external_identity(before, before, 'descriptor-final')
+
+    def test_staging_failure_location_never_contains_exception_payload(self):
+        error = ValueError('PRIVATE_SOURCE_SENTINEL /private/location')
+        message = profiles.gcc_stage_failure(error, 'destination')
+        self.assertIn('destination', message)
+        self.assertNotIn('PRIVATE_SOURCE_SENTINEL', message)
+        self.assertNotIn('/private/location', message)
+        message = profiles.gcc_stage_failure(error, 'PRIVATE_SOURCE_SENTINEL')
+        self.assertNotIn('PRIVATE_SOURCE_SENTINEL', message)
+
     def test_adaptation_selects_only_frozen_lines_and_removes_instrumentation(self):
         lines = ["synthetic line " + str(i) for i in range(1, 67)]
         lines[7] = "static int __attribute__((noinline))"

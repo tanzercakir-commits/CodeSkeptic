@@ -234,6 +234,21 @@ def external_identity(info):
             info.st_size, info.st_mtime_ns, info.st_ctime_ns)
 
 
+class ExternalIdentityError(ValueError):
+    """Only static check/field names, never input bytes, paths or stat values."""
+    def __init__(self, phase, actual, expected):
+        super().__init__("external input identity changed")
+        self.phase = phase
+        names = ("device", "inode", "mode", "links", "size", "mtime_ns", "ctime_ns")
+        self.changed_fields = tuple(name for name, left, right in zip(names, actual, expected) if left != right)
+
+
+def check_external_identity(actual, expected, phase):
+    actual, expected = external_identity(actual), external_identity(expected)
+    if actual != expected:
+        raise ExternalIdentityError(phase, actual, expected)
+
+
 def external_read(path, capture=False):
     """Bounded descriptor read with ordinary-race checks, not hostile-root isolation.
 
@@ -250,7 +265,7 @@ def external_read(path, capture=False):
     descriptor = os.open(path, flags)
     digest, size, chunks = hashlib.sha256(), 0, []
     try:
-        require(external_identity(os.fstat(descriptor)) == external_identity(before), "external open changed")
+        check_external_identity(os.fstat(descriptor), before, "descriptor-open")
         while True:
             chunk = os.read(descriptor, min(1024 * 1024, before.st_size + 1 - size))
             if not chunk:
@@ -260,8 +275,8 @@ def external_read(path, capture=False):
             digest.update(chunk)
             if capture:
                 chunks.append(chunk)
-        require(size == before.st_size and external_identity(os.fstat(descriptor)) == external_identity(before)
-                and path.resolve(strict=True) == path
+        check_external_identity(os.fstat(descriptor), before, "descriptor-final")
+        require(size == before.st_size and path.resolve(strict=True) == path
                 and external_identity(path.lstat()) == external_identity(before), "external input changed")
     finally:
         os.close(descriptor)
@@ -412,6 +427,26 @@ def fetch_gcc_input(relative, row):
     return raw
 
 
+def gcc_stage_failure(error, phase):
+    """Locate a failed guard using public code positions, without exception text."""
+    admitted = {"destination", "binding", "adaptation", "write", "verification",
+                "download-0", "download-1", "download-2", "download-3"}
+    phase = phase if phase in admitted else "unknown"
+    line, identity, seen = 0, "", set()
+    while error is not None and id(error) not in seen and len(seen) < 8:
+        seen.add(id(error))
+        trace = error.__traceback__
+        while trace is not None:
+            if trace.tb_frame.f_code.co_filename == __file__:
+                line = trace.tb_lineno
+            trace = trace.tb_next
+        if isinstance(error, ExternalIdentityError) and error.phase in ("descriptor-open", "descriptor-final"):
+            identity = "; identity=" + error.phase + ":" + ",".join(error.changed_fields)
+        error = error.__context__
+    return ("GCC staging rejected at " + phase + "; profile-check=" + str(line) + identity
+            + "; a newly created partial destination may remain")
+
+
 def stage_gcc_inputs(repo, destination):
     """Materialize only the reviewed candidate, lineage and notices outside Git.
 
@@ -419,6 +454,7 @@ def stage_gcc_inputs(repo, destination):
     after creation may leave that owned partial directory; nothing is overwritten
     or recursively removed. Staging does not resolve the pending rights gate.
     """
+    phase = "destination"
     try:
         repo, destination = Path(repo), Path(destination)
         require(repo.is_absolute() and repo.resolve(strict=True) == repo and repo.is_dir(), "GCC checkout root")
@@ -426,24 +462,31 @@ def stage_gcc_inputs(repo, destination):
                 and destination.parent.is_dir() and not destination.exists() and not destination.is_symlink()
                 and repo != destination and repo not in destination.parents and destination not in repo.parents,
                 "GCC staging destination must be new and external")
+        phase = "binding"
         binding = read_json(repo / GCC_BINDING)
         rows = binding["inputs"]
         require(type(rows) is list and len(rows) == 5
                 and {row["path"] for row in rows} == set(GCC_INPUTS) | {"case.c"}, "GCC input closure changed")
-        payloads = {row["path"]: fetch_gcc_input(row["path"], row) for row in rows if row["path"] != "case.c"}
+        payloads = {}
+        for number, row in enumerate(row for row in rows if row["path"] != "case.c"):
+            phase = "download-" + str(number)
+            payloads[row["path"]] = fetch_gcc_input(row["path"], row)
+        phase = "adaptation"
         payloads["case.c"] = adapt_gcc_source(payloads["origin/malloc-vs-local-3.c"])
         for row in rows:
             require(len(payloads[row["path"]]) == row["size_bytes"]
                     and hashlib.sha256(payloads[row["path"]]).hexdigest() == row["sha256"], "GCC staged bytes differ")
+        phase = "write"
         destination.mkdir()
         for name, payload in payloads.items():
             path = destination / external_relative(name)
             path.parent.mkdir(exist_ok=True)
             with path.open("xb") as stream:
                 stream.write(payload)
+        phase = "verification"
         return verify_external_inputs(repo / GCC_BINDING, repo, destination)
-    except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError):
-        raise ValueError("GCC staging rejected; a newly created partial destination may remain") from None
+    except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError) as error:
+        raise ValueError(gcc_stage_failure(error, phase)) from None
 
 
 def verify_historical(index, repo, frozen):
