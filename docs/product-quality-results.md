@@ -839,7 +839,7 @@ workflow'da tanıdan önce saklanır; policy sonucu case TIMEOUT'unu değiştire
 
 Set-ExecutionPolicy, execution-policy argümanı, signature/cache/service müdahalesi,
 ortam genişletme veya yeniden case denemesi yoktur. Tanı her iki aşamadan sonra
-çalıştığı için önceki cold module ölçümünü prewarm etmez; testler native çağrıları
+çalıştığı için önceki staged module ölçümünü prewarm etmez; testler native çağrıları
 mock eder. Mevcut capture-output sınırları hard RSS/descendant/output-production
 garantisine dönüşmez. Bu prospective gözlem henüz yeni hosted sonuç değildir;
 native/task/product qualification false, U003 açık ve kaynak sayacı 1/1020'dir.
