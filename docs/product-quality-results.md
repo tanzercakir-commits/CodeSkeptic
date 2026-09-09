@@ -801,3 +801,45 @@ paket summary SHA-256
 Kaynak/SDK içerikleri upload edilmedi; primary host native byte'ları yeniden
 açmış sayılmaz. Kaynak sayacı 1/1020, freeze/native/task/product qualification
 false ve U003 açık kalır. Bu raporun belge HEAD'i tested `146bd12` değildir.
+
+### Windows post-attempt politika gözlemi — eklemeli v3 sözleşmesi
+
+`diagnose-windows-context` önce değişmemiş v2 staged collector'ını bir kez,
+ardından aynı dar ortam ve aynı hash-bound Windows PowerShell executable'ı ile
+ayrı bir policy-only süreci bir kez çalıştırır. `check-windows-context` yalnız
+`codeskeptic-windows-query-diagnostic/v3` okur: `policy` dışındaki alanlar,
+schema v2'ye projekte edilerek eski v2 validator'ından geçer. Ek/bilinmeyen
+alanlar düşürülmez, reddedilir. V1/v2 collector, script ve reader anlamı değişmez.
+
+Policy alanı Python parent'ında `PSExecutionPolicyPreference` için yalnız
+`absent/recognized/unrecognized` ve bilinen policy enum'u veya null kaydeder;
+case-insensitive ad/value sınıflandırması yapılır, boş veya bilinmeyen değer
+aynen dışarı verilmez. Aynı sınıflandırma dar case ortamında `absent` olmalıdır.
+ENV_KEYS/CASE_ENV_KEYS genişlemez; bu değişken child'a aktarılmaz veya değiştirilmez.
+[Microsoft'un Windows PowerShell 5.1 sözleşmesi](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_execution_policies?view=powershell-5.1)
+process politikasını bu değişkene bağlar, Group Policy'nin önceliğini açıklar.
+Bu kaynak davranış hipotezidir; mevcut parent değeri veya gecikme nedeni değildir.
+
+Ayrı child sırasıyla STARTED, gerçek engine'in bounded dotted numeric sürümü,
+`Get-ExecutionPolicy` effective sonucu ve MachinePolicy/UserPolicy/Process/
+CurrentUser/LocalMachine scope enum'larını, ardından POLICY_DONE marker'ını verir.
+Komut module-qualified `Microsoft.PowerShell.Security\\Get-ExecutionPolicy`'dir;
+PowerShell 7 parent'ının engine/policy sonucu Windows PowerShell child'a atfedilmez.
+Engine sürümü gözlenir, sırf executable konumundan 5.1 olduğu varsayılmaz.
+Sıralı tamamlanmış prefix saklanır; bilinmeyen/tekrarlı/bozuk/yarım çıktı flag
+olur, arbitrary stdout/stderr veya environment içeriği artifact'e girmez.
+
+Üstteki `timeout_seconds=30` her child'a ait ayrı subprocess sınırıdır; v3 toplamı
+30 saniye değildir. Eski stage clock'ları ve elapsed değeri değişmez; policy'nin
+kendi elapsed/outcome/exit/flag kaydı vardır. Policy elapsed, Security modülünün
+yüklenmesini de içerir; saf policy-resolution süresi veya CimCmdlets kök nedeni
+değildir. Process exit ve eksik çıktı başarısızlıkları eski kayıtlar gibi korunur.
+Kaynak/shell byte kimliği iki süreçten sonra yeniden denetlenir. Asıl case exit'i
+workflow'da tanıdan önce saklanır; policy sonucu case TIMEOUT'unu değiştiremez.
+
+Set-ExecutionPolicy, execution-policy argümanı, signature/cache/service müdahalesi,
+ortam genişletme veya yeniden case denemesi yoktur. Tanı her iki aşamadan sonra
+çalıştığı için önceki cold module ölçümünü prewarm etmez; testler native çağrıları
+mock eder. Mevcut capture-output sınırları hard RSS/descendant/output-production
+garantisine dönüşmez. Bu prospective gözlem henüz yeni hosted sonuç değildir;
+native/task/product qualification false, U003 açık ve kaynak sayacı 1/1020'dir.

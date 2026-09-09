@@ -1008,8 +1008,9 @@ class WindowsDiagnosticTests(unittest.TestCase):
         workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/product-identity.yml').read_text()
         case = workflow.index('& $identityPython -B scripts/product_identity.py capture-case')
         save = workflow.index('$identityCaseExit = $LASTEXITCODE')
-        diagnostic = workflow.index('& $identityPython -B scripts/product_identity.py diagnose-windows-stages `')
+        diagnostic = workflow.index('& $identityPython -B scripts/product_identity.py diagnose-windows-context `')
         self.assertNotIn('& $identityPython -B scripts/product_identity.py diagnose-windows `', workflow)
+        self.assertNotIn('& $identityPython -B scripts/product_identity.py diagnose-windows-stages `', workflow)
         failure = workflow.index("if ($identityCaseExit -ne 0) { throw 'Native case observation failed;")
         self.assertLess(case, save)
         self.assertLess(save, diagnostic)
@@ -1228,6 +1229,212 @@ class WindowsStageDiagnosticTests(unittest.TestCase):
         with mock.patch.object(identity.platform, 'system', return_value='Linux'), \
              mock.patch.object(identity.subprocess, 'run') as execute, self.assertRaises(identity.IdentityError):
             identity.capture_windows_stages(None)
+        execute.assert_not_called()
+
+
+class WindowsContextDiagnosticTests(unittest.TestCase):
+    def protocol(self):
+        return (b'STARTED:OK\nENGINE:5.1.26100.0\nEFFECTIVE:RemoteSigned\n'
+                b'MachinePolicy:Undefined\nUserPolicy:Undefined\nProcess:Undefined\n'
+                b'CurrentUser:Undefined\nLocalMachine:RemoteSigned\nPOLICY_DONE:OK\n')
+
+    def document(self):
+        value = WindowsStageDiagnosticTests().document()
+        value['schema'] = 'codeskeptic-windows-query-diagnostic/v3'
+        value['policy'] = {'inherited_preference': {'state': 'recognized', 'value': 'Bypass'},
+                           'case_preference': {'state': 'absent', 'value': None},
+                           'observation': {'outcome': 'OK', 'exit_code': 0, 'elapsed_ms': 100,
+                             **identity.parse_windows_policy_output(self.protocol()),
+                             'stderr_present': False, 'output_limit_exceeded': False}}
+        return value
+
+    def test_preference_classification_never_exports_unknown_environment_values(self):
+        for environment, expected in (({}, {'state': 'absent', 'value': None}),
+                ({'psexecutionpolicypreference': 'rEmOtEsIgNeD'}, {'state': 'recognized', 'value': 'RemoteSigned'}),
+                ({'PSExecutionPolicyPreference': 'PRIVATE_SENTINEL'}, {'state': 'unrecognized', 'value': None}),
+                ({'PSExecutionPolicyPreference': 'Bypass', 'PSEXECUTIONPOLICYPREFERENCE': 'Bypass'},
+                 {'state': 'unrecognized', 'value': None})):
+            self.assertEqual(identity.windows_policy_preference(environment), expected)
+
+    def test_policy_parser_is_ordered_bounded_and_never_resynchronizes(self):
+        result = identity.parse_windows_policy_output(self.protocol().replace(b'\n', b'\r\n'))
+        self.assertEqual(len(result['records']), 9)
+        self.assertFalse(result['malformed_output'])
+        self.assertFalse(result['trailing_output'])
+        for suffix in (b'ENGINE:PRIVATE_SENTINEL\n', b'ENGINE:5.01\n', b'EFFECTIVE:Bypass\n',
+                       b'ENGINE:5.1\nEFFECTIVE:PRIVATE_SENTINEL\n', b'\xff\n', b'STARTED:OK\n'):
+            result = identity.parse_windows_policy_output(b'STARTED:OK\n' + suffix + self.protocol())
+            self.assertLessEqual(len(result['records']), 2)
+            self.assertTrue(result['malformed_output'])
+            self.assertNotIn('PRIVATE_SENTINEL', identity.canonical(result))
+        result = identity.parse_windows_policy_output(b'STARTED:OK\nENGINE:5.')
+        self.assertEqual(len(result['records']), 1)
+        self.assertTrue(result['trailing_output'])
+        self.assertFalse(result['malformed_output'])
+        self.assertTrue(identity.parse_windows_policy_output(b'x' * (identity.MAX_OUTPUT + 1))['malformed_output'])
+
+    def test_policy_probe_preserves_failures_and_only_fixed_records(self):
+        for response, expected in ((subprocess.CompletedProcess([], 0, self.protocol(), b''), 'OK'),
+                (subprocess.CompletedProcess([], 21, b'STARTED:OK\n', b''), 'NONZERO'),
+                (subprocess.CompletedProcess([], 0, self.protocol(), b'PRIVATE_SENTINEL'), 'UNEXPECTED_OUTPUT'),
+                (subprocess.CompletedProcess([], 0, b'STARTED:OK\n', b''), 'UNEXPECTED_OUTPUT'),
+                (subprocess.CompletedProcess([], 0, b'x' * (identity.MAX_OUTPUT + 1), b''), 'OUTPUT_LIMIT'),
+                (OSError('PRIVATE_SENTINEL'), 'OS_ERROR'),
+                (subprocess.TimeoutExpired('PRIVATE_SENTINEL', 30, output=self.protocol()), 'TIMEOUT'),
+                (subprocess.TimeoutExpired('PRIVATE_SENTINEL', 30, output=b'STARTED:OK\nENGINE:5.',
+                                          stderr=b'PRIVATE_SENTINEL'), 'TIMEOUT')):
+            option = {'side_effect': response} if isinstance(response, Exception) else {'return_value': response}
+            with self.subTest(outcome=expected), mock.patch.object(identity.subprocess, 'run', **option) as execute, \
+                 mock.patch.object(identity.time, 'monotonic', side_effect=[1, 31]):
+                row = identity.windows_policy_probe('C:/Windows/powershell.exe', {'PATH': 'C:/bin'})
+            self.assertEqual(row['outcome'], expected)
+            self.assertEqual(row['elapsed_ms'], 30000)
+            self.assertNotIn('PRIVATE_SENTINEL', identity.canonical(row))
+            execute.assert_called_once()
+            self.assertEqual(execute.call_args.kwargs['timeout'], 30)
+            self.assertEqual(execute.call_args.kwargs['env'], {'PATH': 'C:/bin'})
+            self.assertNotIn('shell', execute.call_args.kwargs)
+            self.assertEqual(execute.call_args.args[0], ['C:/Windows/powershell.exe', '-NoProfile',
+                             '-NonInteractive', '-Command', identity.windows_policy_script()])
+            value = self.document()
+            value['policy']['observation'] = row
+            self.assertFalse(identity.validate_windows_context(value)['native_qualified'])
+
+    def test_policy_script_only_reads_actual_child_engine_and_policy(self):
+        script = identity.windows_policy_script()
+        self.assertIn('$PSVersionTable.PSVersion.ToString()', script)
+        self.assertEqual(script.count('Microsoft.PowerShell.Security\\Get-ExecutionPolicy'), 6)
+        self.assertEqual(script.count('[Console]::Out.Flush()'), 9)
+        self.assertLess(script.index('ENGINE:'), script.index('Get-ExecutionPolicy'))
+        for scope in identity.WINDOWS_POLICY_SCOPES:
+            self.assertEqual(script.count('-Scope ' + scope + ' '), 1)
+        for forbidden in ('Set-ExecutionPolicy', '$env:', 'Get-CimInstance', 'CimCmdlets',
+                          'Get-AuthenticodeSignature', 'Unblock-File', 'ConvertTo-Json', 'Restart-Service'):
+            self.assertNotIn(forbidden, script)
+
+    def test_context_validator_rejects_forged_status_fields_and_raw_values(self):
+        for mutation in ('unknown-top', 'unknown-policy', 'qualified', 'schema', 'raw-parent', 'empty-parent',
+                         'forwarded-case', 'missing-record', 'wrong-order', 'bool-value', 'unknown-policy-value',
+                         'none-exit', 'nonzero-success', 'bool-time', 'negative-time', 'oversized-time',
+                         'malformed-success', 'timeout-exit', 'os-error-records', 'false-output-limit',
+                         'false-unexpected', 'stage-clock'):
+            value = self.document()
+            policy, row = value['policy'], value['policy']['observation']
+            if mutation == 'unknown-top': value['stdout'] = 'PRIVATE_SENTINEL'
+            elif mutation == 'unknown-policy': policy['stdout'] = 'PRIVATE_SENTINEL'
+            elif mutation == 'qualified': value['task_ready'] = True
+            elif mutation == 'schema': value['schema'] = 'codeskeptic-windows-query-diagnostic/v2'
+            elif mutation == 'raw-parent': policy['inherited_preference']['value'] = 'PRIVATE_SENTINEL'
+            elif mutation == 'empty-parent': policy['inherited_preference']['state'] = 'absent'
+            elif mutation == 'forwarded-case': policy['case_preference'] = policy['inherited_preference']
+            elif mutation == 'missing-record': row['records'].pop()
+            elif mutation == 'wrong-order': row['records'].reverse()
+            elif mutation == 'bool-value': row['records'][1]['value'] = True
+            elif mutation == 'unknown-policy-value': row['records'][2]['value'] = 'PRIVATE_SENTINEL'
+            elif mutation == 'none-exit': row['exit_code'] = None
+            elif mutation == 'nonzero-success': row['exit_code'] = 21
+            elif mutation == 'bool-time': row['elapsed_ms'] = True
+            elif mutation == 'negative-time': row['elapsed_ms'] = -1
+            elif mutation == 'oversized-time': row['elapsed_ms'] = 300001
+            elif mutation == 'malformed-success': row['malformed_output'] = True
+            elif mutation == 'timeout-exit': row['outcome'] = 'TIMEOUT'
+            elif mutation == 'os-error-records': row.update(outcome='OS_ERROR', exit_code=None)
+            elif mutation == 'false-output-limit': row['outcome'] = 'OUTPUT_LIMIT'
+            elif mutation == 'false-unexpected': row['outcome'] = 'UNEXPECTED_OUTPUT'
+            elif mutation == 'stage-clock': value['observation']['stages'][-1]['elapsed_ms'] = 300000
+            with self.subTest(mutation=mutation), self.assertRaises(identity.IdentityError):
+                identity.validate_windows_context(value)
+
+    def test_context_capture_runs_stage_then_policy_once_with_original_environment(self):
+        value = self.document()
+        stages = WindowsStageDiagnosticTests().document()
+        stages['observation'].update(outcome='TIMEOUT', exit_code=None)
+        native_env = {'SystemRoot': 'C:/Windows', 'PATH': 'C:/bin', 'PSExecutionPolicyPreference': 'Bypass',
+                      'GITHUB_TOKEN': 'PRIVATE_SENTINEL', 'PSModulePath': 'PRIVATE_SENTINEL'}
+        calls = []
+        def stage_probe(args):
+            calls.append('stages')
+            return copy.deepcopy(stages)
+        def policy_probe(shell, environment):
+            calls.append('policy')
+            self.assertEqual(environment, identity.case_environment(native_env, 'Windows'))
+            self.assertNotIn('PSExecutionPolicyPreference', environment)
+            self.assertEqual(shell, str(Path(value['shell']['path'])))
+            return value['policy']['observation']
+        with mock.patch.dict(identity.os.environ, native_env, clear=True), \
+             mock.patch.object(identity, 'capture_windows_stages', side_effect=stage_probe) as stage, \
+             mock.patch.object(identity, 'windows_policy_probe', side_effect=policy_probe) as policy, \
+             mock.patch.object(identity, 'file_identity', return_value=value['shell']) as files, \
+             mock.patch.object(identity, 'source_identity', return_value=value['source']) as source:
+            result = identity.capture_windows_context(SimpleNamespace(root='/repo', source_sha=value['source']['head']))
+        self.assertEqual(calls, ['stages', 'policy'])
+        self.assertEqual(result['observation']['outcome'], 'TIMEOUT')
+        self.assertEqual(result['policy'], value['policy'])
+        self.assertNotIn('PRIVATE_SENTINEL', identity.canonical(result))
+        stage.assert_called_once()
+        policy.assert_called_once()
+        self.assertEqual(files.call_count, 2)
+        source.assert_called_once()
+        original = copy.deepcopy(result)
+        identity.validate_windows_context(result)
+        self.assertEqual(original, result)
+
+    def test_context_capture_refuses_changed_shell_before_policy_probe(self):
+        with mock.patch.object(identity, 'capture_windows_stages', return_value=WindowsStageDiagnosticTests().document()), \
+             mock.patch.object(identity, 'case_environment', return_value={}), \
+             mock.patch.object(identity, 'file_identity', return_value={}), \
+             mock.patch.object(identity, 'windows_policy_probe') as probe, self.assertRaises(identity.IdentityError):
+            identity.capture_windows_context(None)
+        probe.assert_not_called()
+
+    def test_context_capture_rechecks_shell_and_source_after_policy(self):
+        for mutation in ('shell', 'source'):
+            value = self.document()
+            with mock.patch.object(identity, 'capture_windows_stages',
+                                   return_value=WindowsStageDiagnosticTests().document()), \
+                 mock.patch.object(identity, 'case_environment', return_value={}), \
+                 mock.patch.object(identity, 'file_identity',
+                                   side_effect=[value['shell'], {} if mutation == 'shell' else value['shell']]), \
+                 mock.patch.object(identity, 'source_identity', return_value={} if mutation == 'source' else value['source']), \
+                 mock.patch.object(identity, 'windows_policy_probe', return_value=value['policy']['observation']) as probe, \
+                 self.subTest(mutation=mutation), self.assertRaises(identity.IdentityError):
+                identity.capture_windows_context(SimpleNamespace(root='/repo', source_sha=value['source']['head']))
+            probe.assert_called_once()
+
+    def test_all_three_cli_schemas_and_private_parse_errors(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary).resolve() / 'diagnostic.json'
+            documents = ((self.document(), 'check-windows-context'),
+                         (WindowsStageDiagnosticTests().document(), 'check-windows-stages'),
+                         (WindowsDiagnosticTests().document(), 'check-windows-diagnostic'))
+            for document, accepted in documents:
+                path.write_text(identity.canonical(document), encoding='utf-8')
+                for _, command in documents:
+                    result = subprocess.run([sys.executable, '-B', identity.__file__, command, str(path)],
+                                            capture_output=True, timeout=10)
+                    self.assertEqual(result.returncode, 0 if command == accepted else 2, result.stderr)
+            path.write_text('{"schema":"PRIVATE_SENTINEL","schema":null}', encoding='utf-8')
+            result = subprocess.run([sys.executable, '-B', identity.__file__, 'check-windows-context', str(path)],
+                                    capture_output=True, timeout=10)
+            self.assertEqual(result.returncode, 2)
+            self.assertNotIn(b'PRIVATE_SENTINEL', result.stderr)
+
+    def test_context_cli_protects_output_and_rejects_non_windows_without_execution(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve() / 'repo'
+            root.mkdir()
+            existing = root.parent / 'keep.json'
+            existing.write_text('preserve', encoding='utf-8')
+            for output in (existing, root / 'forbidden.json'):
+                with mock.patch.object(identity, 'capture_windows_context') as collect, \
+                     mock.patch.object(identity.sys, 'stderr', io.StringIO()):
+                    self.assertEqual(identity.main(['diagnose-windows-context', '--root', str(root),
+                             '--source-sha', 'a' * 40, '--output', str(output)]), 2)
+                collect.assert_not_called()
+            self.assertEqual(existing.read_text(encoding='utf-8'), 'preserve')
+        with mock.patch.object(identity.platform, 'system', return_value='Linux'), \
+             mock.patch.object(identity.subprocess, 'run') as execute, self.assertRaises(identity.IdentityError):
+            identity.capture_windows_context(None)
         execute.assert_not_called()
 
 

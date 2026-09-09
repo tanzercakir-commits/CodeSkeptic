@@ -1109,6 +1109,150 @@ def capture_windows_stages(args):
     return value
 
 
+WINDOWS_POLICY_VALUES = ('AllSigned', 'Bypass', 'Default', 'RemoteSigned', 'Restricted', 'Undefined', 'Unrestricted')
+WINDOWS_POLICY_SCOPES = ('MachinePolicy', 'UserPolicy', 'Process', 'CurrentUser', 'LocalMachine')
+WINDOWS_POLICY_NAMES = ('STARTED', 'ENGINE', 'EFFECTIVE', *WINDOWS_POLICY_SCOPES, 'POLICY_DONE')
+
+
+def windows_policy_preference(environment):
+    values = [value for key, value in environment.items() if key.casefold() == 'psexecutionpolicypreference']
+    if not values:
+        return {'state': 'absent', 'value': None}
+    recognized = {value.casefold(): value for value in WINDOWS_POLICY_VALUES}
+    value = recognized.get(values[0].casefold()) if len(values) == 1 and type(values[0]) is str else None
+    return {'state': 'recognized' if value else 'unrecognized', 'value': value}
+
+
+def windows_policy_script():
+    def marker(name, expression):
+        return "[Console]::WriteLine('" + name + ":' + (" + expression + ")); [Console]::Out.Flush(); "
+    return ("$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; "
+            "[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new(); " + marker('STARTED', "'OK'")
+            + 'try { ' + marker('ENGINE', '$PSVersionTable.PSVersion.ToString()')
+            + marker('EFFECTIVE', '(Microsoft.PowerShell.Security\\Get-ExecutionPolicy -ErrorAction Stop).ToString()')
+            + ''.join(marker(scope, '(Microsoft.PowerShell.Security\\Get-ExecutionPolicy -Scope ' + scope
+                             + ' -ErrorAction Stop).ToString()') for scope in WINDOWS_POLICY_SCOPES)
+            + marker('POLICY_DONE', "'OK'") + '} catch { exit 21 }')
+
+
+def valid_windows_policy_record(name, value):
+    if type(value) is not str:
+        return False
+    if name in ('STARTED', 'POLICY_DONE'):
+        return value == 'OK'
+    if name == 'ENGINE':
+        return re.fullmatch(r'(?:0|[1-9][0-9]{0,5})(?:\.(?:0|[1-9][0-9]{0,5})){1,3}', value) is not None
+    return name in ('EFFECTIVE', *WINDOWS_POLICY_SCOPES) and value in WINDOWS_POLICY_VALUES
+
+
+def parse_windows_policy_output(stdout):
+    require(type(stdout) is bytes, 'policy diagnostic bytes required')
+    limited = len(stdout) > MAX_OUTPUT
+    lines = stdout[:MAX_OUTPUT].split(b'\n')
+    trailing = bool(lines.pop())
+    records, malformed = [], limited
+    for line in lines:
+        if line.endswith(b'\r'):
+            line = line[:-1]
+        match = re.fullmatch(rb'([A-Za-z_]+):([A-Za-z0-9.]+)', line)
+        if (not match or len(records) >= len(WINDOWS_POLICY_NAMES)
+                or match[1].decode('ascii') != WINDOWS_POLICY_NAMES[len(records)]
+                or not valid_windows_policy_record(match[1].decode('ascii'), match[2].decode('ascii'))):
+            malformed = True
+            break
+        records.append({'name': match[1].decode('ascii'), 'value': match[2].decode('ascii')})
+    return {'records': records, 'malformed_output': malformed, 'trailing_output': trailing}
+
+
+def windows_policy_probe(shell, environment):
+    argv = [shell, '-NoProfile', '-NonInteractive', '-Command', windows_policy_script()]
+    started = time.monotonic()
+    outcome, code, stdout, stderr = 'OK', None, b'', b''
+    try:
+        result = subprocess.run(argv, capture_output=True, timeout=30, check=False,
+                                env=checked_environment(environment))
+        code, stdout, stderr = result.returncode, result.stdout, result.stderr
+        if code != 0:
+            outcome = 'NONZERO'
+    except subprocess.TimeoutExpired as error:
+        outcome, stdout, stderr = 'TIMEOUT', error.stdout or b'', error.stderr or b''
+    except OSError:
+        outcome = 'OS_ERROR'
+    elapsed = max(0, round((time.monotonic() - started) * 1000))
+    parsed = parse_windows_policy_output(stdout)
+    excessive = len(stdout) > MAX_OUTPUT or len(stderr) > MAX_OUTPUT
+    if outcome == 'OK' and excessive:
+        outcome = 'OUTPUT_LIMIT'
+    if outcome == 'OK' and (stderr or parsed['malformed_output'] or parsed['trailing_output']
+                            or len(parsed['records']) != len(WINDOWS_POLICY_NAMES)):
+        outcome = 'UNEXPECTED_OUTPUT'
+    return {'outcome': outcome, 'exit_code': code, 'elapsed_ms': elapsed, **parsed,
+            'stderr_present': bool(stderr), 'output_limit_exceeded': excessive}
+
+
+def validate_windows_context(value):
+    require(type(value) is dict and value.get('schema') == 'codeskeptic-windows-query-diagnostic/v3',
+            'Windows context diagnostic schema')
+    # V3 adds a later observation; the original V2 projection keeps its meaning.
+    stages = {key: item for key, item in value.items() if key != 'policy'}
+    stages['schema'] = 'codeskeptic-windows-query-diagnostic/v2'
+    result = validate_windows_stages(stages)
+    policy = value['policy']
+    fields(policy, 'inherited_preference case_preference observation', 'policy context')
+    for key in ('inherited_preference', 'case_preference'):
+        preference = policy[key]
+        fields(preference, 'state value', 'policy preference')
+        require(preference['state'] in ('absent', 'recognized', 'unrecognized')
+                and (preference['value'] in WINDOWS_POLICY_VALUES if preference['state'] == 'recognized'
+                     else preference['value'] is None), 'classified policy preference')
+    require(policy['case_preference'] == {'state': 'absent', 'value': None}, 'unchanged filtered case preference')
+    row = policy['observation']
+    fields(row, 'outcome exit_code elapsed_ms records malformed_output trailing_output stderr_present '
+           'output_limit_exceeded', 'policy observation')
+    require(row['outcome'] in ('OK', 'NONZERO', 'TIMEOUT', 'OS_ERROR', 'OUTPUT_LIMIT', 'UNEXPECTED_OUTPUT')
+            and type(row['elapsed_ms']) is int and 0 <= row['elapsed_ms'] <= 300000
+            and type(row['records']) is list and len(row['records']) <= len(WINDOWS_POLICY_NAMES), 'policy observations')
+    flags = ('malformed_output', 'trailing_output', 'stderr_present', 'output_limit_exceeded')
+    require(all(type(row[key]) is bool for key in flags), 'policy output flags')
+    require((row['exit_code'] is None) == (row['outcome'] in ('TIMEOUT', 'OS_ERROR'))
+            and (row['exit_code'] is None or type(row['exit_code']) is int), 'policy process status')
+    for record, expected in zip(row['records'], WINDOWS_POLICY_NAMES):
+        fields(record, 'name value', 'policy record')
+        require(record['name'] == expected and valid_windows_policy_record(expected, record['value']),
+                'policy ordered allowed-value prefix')
+    if row['outcome'] == 'OK':
+        require(row['exit_code'] == 0 and len(row['records']) == len(WINDOWS_POLICY_NAMES)
+                and not any(row[key] for key in flags), 'policy completed process')
+    elif row['outcome'] == 'NONZERO':
+        require(row['exit_code'] != 0, 'policy failed process')
+    elif row['outcome'] == 'OS_ERROR':
+        require(row['records'] == [] and not any(row[key] for key in flags), 'policy unavailable process')
+    elif row['outcome'] == 'OUTPUT_LIMIT':
+        require(row['exit_code'] == 0 and row['output_limit_exceeded'], 'policy output bound failure')
+    elif row['outcome'] == 'UNEXPECTED_OUTPUT':
+        require(row['exit_code'] == 0 and not row['output_limit_exceeded']
+                and (any(row[key] for key in flags) or len(row['records']) != len(WINDOWS_POLICY_NAMES)),
+                'policy incomplete or malformed protocol')
+    return result
+
+
+def capture_windows_context(args):
+    inherited = windows_policy_preference(os.environ)
+    # Never inspect policy in the timed module process or before its attempt.
+    value = capture_windows_stages(args)
+    environment = case_environment(os.environ, 'Windows')
+    preference = windows_policy_preference(environment)
+    shell = Path(value['shell']['path'])
+    require(file_identity(shell) == value['shell'], 'context shell changed before policy probe')
+    row = windows_policy_probe(str(shell), environment)
+    value['schema'] = 'codeskeptic-windows-query-diagnostic/v3'
+    value['policy'] = {'inherited_preference': inherited, 'case_preference': preference, 'observation': row}
+    validate_windows_context(value)
+    require(file_identity(shell) == value['shell'] and source_identity(args.root, args.source_sha) == value['source'],
+            'context diagnostic shell/source changed')
+    return value
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
@@ -1141,6 +1285,12 @@ def main(argv=None):
     stages.add_argument('--output', type=Path, required=True)
     stages_check = commands.add_parser('check-windows-stages', help='structural staged diagnostic check only')
     stages_check.add_argument('input', type=Path)
+    context = commands.add_parser('diagnose-windows-context', help='staged observation then separate read-only policy probe')
+    context.add_argument('--root', type=Path, required=True)
+    context.add_argument('--source-sha', required=True)
+    context.add_argument('--output', type=Path, required=True)
+    context_check = commands.add_parser('check-windows-context', help='structural context diagnostic check only')
+    context_check.add_argument('input', type=Path)
     args = parser.parse_args(argv)
     try:
         validator = validate_case_document if args.command in ('check-case', 'capture-case') else validate_document
@@ -1148,11 +1298,13 @@ def main(argv=None):
             validator = validate_windows_diagnostic
         if args.command in ('diagnose-windows-stages', 'check-windows-stages'):
             validator = validate_windows_stages
-        if args.command in ('check', 'check-case', 'check-windows-diagnostic', 'check-windows-stages'):
+        if args.command in ('diagnose-windows-context', 'check-windows-context'):
+            validator = validate_windows_context
+        if args.command in ('check', 'check-case', 'check-windows-diagnostic', 'check-windows-stages', 'check-windows-context'):
             require(not args.input.is_symlink() and args.input.resolve() == args.input
                     and args.input.is_file() and args.input.stat().st_size <= 16 * MAX_OUTPUT,
                     'metadata input must be a bounded absolute regular file')
-            if args.command in ('check-case', 'check-windows-diagnostic', 'check-windows-stages'):
+            if args.command in ('check-case', 'check-windows-diagnostic', 'check-windows-stages', 'check-windows-context'):
                 from product_profiles import parse_json
                 result = validator(parse_json(args.input.read_text(encoding='utf-8')))
             else:
@@ -1164,7 +1316,8 @@ def main(argv=None):
                     and not args.output.is_relative_to(root), 'output must be new and outside the checkout')
             collector = {'capture-case': capture_case, 'capture': capture,
                          'diagnose-windows': capture_windows_diagnostic,
-                         'diagnose-windows-stages': capture_windows_stages}[args.command]
+                         'diagnose-windows-stages': capture_windows_stages,
+                         'diagnose-windows-context': capture_windows_context}[args.command]
             value = collector(args)
             with args.output.open('x', encoding='utf-8', newline='\n') as stream:
                 stream.write(canonical(value))
@@ -1173,7 +1326,8 @@ def main(argv=None):
         return 0
     except (IdentityError, OSError, ValueError, KeyError, TypeError, RuntimeError) as error:
         private = args.command in ('check-case', 'capture-case', 'diagnose-windows', 'check-windows-diagnostic',
-                                   'diagnose-windows-stages', 'check-windows-stages')
+                                   'diagnose-windows-stages', 'check-windows-stages',
+                                   'diagnose-windows-context', 'check-windows-context')
         print('IDENTITY_INVALID ' + (case_observation_failure(error) if private else str(error)), file=sys.stderr)
         if args.command == 'capture-case':
             print('CASE_FAILURE_KIND ' + case_failure_kind(error), file=sys.stderr)

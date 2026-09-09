@@ -155,7 +155,7 @@ jobs:
           $identityCaseExit = $LASTEXITCODE
           # Only after the actual case: these probes can warm native module caches.
           # No retry of capture-case, no full environment forwarding or SDK export.
-          & $identityPython -B scripts/product_identity.py diagnose-windows-stages `
+          & $identityPython -B scripts/product_identity.py diagnose-windows-context `
             --root "$env:GITHUB_WORKSPACE" --source-sha "$env:GITHUB_SHA" `
             --output "$env:RUNNER_TEMP/codeskeptic-windows-query-diagnostic.json"
           $identityDiagnosticExit = $LASTEXITCODE
@@ -180,7 +180,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Retain bounded Windows post-attempt staged diagnostic markers
+      - name: Retain bounded Windows post-attempt staged and policy observations
         if: always() && runner.os == 'Windows'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
