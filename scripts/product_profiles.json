@@ -1,9 +1,9 @@
 {
-  "boundary": "Draft input identity and prospective limits, not frozen evaluation, authentic configured coverage, product quality, current native qualification or release.",
-  "evaluation_state": "SELECTION_AND_INDEPENDENT_LABEL_REVIEW_PENDING",
+  "boundary": "Partial source selection with actual procedural review linkage. Not frozen evaluation, authentic configured coverage, product quality, final native qualification, legal clearance or distribution approval.",
+  "evaluation_state": "PARTIAL_INDEPENDENT_SOURCE_SELECTION_NOT_FROZEN",
   "historical_index": "tests/product_corpus/historical/measurement-index.json",
   "historical_index_sha256": "e743207feba61a008baca1bc89f93136b8f646e4335c357932c5693edc829e5d",
-  "independent_quota_examples": 0,
+  "independent_quota_examples": 1,
   "limits": {
     "addressable_recall_min": "0.70",
     "buggy_min_per_bucket": 30,
@@ -28,7 +28,7 @@
     "worker_memory_mib": 2048,
     "worker_timeout_ms": 120000
   },
-  "native_environment_state": "PROSPECTIVE_REQUIREMENTS_ONLY_ACTUAL_IDENTITY_CAPTURE_PENDING",
+  "native_environment_state": "PARTIAL_NATIVE_OBSERVATIONS_NOT_FINAL_PROFILE",
   "native_api_model": "tests/product_corpus/native-api-models.json",
   "native_api_model_sha256": "c2caba2a15fef514c81af282c7fd8e1667b141698829f9354cd14118415873f4",
   "projects": [
@@ -3860,7 +3860,11 @@
       "version": "1.14.0"
     }
   ],
-  "schema": "codeskeptic-product-profiles/v1",
+  "schema": "codeskeptic-product-profiles/v2",
   "selection_base": "de642695c96224ab11c5add000c7ad9c996d0a50",
+  "source_selection": {
+    "path": "tests/product_corpus/selection.json",
+    "sha256": "4f541d326b86f82fa1cd436a64e8f1090a5fe009004953f2b94bf5bec2c89d73"
+  },
   "state": "DRAFT_NOT_FROZEN"
 }

@@ -25,12 +25,18 @@ bu belge ikinci TODO veya tamamlanma kaydı değildir.
 catalog sessizce yenilenmedi. Stable kaynak ve tam seçimden sonra ayrı bağımsız
 source-derived successor sınıflandırması gereklidir.
 
-## Bağımsız değerlendirme henüz yok
+## Kısmi bağımsız kaynak seçimi — tam değerlendirme henüz dondurulmadı
 
-Kabul edilmiş yeni bağımsız kota örneği: **0 / en az 1020**. Kaynak seçimi,
+Bağımsız karar ile seçilmiş kaynak: **1 / en az 1020** — tek GCC memory-leak buggy
+örneği, tek köken ve tek global cluster. Bu, frozen değerlendirme paydası değildir.
+[Bağlı seçim kaydı](../tests/product_corpus/selection.json) ve aşağıdaki yeni
+source-admission bölümü geçerli kısmi durumu taşır. Kaynak seçimi,
 bağımsız etiket/semantik cluster incelemesi ve dört yeni ailede zorunlu gerçek
 security-fix çiftlerinin incelenmesi bitmedi. Bu eksiklik fixture çoğaltma,
 köken yeniden adlandırma veya unknown'u safe sayma yoluyla giderilemez.
+
+Aşağıdaki eski head/kanıt kayıtlarının **0/1020** sayıları o kayıtların tarihsel
+durumudur; held incelemeler veya native v1 gözlemleri geriye dönük değiştirilmez.
 
 Kaynak havuzu ayrı, kabul edilmiş değerlendirme ayrı tutulur. Mevcut tam NIST
 Juliet 1.3 arşivi tek türetim kökenidir; template/type/flow-number varyantları
@@ -568,3 +574,32 @@ runtime/artifact kapıları ayrıdır. Bir kaynak, açıkça seçilmiş Linux ta
 all-rule ground truth, ürün başarısı veya dağıtım izni anlamına gelmez. Bir sonraki
 bağımsız exact-source karar açıkça source-count admission vermeden eski sıfır kota
 değişmez. Tüm 1020/üç-köken eşikleri, daha sıkı floors ve FIFO aynen korunur.
+
+### Ayrı kaynak kabulü ve v2 kısmi sayaç bağı
+
+Read-only `/root/native_case_verifier`, exact `d817a8d5fbf17a2dbc3e68b5df9c3438c56d3696`
+üzerinde altı dosyalık implementasyon için material findings olmadan PASS ve ayrı
+**ADMIT_ONE_SOURCE** kararı verdi. Gerçek uyarlama, komşu ownership yapıları,
+14 bağlı kanıt, iki Linux ham paketinin 33+15 dosyası ve eski üç native reader
+incelendi; 182 odaklı test/iki CLI/queue/guard PASS. Yeniden native execution veya
+container-içi compiler/header byte reopening yapılmadı. Kaynak-karar JSON SHA-256:
+`b6bc33764e669176bd1a5e8a28f351e8aa656553d4f8e26d2af22e7a73fec91e`.
+
+Yeni profiles **v2**, [seçim indeksini](../tests/product_corpus/selection.json) exact
+yol/hash ile bağlar. `selection-check` önce gerçek review/candidate byte'larını,
+kararın gerçek ancestor Git commit'indeki candidate/beş link byte'larını ve mevcut
+source/license/recipe kanıtını doğrular; ancak bütün kayıtlar geçince mevcut global
+hash/cluster kotasını hesaplar. Yeni integration HEAD'in eski reviewed HEAD'den
+farklı olması tek başına ret değildir; reviewed source ve bağlı dosyalar değişmişse
+ret gerekir. Held karar, eksik/değişmiş karar, yanlış commit, tekrar kaynak/cluster
+ve sonradan bozulan bir entry kısmi count döndüremez. Git repo yönlendiren kalıtılmış
+`GIT_*` değerleri kullanılmaz; lazy object download, replacement ve prompt kapalıdır.
+
+Sayaç bir memory-leak buggy kaynak, sıfır safe ve tek GCC kökeni gösterir; **1019
+kaynak eksiği** ve bütün bucket/family/köken eksikleri görünürdür. `readiness` hâlâ
+exit 2, `task_ready/product_qualified/evaluation_frozen=false` verir. Salt v1 draft
+okuyucusu, eski held source-binding/candidate okuyucuları ve native v1 zero/false
+gözlemleri değişmez. V2 bir alan sayısına güvenmez; gerçek seçimi tekrar okumadan
+ve declared count ile karşılaştırmadan readiness üretemez. Bu ortak hesapta saklanan
+bağımsız ajan kararı prosedürel denetimdir; imza veya sahte producer'a karşı attestation
+değildir. Lisans ve dağıtım false kalır; U003 için POP ya da completion receipt yoktur.

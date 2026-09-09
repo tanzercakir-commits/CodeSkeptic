@@ -30,6 +30,252 @@ def quota_rows():
     return rows
 
 
+class ProfileV2Tests(unittest.TestCase):
+    def setUp(self):
+        self.repo = Path(__file__).resolve().parents[1]
+        self.manifest = profiles.read_json(self.repo / "scripts/product_profiles.json")
+        self.manifest.update(schema="codeskeptic-product-profiles/v2", independent_quota_examples=1,
+                             evaluation_state="PARTIAL_INDEPENDENT_SOURCE_SELECTION_NOT_FROZEN",
+                             native_environment_state="PARTIAL_NATIVE_OBSERVATIONS_NOT_FINAL_PROFILE",
+                             source_selection={"path": "tests/product_corpus/selection.json", "sha256": "e" * 64})
+        self.result = {"quota_examples": 1, "source_admission_reviews_bound": 1,
+                       "evaluation_frozen": False, "task_ready": False, "product_qualified": False}
+
+    def test_v2_count_requires_actual_selection_reader_and_stays_partial(self):
+        with mock.patch.object(profiles, "verify_source_selection", return_value=self.result) as checked:
+            result = profiles.draft_readiness(self.manifest, self.repo)
+        checked.assert_called_once_with(self.repo, self.manifest["source_selection"])
+        self.assertEqual(result["independent_quota_examples"], 1)
+        self.assertFalse(result["task_ready"])
+        self.assertFalse(result["product_qualified"])
+
+    def test_v2_missing_root_invalid_link_and_declared_count_disagreement_rejected(self):
+        with self.assertRaises(ValueError):
+            profiles.draft_readiness(self.manifest)
+        with mock.patch.object(profiles, "verify_source_selection", return_value=self.result):
+            for count in (True, 0, 1020):
+                value = copy.deepcopy(self.manifest)
+                value["independent_quota_examples"] = count
+                with self.subTest(count=count), self.assertRaises(ValueError):
+                    profiles.draft_readiness(value, self.repo)
+        for key, replacement in (("path", "../selection.json"), ("sha256", "0" * 64)):
+            value = copy.deepcopy(self.manifest)
+            value["source_selection"][key] = replacement
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                profiles.source_metadata(value)
+
+    def test_v1_cannot_acquire_selection_fields_or_admitted_count(self):
+        value = copy.deepcopy(self.manifest)
+        value["schema"] = "codeskeptic-product-profiles/v1"
+        with self.assertRaises(ValueError):
+            profiles.source_metadata(value)
+        del value["source_selection"]
+        value.update(evaluation_state="SELECTION_AND_INDEPENDENT_LABEL_REVIEW_PENDING",
+                     native_environment_state="PROSPECTIVE_REQUIREMENTS_ONLY_ACTUAL_IDENTITY_CAPTURE_PENDING")
+        with self.assertRaises(ValueError):
+            profiles.draft_readiness(value)
+        value["independent_quota_examples"] = 0
+        result = profiles.draft_readiness(value)
+        self.assertEqual(result["independent_quota_examples"], 0)
+        self.assertNotIn("source_selection", result)
+
+
+class SourceAdmissionTests(unittest.TestCase):
+    def setUp(self):
+        self.repo = Path(__file__).resolve().parents[1]
+        self.candidate = profiles.read_json(self.repo / profiles.GCC_SOURCE_CANDIDATE)
+        self.candidate_sha = profiles.file_sha(self.repo / profiles.GCC_SOURCE_CANDIDATE)
+        self.review = {"schema": "codeskeptic-source-admission-review/v1", "repository_head": "d" * 40,
+                       "candidate_path": profiles.GCC_SOURCE_CANDIDATE, "candidate_sha256": self.candidate_sha,
+                       "source_sha256": self.candidate["source"]["sha256"], "implementer": "/root",
+                       "verifier": "/root/synthetic_reviewer", "verdict": "ADMIT_ONE_SOURCE", "admitted_source_count": 1,
+                       "projection": {**profiles.gcc_candidate_metadata(self.candidate), "quota": True},
+                       "reviewed_links": copy.deepcopy(self.candidate["links"]), "rationale": "Synthetic review schema test only.",
+                       "remaining_gaps": ["No real review or admission is created by this fixture."],
+                       "qualification": copy.deepcopy(self.candidate["qualification"])}
+
+    def test_admitting_review_matches_exact_candidate_projection(self):
+        result = profiles.admission_review_metadata(self.review, self.candidate, self.candidate_sha)
+        self.assertEqual(result, self.review["projection"])
+        self.assertTrue(result["quota"])
+
+    def test_held_forged_or_inconsistent_review_cannot_admit(self):
+        variants = []
+        for key, replacement in (("verdict", "HOLD"), ("admitted_source_count", True), ("admitted_source_count", 2),
+                                 ("verifier", "/root"), ("candidate_path", "../candidate.json"),
+                                 ("candidate_sha256", "e" * 64), ("source_sha256", "e" * 64),
+                                 ("repository_head", "HEAD"), ("rationale", ""), ("remaining_gaps", [])):
+            value = copy.deepcopy(self.review)
+            value[key] = replacement
+            variants.append(value)
+        for key, replacement in (("role", "safe"), ("origin", "second-origin"), ("cluster", "second-cluster"),
+                                 ("sha256", "e" * 64), ("quota", False)):
+            value = copy.deepcopy(self.review)
+            value["projection"][key] = replacement
+            variants.append(value)
+        for key in self.review["qualification"]:
+            value = copy.deepcopy(self.review)
+            value["qualification"][key] = True
+            variants.append(value)
+        value = copy.deepcopy(self.review)
+        value["reviewed_links"]["compiler_commands"]["sha256"] = "e" * 64
+        variants.append(value)
+        for index, value in enumerate(variants):
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                profiles.admission_review_metadata(value, self.candidate, self.candidate_sha)
+
+    def selection_fixture(self):
+        temporary = tempfile.TemporaryDirectory(prefix="codeskeptic-admission-selection-")
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        repo, evidence = base / "repo", base / "review.json"
+        path = repo / profiles.GCC_SOURCE_CANDIDATE
+        path.parent.mkdir(parents=True)
+        path.write_bytes((self.repo / profiles.GCC_SOURCE_CANDIDATE).read_bytes())
+        evidence.write_text(profiles.canonical(self.review))
+        index = {"schema": "codeskeptic-product-reviewed-source-selection/v1",
+                 "state": "PARTIAL_REVIEWED_SOURCE_SELECTION_NOT_FROZEN",
+                 "origins": {"gcc-analyzer-testsuite": "https://github.com/gcc-mirror/gcc"},
+                 "admissions": [{"candidate": {"path": profiles.GCC_SOURCE_CANDIDATE, "sha256": self.candidate_sha},
+                                 "review": {"path": str(evidence), "sha256": profiles.file_sha(evidence)}}],
+                 "boundary": "Synthetic linkage test only."}
+        path = repo / profiles.SOURCE_SELECTION
+        path.write_text(profiles.canonical(index))
+        return repo, evidence, index
+
+    def selection_check(self, repo):
+        link = {"path": profiles.SOURCE_SELECTION, "sha256": profiles.file_sha(repo / profiles.SOURCE_SELECTION)}
+        observed = {"candidate_sha256": self.candidate_sha, "projection": profiles.gcc_candidate_metadata(self.candidate)}
+        with mock.patch.object(profiles, "verify_reviewed_files"), \
+                mock.patch.object(profiles, "verify_gcc_source_candidate", return_value=observed):
+            return profiles.verify_source_selection(repo, link)
+
+    def test_actual_review_link_read_before_producing_partial_count(self):
+        repo, _, _ = self.selection_fixture()
+        result = self.selection_check(repo)
+        self.assertEqual(result["quota_examples"], 1)
+        self.assertEqual(result["source_admission_reviews_bound"], 1)
+        self.assertEqual(result["buckets"]["memory-leak"], {"buggy": 1, "safe": 0, "origins": ["gcc-analyzer-testsuite"]})
+        self.assertTrue(result["deficits"])
+        self.assertFalse(result["evaluation_frozen"])
+        self.assertFalse(result["product_qualified"])
+
+    def test_missing_digest_changed_held_or_duplicate_key_review_rejected(self):
+        for mutation in ("missing", "changed", "held", "duplicate-key", "oversized"):
+            repo, evidence, index = self.selection_fixture()
+            if mutation == "missing":
+                evidence.unlink()
+            elif mutation == "changed":
+                evidence.write_bytes(b"PRIVATE_EVIDENCE_SENTINEL")
+            else:
+                value = copy.deepcopy(self.review)
+                value["verdict"] = "HOLD" if mutation == "held" else "ADMIT_ONE_SOURCE"
+                raw = profiles.canonical(value)
+                if mutation == "duplicate-key":
+                    raw = raw.replace('"verdict":', '"verdict":"HOLD","verdict":')
+                elif mutation == "oversized":
+                    raw += " " * 65536
+                evidence.write_text(raw)
+                index["admissions"][0]["review"]["sha256"] = profiles.file_sha(evidence)
+                (repo / profiles.SOURCE_SELECTION).write_text(profiles.canonical(index))
+            with self.subTest(mutation=mutation), self.assertRaisesRegex(ValueError, "^reviewed source selection rejected$"):
+                self.selection_check(repo)
+
+    def test_duplicate_source_or_failed_later_entry_never_returns_partial_count(self):
+        for mutation in ("duplicate", "later-missing-review", "origin-alias"):
+            repo, _, index = self.selection_fixture()
+            if mutation == "origin-alias":
+                index["origins"]["gcc-second-origin"] = "https://github.com/gcc-mirror/gcc"
+            else:
+                index["admissions"].append(copy.deepcopy(index["admissions"][0]))
+                if mutation == "later-missing-review":
+                    index["admissions"][1]["review"]["path"] += ".missing"
+            (repo / profiles.SOURCE_SELECTION).write_text(profiles.canonical(index))
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                self.selection_check(repo)
+
+    def test_git_or_actual_source_failure_and_rehashed_candidate_cannot_admit(self):
+        for mutation in ("git-failure", "source-failure", "source-mismatch", "candidate-changed"):
+            repo, _, index = self.selection_fixture()
+            link = {"path": profiles.SOURCE_SELECTION, "sha256": profiles.file_sha(repo / profiles.SOURCE_SELECTION)}
+            if mutation == "candidate-changed":
+                path = repo / profiles.GCC_SOURCE_CANDIDATE
+                path.write_text(profiles.canonical(self.candidate) + "\n")
+                index["admissions"][0]["candidate"]["sha256"] = profiles.file_sha(path)
+                (repo / profiles.SOURCE_SELECTION).write_text(profiles.canonical(index))
+                link["sha256"] = profiles.file_sha(repo / profiles.SOURCE_SELECTION)
+            observed = {"candidate_sha256": "e" * 64 if mutation == "source-mismatch" else self.candidate_sha,
+                        "projection": profiles.gcc_candidate_metadata(self.candidate)}
+            with self.subTest(mutation=mutation), \
+                    mock.patch.object(profiles, "verify_reviewed_files", side_effect=ValueError("PRIVATE_GIT_SENTINEL")
+                                      if mutation == "git-failure" else None), \
+                    mock.patch.object(profiles, "verify_gcc_source_candidate", return_value=observed,
+                                      side_effect=ValueError("PRIVATE_SOURCE_SENTINEL") if mutation == "source-failure" else None), \
+                    self.assertRaisesRegex(ValueError, "^reviewed source selection rejected$"):
+                profiles.verify_source_selection(repo, link)
+
+    def test_missing_changed_or_symlinked_selection_and_review_rejected(self):
+        repo, evidence, index = self.selection_fixture()
+        path = repo / profiles.SOURCE_SELECTION
+        link = {"path": profiles.SOURCE_SELECTION, "sha256": profiles.file_sha(path)}
+        path.unlink()
+        with self.assertRaises(ValueError):
+            profiles.verify_source_selection(repo, link)
+        path.write_text(profiles.canonical(index) + "\n")
+        with self.assertRaises(ValueError):
+            profiles.verify_source_selection(repo, link)
+        path.write_text(profiles.canonical(index))
+        target = evidence.with_name("target.json")
+        evidence.rename(target)
+        try:
+            evidence.symlink_to(target)
+        except OSError:
+            self.skipTest("host cannot create symlinks")
+        with self.assertRaises(ValueError):
+            self.selection_check(repo)
+        path.unlink()
+        path.symlink_to(target)
+        with self.assertRaises(ValueError):
+            profiles.verify_source_selection(repo, link)
+
+    def test_git_anchor_allows_later_head_but_rejects_wrong_or_nonancestor_bytes(self):
+        with tempfile.TemporaryDirectory(prefix="codeskeptic-admission-git-") as directory:
+            repo = Path(directory).resolve()
+            hooks = repo / "disabled-hooks"
+            hooks.mkdir()
+            def git(*args):
+                return subprocess.run(["git", "-C", str(repo), "-c", "user.name=Synthetic Test",
+                                       "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false",
+                                       "-c", "core.hooksPath=" + str(hooks), *args], check=True,
+                                      capture_output=True, text=True, timeout=10).stdout.strip()
+            git("init", "--initial-branch=source-review-test", "--quiet")
+            path = repo / "candidate.json"
+            path.write_text("{\"synthetic\":true}\n")
+            git("add", "--", path.name)
+            git("commit", "--no-gpg-sign", "-qm", "synthetic source review")
+            reviewed = git("rev-parse", "HEAD")
+            links = [{"path": path.name, "sha256": profiles.file_sha(path)}]
+            (repo / "integration.txt").write_text("metadata-only later integration\n")
+            git("add", "--", "integration.txt")
+            git("commit", "--no-gpg-sign", "-qm", "synthetic integration")
+            self.assertNotEqual(reviewed, git("rev-parse", "HEAD"))
+            with mock.patch.dict(os.environ, {"GIT_DIR": str(repo / "missing-git-dir")}):
+                profiles.verify_reviewed_files(repo, reviewed, links)
+            for head in ("f" * 40, "HEAD"):
+                with self.subTest(head=head), self.assertRaises(ValueError):
+                    profiles.verify_reviewed_files(repo, head, links)
+            with self.assertRaises(ValueError):
+                profiles.verify_reviewed_files(repo, reviewed, [{**links[0], "sha256": "e" * 64}])
+            path.write_text("{\"synthetic\":false}\n")
+            git("add", "--", path.name)
+            git("commit", "--no-gpg-sign", "-qm", "different candidate")
+            with self.assertRaises(ValueError):
+                profiles.verify_reviewed_files(repo, git("rev-parse", "HEAD"), links)
+            detached = git("commit-tree", git("rev-parse", reviewed + "^{tree}"), "-m", "unrelated root")
+            with self.assertRaises(ValueError):
+                profiles.verify_reviewed_files(repo, detached, links)
+
+
 class SourceCandidateTests(unittest.TestCase):
     def test_candidate_link_drift_rejected_before_external_source_read(self):
         original_repo = Path(__file__).resolve().parents[1]
@@ -407,6 +653,12 @@ class SourceProfileTests(unittest.TestCase):
     def setUpClass(cls):
         path = Path(__file__).resolve().parents[1] / "scripts/product_profiles.json"
         cls.manifest = json.loads(path.read_text(encoding="utf-8"))
+        # Preserve the legacy v1 contract as a synthetic compatibility fixture;
+        # v2 evidence-dependent behavior is exercised separately above.
+        cls.manifest.pop("source_selection", None)
+        cls.manifest.update(schema="codeskeptic-product-profiles/v1", independent_quota_examples=0,
+                            evaluation_state="SELECTION_AND_INDEPENDENT_LABEL_REVIEW_PENDING",
+                            native_environment_state="PROSPECTIVE_REQUIREMENTS_ONLY_ACTUAL_IDENTITY_CAPTURE_PENDING")
 
     def test_three_exact_source_inventories_not_configured_coverage(self):
         result = profiles.source_metadata(self.manifest)

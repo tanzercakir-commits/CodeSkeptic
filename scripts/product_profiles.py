@@ -16,6 +16,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import stat
+import subprocess
 import sys
 import urllib.request
 
@@ -264,7 +265,8 @@ def check_external_identity(actual, expected, phase, *, cross_query=False):
 def external_read(path, capture=False):
     """Bounded descriptor read with ordinary-race checks, not hostile-root isolation.
 
-    No source text is returned unless explicitly reading the two JSON records.
+    Content is returned only when the caller explicitly requests capture;
+    public check results export metadata, not captured evidence text.
     O_NOFOLLOW is supplementary where available; canonical paths, lstat, fstat
     and final identities are checked on every host. This does not provide an
     atomic snapshot against malicious ancestor replacement/restoration.
@@ -595,6 +597,137 @@ def verify_gcc_source_candidate(repo):
         raise ValueError("source candidate binding rejected") from None
 
 
+def admission_review_metadata(review, candidate, candidate_sha):
+    """Check a procedural source-count decision, never authenticate its author."""
+    fields(review, "schema repository_head candidate_path candidate_sha256 source_sha256 implementer verifier "
+           "verdict admitted_source_count projection reviewed_links rationale remaining_gaps qualification", "source admission review")
+    require(review["schema"] == "codeskeptic-source-admission-review/v1"
+            and type(review["repository_head"]) is str and re.fullmatch(r"[0-9a-f]{40}", review["repository_head"])
+            and review["repository_head"] != "0" * 40
+            and review["candidate_path"] == GCC_SOURCE_CANDIDATE and review["candidate_sha256"] == candidate_sha
+            and review["verdict"] == "ADMIT_ONE_SOURCE" and type(review["admitted_source_count"]) is int
+            and review["admitted_source_count"] == 1, "source admission identity/verdict")
+    for key in ("implementer", "verifier"):
+        require(type(review[key]) is str and re.fullmatch(r"/[a-z0-9_]+(?:/[a-z0-9_]+)*", review[key])
+                and len(review[key]) <= 128, "source admission agent identity")
+    require(review["implementer"] != review["verifier"], "source admission is not independent")
+    projection = {**gcc_candidate_metadata(candidate), "quota": True}
+    require(review["source_sha256"] == projection["sha256"]
+            and canonical(review["projection"]) == canonical(projection)
+            and canonical(review["reviewed_links"]) == canonical(candidate["links"])
+            and canonical(review["qualification"]) == canonical(candidate["qualification"]),
+            "source admission candidate/projection/qualification mismatch")
+    require(nonempty(review["rationale"]) and len(review["rationale"]) <= 8192
+            and type(review["remaining_gaps"]) is list and 1 <= len(review["remaining_gaps"]) <= 32
+            and all(nonempty(gap) and len(gap) <= 2048 for gap in review["remaining_gaps"]),
+            "source admission rationale/boundaries")
+    return projection
+
+
+def verify_reviewed_files(repo, head, links):
+    """Bind reviewed bytes to a real ancestor commit, permitting later integration."""
+    repo = Path(repo)
+    require(repo.is_absolute() and repo.resolve(strict=True) == repo, "reviewed checkout root")
+    require(type(head) is str and re.fullmatch(r"[0-9a-f]{40}", head) and head != "0" * 40,
+            "reviewed commit identity")
+    environment = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
+    environment.update(GIT_NO_LAZY_FETCH="1", GIT_NO_REPLACE_OBJECTS="1", GIT_TERMINAL_PROMPT="0")
+
+    def git(*args):
+        result = subprocess.run(["git", "--no-pager", "--literal-pathspecs", "-C", str(repo), *args],
+                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=30, env=environment)
+        require(result.returncode == 0, "reviewed Git object unavailable")
+        return result.stdout
+
+    git("cat-file", "-e", head + "^{commit}")
+    git("merge-base", "--is-ancestor", head, "HEAD")
+    require(type(links) is list and 1 <= len(links) <= 64, "reviewed file links")
+    names = set()
+    for link in links:
+        fields(link, "path sha256", "reviewed file")
+        relative = external_relative(link["path"]).as_posix()
+        external_digest(link["sha256"])
+        require(relative not in names, "duplicate reviewed file")
+        names.add(relative)
+        entry = git("ls-tree", "-z", head, "--", relative)
+        require(entry.endswith(b"\0") and entry.count(b"\0") == 1, "reviewed tree entry")
+        info, name = entry[:-1].split(b"\t", 1)
+        mode, kind, blob = info.split(b" ")
+        require(mode in (b"100644", b"100755") and kind == b"blob" and name.decode("utf-8") == relative,
+                "reviewed file is not a regular blob")
+        blob_name = blob.decode("ascii")
+        size = int(git("cat-file", "-s", blob_name))
+        require(0 < size <= 16 * 1024 * 1024, "reviewed blob size")
+        raw = git("cat-file", "blob", blob_name)
+        require(len(raw) == size and hashlib.sha256(raw).hexdigest() == link["sha256"],
+                "reviewed commit bytes changed")
+
+
+SOURCE_SELECTION = "tests/product_corpus/selection.json"
+
+
+def verify_source_selection(repo, link):
+    """Read an entire partial selection before returning any admitted count.
+
+    Exact reviewed commits, actual linked bytes and distinct procedural agent
+    identities are checked. This shared-account process is not signed provenance
+    or proof against an author forging both an index and its review evidence.
+    """
+    try:
+        repo = Path(repo)
+        require(repo.is_absolute() and repo.resolve(strict=True) == repo, "selection checkout root")
+        observations = {}
+
+        def read_link(item, external=False, maximum=16 * 1024 * 1024):
+            fields(item, "path sha256", "selection link")
+            external_digest(item["sha256"])
+            path = Path(item["path"]) if external else repo / external_relative(item["path"])
+            require(not external or (path.is_absolute() and repo not in path.parents), "review evidence must be external")
+            actual, info, raw = external_read(path, capture=True)
+            require(actual["sha256"] == item["sha256"] and actual["size_bytes"] <= maximum, "selection evidence drift/size")
+            observations[path] = info
+            return parse_json(raw.decode("utf-8"))
+
+        require(type(link) is dict and link.get("path") == SOURCE_SELECTION, "selection manifest path")
+        value = read_link(link)
+        fields(value, "schema state origins admissions boundary", "source selection")
+        require(value["schema"] == "codeskeptic-product-reviewed-source-selection/v1"
+                and value["state"] == "PARTIAL_REVIEWED_SOURCE_SELECTION_NOT_FROZEN"
+                and nonempty(value["boundary"]), "source selection state")
+        origins = value["origins"]
+        require(type(origins) is dict and 1 <= len(origins) <= 1000
+                and all(type(name) is str and re.fullmatch(r"[a-z][a-z0-9-]{0,95}", name)
+                        and type(url) is str and re.fullmatch(r"https://[A-Za-z0-9./_-]+", url)
+                        and not url.endswith("/") for name, url in origins.items())
+                and len(set(url.casefold() for url in origins.values())) == len(origins), "canonical source origins")
+        require(type(value["admissions"]) is list and len(value["admissions"]) <= 10000, "bounded source admissions")
+        rows = []
+        for entry in value["admissions"]:
+            fields(entry, "candidate review", "source admission entry")
+            require(type(entry["candidate"]) is dict and entry["candidate"].get("path") == GCC_SOURCE_CANDIDATE,
+                    "unimplemented source candidate schema")
+            candidate = read_link(entry["candidate"], maximum=65536)
+            review = read_link(entry["review"], external=True, maximum=65536)
+            projection = admission_review_metadata(review, candidate, entry["candidate"]["sha256"])
+            require(origins.get(projection["origin"]) == "https://github.com/gcc-mirror/gcc", "candidate canonical origin")
+            verify_reviewed_files(repo, review["repository_head"], [entry["candidate"], *review["reviewed_links"].values()])
+            actual = verify_gcc_source_candidate(repo)
+            require(actual["candidate_sha256"] == entry["candidate"]["sha256"]
+                    and canonical({**actual["projection"], "quota": True}) == canonical(projection),
+                    "admitted candidate no longer matches actual inputs")
+            rows.append(projection)
+        result = quota_readiness(rows, set(origins))
+        for path, before in observations.items():
+            require(path.resolve(strict=True) == path and external_identity(path.lstat()) == external_identity(before),
+                    "selection evidence final identity changed")
+        return {**result, "state": value["state"], "selection_sha256": link["sha256"],
+                "source_admission_reviews_bound": len(rows), "evaluation_frozen": False,
+                "task_ready": False, "native_product_qualified": False, "license_qualified": False,
+                "redistribution_approved": False}
+    except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError, subprocess.SubprocessError):
+        raise ValueError("reviewed source selection rejected") from None
+
+
 def adapt_gcc_source(raw):
     """Replay the reviewed line selection; the caller binds input/output hashes."""
     lines = raw.decode("utf-8").splitlines()
@@ -893,12 +1026,18 @@ def native_api_metadata(model):
 
 
 def source_metadata(manifest):
+    require(type(manifest) is dict, "profile manifest")
+    version2 = manifest.get("schema") == "codeskeptic-product-profiles/v2"
     fields(manifest, "schema state selection_base limits projects historical_index historical_index_sha256 "
            "evaluation_state independent_quota_examples native_environment_state native_api_model "
-           "native_api_model_sha256 boundary", "profile manifest")
-    require(manifest["schema"] == "codeskeptic-product-profiles/v1"
+           "native_api_model_sha256 boundary" + (" source_selection" if version2 else ""), "profile manifest")
+    require(manifest["schema"] in ("codeskeptic-product-profiles/v1", "codeskeptic-product-profiles/v2")
             and manifest["selection_base"] == "de642695c96224ab11c5add000c7ad9c996d0a50"
             and nonempty(manifest["boundary"]), "profile source identity")
+    if version2:
+        fields(manifest["source_selection"], "path sha256", "profile source selection")
+        require(manifest["source_selection"]["path"] == SOURCE_SELECTION, "profile source selection path")
+        external_digest(manifest["source_selection"]["sha256"])
     require(manifest["historical_index"] == "tests/product_corpus/historical/measurement-index.json"
             and type(manifest["historical_index_sha256"]) is str
             and SHA.fullmatch(manifest["historical_index_sha256"])
@@ -998,27 +1137,41 @@ def linked_native_api_model(manifest, root):
     return model
 
 
-def draft_readiness(manifest):
+def draft_readiness(manifest, root=None):
     metadata = source_metadata(manifest)
+    version2 = manifest["schema"] == "codeskeptic-product-profiles/v2"
+    evaluation = "PARTIAL_INDEPENDENT_SOURCE_SELECTION_NOT_FROZEN" if version2 else "SELECTION_AND_INDEPENDENT_LABEL_REVIEW_PENDING"
+    environment = "PARTIAL_NATIVE_OBSERVATIONS_NOT_FINAL_PROFILE" if version2 else "PROSPECTIVE_REQUIREMENTS_ONLY_ACTUAL_IDENTITY_CAPTURE_PENDING"
     require(manifest["state"] == "DRAFT_NOT_FROZEN"
-            and manifest["evaluation_state"] == "SELECTION_AND_INDEPENDENT_LABEL_REVIEW_PENDING"
-            and type(manifest["independent_quota_examples"]) is int and manifest["independent_quota_examples"] == 0
-            and manifest["native_environment_state"] == "PROSPECTIVE_REQUIREMENTS_ONLY_ACTUAL_IDENTITY_CAPTURE_PENDING"
+            and manifest["evaluation_state"] == evaluation
+            and type(manifest["independent_quota_examples"]) is int
+            and (0 <= manifest["independent_quota_examples"] <= 10000 if version2 else manifest["independent_quota_examples"] == 0)
+            and manifest["native_environment_state"] == environment
             and all(project["measurement_state"] == "NOT_CONFIGURED_NOT_MEASURED" for project in manifest["projects"]),
             "draft cannot fabricate completed source/corpus/environment qualification")
-    return {"state": manifest["state"], "task_ready": False, "product_qualified": False,
-            "source_metadata": metadata, "independent_quota_examples": 0,
-            "gaps": ["independent evaluation selection and source-label review missing",
+    selected = None
+    if version2:
+        require(root is not None, "v2 readiness requires actual selected-source evidence")
+        selected = verify_source_selection(root, manifest["source_selection"])
+        require(manifest["independent_quota_examples"] == selected["quota_examples"], "declared source count differs from reviewed evidence")
+    result = {"state": manifest["state"], "task_ready": False, "product_qualified": False,
+            "source_metadata": metadata, "independent_quota_examples": selected["quota_examples"] if selected else 0,
+            "gaps": ["independent evaluation selection and source-label review incomplete" if version2 else
+                     "independent evaluation selection and source-label review missing",
                      "1020 independent quota sources and three origins per bucket not established",
                      "required supplemental source-attributed security-fix pair review incomplete",
                      "native API draft lacks actual header/ABI and complete per-case model qualification",
+                     "final native analysis profiles and all-rule ground truth pending" if version2 else
                      "prospective native environment realization and exact identity capture pending"],
             "boundary": "An honest incomplete draft, not an activated evaluation freeze or permission to skip FRONT."}
+    if selected is not None:
+        result["source_selection"] = selected
+    return result
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check"))
+    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--historical-sources", type=Path, default=Path(
         "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S04-U001/corpus-diagnostic-comparison"))
@@ -1027,6 +1180,9 @@ def main():
     parser.add_argument("--evidence-root", type=Path, help="explicit external license-reference directory")
     args = parser.parse_args()
     try:
+        if args.command == "selection-check":
+            require(args.binding is None and args.evidence_root is None and args.external_root is None,
+                    "reviewed selection uses its explicit tracked roots")
         if args.command == "source-candidate-check":
             require(args.binding is None and args.evidence_root is None and args.external_root is None,
                     "source candidate uses its explicit tracked roots")
@@ -1053,7 +1209,10 @@ def main():
             elif args.command == "api-check":
                 result = native_api_metadata(model)
             else:
-                result = draft_readiness(manifest)
+                result = draft_readiness(manifest, args.root)
+                if args.command == "selection-check":
+                    require(manifest["schema"] == "codeskeptic-product-profiles/v2", "selection check requires profiles v2")
+                    result = result["source_selection"]
         print(canonical(result), end="")
         if args.command == "readiness" and not result["task_ready"]:
             return 2

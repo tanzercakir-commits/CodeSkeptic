@@ -108,6 +108,14 @@ Kaynak-sayım kararı legal clearance veya redistribution yetkisi değildir;
 çözülmemiş hak/dağıtım sınırları açıkça korunur. Eski held inceleme sonradan
 PASS diye değiştirilmez; yeni karar kendi exact kaynak/kanıt kimliğini taşır.
 
+Profile v1 eski zero-count taslağın tam şema/anlamını korur. Opt-in profile v2,
+reviewed-selection indeksinin exact yol/hash'ini taşır; readiness gerçek review
+byte'larını, reviewed Git commit/candidate/bağlı tarifleri ve halen seçilen girdileri
+kontrol ederek kısmi sayımı türetir. Salt metadata sayısı, HELD karar veya proposal
+bu yola kabul edilmez. Aynı global hash/cluster ikinci rol, köken veya platform
+adıyla tekrar sayılamaz. Kısmi v2 seçim de `DRAFT_NOT_FROZEN` ve exit 2 kalır;
+native v1 zero/false observation bayrakları bu karardan bağımsızdır.
+
 ### Native API taslağı — henüz dondurulmuş veya kurulmuş model değil
 
 [`native-api-models.json`](../tests/product_corpus/native-api-models.json), manifestin
