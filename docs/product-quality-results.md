@@ -728,3 +728,33 @@ Kaynak/SDK dosyaları upload edilmedi. Native input byte'ları primary Linux hos
 yeniden açılmış sayılmaz. Kaynak kabulü hâlâ **1/1020**, tüm native/task/product
 qualification ve full freeze false; U003 için POP yoktur. Bu raporun belge HEAD'i
 koşunun tested HEAD'i değildir.
+
+### Aşama zamanlı tanı v2 — aynı 30 saniye, ayrı import/query ölçümü
+
+`diagnose-windows-stages` önceki v1 tanısını yeniden etiketlemez. Ayrı
+`codeskeptic-windows-query-diagnostic/v2` şemasını ve `check-windows-stages`
+okuyucusunu kullanır; eski v1 CLI/validator ve altı-probe kayıtları korunur.
+Workflow mevcut tanı çağrısını bu yeni komutla değiştirir, artifact'in genel adı
+aynı kalır. V2 yalnız asıl case denemesinden sonra, değiştirilmemiş dar case
+ortamında tek PowerShell süreci çalıştırır; module-path karşılaştırması eklemez.
+
+Tek .NET Stopwatch ve flush edilen sabit marker'lar sırasıyla script başlangıcını,
+CimCmdlets import bitişini, Utility import bitişini, yalnız CIM sorgusunun bitişini
+ve selection/JSON dönüşümünün bitişini zamanlar. OS nesnesi/JSON değeri dışarı
+aktarılmaz. Asıl v1 `WINDOWS_OS_QUERY` ve identity kabulü değişmez; pipeline'ı
+bölmek yalnız tanı içindir. Bütün script tek 30 saniyelik subprocess timeout'a
+tabidir; aşama başında süre sıfırlama, yeniden deneme veya case öncesi prewarming
+yoktur. Testler gerçek PowerShell başlatmaz; native probe testleri mock kullanır.
+
+V2 yalnız sıralı, tekrarsız, tamamlanmış marker prefix'ini saklar. Sayaçlar sonlu,
+monotonik tamsayıdır; parent süresine yalnız 1 ms yuvarlama payı tanınır. Bozuk tam
+satır ve sonrasındaki marker'lar kabul edilmez; yarım son satır ayrıca flag taşır.
+Timeout'ta tamamlanma zamanı uydurulmaz. Bütün marker'lar görülse bile süreç
+timeout/nonzero ile biterse süreç başarılı sayılmaz. Raw stdout/stderr, exception
+ve ortam sırları kayda girmez. Eski hard-resource-containment sınırlaması ve
+qualification=false anlamı aynen geçerlidir.
+
+Ölçülen farklar aynı post-attempt süreçteki sıralı import/query/serialization
+maliyetidir; cold host, yalnız modül CPU zamanı veya ilk timeout'un kök nedeni
+değildir. Code/CLI negatifleri başarılı olsa da gerçek Windows gözlemi olmadan
+bu v2 tanısı sonuç üretmiş, hata çözülmüş veya U003 tamamlanmış sayılmaz.

@@ -965,6 +965,150 @@ def capture_windows_diagnostic(args):
     return value
 
 
+WINDOWS_STAGE_NAMES = ('STARTED', 'CIM_LOADED', 'UTILITY_LOADED', 'CIM_QUERY_DONE', 'QUERY_DONE')
+
+
+def windows_stage_script():
+    def marker(name):
+        return ("[Console]::WriteLine('" + name + ":' + $identityClock.ElapsedMilliseconds.ToString("
+                "[Globalization.CultureInfo]::InvariantCulture)); [Console]::Out.Flush(); ")
+    return ("$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; "
+            "[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new(); "
+            "$identityClock=[Diagnostics.Stopwatch]::StartNew(); " + marker('STARTED')
+            + "try { Import-Module CimCmdlets -ErrorAction Stop; " + marker('CIM_LOADED')
+            + "Import-Module Microsoft.PowerShell.Utility -ErrorAction Stop; " + marker('UTILITY_LOADED')
+            + "$identityOs=Get-CimInstance Win32_OperatingSystem -ErrorAction Stop; " + marker('CIM_QUERY_DONE')
+            + "$identityJson=$identityOs | Select-Object Caption,Version,BuildNumber,OSArchitecture "
+            "| ConvertTo-Json -Compress; if (-not $identityJson) { exit 22 }; " + marker('QUERY_DONE')
+            + '} catch { exit 21 }')
+
+
+def parse_windows_stage_output(stdout, parent_elapsed_ms):
+    """Keep only a complete, ordered prefix. Invalid bytes are flags, not output."""
+    require(type(stdout) is bytes and type(parent_elapsed_ms) is int
+            and 0 <= parent_elapsed_ms <= 300000, 'staged diagnostic input bound')
+    limited = len(stdout) > MAX_OUTPUT
+    data = stdout[:MAX_OUTPUT]
+    lines = data.split(b'\n')
+    trailing = bool(lines.pop())
+    stages, malformed, previous = [], limited, 0
+    for line in lines:
+        if line.endswith(b'\r'):
+            line = line[:-1]
+        match = re.fullmatch(rb'([A-Z_]+):(0|[1-9][0-9]{0,5})', line)
+        if (not match or len(stages) >= len(WINDOWS_STAGE_NAMES)
+                or match[1].decode('ascii') != WINDOWS_STAGE_NAMES[len(stages)]):
+            malformed = True
+            break
+        elapsed = int(match[2])
+        # The parent includes process startup/shutdown; allow only its 1ms rounding.
+        if not previous <= elapsed <= parent_elapsed_ms + 1:
+            malformed = True
+            break
+        stages.append({'name': WINDOWS_STAGE_NAMES[len(stages)], 'elapsed_ms': elapsed})
+        previous = elapsed
+    return {'stages': stages, 'malformed_output': malformed, 'trailing_output': trailing}
+
+
+def windows_stage_probe(shell, environment):
+    """One 30s process for all stages; no per-stage deadline reset or retry."""
+    argv = [shell, '-NoProfile', '-NonInteractive', '-Command', windows_stage_script()]
+    started = time.monotonic()
+    outcome, code, stdout, stderr = 'OK', None, b'', b''
+    try:
+        result = subprocess.run(argv, capture_output=True, timeout=30, check=False,
+                                env=checked_environment(environment))
+        code, stdout, stderr = result.returncode, result.stdout, result.stderr
+        if code != 0:
+            outcome = 'NONZERO'
+    except subprocess.TimeoutExpired as error:
+        outcome, stdout, stderr = 'TIMEOUT', error.stdout or b'', error.stderr or b''
+    except OSError:
+        outcome = 'OS_ERROR'
+    elapsed = max(0, round((time.monotonic() - started) * 1000))
+    parsed = parse_windows_stage_output(stdout, elapsed)
+    excessive = len(stdout) > MAX_OUTPUT or len(stderr) > MAX_OUTPUT
+    if outcome == 'OK' and excessive:
+        outcome = 'OUTPUT_LIMIT'
+    if outcome == 'OK' and (stderr or parsed['malformed_output'] or parsed['trailing_output']
+                            or len(parsed['stages']) != len(WINDOWS_STAGE_NAMES)):
+        outcome = 'UNEXPECTED_OUTPUT'
+    return {'outcome': outcome, 'exit_code': code, 'elapsed_ms': elapsed, **parsed,
+            'stderr_present': bool(stderr), 'output_limit_exceeded': excessive}
+
+
+def validate_windows_stages(value):
+    fields(value, 'schema source shell runner observation diagnostic_only task_ready native_qualified '
+           'product_qualified timeout_seconds', 'Windows staged diagnostic')
+    require(value['schema'] == 'codeskeptic-windows-query-diagnostic/v2'
+            and value['diagnostic_only'] is True and type(value['timeout_seconds']) is int
+            and value['timeout_seconds'] == 30
+            and all(value[key] is False for key in ('task_ready', 'native_qualified', 'product_qualified')),
+            'staged diagnostic is not qualification')
+    fields(value['source'], 'head tree collector_sha256 workflow_sha256 profiles_sha256 api_models_sha256', 'source')
+    require(all(digest(item, 40 if key in ('head', 'tree') else 64)
+                for key, item in value['source'].items()), 'staged source identity')
+    validate_file(value['shell'], 'windows')
+    fields(value['runner'], 'run_id attempt head image_os image_version', 'staged runner')
+    require(all(nonempty(item) for item in value['runner'].values())
+            and value['runner']['head'] == value['source']['head'], 'staged runner identity')
+    row = value['observation']
+    fields(row, 'outcome exit_code elapsed_ms stages malformed_output trailing_output stderr_present '
+           'output_limit_exceeded', 'staged observation')
+    require(row['outcome'] in ('OK', 'NONZERO', 'TIMEOUT', 'OS_ERROR', 'OUTPUT_LIMIT', 'UNEXPECTED_OUTPUT')
+            and type(row['elapsed_ms']) is int and 0 <= row['elapsed_ms'] <= 300000
+            and type(row['stages']) is list and len(row['stages']) <= len(WINDOWS_STAGE_NAMES), 'staged observations')
+    flags = ('malformed_output', 'trailing_output', 'stderr_present', 'output_limit_exceeded')
+    require(all(type(row[key]) is bool for key in flags), 'staged output flags')
+    require((row['exit_code'] is None) == (row['outcome'] in ('TIMEOUT', 'OS_ERROR'))
+            and (row['exit_code'] is None or type(row['exit_code']) is int), 'staged process status')
+    previous = 0
+    for stage, expected in zip(row['stages'], WINDOWS_STAGE_NAMES):
+        fields(stage, 'name elapsed_ms', 'completed stage')
+        require(stage['name'] == expected and type(stage['elapsed_ms']) is int
+                and previous <= stage['elapsed_ms'] <= row['elapsed_ms'] + 1, 'staged ordered clock prefix')
+        previous = stage['elapsed_ms']
+    if row['outcome'] == 'OK':
+        require(row['exit_code'] == 0 and len(row['stages']) == len(WINDOWS_STAGE_NAMES)
+                and not any(row[key] for key in flags), 'staged completed process')
+    elif row['outcome'] == 'NONZERO':
+        require(row['exit_code'] != 0, 'staged failed process')
+    elif row['outcome'] == 'OS_ERROR':
+        require(row['stages'] == [] and not any(row[key] for key in flags), 'staged unavailable process')
+    elif row['outcome'] == 'OUTPUT_LIMIT':
+        require(row['exit_code'] == 0 and row['output_limit_exceeded'], 'staged output bound failure')
+    elif row['outcome'] == 'UNEXPECTED_OUTPUT':
+        require(row['exit_code'] == 0 and not row['output_limit_exceeded']
+                and (any(row[key] for key in flags) or len(row['stages']) != len(WINDOWS_STAGE_NAMES)),
+                'staged incomplete or malformed protocol')
+    return {'diagnostic_only': True, 'task_ready': False, 'native_qualified': False, 'product_qualified': False}
+
+
+def capture_windows_stages(args):
+    require(platform.system() == 'Windows', 'staged diagnostic requires actual Windows')
+    source = source_identity(args.root, args.source_sha)
+    environment = case_environment(os.environ, 'Windows')
+    native_root = PureWindowsPath(environment['SystemRoot'])
+    require(native_root.is_absolute() and re.fullmatch('[A-Za-z]:', native_root.drive)
+            and '..' not in native_root.parts, 'staged diagnostic requires local Windows')
+    root = Path(environment['SystemRoot']).resolve(strict=True)
+    shell = root / 'System32/WindowsPowerShell/v1.0/powershell.exe'
+    require(Path(shutil.which('powershell.exe', path=environment.get('PATH', '')) or '').resolve(strict=True)
+            == shell.resolve(strict=True), 'staged diagnostic must use original Windows shell')
+    shell_identity = file_identity(shell)
+    row = windows_stage_probe(str(shell), environment)
+    value = {'schema': 'codeskeptic-windows-query-diagnostic/v2', 'source': source, 'shell': shell_identity,
+             'runner': {field: environment.get(key, '') for field, key in
+                        (('run_id', 'GITHUB_RUN_ID'), ('attempt', 'GITHUB_RUN_ATTEMPT'), ('head', 'GITHUB_SHA'),
+                         ('image_os', 'ImageOS'), ('image_version', 'ImageVersion'))},
+             'observation': row, 'diagnostic_only': True, 'timeout_seconds': 30,
+             'task_ready': False, 'native_qualified': False, 'product_qualified': False}
+    validate_windows_stages(value)
+    require(file_identity(shell) == shell_identity and source_identity(args.root, args.source_sha) == source,
+            'staged diagnostic shell/source changed')
+    return value
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
@@ -991,16 +1135,24 @@ def main(argv=None):
     diagnostic.add_argument('--output', type=Path, required=True)
     diagnostic_check = commands.add_parser('check-windows-diagnostic', help='structural diagnostic check only')
     diagnostic_check.add_argument('input', type=Path)
+    stages = commands.add_parser('diagnose-windows-stages', help='one post-attempt process with clocked stages')
+    stages.add_argument('--root', type=Path, required=True)
+    stages.add_argument('--source-sha', required=True)
+    stages.add_argument('--output', type=Path, required=True)
+    stages_check = commands.add_parser('check-windows-stages', help='structural staged diagnostic check only')
+    stages_check.add_argument('input', type=Path)
     args = parser.parse_args(argv)
     try:
         validator = validate_case_document if args.command in ('check-case', 'capture-case') else validate_document
         if args.command in ('diagnose-windows', 'check-windows-diagnostic'):
             validator = validate_windows_diagnostic
-        if args.command in ('check', 'check-case', 'check-windows-diagnostic'):
+        if args.command in ('diagnose-windows-stages', 'check-windows-stages'):
+            validator = validate_windows_stages
+        if args.command in ('check', 'check-case', 'check-windows-diagnostic', 'check-windows-stages'):
             require(not args.input.is_symlink() and args.input.resolve() == args.input
                     and args.input.is_file() and args.input.stat().st_size <= 16 * MAX_OUTPUT,
                     'metadata input must be a bounded absolute regular file')
-            if args.command in ('check-case', 'check-windows-diagnostic'):
+            if args.command in ('check-case', 'check-windows-diagnostic', 'check-windows-stages'):
                 from product_profiles import parse_json
                 result = validator(parse_json(args.input.read_text(encoding='utf-8')))
             else:
@@ -1011,7 +1163,8 @@ def main(argv=None):
                     and not args.output.exists() and not args.output.is_symlink()
                     and not args.output.is_relative_to(root), 'output must be new and outside the checkout')
             collector = {'capture-case': capture_case, 'capture': capture,
-                         'diagnose-windows': capture_windows_diagnostic}[args.command]
+                         'diagnose-windows': capture_windows_diagnostic,
+                         'diagnose-windows-stages': capture_windows_stages}[args.command]
             value = collector(args)
             with args.output.open('x', encoding='utf-8', newline='\n') as stream:
                 stream.write(canonical(value))
@@ -1019,7 +1172,8 @@ def main(argv=None):
         print(canonical(result), end='')
         return 0
     except (IdentityError, OSError, ValueError, KeyError, TypeError, RuntimeError) as error:
-        private = args.command in ('check-case', 'capture-case', 'diagnose-windows', 'check-windows-diagnostic')
+        private = args.command in ('check-case', 'capture-case', 'diagnose-windows', 'check-windows-diagnostic',
+                                   'diagnose-windows-stages', 'check-windows-stages')
         print('IDENTITY_INVALID ' + (case_observation_failure(error) if private else str(error)), file=sys.stderr)
         if args.command == 'capture-case':
             print('CASE_FAILURE_KIND ' + case_failure_kind(error), file=sys.stderr)

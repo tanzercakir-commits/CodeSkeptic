@@ -8,6 +8,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
@@ -1007,7 +1008,8 @@ class WindowsDiagnosticTests(unittest.TestCase):
         workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/product-identity.yml').read_text()
         case = workflow.index('& $identityPython -B scripts/product_identity.py capture-case')
         save = workflow.index('$identityCaseExit = $LASTEXITCODE')
-        diagnostic = workflow.index('& $identityPython -B scripts/product_identity.py diagnose-windows')
+        diagnostic = workflow.index('& $identityPython -B scripts/product_identity.py diagnose-windows-stages `')
+        self.assertNotIn('& $identityPython -B scripts/product_identity.py diagnose-windows `', workflow)
         failure = workflow.index("if ($identityCaseExit -ne 0) { throw 'Native case observation failed;")
         self.assertLess(case, save)
         self.assertLess(save, diagnostic)
@@ -1050,6 +1052,183 @@ class WindowsDiagnosticTests(unittest.TestCase):
                              '--source-sha', 'a' * 40, '--output', str(output)]), 2)
                 collect.assert_not_called()
             self.assertEqual(existing.read_text(encoding='utf-8'), 'preserve')
+
+
+class WindowsStageDiagnosticTests(unittest.TestCase):
+    def document(self):
+        old = WindowsDiagnosticTests().document()
+        value = {key: old[key] for key in ('source', 'shell', 'runner', 'diagnostic_only',
+                                          'timeout_seconds', 'task_ready', 'native_qualified', 'product_qualified')}
+        value['schema'] = 'codeskeptic-windows-query-diagnostic/v2'
+        value['observation'] = {'outcome': 'OK', 'exit_code': 0, 'elapsed_ms': 200,
+              'stages': [{'name': name, 'elapsed_ms': index * 20} for index, name in enumerate(identity.WINDOWS_STAGE_NAMES)],
+              'malformed_output': False, 'trailing_output': False, 'stderr_present': False, 'output_limit_exceeded': False}
+        return value
+
+    def test_stage_parser_keeps_only_completed_ordered_prefix(self):
+        result = identity.parse_windows_stage_output(b'STARTED:0\r\nCIM_LOADED:120\r\nUTILITY_LOA', 130)
+        self.assertEqual(result['stages'], [{'name': 'STARTED', 'elapsed_ms': 0},
+                                           {'name': 'CIM_LOADED', 'elapsed_ms': 120}])
+        self.assertTrue(result['trailing_output'])
+        self.assertFalse(result['malformed_output'])
+
+    def test_stage_parser_never_recovers_after_malformed_or_out_of_order_line(self):
+        for data in (b'STARTED:0\nPRIVATE_SENTINEL\nCIM_LOADED:12\n',
+                     b'STARTED:0\nUTILITY_LOADED:12\nCIM_LOADED:12\n'):
+            result = identity.parse_windows_stage_output(data, 20)
+            self.assertEqual(result['stages'], [{'name': 'STARTED', 'elapsed_ms': 0}])
+            self.assertTrue(result['malformed_output'])
+            self.assertNotIn('PRIVATE_SENTINEL', identity.canonical(result))
+
+    def test_stage_parser_rejects_invalid_clocks_duplicates_and_suffixes(self):
+        for suffix in (b'STARTED:0\n', b'CIM_LOADED:-1\n', b'CIM_LOADED:01\n',
+                       b'CIM_LOADED:1.2\n', b'CIM_LOADED:true\n', b'CIM_LOADED:32\n',
+                       b'CIM_LOADED:1000000\n', b'PRIVATE_SENTINEL\n', b'\xff\n', b'\n'):
+            result = identity.parse_windows_stage_output(b'STARTED:0\n' + suffix, 30)
+            self.assertEqual(result['stages'], [{'name': 'STARTED', 'elapsed_ms': 0}])
+            self.assertTrue(result['malformed_output'])
+            self.assertNotIn('PRIVATE_SENTINEL', identity.canonical(result))
+        result = identity.parse_windows_stage_output(b'STARTED:1\nCIM_LOADED:0\n', 30)
+        self.assertEqual(len(result['stages']), 1)
+        self.assertTrue(result['malformed_output'])
+        result = identity.parse_windows_stage_output(b'STARTED:0\n' + b'x' * identity.MAX_OUTPUT, 30)
+        self.assertTrue(result['malformed_output'])
+        self.assertTrue(result['trailing_output'])
+        self.assertEqual(len(result['stages']), 1)
+        for elapsed in (-1, True, 300001):
+            with self.subTest(elapsed=elapsed), self.assertRaises(identity.IdentityError):
+                identity.parse_windows_stage_output(b'', elapsed)
+
+    def test_stage_probe_is_one_process_one_deadline_with_no_raw_stream_export(self):
+        environment = {'PATH': 'C:/bin', 'LANG': 'C'}
+        timeout = subprocess.TimeoutExpired('PRIVATE_SENTINEL', 30,
+                  output=b'STARTED:0\nCIM_LOADED:12000\nUTILITY_', stderr=b'PRIVATE_SENTINEL')
+        with mock.patch.object(identity.subprocess, 'run', side_effect=timeout) as execute, \
+             mock.patch.object(identity.time, 'monotonic', side_effect=[1, 31.1]):
+            row = identity.windows_stage_probe('C:/Windows/powershell.exe', environment)
+        self.assertEqual(row['outcome'], 'TIMEOUT')
+        self.assertIsNone(row['exit_code'])
+        self.assertEqual(row['elapsed_ms'], 30100)
+        self.assertEqual([stage['name'] for stage in row['stages']], ['STARTED', 'CIM_LOADED'])
+        self.assertTrue(row['trailing_output'])
+        self.assertTrue(row['stderr_present'])
+        self.assertNotIn('PRIVATE_SENTINEL', identity.canonical(row))
+        execute.assert_called_once()
+        self.assertEqual(execute.call_args.kwargs['timeout'], 30)
+        self.assertEqual(execute.call_args.kwargs['env'], environment)
+        self.assertNotIn('shell', execute.call_args.kwargs)
+        script = execute.call_args.args[0][-1]
+        self.assertEqual(script, identity.windows_stage_script())
+        self.assertEqual(script.count('Get-CimInstance Win32_OperatingSystem'), 1)
+        self.assertEqual(script.count('[Diagnostics.Stopwatch]::StartNew()'), 1)
+        self.assertEqual(script.count('[Console]::Out.Flush()'), 5)
+        self.assertLess(script.index('Import-Module CimCmdlets'), script.index('Import-Module Microsoft.PowerShell.Utility'))
+        self.assertLess(script.index('CIM_QUERY_DONE:'), script.index('$identityJson='))
+        for forbidden in ('Install-Module', '$env:', 'Set-ExecutionPolicy', 'Restart-Service', 'Measure-Command'):
+            self.assertNotIn(forbidden, script)
+
+    def test_stage_process_error_outcomes_are_nonqualifying(self):
+        complete = b''.join((name + ':' + str(index) + '\n').encode()
+                            for index, name in enumerate(identity.WINDOWS_STAGE_NAMES))
+        for response, expected in ((subprocess.CompletedProcess([], 0, complete, b''), 'OK'),
+                (subprocess.CompletedProcess([], 21, b'STARTED:0\n', b''), 'NONZERO'),
+                (subprocess.CompletedProcess([], 0, complete, b'PRIVATE_SENTINEL'), 'UNEXPECTED_OUTPUT'),
+                (subprocess.CompletedProcess([], 0, b'STARTED:0\n', b''), 'UNEXPECTED_OUTPUT'),
+                (subprocess.CompletedProcess([], 0, b'x' * (identity.MAX_OUTPUT + 1), b''), 'OUTPUT_LIMIT'),
+                (OSError('PRIVATE_SENTINEL'), 'OS_ERROR'),
+                (subprocess.TimeoutExpired('PRIVATE_SENTINEL', 30, output=complete), 'TIMEOUT')):
+            option = {'side_effect': response} if isinstance(response, Exception) else {'return_value': response}
+            with self.subTest(outcome=expected), mock.patch.object(identity.subprocess, 'run', **option), \
+                 mock.patch.object(identity.time, 'monotonic', side_effect=[1, 31]):
+                row = identity.windows_stage_probe('C:/Windows/powershell.exe', {})
+            self.assertEqual(row['outcome'], expected)
+            self.assertNotIn('PRIVATE_SENTINEL', identity.canonical(row))
+            value = self.document()
+            value['observation'] = row
+            self.assertFalse(identity.validate_windows_stages(value)['native_qualified'])
+
+    def test_stage_validator_rejects_forged_completion_and_clock_shapes(self):
+        for mutation in ('qualified', 'schema', 'raw-output', 'marker-order', 'decreasing-clock', 'oversized-clock',
+                         'bool-clock', 'missing-stage', 'extra-stage', 'none-exit', 'malformed-success',
+                         'timeout-exit', 'os-error-stage', 'false-output-limit', 'false-unexpected'):
+            value = self.document()
+            row = value['observation']
+            if mutation == 'qualified': value['task_ready'] = True
+            elif mutation == 'schema': value['schema'] = 'codeskeptic-windows-query-diagnostic/v1'
+            elif mutation == 'raw-output': row['stdout'] = 'PRIVATE_SENTINEL'
+            elif mutation == 'marker-order': row['stages'].reverse()
+            elif mutation == 'decreasing-clock': row['stages'][2]['elapsed_ms'] = 0
+            elif mutation == 'oversized-clock': row['stages'][-1]['elapsed_ms'] = 202
+            elif mutation == 'bool-clock': row['stages'][0]['elapsed_ms'] = False
+            elif mutation == 'missing-stage': row['stages'].pop()
+            elif mutation == 'extra-stage': row['stages'].append(row['stages'][-1])
+            elif mutation == 'none-exit': row['exit_code'] = None
+            elif mutation == 'malformed-success': row['malformed_output'] = True
+            elif mutation == 'timeout-exit': row['outcome'] = 'TIMEOUT'
+            elif mutation == 'os-error-stage': row.update(outcome='OS_ERROR', exit_code=None)
+            elif mutation == 'false-output-limit': row['outcome'] = 'OUTPUT_LIMIT'
+            elif mutation == 'false-unexpected': row['outcome'] = 'UNEXPECTED_OUTPUT'
+            with self.subTest(mutation=mutation), self.assertRaises(identity.IdentityError):
+                identity.validate_windows_stages(value)
+
+    def test_both_cli_versions_preserve_schema_boundaries_and_private_errors(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary).resolve() / 'diagnostic.json'
+            for document, accepted in ((self.document(), 'check-windows-stages'),
+                     (WindowsDiagnosticTests().document(), 'check-windows-diagnostic')):
+                path.write_text(identity.canonical(document), encoding='utf-8')
+                for command in ('check-windows-stages', 'check-windows-diagnostic'):
+                    result = subprocess.run([sys.executable, '-B', identity.__file__, command, str(path)],
+                                            capture_output=True, timeout=10)
+                    self.assertEqual(result.returncode, 0 if command == accepted else 2, result.stderr)
+            path.write_text('{"schema":"PRIVATE_SENTINEL","schema":null}', encoding='utf-8')
+            result = subprocess.run([sys.executable, '-B', identity.__file__, 'check-windows-stages', str(path)],
+                                    capture_output=True, timeout=10)
+            self.assertEqual(result.returncode, 2)
+            self.assertNotIn(b'PRIVATE_SENTINEL', result.stderr)
+
+    def test_staged_capture_uses_unchanged_filtered_environment_and_one_mocked_probe(self):
+        value = self.document()
+        native_env = {'PATH': 'C:/bin', 'SystemRoot': 'C:/Windows', 'GITHUB_SHA': value['source']['head'],
+                      'GITHUB_RUN_ID': '123', 'GITHUB_RUN_ATTEMPT': '1', 'ImageOS': 'win25',
+                      'ImageVersion': '20260824.214.3', 'GITHUB_TOKEN': 'PRIVATE_SENTINEL',
+                      'PSModulePath': 'PRIVATE_SENTINEL'}
+        root, shell = mock.MagicMock(), mock.MagicMock()
+        root.resolve.return_value = root
+        root.__truediv__.return_value = shell
+        shell.resolve.return_value = shell
+        shell.__str__.return_value = value['shell']['path']
+        with mock.patch.dict(identity.os.environ, native_env, clear=True), \
+             mock.patch.object(identity.platform, 'system', return_value='Windows'), \
+             mock.patch.object(identity, 'source_identity', return_value=value['source']) as source, \
+             mock.patch.object(identity, 'file_identity', return_value=value['shell']) as files, \
+             mock.patch.object(identity, 'Path', side_effect=lambda path: root if path == 'C:/Windows' else shell), \
+             mock.patch.object(identity.shutil, 'which', return_value=value['shell']['path']), \
+             mock.patch.object(identity, 'windows_stage_probe', return_value=value['observation']) as probe:
+            result = identity.capture_windows_stages(SimpleNamespace(root='/repo', source_sha=value['source']['head']))
+        self.assertEqual(result, value)
+        probe.assert_called_once_with(value['shell']['path'], identity.case_environment(native_env, 'Windows'))
+        self.assertNotIn('PRIVATE_SENTINEL', identity.canonical(probe.call_args.args[1]))
+        self.assertEqual(source.call_count, 2)
+        self.assertEqual(files.call_count, 2)
+
+    def test_staged_cli_checks_output_and_platform_before_native_probe(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve() / 'repo'
+            root.mkdir()
+            existing = root.parent / 'keep.json'
+            existing.write_text('preserve', encoding='utf-8')
+            for output in (existing, root / 'forbidden.json'):
+                with mock.patch.object(identity, 'capture_windows_stages') as collect, \
+                     mock.patch.object(identity.sys, 'stderr', io.StringIO()):
+                    self.assertEqual(identity.main(['diagnose-windows-stages', '--root', str(root),
+                             '--source-sha', 'a' * 40, '--output', str(output)]), 2)
+                collect.assert_not_called()
+            self.assertEqual(existing.read_text(encoding='utf-8'), 'preserve')
+        with mock.patch.object(identity.platform, 'system', return_value='Linux'), \
+             mock.patch.object(identity.subprocess, 'run') as execute, self.assertRaises(identity.IdentityError):
+            identity.capture_windows_stages(None)
+        execute.assert_not_called()
 
 
 class WorkflowTests(unittest.TestCase):
