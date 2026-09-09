@@ -50,9 +50,9 @@ cluster ID, bağımsızlık ve etiket doğruluğunun kendi başına kanıtı de�
 [`selection-record.json`](../tests/product_corpus/candidates/selection-record.json)
 içindedir. Ayrı read-only kaynak incelemesi receiver-after-delete adayının mevcut
 `MethodCallReceiver_AfterFree_StillUAF` eğitim örneğinin semantik tekrarı olduğunu
-saptadı: bağımsız kotadan dışlandı. Derived-return/matching-delete adayı yalnız
-memory-leak ailesi için safe etiket önerisidir; tam bağımlılık ve bağımsızlık
-incelemesi bitmediğinden kabul edilmedi. İkisi de analiz edilmedi ve **0/1020**
+saptadı: bağımsız kotadan dışlandı. Derived-return/matching-delete adayı daha
+sonraki standalone kaynak hakemliğinde memory-leak ailesi için safe, ancak
+eğitim yakın varyantı nedeniyle supplemental/nonquota bulundu. İkisi de analiz edilmedi ve **0/1020**
 sayısı değişmedi. GCC 16.1.1 ile C++17 syntax-only kontrolü ürün ölçümü değildir.
 
 Tarihsel indeksin manifestteki exact yol/hash bağı artık manifest okuyan profile CLI
@@ -249,3 +249,32 @@ açısından güvenli olduğu söylenmez. Typed Base/Derived eklemesi bağımsı
 yeterli ayrım değildir. Karar, exact kaynak/inceleme/ham syntax hash'leriyle
 `candidates/selection-record.json` içinde tutulur. Önceki held öneri korunur;
 receiver-after-delete eğitim kopyası da dışarıda kalır. Kota hâlâ **0/1020**'dir.
+
+### Değer döndürürken kaybolan sahiplik — etiketi doğrulandı, seçim bekliyor
+
+Yeni [`llvm-value-return-selection.json`](../tests/product_corpus/candidates/llvm-value-return-selection.json)
+kaydı, LLVM'nin aynı kökenindeki ayrı `NewDeleteLeaks.cpp` bölümünü kaynak ve
+bağımsız inceleme hashlerine bağlar. `new Wrapping()` sonrasında pointer taşımayan
+alt nesnenin değer kopyası döner; helper'ın tahsisi serbest bırakılmaz veya
+devredilmez. Bağımsız hakem başarıyla tahsis edilen yol için **BUGGY/CWE-401**
+etiketini doğruladı. Caller ikinci bir sızıntı veya ayrı safe kota örneği değildir.
+
+Seçim **HELD_NONQUOTA** kaldı: denetçi `SourceManagerTest.cpp` içindeki
+`WarmBackendPreservesOriginalAssertPreprocessingSemantics` kaynak parçasında
+aynı fonksiyonda allocation → value return → owner loss yapısını buldu.
+Bu test null-dereference/cache davranışını çalıştırır; memory-leak qualification
+kanıtı değildir. Scalar yerine aggregate kopyasının bağımsız cluster oluşturduğu
+henüz kanıtlanmadı. Kaynaktan türetilen olası rapor yeri helper kapanışıdır
+(satır 18), fakat bu gözlenmiş analyzer sonucu değildir; exact komut/rapor bağı
+ve native profil hâlâ bekler. Üç LLVM adayı da bağımsız kota dışındadır.
+
+Ayrı GCC 15.2.0 kaynak havuzundan sekiz bellek yönetimi test dosyası ve `COPYING3`,
+`5115c7e447fc07457443df874bf57840e8316d5f` revision'ına ve gerçek Git blob/SHA-256
+kimliklerine bağlı olarak repo dışında saklandı. Paket özet SHA-256'sı
+`a790d69453c182f4607e16b75d5737a054772548bf9e9cbdc5d3907ad71f89f5`'tir.
+Bu havuz kabul edilmiş korpus değildir. İki kaynak dosyası aynı HAProxy 2.7.1
+örneğinden türetildiğini belirtir; dosya/repo sayısı bağımsız köken sayısına
+çevrilmez. Upstream warning/no-warning direktifleri etiket kanıtı sayılmaz.
+Bu olağan bellek testleri, engellenen dört yeni ailelik security-fix araştırmasının
+tekrarı değildir; o zorunlu kabulün eksikliğini de kapatmaz. Kota **0/1020**,
+U003 ve kalan bütün ürün kapıları beklemededir; hiçbir POP hazırlanmadı.

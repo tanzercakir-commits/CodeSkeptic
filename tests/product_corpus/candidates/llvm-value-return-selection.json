@@ -1,0 +1,77 @@
+{
+  "schema": "codeskeptic-product-source-adjudication/v1",
+  "state": "SOURCE_LABELED_HELD_NONQUOTA_NOT_FROZEN",
+  "id": "llvm-value-return-loses-owner",
+  "path": "tests/product_corpus/candidates/llvm-value-return-loses-owner.cpp",
+  "sha256": "a8ec2a709ca290c7db446b4039054dbc71aba8793437afbae83ffc495e11032a",
+  "origin": {
+    "id": "llvm-project-clang-analysis-tests",
+    "repository": "https://github.com/llvm/llvm-project",
+    "revision": "87f0227cb60147a26a1eeb4fb06e3b505e9c7261",
+    "path": "clang/test/Analysis/NewDeleteLeaks.cpp",
+    "lines": [
+      199,
+      220
+    ],
+    "git_blob": "b2bad7e76fad0605b4e78ec90903550cc5bacb84",
+    "sha256": "af674c37992a33909c744a0d52dabfc801660d67cd3e4bc830cc51c6ec620492",
+    "local_evidence": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/upstream-candidates/llvm-20.1.8/NewDeleteLeaks.cpp",
+    "license": {
+      "spdx": "Apache-2.0 WITH LLVM-exception",
+      "preserved_path": "tests/product_corpus/licenses/LLVM.txt",
+      "sha256": "8d85c1057d742e597985c7d4e6320b015a9139385cff4cbae06ffc0ebe89afee"
+    },
+    "lineage_boundary": "Same LLVM analysis-test origin as the other LLVM candidates; a different source file is not a new independent origin."
+  },
+  "source_label": {
+    "family": "memory-leak",
+    "cwe": 401,
+    "label": "BUGGY_ON_SUCCESSFUL_ALLOCATION",
+    "function": "symbol_reaper_lifetime::allocateWrappingAndReturnNested",
+    "allocation_line": 16,
+    "value_return_line": 17,
+    "rationale": "new Wrapping() value-initializes the nested integer array. The return copies a pointer-free Nested object, not an ownership handle. No release or pointer escape follows successful allocation, so the helper loses its allocation. A throwing allocation creates no acquired object. Caller does not own a second leak.",
+    "language_boundary": "Header-free C++17 translation unit; ordinary global single-object new/delete, no allocator replacement or interposition. Visible aggregate operations introduce no custom copy or destructor cleanup. Original simulator-harness equivalence is not claimed; this is source-level ownership semantics, not measured runtime allocation."
+  },
+  "selection": {
+    "decision": "HELD_NONQUOTA",
+    "quota": false,
+    "accepted_independent_quota_examples": 0,
+    "reason": "The scalar-to-pointer-free-aggregate return distinction has not established independence from an existing same-function allocate/value-return/owner-loss source structure.",
+    "overlap_evidence": {
+      "path": "tests/SourceManagerTest.cpp",
+      "test": "SourceInputCacheTest.WarmBackendPreservesOriginalAssertPreprocessingSemantics",
+      "lines": [
+        415,
+        425
+      ],
+      "boundary": "This cache fixture invokes NullDerefRule via scan(..., true), not memory-leak qualification. It is structural source overlap, not proof that the memory-leak detector was trained or passed this case, and not an all-rule-safe comparison."
+    }
+  },
+  "prospective_mapping": {
+    "state": "SOURCE_DERIVED_NOT_MEASURED_NOT_ADMITTED",
+    "rule": "memory-leak",
+    "function": "symbol_reaper_lifetime::allocateWrappingAndReturnNested",
+    "line": 18,
+    "column": 1,
+    "cwes": [
+      401
+    ],
+    "basis": "At the reviewed repository head, src/rules/MemoryLeakRule_Ex.cpp:2517 and 2546-2574 use the helper body closing brace for an exit-block leak. This is prospective source mapping, not an observed result or the upstream warning location. Exact case-command/report binding is still pending."
+  },
+  "review": {
+    "reviewer": "/root/product_plan_verifier",
+    "role": "independent read-only source-admission review",
+    "repository_head": "ed6c0c909e02c18aa31debf4a5bea780abeaec1b",
+    "reviewed_source_sha256": "a8ec2a709ca290c7db446b4039054dbc71aba8793437afbae83ffc495e11032a",
+    "syntax_evidence": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/value-return-source-review-v1/proof/summary.json",
+    "syntax_evidence_sha256": "cd64547715fab36f7ecc38935a7ff9954e1b380bf230783fb741ee9b7219181c",
+    "review_evidence": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/value-return-source-review-v1/independent-source-review.txt",
+    "review_evidence_sha256": "14d839e5d89eceb39e9431fb28224fb4395645c1c2b8ee1a4d37581b3f494af9",
+    "upstream_harness_equivalence_verified": false,
+    "analyzer_run": false,
+    "native_product_qualified": false,
+    "unit_pass": false
+  },
+  "boundary": "Source label and held selection only. No accepted independent example, frozen evaluation, measured addressability, corpus quota, native qualification or U003 completion is established."
+}
