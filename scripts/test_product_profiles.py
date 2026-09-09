@@ -5,7 +5,7 @@ import hashlib
 import io
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import subprocess
 import sys
 import tempfile
@@ -158,6 +158,8 @@ class AllRuleGroundTruthTests(unittest.TestCase):
         selection_sha = write(repo / profiles.SOURCE_SELECTION, {'admissions': [{'candidate': value['candidate']}]})
         manifest = profiles.read_json(self.repo / 'scripts/product_profiles.json')
         manifest['source_selection']['sha256'] = selection_sha
+        for project in manifest['projects']:
+            project['local_snapshot'] = str(base / 'source-projects' / project['id'])
         write(repo / 'scripts/product_profiles.json', manifest)
         return SimpleNamespace(repo=repo, inputs=inputs, source_sha=source_sha, candidate_sha=candidate_sha,
                                value=value, record_sha=record_sha, index=index, review_path=review_path, write=write)
@@ -174,6 +176,25 @@ class AllRuleGroundTruthTests(unittest.TestCase):
         self.assertFalse(result['source_labels_independently_reviewed'])
         objects.assert_called_once_with(staged.repo, self.value['reference_head'], self.value['references'])
         execute.assert_not_called()
+
+    def test_staged_manifest_uses_synthetic_native_snapshot_roots(self):
+        staged = self.staged_fixture()
+        manifest = profiles.read_json(staged.repo / 'scripts/product_profiles.json')
+        for project in manifest['projects']:
+            self.assertEqual(project['local_snapshot'], str(staged.repo.parent / 'source-projects' / project['id']))
+            self.assertTrue(Path(project['local_snapshot']).is_absolute())
+        profiles.source_metadata(manifest)
+        # Exercise Windows path semantics on every host without running tools
+        # or weakening the production host-absolute snapshot requirement.
+        windows_manifest = copy.deepcopy(manifest)
+        with mock.patch.object(profiles, 'Path', PureWindowsPath):
+            for project in windows_manifest['projects']:
+                project['local_snapshot'] = '/synthetic-posix-only/' + project['id']
+            with self.assertRaisesRegex(ValueError, '^source archive/selection metadata$'):
+                profiles.source_metadata(windows_manifest)
+            for project in windows_manifest['projects']:
+                project['local_snapshot'] = str(PureWindowsPath('C:/synthetic-sources') / project['id'])
+            profiles.source_metadata(windows_manifest)
 
     def test_bound_native_recipe_cannot_disagree_with_label_arithmetic_model(self):
         for width in (4, True, 8.0):

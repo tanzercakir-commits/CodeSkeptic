@@ -964,3 +964,33 @@ mevcut 26 external-input/staging testiyle birlikte her lane 36 odaklı test seç
 Bu testler sentetik geçici fixture kullanır; dış kaynakları yeni örnek olarak
 kaydetmez, analyzer çalıştırmaz ve bu ekleme kendi başına yeni hosted başarı
 kanıtı değildir. Önceki native koşuların tarihî sonuçları değişmez.
+
+### All-rule native test seçimi — ilk Windows RED ve fixture düzeltmesi
+
+Entegrasyon `6b4478df32ee3c86367393f36bd094d82de95871` ayrı exact-head
+bağımsız PASS aldı; 234 yerel test ve 15 kontrol beklenen exit sonuçlarını verdi.
+Ancak [native koşu 34346981841](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34346981841)
+attempt 1 genel **failure** kaldı: Ubuntu/macOS geçti, Windows 88 identity testini
+ve gerçek kaynak staging'ini geçtikten sonra 36 external-input/staging/all-rule
+testinden `test_reviewed_reader_binds_procedural_review_without_extra_quota`
+hata verdi. Windows case/ABI ve post-attempt diagnostic adımları çalışmadı;
+eksik artifact'ler başarı sayılmaz. Beş mevcut JSON artifact'i, run/job metadata,
+loglar ve ZIP/JSON SHA-256'ları checkout dışındaki
+`gcc-all-rule-ground-truth-v1/hosted-34346981841` paketinde korundu; summary
+SHA-256 `1eac27a2d5f76683750d06c46033b4d8f8ed63cdcf27097b838f3fa59a0dc638`.
+
+Yeni sentetik fixture, gerçek Linux manifestinden üç projenin mutlak snapshot
+yollarını kopyalıyordu. Windows `Path.is_absolute()` bu drive içermeyen POSIX
+yolları reddeder; production `source_metadata` kontrolü bu nedenle doğru biçimde
+fail-closed kaldı. Fixture artık yalnız geçici test manifestindeki snapshot
+yollarını kendi host'una göre kurar. Gerçek profil, source reader, etiket,
+receipt/admission/selection ve path güvenlik koşulları değiştirilmez.
+
+Fixture regresyonunun RED exit 1 ve GREEN exit 0 kanıtları aynı dış pakette
+`windows-fixture-red.json` / `windows-fixture-green.json` olarak saklandı.
+Yeni test ayrıca her host'ta `PureWindowsPath` ile POSIX-rooted yol reddini ve
+drive içeren sentetik yol kabulünü kontrol eder. Native lane seçiminde artık
+37 test (26 önceki + 11 all-rule) bulunur. Yerel GREEN Windows native GREEN
+yerine geçmez; ilk hosted failure değişmeden korunur ve yeni exact-head inceleme
+ile yeni hosted sonuç ayrıca gerekir. Korpus 1/1020 ve bütün qualification
+bayrakları false kalır.
