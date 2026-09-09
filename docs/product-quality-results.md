@@ -535,3 +535,36 @@ SDK gövdeleri artifact'e eklenmedi; negatif tanılar yalnız boyut/hash taşır
 `native_qualified/license_qualified/task_ready/product_qualified=false`, kota
 **0/1020**, aynı FRONT U003 ve bütün gerçek freeze/tamamlanma kapıları korunur.
 Bağımsız U003 completion receipt veya POP yoktur.
+## U003 — İlk kaynak-sayım kararı için bağlı GCC adayı
+
+Bu ek, eski held kararını veya native sonuçları yeniden etiketlemez. Aynı 636-byte
+GCC uyarlaması için [kaynak seçim adayı](../tests/product_corpus/candidates/gcc-mixed-storage-source-candidate.json)
+source/hash, bağımsız label/tek cluster kaydı, Linux C17 CDB/analiz tarifi, prospective
+occurrence ve bütün sabit limitleri bir araya getirir. `source-candidate-check`
+beş tracked linki, önceki üç source-review kanıtını ve beş Linux native/recipe kanıtını
+gerçek byte/hash üzerinden okur; ayrıca beş kaynak dosyası ve üç lisans referansını
+bağlar. Bu komut analyzer çalıştırmaz ve kendi başına kota kabul etmez.
+
+[Lisans dayanağı kaydı](../tests/product_corpus/candidates/gcc-mixed-storage-license-basis.json)
+ayrı `license-basis-check` ile sınanır. Sabit GCC revizyonunun
+[root README](https://raw.githubusercontent.com/gcc-mirror/gcc/5115c7e447fc07457443df874bf57840e8316d5f/README)
+COPYING dosyalarına yönlendirir;
+[resmî GCC açıklaması](https://gcc.gnu.org/pipermail/gcc/2021-June/236201.html)
+proje lisansını GPL version 3 or later olarak belirtir. Bunlar proje düzeyinde
+dayanaktır: seçili testcase'in ayrı banner'ı yoktur; test dizini README'sinin
+kopyalama izni yalnız README'ye uygulanır. Kayda source-specific legal clearance,
+tam authorship, Runtime Library Exception veya redistribution onayı eklenmez.
+GPL/source içerikleri repository'ye alınmadı. Gelecekte kaynak iletimi için gerekli
+upstream notices, değişiklik/tarih bildirimi ve kesin dağıtım yüzeyi ayrıca ele alınır.
+
+Saklanan yeni referanslar `CS3-CH08-S01-U003/gcc-license-basis-v1` dizinindedir;
+retention summary SHA-256 `a52c025b1beea1855d85a08e49d6acdefd1c427f77473c3a9a51340aea9f1049`.
+Root README 1026 byte, COPYING3 35147 byte, resmî açıklama HTML'i 4703 byte;
+COPYING3 eski beş dosyalı source snapshot'taki notice ile byte eşittir.
+
+U003'ün source-count kararı ile U004'ün clean Release ölçümü ve sonraki native
+runtime/artifact kapıları ayrıdır. Bir kaynak, açıkça seçilmiş Linux tarifinde
+önceden etiketlenebilir; bu tam cohort freeze, Windows/macOS nihai analiz tarifi,
+all-rule ground truth, ürün başarısı veya dağıtım izni anlamına gelmez. Bir sonraki
+bağımsız exact-source karar açıkça source-count admission vermeden eski sıfır kota
+değişmez. Tüm 1020/üç-köken eşikleri, daha sıkı floors ve FIFO aynen korunur.

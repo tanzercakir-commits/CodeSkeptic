@@ -97,6 +97,17 @@ Bu ilk belge sayı uydurmaz ve ölçülmemiş donanım performansı vaat etmez. 
 sonrası yeni temiz Release baseline ölçer. Yeni aile yoksa PLANNED_NOT_IMPLEMENTED/RED;
 bilinmeyen CLI seçeneğiyle çalıştırılan komut gerçek aile analizi diye raporlanmaz.
 
+Ara source-selection kayıtları tam cohort freeze ile aynı değildir. Bir örneğin
+exact source/hash, provenance, bağımsız etiket/cluster, prospective occurrence,
+açık seçilmiş analiz tarifi ve sabit limitleri ayrı bağımsız source-admission
+kararıyla bağlanabilir. Bu karar yalnız o kaynak örneğinin bir kez sayılmasını
+destekler; 1020/üç-köken kapısını, diğer platform tariflerini, eksik all-rule
+ground truth'u veya U004 öncesi tam freeze'i karşılamaz. Sonraki clean Release
+binary/runtime/native/artifact başarıları önceden varmış gibi gösterilmez.
+Kaynak-sayım kararı legal clearance veya redistribution yetkisi değildir;
+çözülmemiş hak/dağıtım sınırları açıkça korunur. Eski held inceleme sonradan
+PASS diye değiştirilmez; yeni karar kendi exact kaynak/kanıt kimliğini taşır.
+
 ### Native API taslağı — henüz dondurulmuş veya kurulmuş model değil
 
 [`native-api-models.json`](../tests/product_corpus/native-api-models.json), manifestin

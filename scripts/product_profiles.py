@@ -402,12 +402,197 @@ def verify_external_inputs(binding_path, repo, source_root):
 
 GCC_BINDING = "tests/product_corpus/candidates/gcc-mixed-storage-binding.json"
 GCC_REVISION = "5115c7e447fc07457443df874bf57840e8316d5f"
+GCC_LICENSE_BASIS = "tests/product_corpus/candidates/gcc-mixed-storage-license-basis.json"
+GCC_SOURCE_CANDIDATE = "tests/product_corpus/candidates/gcc-mixed-storage-source-candidate.json"
+GCC_CASE_SHA = "5c5563b8ed6e5715cb1913e223276146bc4c8799c11ee4dace55cf6e8a5e4b0a"
+GCC_CANDIDATE_LINKS = {
+    "source_binding": GCC_BINDING,
+    "source_review": "tests/product_corpus/candidates/gcc-mixed-storage-selection.json",
+    "license_basis": GCC_LICENSE_BASIS,
+    "analysis_profile": "tests/product_corpus/candidates/gcc-mixed-storage-linux.json",
+    "compiler_commands": "tests/product_corpus/candidates/gcc-mixed-storage-linux/compile_commands.json",
+}
 GCC_INPUTS = {
     "origin/malloc-vs-local-3.c": "gcc/testsuite/c-c++-common/analyzer/malloc-vs-local-3.c",
     "lineage/malloc-vs-local-2.c": "gcc/testsuite/c-c++-common/analyzer/malloc-vs-local-2.c",
     "notices/COPYING3": "COPYING3",
     "notices/README": "gcc/testsuite/README",
 }
+
+
+def gcc_license_metadata(value):
+    """Validate the scope of a project-license reference record, not permissions."""
+    fields(value, "schema state id revision source_binding source_sha256 references assessment boundary",
+           "GCC license basis")
+    require(value["schema"] == "codeskeptic-gcc-license-basis/v1"
+            and value["state"] == "PROJECT_LICENSE_REFERENCES_BOUND_NOT_DISTRIBUTION_CLEARANCE"
+            and value["id"] == "gcc-mixed-storage-local-loss" and value["revision"] == GCC_REVISION
+            and nonempty(value["boundary"]), "GCC license reference identity")
+    external_digest(value["source_sha256"])
+    fields(value["source_binding"], "path sha256", "GCC license source binding")
+    require(value["source_binding"]["path"] == GCC_BINDING, "GCC license binding path")
+    external_digest(value["source_binding"]["sha256"])
+    expected = {
+        "license-text": ("COPYING3", f"https://raw.githubusercontent.com/gcc-mirror/gcc/{GCC_REVISION}/COPYING3"),
+        "project-statement": ("gcc-license-statement.html", "https://gcc.gnu.org/pipermail/gcc/2021-June/236201.html"),
+        "root-notice": ("root-README", f"https://raw.githubusercontent.com/gcc-mirror/gcc/{GCC_REVISION}/README"),
+    }
+    require(type(value["references"]) is list and len(value["references"]) == 3, "GCC license references")
+    roles = []
+    for row in value["references"]:
+        fields(row, "role path url size_bytes sha256", "GCC license reference")
+        require(type(row["role"]) is str and row["role"] in expected
+                and (row["path"], row["url"]) == expected[row["role"]]
+                and type(row["size_bytes"]) is int and 0 < row["size_bytes"] <= 262144,
+                "GCC reference location/size")
+        external_digest(row["sha256"])
+        roles.append(row["role"])
+    require(roles == sorted(expected), "GCC reference ordering/duplicate role")
+    assessment = value["assessment"]
+    fields(assessment, "upstream_project_spdx basis source_specific_boundary distribution_boundary "
+           "license_qualified redistribution_approved author_completeness_verified", "GCC license assessment")
+    require(assessment["upstream_project_spdx"] == "GPL-3.0-or-later"
+            and all(nonempty(assessment[key]) for key in
+                    ("basis", "source_specific_boundary", "distribution_boundary"))
+            and all(assessment[key] is False for key in
+                    ("license_qualified", "redistribution_approved", "author_completeness_verified")),
+            "project declaration is not source-specific distribution clearance")
+    return {"upstream_project_spdx": assessment["upstream_project_spdx"],
+            "reference_bytes_verified": False, "source_bytes_verified": False,
+            "license_qualified": False, "redistribution_approved": False,
+            "independent_quota_examples": 0, "task_ready": False, "product_qualified": False}
+
+
+def verify_gcc_license_basis(repo, evidence_root, source_root):
+    """Bind actual references to the unchanged source snapshot; never download."""
+    try:
+        repo, root = Path(repo), Path(evidence_root)
+        require(root.is_absolute() and root.resolve(strict=True) == root and root.is_dir()
+                and root != repo and repo not in root.parents and root not in repo.parents,
+                "GCC license evidence root")
+        path = repo / GCC_LICENSE_BASIS
+        actual, info, raw = external_read(path, capture=True)
+        value = parse_json(raw.decode("utf-8"))
+        result = gcc_license_metadata(value)
+        binding = verify_external_inputs(repo / GCC_BINDING, repo, source_root)
+        require(binding["binding_sha256"] == value["source_binding"]["sha256"], "GCC license binding drift")
+        manifest = read_json(repo / GCC_BINDING)
+        require(next(row["sha256"] for row in manifest["inputs"] if row["role"] == "candidate")
+                == value["source_sha256"], "GCC license source drift")
+        rows = value["references"]
+        require(next(row["sha256"] for row in rows if row["role"] == "license-text") ==
+                next(row["sha256"] for row in manifest["inputs"] if row["path"] == "notices/COPYING3"),
+                "GCC source notice differs from license reference")
+        observations = {path: info}
+        for row in rows:
+            path = root / external_relative(row["path"])
+            observed, info, _ = external_read(path)
+            require(observed == {key: row[key] for key in ("sha256", "size_bytes")}, "GCC license reference drift")
+            observations[path] = info
+        for path, before in observations.items():
+            require(path.resolve(strict=True) == path and external_identity(path.lstat()) == external_identity(before),
+                    "GCC license final identity changed")
+        return {**result, "reference_bytes_verified": True, "source_bytes_verified": True,
+                "license_record_sha256": actual["sha256"], "source_binding_sha256": binding["binding_sha256"],
+                "source_sha256": value["source_sha256"], "verified_references": len(rows)}
+    except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError, StopIteration):
+        raise ValueError("GCC license reference binding rejected") from None
+
+
+def gcc_candidate_metadata(value):
+    """One pre-result ordinary memory source proposal, not an admission receipt."""
+    fields(value, "schema state id family subprofile role selection origin cluster source links "
+           "license_evidence_root analysis_selection limits expected boundaries qualification", "source candidate")
+    require(value["schema"] == "codeskeptic-product-source-candidate/v1"
+            and value["state"] == "PRE_RESULT_SOURCE_SELECTION_FOR_REVIEW"
+            and value["id"] == "gcc-mixed-storage-local-loss"
+            and value["family"] == "memory-leak" and value["subprofile"] is None
+            and value["role"] == "buggy" and value["selection"] == "independent-evaluation"
+            and value["origin"] == "gcc-analyzer-testsuite"
+            and value["cluster"] == "mixed-automatic-heap-small-buffer-fallback-loss"
+            and value["analysis_selection"] == "linux-x86_64-ubuntu24-clang20-c17-native-malloc-v1",
+            "source candidate identity/selection")
+    source = value["source"]
+    fields(source, "path sha256 language snapshot_root", "candidate source")
+    require(source["path"] == "/input/case.c" and source["sha256"] == GCC_CASE_SHA
+            and source["language"] == "C17" and nonempty(source["snapshot_root"])
+            and nonempty(value["license_evidence_root"]), "candidate source identity")
+    fields(value["links"], " ".join(GCC_CANDIDATE_LINKS), "candidate links")
+    for name, link in value["links"].items():
+        fields(link, "path sha256", "candidate link")
+        require(link["path"] == GCC_CANDIDATE_LINKS[name], "candidate link path")
+        external_digest(link["sha256"])
+    validate_limits(value["limits"])
+    require(canonical(value["expected"]) == canonical([
+        {"rule": "memory-leak", "function": "test_2", "line": 28, "column": 1, "cwes": [401], "multiplicity": 1}]),
+        "pre-result source expectation changed")
+    fields(value["boundaries"], "allocation independence addressability all_rule_ground_truth platforms measurement rights",
+           "candidate boundaries")
+    require(all(nonempty(item) for item in value["boundaries"].values()), "candidate boundary missing")
+    fields(value["qualification"], "evaluation_frozen native_product_qualified license_qualified "
+           "redistribution_approved analyzer_run task_ready product_qualified", "candidate qualification")
+    require(all(item is False for item in value["qualification"].values()), "source proposal cannot qualify product")
+    return {key: value[key] for key in ("id", "family", "subprofile", "role", "origin", "cluster", "selection")} | {
+        "sha256": source["sha256"], "quota": False}
+
+
+def verify_gcc_source_candidate(repo):
+    """Verify actual proposed inputs and predeclared recipe; do not run/admit it."""
+    try:
+        repo = Path(repo)
+        require(repo.is_absolute() and repo.resolve(strict=True) == repo, "candidate checkout root")
+        observations = {}
+
+        def read_bound(path, sha=None, document=True):
+            actual, info, raw = external_read(path, capture=True)
+            require(sha is None or actual["sha256"] == sha, "candidate linked evidence changed")
+            observations[path] = info
+            return (parse_json(raw.decode("utf-8")) if document else None), actual["sha256"]
+
+        value, candidate_sha = read_bound(repo / GCC_SOURCE_CANDIDATE)
+        projection = gcc_candidate_metadata(value)
+        linked = {name: read_bound(repo / link["path"], link["sha256"])[0]
+                  for name, link in value["links"].items()}
+        licensing = verify_gcc_license_basis(repo, value["license_evidence_root"], value["source"]["snapshot_root"])
+        require(licensing["license_record_sha256"] == value["links"]["license_basis"]["sha256"]
+                and licensing["source_sha256"] == projection["sha256"], "candidate license identity")
+        binding, review, recipe = (linked[key] for key in ("source_binding", "source_review", "analysis_profile"))
+        require(binding["adjudication"] == value["links"]["source_review"]
+                and review["source"]["sha256"] == projection["sha256"]
+                and review["source_label"]["family"] == projection["family"]
+                and review["source_label"]["label"] == "BUGGY_CWE401"
+                and review["independence"]["cluster"] == projection["cluster"]
+                and review["independence"]["verdict"] == "DISTINCT_PROSPECTIVE_CLUSTER", "candidate source review")
+        previous = review["review"]
+        for key in ("proof_evidence", "review_evidence", "history_evidence"):
+            read_bound(Path(previous[key]), previous[key + "_sha256"], document=False)
+        require(recipe["id"] == projection["id"] and recipe["source_binding"]["case_sha256"] == projection["sha256"]
+                and {key: recipe["source_binding"][key] for key in ("path", "sha256")} == value["links"]["source_binding"]
+                and {key: recipe["compilation_database"][key] for key in ("path", "sha256")} == value["links"]["compiler_commands"]
+                and recipe["source_binding"]["case"] == value["source"]["path"]
+                and recipe["analyzer_recipes"]["state"] == "PREDECLARED_NOT_EXECUTED"
+                and recipe["analyzer_recipes"]["executable_sha256"] is None
+                and recipe["analyzer_recipes"]["repetitions"] == LIMITS["repetitions"]
+                and recipe["analyzer_recipes"]["outer_case_timeout_seconds"] == LIMITS["case_timeout_seconds"],
+                "candidate prospective recipe linkage")
+        cdb = linked["compiler_commands"]
+        require(type(cdb) is list and len(cdb) == 1 and cdb[0]["file"] == value["source"]["path"]
+                and cdb[0]["arguments"][0] == recipe["environment_reference"]["compiler"]
+                and cdb[0]["arguments"][-1] == value["source"]["path"]
+                and "-std=c17" in cdb[0]["arguments"], "candidate selected C17 translation unit")
+        native = recipe["native_evidence"]
+        for key in ("source_abi_summary", "source_abi_wrapper", "source_abi_review",
+                    "selected_recipe_summary", "selected_recipe_wrapper"):
+            read_bound(Path(native[key]), native[key + "_sha256"], document=False)
+        for path, before in observations.items():
+            require(path.resolve(strict=True) == path and external_identity(path.lstat()) == external_identity(before),
+                    "candidate evidence final identity changed")
+        return {"candidate_sha256": candidate_sha, "projection": projection,
+                "linked_evidence_files": len(observations), "source_bytes_verified": True,
+                "pre_result_recipe_bound": True, "fresh_independent_admission_required": True,
+                "independent_quota_examples": 0, "task_ready": False, "product_qualified": False}
+    except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError, IndexError):
+        raise ValueError("source candidate binding rejected") from None
 
 
 def adapt_gcc_source(raw):
@@ -833,15 +1018,23 @@ def draft_readiness(manifest):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs"))
+    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--historical-sources", type=Path, default=Path(
         "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S04-U001/corpus-diagnostic-comparison"))
     parser.add_argument("--binding", type=Path, help="tracked binding manifest (absolute path)")
     parser.add_argument("--external-root", type=Path, help="explicit external snapshot root (absolute canonical path)")
+    parser.add_argument("--evidence-root", type=Path, help="explicit external license-reference directory")
     args = parser.parse_args()
     try:
-        if args.command == "stage-gcc-inputs":
+        if args.command == "source-candidate-check":
+            require(args.binding is None and args.evidence_root is None and args.external_root is None,
+                    "source candidate uses its explicit tracked roots")
+            result = verify_gcc_source_candidate(args.root)
+        elif args.command == "license-basis-check":
+            require(args.binding is None, "GCC licensing uses its fixed tracked binding")
+            result = verify_gcc_license_basis(args.root, args.evidence_root, args.external_root)
+        elif args.command == "stage-gcc-inputs":
             require(args.binding is None, "GCC staging uses its fixed tracked binding")
             result = stage_gcc_inputs(args.root, args.external_root)
         elif args.command == "external-source-check":

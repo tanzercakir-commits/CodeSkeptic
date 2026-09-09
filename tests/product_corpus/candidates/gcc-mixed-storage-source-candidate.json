@@ -1,0 +1,95 @@
+{
+  "schema": "codeskeptic-product-source-candidate/v1",
+  "state": "PRE_RESULT_SOURCE_SELECTION_FOR_REVIEW",
+  "id": "gcc-mixed-storage-local-loss",
+  "family": "memory-leak",
+  "subprofile": null,
+  "role": "buggy",
+  "selection": "independent-evaluation",
+  "origin": "gcc-analyzer-testsuite",
+  "cluster": "mixed-automatic-heap-small-buffer-fallback-loss",
+  "source": {
+    "path": "/input/case.c",
+    "sha256": "5c5563b8ed6e5715cb1913e223276146bc4c8799c11ee4dace55cf6e8a5e4b0a",
+    "language": "C17",
+    "snapshot_root": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/native-gcc-cross-v1/source-snapshot"
+  },
+  "links": {
+    "source_binding": {
+      "path": "tests/product_corpus/candidates/gcc-mixed-storage-binding.json",
+      "sha256": "cbcd1402bbb8a581678f176118d3e256c1e375b692fe20121ff9cc8c18a801c9"
+    },
+    "source_review": {
+      "path": "tests/product_corpus/candidates/gcc-mixed-storage-selection.json",
+      "sha256": "ed7760f92740f868486ab303c7b72d87c12f46811b261aaf28ee884826b5b0bd"
+    },
+    "license_basis": {
+      "path": "tests/product_corpus/candidates/gcc-mixed-storage-license-basis.json",
+      "sha256": "a28e1957a89afa11543ce452819e8db5769650098befacf6891ebc34af4d87a7"
+    },
+    "analysis_profile": {
+      "path": "tests/product_corpus/candidates/gcc-mixed-storage-linux.json",
+      "sha256": "dcd25caa2ef21ea304724d7a9baacf80121c1cdbb57c3bba10c1123f59ac53b2"
+    },
+    "compiler_commands": {
+      "path": "tests/product_corpus/candidates/gcc-mixed-storage-linux/compile_commands.json",
+      "sha256": "1d49fefb76cbcafd687313a3a7b2f3346268a47209b4ac1c45855a3e32d5777c"
+    }
+  },
+  "license_evidence_root": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/gcc-license-basis-v1",
+  "analysis_selection": "linux-x86_64-ubuntu24-clang20-c17-native-malloc-v1",
+  "limits": {
+    "addressable_recall_min": "0.70",
+    "buggy_min_per_bucket": 30,
+    "campaign_timeout_seconds": 43200,
+    "capture_bytes_per_stream": 2097152,
+    "case_timeout_seconds": 30,
+    "family_precision_min": "0.90",
+    "linux_harness_cpu_quota": 2,
+    "linux_harness_memory_mib": 6144,
+    "linux_harness_memory_plus_swap_mib": 12288,
+    "linux_harness_pids_max": 256,
+    "linux_harness_tmpfs_mib": 1024,
+    "origins_min_per_bucket": 3,
+    "project_timeout_seconds": 1200,
+    "repetitions": 3,
+    "safe_fp_max": 0,
+    "safe_min_per_bucket": 30,
+    "string_flow_call_depth_max": 4,
+    "string_flow_states_per_function_max": 256,
+    "string_flow_transfer_steps_per_function_max": 65536,
+    "unique_quota_sources_min": 1020,
+    "worker_memory_mib": 2048,
+    "worker_timeout_ms": 120000
+  },
+  "expected": [
+    {
+      "rule": "memory-leak",
+      "function": "test_2",
+      "line": 28,
+      "column": 1,
+      "cwes": [
+        401
+      ],
+      "multiplicity": 1
+    }
+  ],
+  "boundaries": {
+    "allocation": "Successful native malloc acquires an obligation; its visible non-consuming helper does not release or escape it. Allocation failure and automatic-array paths create no heap obligation. Ordinary native malloc without replacement or interposition; int32, size_t64 and pointer64.",
+    "independence": "One source example and one global cluster. GCC sibling, ancestor, helper, compiler, language and adaptation variants receive no further source-count credit. Same GCC origin; no third-origin, producer-blindness or market-representation claim.",
+    "addressability": "Preselected bounded TU-local ownership join and visible borrowing call; a later missing expected occurrence is a miss, not grounds to relabel this source unsupported.",
+    "all_rule_ground_truth": "Target memory-leak label only. Other-family occurrences remain unadjudicated; no all-rule-safe or all-rule-quality PASS. Complete all-rule ground truth is required before the full evaluation freeze and baseline.",
+    "platforms": "This record selects the existing exact Linux analysis recipe. Windows and macOS syntax observations are supplemental; their final analysis recipes and complete native product qualification remain pending. The source is counted at most once globally, never once per platform.",
+    "measurement": "No analyzer execution or baseline here. The clean Release executable identity is bound in U004 after the full cohort freeze. This partial source selection cannot activate U004.",
+    "rights": "Upstream project license references are bound; source-specific legal clearance and redistribution approval remain false. No source bytes are vendored or published by this metadata record."
+  },
+  "qualification": {
+    "evaluation_frozen": false,
+    "native_product_qualified": false,
+    "license_qualified": false,
+    "redistribution_approved": false,
+    "analyzer_run": false,
+    "task_ready": false,
+    "product_qualified": false
+  }
+}

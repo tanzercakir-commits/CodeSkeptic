@@ -30,6 +30,194 @@ def quota_rows():
     return rows
 
 
+class SourceCandidateTests(unittest.TestCase):
+    def test_candidate_link_drift_rejected_before_external_source_read(self):
+        original_repo = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory(prefix="codeskeptic-candidate-links-") as directory:
+            repo = Path(directory).resolve()
+            for relative in (profiles.GCC_SOURCE_CANDIDATE, *profiles.GCC_CANDIDATE_LINKS.values()):
+                path = repo / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes((original_repo / relative).read_bytes())
+            for key, relative in profiles.GCC_CANDIDATE_LINKS.items():
+                path = repo / relative
+                original = path.read_bytes()
+                path.write_bytes(b"PRIVATE_INPUT_SENTINEL")
+                with self.subTest(link=key), \
+                        mock.patch.object(profiles, "verify_gcc_license_basis", side_effect=AssertionError("must reject first")), \
+                        self.assertRaisesRegex(ValueError, "^source candidate binding rejected$"):
+                    profiles.verify_gcc_source_candidate(repo)
+                path.write_bytes(original)
+
+    def test_candidate_missing_or_malformed_record_has_fixed_failure(self):
+        with tempfile.TemporaryDirectory(prefix="codeskeptic-candidate-failure-") as directory:
+            repo = Path(directory).resolve()
+            with self.assertRaisesRegex(ValueError, "^source candidate binding rejected$"):
+                profiles.verify_gcc_source_candidate(repo)
+            path = repo / profiles.GCC_SOURCE_CANDIDATE
+            path.parent.mkdir(parents=True)
+            for raw in (b'{"PRIVATE_SOURCE_SENTINEL":', b"[]", b"null"):
+                path.write_bytes(raw)
+                with self.subTest(raw=raw), self.assertRaisesRegex(ValueError, "^source candidate binding rejected$"):
+                    profiles.verify_gcc_source_candidate(repo)
+
+    def test_candidate_projection_requires_fresh_admission(self):
+        repo = Path(__file__).resolve().parents[1]
+        value = profiles.read_json(repo / "tests/product_corpus/candidates/gcc-mixed-storage-source-candidate.json")
+        result = profiles.gcc_candidate_metadata(value)
+        self.assertEqual(result["family"], "memory-leak")
+        self.assertEqual(result["origin"], "gcc-analyzer-testsuite")
+        self.assertFalse(result["quota"])
+        self.assertEqual(result["sha256"], value["source"]["sha256"])
+
+    def test_changed_label_cluster_recipe_budget_or_qualification_rejected(self):
+        repo = Path(__file__).resolve().parents[1]
+        original = profiles.read_json(repo / "tests/product_corpus/candidates/gcc-mixed-storage-source-candidate.json")
+        variants = []
+        for key, replacement in (("role", "safe"), ("family", "bounds"), ("cluster", "second-cluster"),
+                                 ("origin", "gcc-second-origin"), ("selection", "training")):
+            value = copy.deepcopy(original)
+            value[key] = replacement
+            variants.append(value)
+        for key in original["qualification"]:
+            value = copy.deepcopy(original)
+            value["qualification"][key] = True
+            variants.append(value)
+        for key, replacement in (("line", 27), ("column", True), ("multiplicity", 2)):
+            value = copy.deepcopy(original)
+            value["expected"][0][key] = replacement
+            variants.append(value)
+        for group, key, replacement in (("source", "sha256", "e" * 64),
+                                         ("limits", "repetitions", 1), ("boundaries", "addressability", "")):
+            value = copy.deepcopy(original)
+            value[group][key] = replacement
+            variants.append(value)
+        value = copy.deepcopy(original)
+        value["links"]["compiler_commands"]["path"] = "../compile_commands.json"
+        variants.append(value)
+        for index, value in enumerate(variants):
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                profiles.gcc_candidate_metadata(value)
+
+
+class LicenseBasisTests(unittest.TestCase):
+    def fixture(self):
+        temporary = tempfile.TemporaryDirectory(prefix="codeskeptic-license-binding-")
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        repo, source, evidence = (base / name for name in ("repo", "source", "evidence"))
+        for path in (repo, source, evidence):
+            path.mkdir()
+        checkout = Path(__file__).resolve().parents[1]
+        value = profiles.read_json(checkout / profiles.GCC_LICENSE_BASIS)
+        for row in value["references"]:
+            raw = ("LICENSE_SENTINEL_" + row["role"]).encode()
+            (evidence / row["path"]).write_bytes(raw)
+            row.update(size_bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest())
+        inputs = []
+        for role, relative in (("candidate", "case.c"), ("origin", "origin.c"),
+                               ("lineage", "lineage.c"), ("notice", "notices/COPYING3")):
+            raw = (evidence / "COPYING3").read_bytes() if role == "notice" else ("SOURCE_SENTINEL_" + role).encode()
+            path = source / relative
+            path.parent.mkdir(exist_ok=True)
+            path.write_bytes(raw)
+            inputs.append({"role": role, "path": relative, "size_bytes": len(raw),
+                           "sha256": hashlib.sha256(raw).hexdigest()})
+        candidate_sha = inputs[0]["sha256"]
+        review = {"id": value["id"], "source": {"sha256": candidate_sha},
+                  "origin": {"sha256": inputs[1]["sha256"]}}
+        raw = profiles.canonical(review).encode()
+        (repo / "review.json").write_bytes(raw)
+        binding = {"schema": "codeskeptic-product-external-inputs/v1", "state": "SOURCE_BINDING_ONLY_NOT_FROZEN",
+                   "id": value["id"], "adjudication": {"path": "review.json", "sha256": hashlib.sha256(raw).hexdigest()},
+                   "inputs": sorted(inputs, key=lambda row: row["path"])}
+        raw = profiles.canonical(binding).encode()
+        path = repo / profiles.GCC_BINDING
+        path.parent.mkdir(parents=True)
+        path.write_bytes(raw)
+        value["source_binding"]["sha256"] = hashlib.sha256(raw).hexdigest()
+        value["source_sha256"] = candidate_sha
+        (repo / profiles.GCC_LICENSE_BASIS).write_text(profiles.canonical(value))
+        return repo, source, evidence
+
+    def test_actual_reference_and_source_bytes_read_without_execution_or_export(self):
+        repo, source, evidence = self.fixture()
+        with mock.patch.object(subprocess, "run", side_effect=AssertionError("no execution")), \
+                mock.patch.object(profiles.urllib.request, "build_opener", side_effect=AssertionError("no network")):
+            result = profiles.verify_gcc_license_basis(repo, evidence, source)
+        self.assertTrue(result["reference_bytes_verified"])
+        self.assertTrue(result["source_bytes_verified"])
+        self.assertFalse(result["license_qualified"])
+        self.assertNotIn("SENTINEL", profiles.canonical(result))
+
+    def test_actual_reference_source_and_record_drift_rejected(self):
+        for target in ("reference", "source", "binding", "notice"):
+            repo, source, evidence = self.fixture()
+            if target in ("reference", "source"):
+                path = evidence / "root-README" if target == "reference" else source / "case.c"
+                path.write_bytes(b"MUTATED_PRIVATE_SENTINEL")
+            else:
+                path = repo / profiles.GCC_LICENSE_BASIS
+                value = profiles.read_json(path)
+                if target == "binding":
+                    value["source_binding"]["sha256"] = "f" * 64
+                else:
+                    value["references"][0]["sha256"] = "f" * 64
+                path.write_text(profiles.canonical(value))
+            with self.subTest(target=target), self.assertRaisesRegex(ValueError, "^GCC license reference binding rejected$"):
+                profiles.verify_gcc_license_basis(repo, evidence, source)
+
+    def test_reference_symlink_and_checkout_overlap_rejected(self):
+        repo, source, evidence = self.fixture()
+        path = evidence / "root-README"
+        destination = evidence / "notice-target"
+        path.rename(destination)
+        try:
+            path.symlink_to(destination)
+        except OSError:
+            self.skipTest("host cannot create symlinks")
+        with self.assertRaises(ValueError):
+            profiles.verify_gcc_license_basis(repo, evidence, source)
+        for invalid in (repo, repo / "inside", Path("relative")):
+            with self.subTest(root=invalid), self.assertRaises(ValueError):
+                profiles.verify_gcc_license_basis(repo, invalid, source)
+
+    def test_reference_metadata_preserves_nonqualification(self):
+        repo = Path(__file__).resolve().parents[1]
+        value = profiles.read_json(repo / profiles.GCC_LICENSE_BASIS)
+        result = profiles.gcc_license_metadata(value)
+        self.assertEqual(result["upstream_project_spdx"], "GPL-3.0-or-later")
+        self.assertFalse(result["license_qualified"])
+        self.assertFalse(result["redistribution_approved"])
+        self.assertEqual(result["independent_quota_examples"], 0)
+
+    def test_forged_status_paths_roles_and_source_rejected(self):
+        repo = Path(__file__).resolve().parents[1]
+        original = profiles.read_json(repo / profiles.GCC_LICENSE_BASIS)
+        variants = []
+        for key in ("license_qualified", "redistribution_approved", "author_completeness_verified"):
+            value = copy.deepcopy(original)
+            value["assessment"][key] = True
+            variants.append(value)
+        for key, replacement in (("state", "FROZEN"), ("revision", "f" * 40),
+                                 ("source_sha256", "0" * 64)):
+            value = copy.deepcopy(original)
+            value[key] = replacement
+            variants.append(value)
+        for key, replacement in (("path", "../COPYING3"), ("role", "root-notice"),
+                                 ("url", "https://example.invalid/COPYING3"),
+                                 ("size_bytes", True), ("sha256", "0" * 64)):
+            value = copy.deepcopy(original)
+            value["references"][0][key] = replacement
+            variants.append(value)
+        value = copy.deepcopy(original)
+        value["independent_quota_examples"] = 1
+        variants.append(value)
+        for index, value in enumerate(variants):
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                profiles.gcc_license_metadata(value)
+
+
 class QuotaTests(unittest.TestCase):
     def test_contract_has_sixteen_families_and_seventeen_disjoint_buckets(self):
         self.assertEqual(len(profiles.FAMILIES), 16)
