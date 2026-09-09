@@ -603,3 +603,36 @@ gözlemleri değişmez. V2 bir alan sayısına güvenmez; gerçek seçimi tekrar
 ve declared count ile karşılaştırmadan readiness üretemez. Bu ortak hesapta saklanan
 bağımsız ajan kararı prosedürel denetimdir; imza veya sahte producer'a karşı attestation
 değildir. Lisans ve dağıtım false kalır; U003 için POP ya da completion receipt yoktur.
+
+### 4ff3150 sonrası native gözlem — Windows tekrar başarısız
+
+V2 integration `4ff315057d5145e10318be3dd13da211b78a686b`, bağımsız
+`/root/external_binding_verifier` tarafından material finding olmadan PASS aldı;
+193 odaklı test ve gerçek source-selection/diğer read-only CLI kanıtları geçti.
+Bu yalnız bir kaynak sayımının ve v2 bağlantısının kabulüdür. Normal feature push'un
+başlattığı [34335727168 koşusu](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34335727168)
+**failure**: Ubuntu ve macOS gözlemleri başarılı, Windows gözlemi başarısızdır.
+
+Windows'ta 57 kimlik testi ve 26 external-input testi geçti; özgün v1 collector
+188/427 header kaydı üretti ve beş GCC girdisi/43256 byte staging doğrulandı.
+Ardından case collector yaklaşık 30 saniye sonra
+`identity:857,755,471,285,115,111` failure zinciriyle durdu. Exact kaynakta bu zincir
+`capture_case → capture → native_metadata → powershell.exe Get-CimInstance
+Win32_OperatingSystem → subprocess.run` yoludur; GCC candidate syntax aşamasına
+ulaşılmadı. Hata zinciri OSError/TimeoutExpired alt türünü dışa aktarmadığından
+kesin exception türü yalnız süreye bakılarak ileri sürülmez.
+
+Yeni run/jobs/logs, iki başarılı lane'in dört JSON/ZIP gözlemi ve katalog dış
+`native-gcc-cross-v1/hosted-34335727168` paketindedir; summary SHA-256
+`2d7631f6f9111fc5ba4b6b007d046b5a27bf4631aa2ec4dcbd1a0fdf119b4645`.
+Başarısız Windows step'i nedeniyle o lane'in JSON artifact'i yüklenmedi; v1'in
+başarılı dönüşü ve output hash'i ham logda vardır, tam belge varmış gibi davranılmaz.
+
+Eski başarılı `34329928158` başarı olarak, yeni koşu failure olarak korunur.
+Üç Windows profile/cache değişkeninin önceki başarılı denemesi sorgunun güvenilir
+çözümü olduğunu kanıtlamaz: aynı sorgu yeri yeniden başarısızdır. Sonraki teşhis,
+native host'ta açık ve sonlu startup/module/CIM kontrolleriyle full ve seçilmiş
+ortamı karşılaştırmalıdır; kör env genişletme, timeout gevşetme veya sırf yeniden
+çalıştırıp yeşili kabul etme yoktur. Bu OS metadata başarısızlığı, bağımsız Linux
+tarifine bağlı tek kaynak kararını değiştirmez; Windows/final native freeze ve
+U003 zaten açık kalır. Yeni doküman HEAD'i bu koşunun tested HEAD'i değildir.
