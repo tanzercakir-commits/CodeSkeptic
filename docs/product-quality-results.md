@@ -278,3 +278,26 @@ Bu havuz kabul edilmiş korpus değildir. İki kaynak dosyası aynı HAProxy 2.7
 Bu olağan bellek testleri, engellenen dört yeni ailelik security-fix araştırmasının
 tekrarı değildir; o zorunlu kabulün eksikliğini de kapatmaz. Kota **0/1020**,
 U003 ve kalan bütün ürün kapıları beklemededir; hiçbir POP hazırlanmadı.
+
+### GCC kaynak kümesi — bağımsızlık açısından olumlu, tam kabul bekliyor
+
+[`gcc-mixed-storage-selection.json`](../tests/product_corpus/candidates/gcc-mixed-storage-selection.json)
+ilk **DISTINCT_PROSPECTIVE_CLUSTER** kararını kaydeder. Aynı pointer'ın bir dalda
+yeni heap tahsisine, diğerinde otomatik diziye bağlanıp görünür ve tüketmeyen
+helper sonrasında heap sahipliğini kaybetmesi, incelenen mevcut eğitim
+yapılarından ayrışmıştır. `n=11` ve başarılı tahsis yolunun **BUGGY/CWE-401**
+etiketi bağımsız doğrulandı. Bu kaynak, parent/sibling/helper ve dil/derleyici
+varyantlarıyla birlikte yalnız tek global cluster olabilir.
+
+Tam kabul **HELD** kalır: kaynağa özgü lisans/dağıtım/atıf sınırı, nihai
+kaynak–komut–ortam–occurrence bağı ve seçili native platform kanıtları eksiktir.
+GCC kaynak kodu repoya eklenmedi; yalnız dış kanıtın kimliği ve inceleme kararı
+kaydedildi. Bu, gelecekteki yayın için uygulanmış bir internal-only politika
+veya lisans sonucu değildir. Genel GCC/libstdc++ belgelerinden bu dosyaya özel
+izin varsayılmadı; tag kimlik bağı da doğrulanmış imza diye sunulmaz.
+
+Yerel GCC 16.1.1 ve Clang 22.1.8 ile sekiz syntax/ABI/dependency kontrolü geçti;
+16/19 girdi hash'i ve `int/size_t/pointer=4/8/8` boyutları yeniden denetlendi.
+Bunlar runtime closure, Windows/macOS yeterliliği veya analyzer sonucu değildir.
+Prospektif rapor yeri `test_2` kapanışıdır (satır 28). Bağımsız seçim çalışması
+ilerlemiş olsa da kabul edilmiş kota hâlâ **0/1020** ve U003 tamamlanmamıştır.

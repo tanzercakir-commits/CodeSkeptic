@@ -1,0 +1,95 @@
+{
+  "schema": "codeskeptic-product-external-source-adjudication/v1",
+  "state": "DISTINCT_PROSPECTIVE_CLUSTER_FULL_ADMISSION_HELD",
+  "id": "gcc-mixed-storage-local-loss",
+  "source": {
+    "storage": "EXTERNAL_CANDIDATE_NOT_VENDORED",
+    "local_evidence": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/gcc-mixed-storage-source-review-v1/candidate.c",
+    "sha256": "5c5563b8ed6e5715cb1913e223276146bc4c8799c11ee4dace55cf6e8a5e4b0a",
+    "language": "C17",
+    "adaptation": "Selected native stdlib.h include, visible do_stuff_2 body and test_2. Removed the noinline optimization attribute, diagnostic dump calls/comments, unrelated functions and the simulator header. No original harness equivalence is claimed."
+  },
+  "origin": {
+    "repository": "https://github.com/gcc-mirror/gcc",
+    "revision": "5115c7e447fc07457443df874bf57840e8316d5f",
+    "tag": "releases/gcc-15.2.0",
+    "path": "gcc/testsuite/c-c++-common/analyzer/malloc-vs-local-3.c",
+    "lines": [
+      [
+        3,
+        3
+      ],
+      [
+        8,
+        12
+      ],
+      [
+        48,
+        66
+      ]
+    ],
+    "git_blob": "70b3edd38f5b5670f50d3417b91e73256d9bdd33",
+    "sha256": "6606b3996702fe727da53e66d2a025b744a896a82080f1e85caa092a275106a6",
+    "local_evidence": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/upstream-candidates/gcc-15.2.0/retained/malloc-vs-local-3.c",
+    "tag_signature_authenticated": false
+  },
+  "source_label": {
+    "family": "memory-leak",
+    "cwe": 401,
+    "label": "BUGGY_CWE401",
+    "function": "test_2",
+    "rationale": "With n=11 and successful allocation under the observed int32/size_t64 data model, ptr owns heap storage. The visible helper returns zero without reading, storing or releasing it. Function exit loses that obligation. Allocation failure creates no resource; the automatic-array alternative acquires no heap resource. These paths and the helper are not separate quota samples.",
+    "boundary": "Ordinary native malloc semantics without interposition. Source-level ownership label, not measured runtime allocation or an observed analyzer result."
+  },
+  "independence": {
+    "verdict": "DISTINCT_PROSPECTIVE_CLUSTER",
+    "cluster": "mixed-automatic-heap-small-buffer-fallback-loss",
+    "rationale": "A single pointer slot joins mutually exclusive automatic-array provenance and a newly acquired heap obligation before a visible non-consuming call and local owner loss. Reviewed conditional-release, borrowing-call, null-alternative acquisition/cleanup, owned/global return and secondary-alias conflict neighbors have different ownership structures.",
+    "single_cluster_members": [
+      "malloc-vs-local-3.c test_1 and test_2",
+      "malloc-vs-local-2.c guarded-release variants",
+      "visible helper, compiler/language and source-adaptation variants"
+    ],
+    "global_originality_claim": false,
+    "generator_blindness_claim": false,
+    "independent_origin_count_established": false
+  },
+  "selection": {
+    "quota": false,
+    "accepted_independent_quota_examples": 0,
+    "decision": "FULL_ADMISSION_HELD",
+    "gaps": [
+      "source-specific licensing and distribution/attribution boundary unresolved",
+      "final selected source/path and native TU/analyzer command/environment/occurrence binding not frozen",
+      "selected platform-native per-case evidence remains incomplete"
+    ],
+    "redistribution": "No GCC candidate source was added to this repository; only this evidence/provenance record. This is an observed boundary, not an implemented future internal-only publication policy or a license conclusion."
+  },
+  "prospective_mapping": {
+    "state": "SOURCE_DERIVED_NOT_MEASURED_NOT_ADMITTED",
+    "rule": "memory-leak",
+    "function": "test_2",
+    "line": 28,
+    "column": 1,
+    "cwes": [
+      401
+    ],
+    "basis": "Reviewed current exit-block emitter uses the function closing brace. A later missing diagnostic must not be relabeled unsupported solely because it was missed."
+  },
+  "review": {
+    "reviewer": "/root/product_plan_verifier",
+    "role": "independent read-only source-admission review",
+    "repository_head": "2f6029d28276182b7a42daa3b31a90b9aa2b3352",
+    "source_sha256": "5c5563b8ed6e5715cb1913e223276146bc4c8799c11ee4dace55cf6e8a5e4b0a",
+    "proof_evidence": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/gcc-mixed-storage-source-review-v1/proof/summary.json",
+    "proof_evidence_sha256": "ba7fe4d1ed8aa8b78eb0266d37be62969fac8893eb84e761ac809bb97403bb25",
+    "review_evidence": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/gcc-mixed-storage-source-review-v1/independent-source-review.txt",
+    "review_evidence_sha256": "8777fefcf344d88fc414b8769b8ef1d0141fc90d2014a197efee6d0b239442d7",
+    "history_evidence": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/gcc-mixed-storage-source-review-v1/history/summary.json",
+    "history_evidence_sha256": "6afc0d64dc7cd6c955c0e128af522306841f7900f826904f8474a210033b6274",
+    "analyzer_run": false,
+    "native_product_qualified": false,
+    "unit_pass": false
+  },
+  "boundary": "Source label and one prospective cluster were independently accepted, not a corpus quota example. Local syntax and 16/19 compiler source/header input records are not frozen product commands, Windows/macOS qualification, authenticated publisher signatures or U003 completion."
+}
