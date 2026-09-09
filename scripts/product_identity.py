@@ -792,6 +792,22 @@ def capture_case(args):
         return value
 
 
+def case_observation_failure(error):
+    """Only fixed module names and source line numbers, never native diagnostics."""
+    modules = {__file__: 'identity', str(Path(__file__).with_name('product_profiles.py')): 'profile'}
+    checks, seen = [], set()
+    while error is not None and id(error) not in seen and len(seen) < 8:
+        seen.add(id(error))
+        trace = error.__traceback__
+        while trace is not None and len(checks) < 24:
+            module = modules.get(trace.tb_frame.f_code.co_filename)
+            if module:
+                checks.append(module + ':' + str(trace.tb_lineno))
+            trace = trace.tb_next
+        error = error.__context__
+    return 'case observation rejected; checks=' + (','.join(checks) if checks else 'unknown')
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
@@ -836,7 +852,7 @@ def main(argv=None):
         print(canonical(result), end='')
         return 0
     except (IdentityError, OSError, ValueError, KeyError, TypeError, RuntimeError) as error:
-        print('IDENTITY_INVALID ' + ('case observation rejected' if args.command in ('check-case', 'capture-case') else str(error)), file=sys.stderr)
+        print('IDENTITY_INVALID ' + (case_observation_failure(error) if args.command in ('check-case', 'capture-case') else str(error)), file=sys.stderr)
         return 2
 
 

@@ -467,3 +467,13 @@ replacement ayrıca lstat ile open arasında uygulanır ve inode reddi doğrulan
 böylece Windows'un açık dosya değiştirme yasağına bağlı olmayan gerçek negatif
 vardır. Okuma sonrası diğer mutation bayrağı da ancak başarılı işlemden sonra
 işaretlenir. Yeni odaklı RED/GREEN kaydı önceki yanıltıcı PASS'i değiştirmez.
+
+Dördüncü run
+[`34328127135`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34328127135)
+`abfde218` kaynağında Windows staging'ini beş dosya/43.256 byte ile ve ardından
+26 dış-girdi testini geçti. Böylece önceki timestamp engeli gerçek Windows'ta
+aşıldı; native case capture daha sonra generic ret verdi. Ubuntu/macOS geçti,
+run başarısız kaldı. Yeni hata iletisi yalnız sabit script adları ve kontrol
+satırlarını verir; native tanı, exception metni veya kaynak/SDK byte'ı içermez.
+Bu tanılama eklemesi hiçbir kabul koşulunu değiştirmez; sonraki gerçek run
+reddin yerini kanıtlamadan kök neden veya native Windows PASS iddiası yoktur.

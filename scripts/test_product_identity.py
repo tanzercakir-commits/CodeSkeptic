@@ -754,7 +754,20 @@ class CaseCaptureTests(unittest.TestCase):
             result = subprocess.run([sys.executable, '-B', identity.__file__, 'check-case', str(path)], capture_output=True, timeout=10)
             self.assertEqual(result.returncode, 2)
             self.assertEqual(result.stdout, b'')
-            self.assertEqual(result.stderr.replace(b'\r\n', b'\n'), b'IDENTITY_INVALID case observation rejected\n')
+            self.assertRegex(result.stderr.replace(b'\r\n', b'\n'),
+                             rb'^IDENTITY_INVALID case observation rejected; checks=(?:identity|profile):[0-9]+(?:,(?:identity|profile):[0-9]+)*\n$')
+
+    def test_case_failure_locations_are_bounded_and_source_free(self):
+        self.assertEqual(identity.case_observation_failure(ValueError('PRIVATE_SOURCE_SENTINEL')),
+                         'case observation rejected; checks=unknown')
+        try:
+            identity.require(False, 'PRIVATE_SOURCE_SENTINEL /private/SDK/header.h')
+        except identity.IdentityError as error:
+            error.__context__ = error
+            result = identity.case_observation_failure(error)
+        self.assertRegex(result, r'^case observation rejected; checks=identity:[0-9]+$')
+        self.assertNotIn('PRIVATE_SOURCE_SENTINEL', result)
+        self.assertNotIn('/private', result)
 
     def test_clt_sdk_alias_and_compiler_alias_preserve_resolved_identity(self):
         value = self.case_document('Darwin')
