@@ -563,6 +563,14 @@ def case_command(native, source, dependencies=False):
     return argv + (['-M', '-MT', 'identity-probe'] if dependencies else ['-fsyntax-only']) + [source]
 
 
+def resolve_case_resources(native):
+    """Use physical resource directories for the new case, not v1 reinterpretation."""
+    for role in ('clang', 'clangxx'):
+        resource = Path(native['tools'][role]['resource_dir']).resolve(strict=True)
+        require(resource.is_dir(), 'case resource is not a directory')
+        native['tools'][role]['resource_dir'] = str(resource)
+
+
 def validate_case_selection(native, environment):
     """Bind the effective case selection; legacy v1 remains observational."""
     validate_document(native)
@@ -728,6 +736,7 @@ def capture_case(args):
     environment = case_environment(os.environ, platform.system())
     with selected_case_environment(environment):
         native = capture(args)
+        resolve_case_resources(native)
         validate_case_selection(native, environment)
         source_files = {}
         for relative in CASE_SOURCE_FILES:

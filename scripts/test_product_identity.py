@@ -639,6 +639,21 @@ class CaseCaptureTests(unittest.TestCase):
         self.assertEqual(probes['bad-width'], probes['abi'].replace('sizeof(int) == 4', 'sizeof(int) == 8'))
         self.assertEqual(probes['bad-signature'], probes['abi'].replace('void *(*)(size_t)', 'int *(*)(size_t)'))
 
+    def test_observed_relative_segments_resolve_before_case_command_binding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory).resolve()
+            (base / 'bin').mkdir()
+            resource = base / 'lib' / 'clang' / '22'
+            resource.mkdir(parents=True)
+            observed = str(base / 'bin' / '..' / 'lib' / 'clang' / '22')
+            native = {'tools': {role: {'resource_dir': observed} for role in ('clang', 'clangxx')}}
+            identity.resolve_case_resources(native)
+            for tool in native['tools'].values():
+                self.assertEqual(tool['resource_dir'], str(resource))
+            resource.rmdir()
+            with self.assertRaises(FileNotFoundError):
+                identity.resolve_case_resources(native)
+
     def test_three_coherent_case_shapes_are_nonqualifying_observations(self):
         for system in ('Linux', 'Windows', 'Darwin'):
             with self.subTest(system=system):
