@@ -13,7 +13,7 @@ import hashlib
 import json
 import math
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
 import stat
 import subprocess
@@ -624,7 +624,7 @@ def admission_review_metadata(review, candidate, candidate_sha):
     return projection
 
 
-def verify_reviewed_files(repo, head, links):
+def verify_reviewed_files(repo, head, links, *, expected_tree=None):
     """Bind reviewed bytes to a real ancestor commit, permitting later integration."""
     repo = Path(repo)
     require(repo.is_absolute() and repo.resolve(strict=True) == repo, "reviewed checkout root")
@@ -641,11 +641,18 @@ def verify_reviewed_files(repo, head, links):
 
     git("cat-file", "-e", head + "^{commit}")
     git("merge-base", "--is-ancestor", head, "HEAD")
+    if expected_tree is not None:
+        require(type(expected_tree) is str and re.fullmatch(r"[0-9a-f]{40}", expected_tree)
+                and git("rev-parse", head + "^{tree}").decode("ascii").strip() == expected_tree,
+                "observed producer tree changed")
     require(type(links) is list and 1 <= len(links) <= 64, "reviewed file links")
     names = set()
     for link in links:
         fields(link, "path sha256", "reviewed file")
-        relative = external_relative(link["path"]).as_posix()
+        # One actual producer input lives under a dot-directory. Keep the
+        # external-source filename grammar unchanged; this is a Git blob read.
+        relative = (link["path"] if link["path"] == ".github/workflows/product-identity.yml"
+                    else external_relative(link["path"]).as_posix())
         external_digest(link["sha256"])
         require(relative not in names, "duplicate reviewed file")
         names.add(relative)
@@ -917,6 +924,245 @@ def verify_ground_truth_index(repo):
                 "source_selection_quota_examples": selection["quota_examples"], "review_head": review["repository_head"]}
     except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError, subprocess.SubprocessError):
         raise ValueError("reviewed all-rule source labels rejected") from None
+
+
+GCC_PLATFORM_FILES = {
+    "Windows": "tests/product_corpus/candidates/gcc-mixed-storage-windows.json",
+    "Darwin": "tests/product_corpus/candidates/gcc-mixed-storage-macos.json",
+}
+GCC_PLATFORM_REFERENCES = (
+    "src/source_manager/SourceManager.cpp", "src/source_manager/ResourceDir.cpp",
+    "src/config/Config.cpp", "src/config/Config.h", "src/core/RuleCapabilities.def",
+    "src/analyzer/BuiltinRules.h", "src/main.cpp", "src/source_manager/CompilationDatabaseDiscovery.cpp",
+    "src/analyzer/StaticAnalyzer.cpp", "src/analyzer/AnalysisCoordinator.cpp", "src/CMakeLists.txt",
+)
+GCC_PLATFORM_QUALIFICATION = (
+    "evaluation_frozen", "platform_source_labels_reviewed", "adjusted_header_closure_verified",
+    "native_bytes_reopened", "native_product_qualified", "analyzer_run", "license_qualified",
+    "redistribution_approved", "task_ready", "product_qualified",
+)
+GCC_ISOLATED_DISABLED = ("uninit-ptr,uninit-scalar,double-free,use-after-free,resource-leak,div-by-zero,"
+                         "null-deref,bounds,int-overflow,sign-conversion,alloc-size-overflow,assumption,contract,policy")
+
+
+def map_gcc_native_source(system, mapping, filename):
+    """Lexical mapping of exactly one source, never a filesystem/SDK relocation."""
+    require(type(system) is str and system in GCC_PLATFORM_FILES, "native mapping platform")
+    fields(mapping, "kind logical_path native_path", "native source mapping")
+    require(mapping["kind"] == "EXACT_SOURCE_ONLY" and mapping["logical_path"] == "/input/case.c",
+            "native mapping scope")
+    path_type = PureWindowsPath if system == "Windows" else PurePosixPath
+    for path in (mapping["native_path"], filename):
+        require(type(path) is str and 0 < len(path) <= 4096 and not any(ord(char) < 32 for char in path),
+                "native source path")
+        parts = re.split(r"[/\\]", path) if system == "Windows" else path.split("/")
+        parsed = path_type(path)
+        require(parsed.is_absolute() and not any(part in (".", "..") for part in parts)
+                and (bool(re.fullmatch(r"[A-Za-z]:", parsed.drive)) if system == "Windows" else not path.startswith("//")),
+                "native source path form")
+    require(path_type(filename) == path_type(mapping["native_path"]) and path_type(mapping["native_path"]).name == "case.c",
+            "unmapped native source")
+    return mapping["logical_path"]
+
+
+def gcc_platform_recipe_parts(value):
+    """Deterministic prospective recipe parts; this function never runs tools."""
+    import product_identity as identity
+    identity.validate_case_document(value)
+    native = value["native_identity"]
+    system = native["platform"]["system"]
+    require(system in GCC_PLATFORM_FILES, "native recipe platform")
+    path_type = PureWindowsPath if system == "Windows" else PurePosixPath
+    source = value["input"]["path"]
+    mapping = {"kind": "EXACT_SOURCE_ONLY", "logical_path": "/input/case.c", "native_path": source}
+    map_gcc_native_source(system, mapping, source)
+    source_root = path_type(source).parent
+    root = source_root.parent / "codeskeptic-gcc-analysis"
+    profile, output, temporary = (root / name for name in ("profile", "output", "tmp"))
+    executable = str(root / "product/bin" / ("codeskeptic.exe" if system == "Windows" else "codeskeptic"))
+    tool = native["tools"]["clang"]
+    environment = {"CODESKEPTIC_RESOURCE_DIR": tool["resource_dir"], "LANG": "C", "LC_ALL": "C"}
+    if system == "Windows":
+        keys = ("INCLUDE", "VCToolsInstallDir", "VCToolsVersion", "VSINSTALLDIR", "WindowsSdkDir",
+                "WindowsSDKVersion", "UniversalCRTSdkDir", "UCRTVersion", "SystemRoot", "WINDIR", "SystemDrive",
+                "COMSPEC", "USERPROFILE", "APPDATA", "LOCALAPPDATA")
+        environment.update({key: value["environment"][key] for key in keys if key in value["environment"]})
+        path = [str(path_type(executable).parent), str(path_type(tool["file"]["path"]).parent)]
+        if "SystemRoot" in environment:
+            path.append(str(path_type(environment["SystemRoot"]) / "System32"))
+        environment.update(PATH=";".join(path), TEMP=str(temporary), TMP=str(temporary), VSLANG="1033")
+    else:
+        environment.update({key: value["environment"][key] for key in
+                            ("DEVELOPER_DIR", "SDKROOT", "MACOSX_DEPLOYMENT_TARGET")})
+        environment.update(PATH=str(path_type(executable).parent) + ":/usr/bin:/bin", TMPDIR=str(temporary))
+
+    def command(report):
+        return [executable, "--source", source, "--build-path", str(profile), "--json", str(output / report),
+                "--severity", "info", "--lang", "en", "--worker-timeout-ms", str(LIMITS["worker_timeout_ms"]),
+                "--worker-memory-mb", str(LIMITS["worker_memory_mib"]), "--no-analysis-cache"]
+
+    extra = []
+    if system == "Darwin":
+        extra += ["-isystem", "/usr/include", "-isystem", "/usr/local/include"]
+    extra += ["-resource-dir", tool["resource_dir"]]
+    if system == "Darwin":
+        extra += ["-isysroot", environment["SDKROOT"]]
+    closures = {name: {"input_count": len(value["probes"][name]["headers"]),
+                       "records_sha256": hashlib.sha256(canonical(value["probes"][name]["headers"]).encode()).hexdigest()}
+                for name in ("candidate", "abi")}
+    return {
+        "source_mapping": mapping,
+        "compiler": tool,
+        "compilation_database": [{"directory": str(source_root), "file": source,
+                                  "arguments": value["probes"]["candidate"]["command"]["argv"]}],
+        "header_closures": closures,
+        "abi_preflight": {"char_bit": 8, "int_bytes": 4, "size_t_bytes": 8, "pointer_bytes": 8,
+                          "malloc_compatible_type": "void *(*)(size_t)",
+                          "boundary": "Historical Clang C17 size/prototype assertions and two rejected negatives, not runtime calling ABI, allocator implementation or noninterposition proof."},
+        "frontend": {"state": "ADJUSTED_HEADER_CLOSURE_AND_EMBEDDED_FRONTEND_PENDING",
+                     "begin_adjusters_in_registration_order": [["-fparse-all-comments"], extra],
+                     "argument_handling": "The comment adjuster is registered before the platform adjuster. Each uses BEGIN; this is not a captured final argv and no CDB option deduplication is claimed.",
+                     "resource_precondition": "Before analysis, verify the selected resource directory and full referenced native header identities; otherwise the implementation may silently select bundled/build-time fallback headers.",
+                     "sdk_precondition": "On macOS, verify SDKROOT alias/resolved SDK identity and the eagerly executed xcrun probe. Explicit SDKROOT does not suppress that subprocess.",
+                     "boundary": "Historical external compiler syntax success is not embedded product frontend compatibility or selected-versus-adjusted dependency equivalence."},
+        "analyzer": {
+            "state": "PREDECLARED_NOT_EXECUTED", "executable": executable, "executable_sha256": None,
+            "executable_policy": "FUTURE_U004_CLEAN_RELEASE_SOURCE_TREE_TOOLCHAIN_AND_BINARY_IDENTITY_REQUIRED",
+            "cwd": str(profile), "environment": environment, "inherit_environment": False,
+            "memory_leak_only": command("memory-leak.json") + ["--disable-rule", GCC_ISOLATED_DISABLED],
+            "all_current_rules_including_assumptions": command("all-current-rules.json") + ["--assumptions"],
+            "outer_case_timeout_seconds": LIMITS["case_timeout_seconds"], "repetitions": LIMITS["repetitions"],
+            "required_conditions": [
+                "Only the bound one-command compile_commands.json in the declared profile cwd; no .codeskeptic.conf there.",
+                "Verify exact source bytes and all native compiler/resource/SDK/header identities before each invocation; no undeclared environment inheritance.",
+                "Recreate an isolated profile/output/tmp and worker state per repetition after retaining prior evidence; existing outputs or caches cannot be reused.",
+                "No baseline, custom model/sidecar, checkpoint/resume, suppression or scope-filter inputs. --no-analysis-cache does not disable config discovery.",
+                "Keep every raw diagnostic and multiplicity. Reject unmapped source paths rather than discard observations. A missing expected leak remains a miss.",
+                "Require complete one-source/one-command coverage. Outer timeout is separate from worker limits; neither is raised on retry.",
+            ],
+            "new_injection_families": "PLANNED_NOT_IMPLEMENTED_RED_NO_FAKE_CLI_ENABLEMENT_OR_ZERO_FINDING_PASS",
+        },
+    }
+
+
+def gcc_platform_recipe_metadata(value, cdb, native, candidate, labels):
+    fields(value, "schema state id platform candidate linux_recipe ground_truth ground_truth_index reference "
+           "native_evidence compilation_database recipe limits source_label_applicability additional_quota_examples "
+           "qualification boundary", "native recipe")
+    system = value["platform"]
+    require(value["schema"] == "codeskeptic-product-prospective-platform-recipe/v1"
+            and value["state"] == "PREDECLARED_NATIVE_RECIPE_NOT_QUALIFIED"
+            and value["id"] == candidate["id"] and type(system) is str and system in GCC_PLATFORM_FILES
+            and native["native_identity"]["platform"]["system"] == system, "native recipe identity")
+    gcc_ground_truth_metadata(labels, candidate)
+    cdb_path = GCC_PLATFORM_FILES[system][:-5] + "/compile_commands.json"
+    links = {"candidate": GCC_SOURCE_CANDIDATE, "linux_recipe": GCC_CANDIDATE_LINKS["analysis_profile"],
+             "ground_truth": GCC_GROUND_TRUTH, "ground_truth_index": GROUND_TRUTH_INDEX,
+             "compilation_database": cdb_path}
+    for field, path in links.items():
+        fields(value[field], "path sha256", "native recipe link")
+        require(value[field]["path"] == path, "native recipe linked path")
+        external_digest(value[field]["sha256"])
+    require(value["linux_recipe"] == candidate["links"]["analysis_profile"], "original Linux recipe changed")
+    reference = value["reference"]
+    fields(reference, "head files", "native recipe reference")
+    require(type(reference["head"]) is str and re.fullmatch(r"[0-9a-f]{40}", reference["head"])
+            and type(reference["files"]) is list and len(reference["files"]) == len(GCC_PLATFORM_REFERENCES),
+            "native recipe reference coverage")
+    for link, path in zip(reference["files"], GCC_PLATFORM_REFERENCES):
+        fields(link, "path sha256", "native recipe reference link")
+        require(link["path"] == path, "native recipe reference path")
+        external_digest(link["sha256"])
+    evidence = value["native_evidence"]
+    fields(evidence, "state run_id run_attempt producer_source case run", "native recipe evidence")
+    require(evidence["state"] == "HISTORICAL_HOSTED_PREFLIGHT_NOT_CURRENT_QUALIFICATION"
+            and type(evidence["run_id"]) is int and evidence["run_id"] > 0
+            and type(evidence["run_attempt"]) is int and evidence["run_attempt"] == 1
+            and evidence["producer_source"] == native["native_identity"]["source"], "native recipe producer")
+    for key in ("case", "run"):
+        fields(evidence[key], "path sha256", "native recipe external evidence")
+        require(nonempty(evidence[key]["path"]), "native recipe external path")
+        external_digest(evidence[key]["sha256"])
+    expected = gcc_platform_recipe_parts(native)
+    expected_cdb = expected.pop("compilation_database")
+    require(canonical(cdb) == canonical(expected_cdb) and canonical(value["recipe"]) == canonical(expected),
+            "native prospective commands/environment/closure changed")
+    validate_limits(value["limits"])
+    require(value["source_label_applicability"] == "PENDING_ADDITIVE_PLATFORM_SOURCE_REVIEW"
+            and type(value["additional_quota_examples"]) is int and value["additional_quota_examples"] == 0
+            and nonempty(value["boundary"]) and len(value["boundary"]) <= 8192, "native recipe limits/boundary")
+    fields(value["qualification"], " ".join(GCC_PLATFORM_QUALIFICATION), "native recipe qualification")
+    require(all(item is False for item in value["qualification"].values()), "prospective recipe cannot qualify product")
+    return {"platform": system, "source_sha256": native["input"]["sha256"], "command_count": len(cdb),
+            "candidate_input_count": expected["header_closures"]["candidate"]["input_count"],
+            "producer_head": evidence["producer_source"]["head"], "additional_quota_examples": 0,
+            **value["qualification"]}
+
+
+def verify_gcc_platform_recipes(repo):
+    """Read historical native evidence and prospective recipes without execution."""
+    try:
+        import product_identity as identity
+        repo = Path(repo)
+        require(repo.is_absolute() and repo.resolve(strict=True) == repo, "native recipe checkout root")
+        observations = {}
+
+        def read(path, expected=None, external=False, maximum=65536):
+            require(not external or (path.is_absolute() and repo not in path.parents), "native evidence must be external")
+            info, before, raw = external_read(path, capture=True)
+            require(info["size_bytes"] <= maximum and (expected is None or info["sha256"] == expected),
+                    "native recipe evidence size/hash")
+            if path in observations:
+                require(external_identity(observations[path]) == external_identity(before),
+                        "native recipe evidence changed between reads")
+            observations[path] = before
+            return parse_json(raw.decode("utf-8")), info["sha256"]
+
+        original = verify_ground_truth_index(repo)
+        results = []
+        for system, path in GCC_PLATFORM_FILES.items():
+            value, record_sha = read(repo / path)
+            linked = {}
+            for key in ("candidate", "linux_recipe", "ground_truth", "ground_truth_index", "compilation_database"):
+                link = value[key]
+                linked[key], _ = read(repo / external_relative(link["path"]), link["sha256"])
+            evidence = value["native_evidence"]
+            native, _ = read(Path(evidence["case"]["path"]), evidence["case"]["sha256"], True, 4 * 1024 * 1024)
+            run, _ = read(Path(evidence["run"]["path"]), evidence["run"]["sha256"], True)
+            result = gcc_platform_recipe_metadata(value, linked["compilation_database"], native,
+                                                  linked["candidate"], linked["ground_truth"])
+            require(result["platform"] == system and result["source_sha256"] == original["source_sha256"]
+                    and value["candidate"]["sha256"] == original["candidate_sha256"]
+                    and value["ground_truth"]["sha256"] == original["record_sha256"], "native recipe original labels changed")
+            source = evidence["producer_source"]
+            require(type(run["id"]) is int and run["id"] == evidence["run_id"]
+                    and type(run["run_attempt"]) is int and run["run_attempt"] == evidence["run_attempt"]
+                    and run["head_sha"] == source["head"] and run["status"] == "completed" and run["conclusion"] == "success"
+                    and run["path"] == ".github/workflows/product-identity.yml" and run["event"] == "push"
+                    and run["head_branch"] == "agent/cs3-ch08-s01-u003-frozen-product-profiles"
+                    and run["repository"]["full_name"] == "tanzercakir-commits/CodeSkeptic", "native recipe hosted run identity")
+            environment = native["environment"]
+            require(environment["GITHUB_SHA"] == source["head"]
+                    and environment["GITHUB_RUN_ID"] == str(run["id"])
+                    and environment["GITHUB_RUN_ATTEMPT"] == str(run["run_attempt"]), "native recipe runner identity")
+            candidate = linked["candidate"]
+            require(native["binding"]["binding_sha256"] == candidate["links"]["source_binding"]["sha256"]
+                    and native["binding"]["adjudication_sha256"] == candidate["links"]["source_review"]["sha256"],
+                    "native recipe source binding changed")
+            producer_files = [{"path": path, "sha256": source[field]} for field, path in identity.SOURCE_FILES.items()]
+            producer_files += [{"path": path, "sha256": sha} for path, sha in native["source_files"].items()]
+            verify_reviewed_files(repo, source["head"], producer_files, expected_tree=source["tree"])
+            verify_reviewed_files(repo, value["reference"]["head"], value["reference"]["files"])
+            results.append({**result, "record_sha256": record_sha})
+        for path, before in observations.items():
+            require(path.resolve(strict=True) == path and external_identity(path.lstat()) == external_identity(before),
+                    "native recipe evidence final identity changed")
+        return {"recipes": results, "recipe_count": len(results), "unique_source_count": 1,
+                "source_selection_quota_examples": original["source_selection_quota_examples"],
+                "original_source_labels_independently_reviewed": original["source_labels_independently_reviewed"],
+                "additional_quota_examples": 0, **{key: False for key in GCC_PLATFORM_QUALIFICATION}}
+    except (ValueError, OSError, TypeError, KeyError, IndexError, RecursionError, RuntimeError, subprocess.SubprocessError):
+        raise ValueError("GCC prospective platform recipes rejected") from None
 
 
 def adapt_gcc_source(raw):
@@ -1362,7 +1608,7 @@ def draft_readiness(manifest, root=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check", "ground-truth-candidate-check", "ground-truth-check"))
+    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check", "ground-truth-candidate-check", "ground-truth-check", "platform-recipes-check"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--historical-sources", type=Path, default=Path(
         "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S04-U001/corpus-diagnostic-comparison"))
@@ -1374,7 +1620,11 @@ def main():
         if args.command == "selection-check":
             require(args.binding is None and args.evidence_root is None and args.external_root is None,
                     "reviewed selection uses its explicit tracked roots")
-        if args.command in ("ground-truth-candidate-check", "ground-truth-check"):
+        if args.command == "platform-recipes-check":
+            require(args.binding is None and args.evidence_root is None and args.external_root is None,
+                    "native recipes use their fixed tracked roots")
+            result = verify_gcc_platform_recipes(args.root)
+        elif args.command in ("ground-truth-candidate-check", "ground-truth-check"):
             require(args.binding is None and args.evidence_root is None and args.external_root is None,
                     "all-rule source labels use their fixed tracked roots")
             result = (verify_gcc_ground_truth(args.root) if args.command == "ground-truth-candidate-check"

@@ -1,0 +1,21 @@
+[
+  {
+    "directory": "/Users/runner/work/_temp/codeskeptic-gcc-case",
+    "file": "/Users/runner/work/_temp/codeskeptic-gcc-case/case.c",
+    "arguments": [
+      "/Library/Developer/CommandLineTools/usr/bin/clang",
+      "--no-default-config",
+      "-fno-modules",
+      "-resource-dir",
+      "/Library/Developer/CommandLineTools/usr/lib/clang/16",
+      "-x",
+      "c",
+      "-std=c17",
+      "--target=arm64-apple-macos14.0",
+      "-isysroot",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-fsyntax-only",
+      "/Users/runner/work/_temp/codeskeptic-gcc-case/case.c"
+    ]
+  }
+]

@@ -300,3 +300,35 @@ gerçek freeze ve bağımsız kabulden sonra sonuçlara bakılarak değiştirile
 Ortam kimlikleri ölçüm öncesi gerçekten yakalanıp karşılaştırılmalıdır; eski rolling
 hosted image gözlemi replay edilebilir sabit image diye sunulamaz. Eksik kaynak/etiket,
 güvenlik-fix incelemesi veya ortam kanıtı task/FIFO kapanışında atlanamaz.
+
+## U003 ek platform tarifleri — prospective, native yeterlilik değil
+
+Mevcut GCC kaynağının Windows/macOS tarifleri ayrı JSON ve tek-komutlu CDB
+dosyalarında tutulur. `platform-recipes-check` salt-okunurdur; kaynak, eski Linux
+tarifi, kabul edilmiş all-rule etiket zinciri, tarihsel native case/run byte'ları,
+producer Git tree ve ilgili collector/workflow/yardımcı kaynak hashlerini birlikte
+denetler. CLI/registry/worker/SourceManager/ResourceDir referansları da ayrı exact
+Git nesnelerine bağlıdır. Bu kayıtları üretmek compiler/analyzer çalıştırmak değildir.
+
+CDB kaynak yolu gözlenmiş native mutlak yol olarak korunur. Yalnız o tek kaynak
+component-aware biçimde `/input/case.c` kimliğine eşlenebilir; traversal, başka
+kaynak, drive-relative/device/UNC yolu veya SDK/header ağacı bu yolla taşınamaz.
+Windows drive/yol karşılaştırması kendi yol kurallarını kullanır; POSIX kaynak
+kimliği büyük/küçük harfe duyarlıdır. Bu leksik eşleme native dosyayı yeniden
+açmaz ve adversarial filesystem alias izolasyonu iddiası taşımaz.
+
+Prospective analyzer komutları üç tekrar, değişmemiş worker/outer bütçeleri,
+ayrı memory-leak/all-current çıktıları, kapalı analysis cache, explicit environment
+ve her tekrarda taze profile/output/tmp koşullarını belirtir. Dört planlı aile
+fake CLI enablement ile çalıştırılmış sayılmaz. CDB compiler/resource/SDK/INCLUDE
+seçimi ile gelecekteki embedded frontend ayrıdır: macOS ek include/sysroot
+adjuster'ları, eagerly çalıştırılan xcrun ve resource-dir fallback davranışı için
+pozitif native doğrulama gereklidir. Ortamın küçültülmüş olması gözlenmiş ortamla
+eşdeğerliğini kanıtlamaz. Kaynak/SDK/header byte'ları fiilen yeniden açılmadan ve
+selected/adjusted header closure karşılaştırılmadan bu kapılar geçmez.
+
+Eski etiket kabulü Linux tarifine bağlı koşulları sessizce Windows/macOS'a taşımaz;
+ek platform source-label applicability incelemesi ayrı ve pending kalır. Native
+tarif sayısı iki olsa da ek kota sıfırdır. Önceki başarısız koşular korunur;
+rolling hosted image tarihsel preflight'ı güncel native/product yeterlilik veya
+evaluation freeze değildir. Bu ekler U004'ü başlatmaz, U003'ü POP etmez.

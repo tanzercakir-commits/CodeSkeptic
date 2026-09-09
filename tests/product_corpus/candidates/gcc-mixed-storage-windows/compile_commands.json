@@ -1,0 +1,19 @@
+[
+  {
+    "directory": "D:\\a\\_temp\\codeskeptic-gcc-case",
+    "file": "D:\\a\\_temp\\codeskeptic-gcc-case\\case.c",
+    "arguments": [
+      "C:\\Program Files\\LLVM\\bin\\clang.exe",
+      "--no-default-config",
+      "-fno-modules",
+      "-resource-dir",
+      "C:\\Program Files\\LLVM\\lib\\clang\\20",
+      "-x",
+      "c",
+      "-std=c17",
+      "--target=x86_64-pc-windows-msvc",
+      "-fsyntax-only",
+      "D:\\a\\_temp\\codeskeptic-gcc-case\\case.c"
+    ]
+  }
+]

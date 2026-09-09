@@ -1027,3 +1027,46 @@ etiketleri 16 aile + üç project-diagnostic olarak bağlıdır, ancak tek kayna
 1/1020 ve ek kota 0 kalır. Windows native kapısı, eksik diğer değerlendirme
 kaynakları ve platform analiz tarifleri açık; evaluation freeze, task/product
 qualification ve U003 POP hâlâ yoktur.
+
+### GCC Windows/macOS prospective analiz tarifleri
+
+`gcc-mixed-storage-windows.json` ve `gcc-mixed-storage-macos.json`, her biri ayrı
+tek-source/tek-command `compile_commands.json` ile mevcut GCC girdisine eklenir.
+Eski Linux tarifi, source candidate, admission, selection, all-rule önerisi ve
+bağımsız source-review receipt'i yeniden yazılmaz. İki platform hâlâ tek kaynak
+ve tek global cluster'dır; ek kota 0, kaynak sayacı 1/1020 kalır.
+
+Tarifler son başarılı üç-platform preflight koşusu `34343205581` / producer
+`7cfec2d51385377ce5d50d3392246d9b49a974e7` üzerinde hashli tarihsel referanstır.
+Windows Clang 20.1.8, `x86_64-pc-windows-msvc`, MSVC 14.51.36231 ve SDK/UCRT
+10.0.26100.0; macOS Apple Clang 16.0.0, CLT 16.2, SDK 15.2 ve explicit
+`arm64-apple-macos14.0` seçimi korunur. Windows candidate closure 22 input
+(kaynak + 21 header), macOS 73 input (kaynak + 72 header) içerir. Native JSON'un
+tam header kayıtları hash üzerinden bağlıdır; bu sayılar ek değerlendirme örneği
+değildir. Windows `cl.exe /Bv` kaydı candidate'ın MSVC ile derlendiğini göstermez.
+Sonraki `34346981841` ve `34348054597` Windows başarısızlıkları geçerli kalır.
+
+Seçilen CDB argv, gözlenmiş C17 candidate `-fsyntax-only` komutunu ve native
+kaynak yolunu korur. Analyzer komutları kendi ayrı binary/profile/output yollarını,
+14 diğer aileyi kapatan memory-only listesi ile `--assumptions` içeren all-current
+seçimini önceden kaydeder. `--lang en` diagnostic dilidir; C17 seçimi CDB'dedir.
+Yeni binary hash'i pending U004'tür, hiçbir analyzer çıktısı üretilmemiştir.
+
+Salt-okunur kontrol gerçek source/etiket zincirini, iki CDB'yi, tarihsel run/head/
+tree/helper/workflow bağlarını ve on bir CLI/frontend/registry/worker referansını
+yeniden denetler. Native absolute path'ler yalnız ait oldukları platformun
+leksik kurallarıyla işlenir; Linux host'ta SDK/compiler yolları açılmış gibi
+yapılmaz. Kaynak dışı veya kaçan yol map edilemez ve sonra sessizce atılamaz.
+
+Yeni on odaklı test sentetik Windows/macOS metadata fixture'larıyla pozitif
+şekilleri, komut/SDK/resource/closure/ABI/label/quota forgeries'ini, bağlı dış dosya
+bozulmasını, producer tree ve exact workflow Git blob'unu denetler. Compiler veya
+network çağrısı yapılmadığı ayrıca kontrol edilir. Native workflow test seçimi
+37'den 47'ye çıkar; bu değişiklik tek başına yeni hosted PASS değildir.
+
+Durum `PREDECLARED_NATIVE_RECIPE_NOT_QUALIFIED` kalır. Explicit küçültülmüş
+analyzer environment'in native eşdeğerliği, SourceManager tarafından eklenen
+header seçenekleriyle closure eşitliği, embedded frontend uyumu, güncel native
+byte reopening ve ek platform source-label incelemesi pending'dir. Mevcut Linux
+etiket kabulü bu kapıları kapatmaz. Tüm qualification bayrakları false kalır;
+genel readiness başarısız, U003 ve tam ürün hedefi açık durumdadır.

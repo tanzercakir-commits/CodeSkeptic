@@ -30,6 +30,279 @@ def quota_rows():
     return rows
 
 
+class NativeRecipeTests(unittest.TestCase):
+    def fixture(self, system):
+        import product_identity as identity
+        from test_product_identity import CaseCaptureTests
+        repo = Path(__file__).resolve().parents[1]
+        value = profiles.read_json(repo / profiles.GCC_PLATFORM_FILES[system])
+        candidate = profiles.read_json(repo / profiles.GCC_SOURCE_CANDIDATE)
+        labels = profiles.read_json(repo / profiles.GCC_GROUND_TRUTH)
+        native = CaseCaptureTests().case_document(system)
+        native['binding']['binding_sha256'] = candidate['links']['source_binding']['sha256']
+        native['binding']['adjudication_sha256'] = candidate['links']['source_review']['sha256']
+        native['source_files'][identity.CASE_SOURCE_FILES[2]] = native['binding']['binding_sha256']
+        native['source_files'][identity.CASE_SOURCE_FILES[3]] = native['binding']['adjudication_sha256']
+        native['environment'].update(GITHUB_SHA=native['native_identity']['source']['head'],
+                                     GITHUB_RUN_ID='123', GITHUB_RUN_ATTEMPT='1')
+        native['native_identity']['platform']['environment'] = identity.observed_environment(native['environment'])
+        parts = profiles.gcc_platform_recipe_parts(native)
+        cdb = parts.pop('compilation_database')
+        value['recipe'] = copy.deepcopy(parts)
+        value['native_evidence'].update(run_id=123, producer_source=copy.deepcopy(native['native_identity']['source']))
+        return SimpleNamespace(value=value, cdb=copy.deepcopy(cdb), native=native, candidate=candidate, labels=labels)
+
+    def staged_fixture(self):
+        temporary = tempfile.TemporaryDirectory(prefix='codeskeptic-native-recipe-')
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        repo = base / 'repo'
+        original_repo = Path(__file__).resolve().parents[1]
+        def write(path, value):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(profiles.canonical(value).encode())
+            return profiles.file_sha(path)
+        for relative in (profiles.GCC_SOURCE_CANDIDATE, profiles.GCC_GROUND_TRUTH, profiles.GROUND_TRUTH_INDEX,
+                         profiles.GCC_CANDIDATE_LINKS['analysis_profile']):
+            path = repo / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes((original_repo / relative).read_bytes())
+        rows = {}
+        for system, relative in profiles.GCC_PLATFORM_FILES.items():
+            row = self.fixture(system)
+            row.run = {'id': 123, 'run_attempt': 1, 'head_sha': row.native['native_identity']['source']['head'],
+                       'status': 'completed', 'conclusion': 'success', 'path': '.github/workflows/product-identity.yml',
+                       'event': 'push', 'head_branch': 'agent/cs3-ch08-s01-u003-frozen-product-profiles',
+                       'repository': {'full_name': 'tanzercakir-commits/CodeSkeptic'}}
+            for key, document in (('case', row.native), ('run', row.run)):
+                path = base / (system + '-' + key + '.json')
+                row.value['native_evidence'][key] = {'path': str(path), 'sha256': write(path, document)}
+            row.value['compilation_database']['sha256'] = write(repo / row.value['compilation_database']['path'], row.cdb)
+            write(repo / relative, row.value)
+            rows[system] = row
+        accepted = {'source_sha256': profiles.GCC_CASE_SHA,
+                    'candidate_sha256': profiles.file_sha(repo / profiles.GCC_SOURCE_CANDIDATE),
+                    'record_sha256': profiles.file_sha(repo / profiles.GCC_GROUND_TRUTH),
+                    'source_selection_quota_examples': 1, 'source_labels_independently_reviewed': True}
+        return SimpleNamespace(repo=repo, rows=rows, accepted=accepted, write=write)
+
+    def test_native_source_mapping_is_exact_and_does_not_relocate_headers(self):
+        for system, path in (('Windows', r'D:\case input\case.c'), ('Darwin', '/case input/case.c')):
+            mapping = {'kind': 'EXACT_SOURCE_ONLY', 'logical_path': '/input/case.c', 'native_path': path}
+            self.assertEqual(profiles.map_gcc_native_source(system, mapping, path), '/input/case.c')
+            with self.assertRaises(ValueError):
+                profiles.map_gcc_native_source(system, mapping, path + '.other')
+
+    def test_prospective_commands_preserve_isolated_and_all_current_selections(self):
+        from test_product_identity import CaseCaptureTests
+        for system in ('Windows', 'Darwin'):
+            native = CaseCaptureTests().case_document(system)
+            parts = profiles.gcc_platform_recipe_parts(native)
+            self.assertEqual(parts['compilation_database'][0]['arguments'], native['probes']['candidate']['command']['argv'])
+            analyzer = parts['analyzer']
+            self.assertEqual(analyzer['repetitions'], 3)
+            self.assertEqual(analyzer['outer_case_timeout_seconds'], 30)
+            self.assertIsNone(analyzer['executable_sha256'])
+            self.assertIn('--disable-rule', analyzer['memory_leak_only'])
+            self.assertIn('--assumptions', analyzer['all_current_rules_including_assumptions'])
+            self.assertNotIn('--enable-rule', analyzer['all_current_rules_including_assumptions'])
+
+    def test_mapping_rejects_other_sources_traversal_devices_and_host_confusion(self):
+        for system, native, bad_paths in (
+                ('Windows', r'D:\case input\case.c', ('case.c', r'\case input\case.c', r'D:case.c',
+                  r'D:\case input\..\case input\case.c', r'D:\case input\case.c:stream',
+                  r'\\server\share\case.c', r'\\?\D:\case input\case.c', r'D:\case input\case.c.other',
+                  r'D:\case input\sdk\stdlib.h', '/case input/case.c', 'PRIVATE\nSENTINEL')),
+                ('Darwin', '/case input/case.c', ('case.c', '/case input/../case input/case.c',
+                  '/case input/./case.c', '//case input/case.c', '/case input2/case.c', '/sdk/stdlib.h',
+                  r'C:\case input\case.c', '/case input/CASE.C'))):
+            mapping = {'kind': 'EXACT_SOURCE_ONLY', 'logical_path': '/input/case.c', 'native_path': native}
+            for path in bad_paths:
+                with self.subTest(system=system, path=path), self.assertRaises(ValueError):
+                    profiles.map_gcc_native_source(system, mapping, path)
+        mapping = {'kind': 'EXACT_SOURCE_ONLY', 'logical_path': '/input/case.c', 'native_path': r'D:\case input\case.c'}
+        self.assertEqual(profiles.map_gcc_native_source('Windows', mapping, 'd:/CASE INPUT/CASE.C'), '/input/case.c')
+        for key, replacement in (('kind', 'PREFIX_REPLACE'), ('logical_path', '/other.c'), ('native_path', 'relative')):
+            changed = {**mapping, key: replacement}
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                profiles.map_gcc_native_source('Windows', changed, mapping['native_path'])
+
+    def test_both_recipe_shapes_are_pending_and_do_not_add_sources(self):
+        for system in profiles.GCC_PLATFORM_FILES:
+            row = self.fixture(system)
+            result = profiles.gcc_platform_recipe_metadata(row.value, row.cdb, row.native, row.candidate, row.labels)
+            self.assertEqual(result['command_count'], 1)
+            self.assertEqual(result['candidate_input_count'], 2)  # Synthetic metadata, not observed real headers.
+            self.assertEqual(result['additional_quota_examples'], 0)
+            self.assertTrue(all(result[key] is False for key in profiles.GCC_PLATFORM_QUALIFICATION))
+
+    def test_recipe_rejects_commands_models_links_closure_references_and_false_qualification(self):
+        mutations = ('source', 'cdb-empty', 'cdb-duplicate', 'cdb-c17', 'cdb-resource', 'cdb-target', 'cdb-compiler',
+                     'cdb-extra-source', 'cdb-directory', 'compiler-hash', 'closure', 'closure-count-bool', 'abi-width',
+                     'environment-resource', 'environment-extra', 'environment-path', 'environment-inherit', 'cwd', 'binary', 'binary-hash',
+                     'isolated-selection', 'all-current-selection', 'fake-enable', 'cache', 'timeout', 'repeat-bool',
+                     'frontend-state', 'frontend-argument', 'reference-missing', 'reference-file', 'reference-hash',
+                     'label-link', 'linux-link', 'quota', 'quota-bool', 'qualification', 'applicability', 'observed')
+        for system in profiles.GCC_PLATFORM_FILES:
+            for mutation in mutations:
+                row = self.fixture(system)
+                value, cdb = row.value, row.cdb
+                recipe = value['recipe']
+                if mutation == 'source': recipe['source_mapping']['native_path'] += '.other'
+                elif mutation == 'cdb-empty': cdb.clear()
+                elif mutation == 'cdb-duplicate': cdb *= 2
+                elif mutation == 'cdb-c17': cdb[0]['arguments'][7] = '-std=c11'
+                elif mutation == 'cdb-resource': cdb[0]['arguments'][4] += '-other'
+                elif mutation == 'cdb-target': cdb[0]['arguments'][8] = '--target=i686-pc-windows-msvc'
+                elif mutation == 'cdb-compiler': cdb[0]['arguments'][0] += '-other'
+                elif mutation == 'cdb-extra-source': cdb[0]['arguments'].append('other.c')
+                elif mutation == 'cdb-directory': cdb[0]['directory'] += '-other'
+                elif mutation == 'compiler-hash': recipe['compiler']['file']['sha256'] = 'e' * 64
+                elif mutation == 'closure': recipe['header_closures']['candidate']['records_sha256'] = 'e' * 64
+                elif mutation == 'closure-count-bool': recipe['header_closures']['abi']['input_count'] = True
+                elif mutation == 'abi-width': recipe['abi_preflight']['size_t_bytes'] = 4
+                elif mutation == 'environment-resource': recipe['analyzer']['environment']['CODESKEPTIC_RESOURCE_DIR'] += '-other'
+                elif mutation == 'environment-extra': recipe['analyzer']['environment']['CPATH'] = 'PRIVATE_SENTINEL'
+                elif mutation == 'environment-path': recipe['analyzer']['environment']['PATH'] += ':other'
+                elif mutation == 'environment-inherit': recipe['analyzer']['inherit_environment'] = True
+                elif mutation == 'cwd': recipe['analyzer']['cwd'] += '-other'
+                elif mutation == 'binary': recipe['analyzer']['executable'] += '-other'
+                elif mutation == 'binary-hash': recipe['analyzer']['executable_sha256'] = 'e' * 64
+                elif mutation == 'isolated-selection': recipe['analyzer']['memory_leak_only'][-1] = 'bounds'
+                elif mutation == 'all-current-selection': recipe['analyzer']['all_current_rules_including_assumptions'].pop()
+                elif mutation == 'fake-enable': recipe['analyzer']['all_current_rules_including_assumptions'] += ['--enable-rule', 'sql-injection']
+                elif mutation == 'cache': recipe['analyzer']['memory_leak_only'].remove('--no-analysis-cache')
+                elif mutation == 'timeout': recipe['analyzer']['outer_case_timeout_seconds'] += 1
+                elif mutation == 'repeat-bool': recipe['analyzer']['repetitions'] = True
+                elif mutation == 'frontend-state': recipe['frontend']['state'] = 'VERIFIED'
+                elif mutation == 'frontend-argument': recipe['frontend']['begin_adjusters_in_registration_order'].pop()
+                elif mutation == 'reference-missing': value['reference']['files'].pop()
+                elif mutation == 'reference-file': value['reference']['files'][0]['path'] = 'src/main.cpp'
+                elif mutation == 'reference-hash': value['reference']['files'][0]['sha256'] = '0' * 64
+                elif mutation == 'label-link': value['ground_truth']['path'] = 'other.json'
+                elif mutation == 'linux-link': value['linux_recipe']['sha256'] = 'e' * 64
+                elif mutation == 'quota': value['additional_quota_examples'] = 1
+                elif mutation == 'quota-bool': value['additional_quota_examples'] = False
+                elif mutation == 'qualification': value['qualification']['native_bytes_reopened'] = True
+                elif mutation == 'applicability': value['source_label_applicability'] = 'REVIEWED'
+                elif mutation == 'observed': value['observed'] = []
+                with self.subTest(system=system, mutation=mutation), self.assertRaises(ValueError):
+                    profiles.gcc_platform_recipe_metadata(value, cdb, row.native, row.candidate, row.labels)
+
+    def test_native_probe_forgery_cannot_become_recipe_preflight(self):
+        for system in profiles.GCC_PLATFORM_FILES:
+            for mutation in ('positive-fail', 'negative-pass', 'abi-source', 'target', 'dependency-missing',
+                             'sdk-root', 'include-root', 'platform', 'source-hash', 'qualified'):
+                row = self.fixture(system)
+                native = row.native
+                if mutation == 'positive-fail': native['probes']['candidate']['command']['exit_code'] = 1
+                elif mutation == 'negative-pass': native['probes']['bad-width']['command']['exit_code'] = 0
+                elif mutation == 'abi-source': native['probes']['abi']['source_sha256'] = 'e' * 64
+                elif mutation == 'target': native['probes']['candidate']['command']['argv'][8] = '--target=i686-linux-gnu'
+                elif mutation == 'dependency-missing': native['probes']['candidate']['headers'].pop()
+                elif mutation == 'sdk-root': native['native_identity']['platform']['metadata']['selected_roots' if system == 'Windows' else 'sdk_root'] = 'other'
+                elif mutation == 'include-root': native['environment']['INCLUDE' if system == 'Windows' else 'SDKROOT'] += '-other'
+                elif mutation == 'platform': native['native_identity']['platform']['system'] = 'Linux'
+                elif mutation == 'source-hash': native['input']['sha256'] = 'e' * 64
+                elif mutation == 'qualified': native['native_qualified'] = True
+                with self.subTest(system=system, mutation=mutation), self.assertRaises((ValueError, TypeError)):
+                    profiles.gcc_platform_recipe_metadata(row.value, row.cdb, native, row.candidate, row.labels)
+
+    def test_reader_reopens_both_bound_shapes_without_native_execution(self):
+        staged = self.staged_fixture()
+        with mock.patch.object(profiles, 'verify_ground_truth_index', return_value=staged.accepted), \
+             mock.patch.object(profiles, 'verify_reviewed_files') as objects, \
+             mock.patch.object(profiles.subprocess, 'run') as execute, \
+             mock.patch.object(profiles.urllib.request, 'urlopen') as download:
+            result = profiles.verify_gcc_platform_recipes(staged.repo)
+        self.assertEqual(result['recipe_count'], 2)
+        self.assertEqual(result['unique_source_count'], 1)
+        self.assertEqual(result['source_selection_quota_examples'], 1)
+        self.assertEqual(result['additional_quota_examples'], 0)
+        self.assertFalse(result['platform_source_labels_reviewed'])
+        self.assertEqual(objects.call_count, 4)
+        for call in (objects.call_args_list[0], objects.call_args_list[2]):
+            self.assertIn('expected_tree', call.kwargs)
+            self.assertEqual(len(call.args[2]), 8)
+        execute.assert_not_called()
+        download.assert_not_called()
+
+    def test_reader_rejects_missing_hash_alias_held_or_changed_inputs_privately(self):
+        mutations = ('missing-recipe', 'missing-native', 'native-hash', 'native-symlink', 'native-in-repo',
+                     'cdb-hash', 'candidate-hash', 'labels-hash', 'run-hash', 'run-failure', 'run-head', 'run-repository',
+                     'run-id-bool', 'run-attempt-bool', 'run-workflow', 'producer-tree', 'reference-head',
+                     'original-labels-unavailable', 'original-source-drift', 'final-native-change', 'final-record-change')
+        for mutation in mutations:
+            staged = self.staged_fixture()
+            row = staged.rows['Windows']
+            record_path = staged.repo / profiles.GCC_PLATFORM_FILES['Windows']
+            native_path = Path(row.value['native_evidence']['case']['path'])
+            if mutation == 'missing-recipe': record_path.unlink()
+            elif mutation == 'missing-native': native_path.unlink()
+            elif mutation == 'native-hash': native_path.write_bytes(b'PRIVATE_SENTINEL')
+            elif mutation == 'native-in-repo':
+                alias = staged.repo / 'native.json'
+                row.value['native_evidence']['case'].update(path=str(alias), sha256=staged.write(alias, row.native))
+            elif mutation == 'native-symlink':
+                target = native_path.with_suffix('.saved')
+                native_path.rename(target)
+                try:
+                    native_path.symlink_to(target)
+                except OSError as error:
+                    with self.subTest(mutation=mutation):
+                        self.skipTest('temporary symlink unavailable: ' + str(error))
+                    continue
+            elif mutation in ('cdb-hash', 'candidate-hash', 'labels-hash'):
+                key = {'cdb-hash': 'compilation_database', 'candidate-hash': 'candidate', 'labels-hash': 'ground_truth'}[mutation]
+                (staged.repo / row.value[key]['path']).write_bytes(b'PRIVATE_SENTINEL')
+            elif mutation == 'run-hash': Path(row.value['native_evidence']['run']['path']).write_bytes(b'PRIVATE_SENTINEL')
+            elif mutation.startswith('run-'):
+                key, replacement = {'run-failure': ('conclusion', 'failure'), 'run-head': ('head_sha', 'e' * 40),
+                                    'run-repository': ('repository', {'full_name': 'other/repo'}),
+                                    'run-id-bool': ('id', True), 'run-attempt-bool': ('run_attempt', True),
+                                    'run-workflow': ('path', '.github/workflows/ci.yml')}[mutation]
+                row.run[key] = replacement
+                row.value['native_evidence']['run']['sha256'] = staged.write(Path(row.value['native_evidence']['run']['path']), row.run)
+            elif mutation == 'original-source-drift': staged.accepted['source_sha256'] = 'e' * 64
+            if mutation != 'missing-recipe': staged.write(record_path, row.value)
+            def check_objects(repo, head, links, **kwargs):
+                if (mutation == 'producer-tree' and kwargs) or (mutation == 'reference-head' and not kwargs):
+                    raise ValueError('PRIVATE_SENTINEL')
+                if mutation == 'final-native-change': native_path.write_bytes(b'PRIVATE_SENTINEL')
+                if mutation == 'final-record-change': record_path.write_bytes(b'PRIVATE_SENTINEL')
+            with mock.patch.object(profiles, 'verify_ground_truth_index', return_value=staged.accepted,
+                                   side_effect=ValueError('PRIVATE_SENTINEL') if mutation == 'original-labels-unavailable' else None), \
+                 mock.patch.object(profiles, 'verify_reviewed_files', side_effect=check_objects), \
+                 self.subTest(mutation=mutation), self.assertRaisesRegex(ValueError, '^GCC prospective platform recipes rejected$'):
+                profiles.verify_gcc_platform_recipes(staged.repo)
+
+    def test_producer_tree_and_exact_workflow_git_blob_are_bound_without_external_grammar_relaxation(self):
+        repo = Path(__file__).resolve().parents[1]
+        head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repo, text=True).strip()
+        tree = subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], cwd=repo, text=True).strip()
+        path = '.github/workflows/product-identity.yml'
+        sha = hashlib.sha256(subprocess.check_output(['git', 'show', head + ':' + path], cwd=repo)).hexdigest()
+        profiles.verify_reviewed_files(repo, head, [{'path': path, 'sha256': sha}], expected_tree=tree)
+        for bad_tree in ('e' * 40, 'HEAD', True):
+            with self.subTest(tree=bad_tree), self.assertRaises(ValueError):
+                profiles.verify_reviewed_files(repo, head, [{'path': path, 'sha256': sha}], expected_tree=bad_tree)
+        for bad_path in ('.github/workflows/ci.yml', '.git/config', '../src/main.cpp'):
+            with self.subTest(path=bad_path), self.assertRaises(ValueError):
+                profiles.verify_reviewed_files(repo, head, [{'path': bad_path, 'sha256': sha}])
+        with self.assertRaises(ValueError):
+            profiles.external_relative(path)
+
+    def test_cli_is_private_and_rejects_external_root_override(self):
+        with tempfile.TemporaryDirectory(prefix='codeskeptic-native-cli-') as temporary:
+            root = Path(temporary).resolve()
+            for suffix in ([], ['--binding', str(root / 'PRIVATE_SENTINEL')], ['--external-root', str(root)]):
+                process = subprocess.run([sys.executable, '-B', profiles.__file__, 'platform-recipes-check',
+                                          '--root', str(root), *suffix], capture_output=True, timeout=10)
+                self.assertEqual(process.returncode, 2)
+                self.assertEqual(process.stdout, b'')
+                self.assertNotIn(b'PRIVATE_SENTINEL', process.stderr)
+
+
 class AllRuleGroundTruthTests(unittest.TestCase):
     def setUp(self):
         self.repo = Path(__file__).resolve().parents[1]
