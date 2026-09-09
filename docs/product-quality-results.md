@@ -939,3 +939,28 @@ gerçek ayrı source-review receipt'i ve indeks olmadan `ground-truth-check`
 başarılı reviewed sonuç üretemez. Etiket ve entegrasyon için bağımsız exact-head
 inceleme ayrıca gerekir. Korpus sayacı 1/1020, ek kota 0, bütün freeze/native/
 analyzer/license/distribution/product/task qualification bayrakları false kalır.
+
+### GCC all-rule source-review bağlantısı — kısmi, frozen değil
+
+Önerinin `f2b833ad3ab1541d8972b42a2be0778e2b09425d` exact-head durumunda
+ayrı kaynak hakemi gerçek kaynak, 16 aile ve üç project-diagnostic gerekçesini
+inceleyerek `ACCEPT_SOURCE_LABELS` verdi. Primary'den farklı hakemin receipt'i
+checkout dışında saklanır; `ground_truth.json` hem değişmemiş öneriyi hem de
+`c192bb63d2097f79a375028ec81717e7e2bb3d33203876b139359f9607572837`
+SHA-256 receipt'ini bağlar. Etiket önerisi receipt için yeniden yazılmaz.
+Kod/doğrulama önerisi aynı head'de ayrı bağımsız PASS aldı; indeks entegrasyonu
+bu iki incelemeden ayrı exact-head kontrol gerektirir.
+
+İndeks kontrolü gerçek dış receipt, incelenmiş Git nesneleri, kaynak/native-width
+bağı ve eski kabul/seçim zincirini birlikte yeniden açar. Eksik veya değişmiş
+bir bağlantı reviewed sonucu vermez. Kabul yalnız bir kaynağın etiketlerinindir:
+memory-leak beklentisi bir occurrence olarak korunur, diğer ailelerin etiketleri
+yeni kota oluşturmaz. Sayım 1/1020, ek örnek 0, state
+`PARTIAL_REVIEWED_SOURCE_LABELS_NOT_FROZEN` kalır; bütün qualification bayrakları
+false ve genel readiness hâlâ başarısızdır.
+
+Native kimlik workflow'una on yeni all-rule doğrulama/bozulma testi eklendi;
+mevcut 26 external-input/staging testiyle birlikte her lane 36 odaklı test seçer.
+Bu testler sentetik geçici fixture kullanır; dış kaynakları yeni örnek olarak
+kaydetmez, analyzer çalıştırmaz ve bu ekleme kendi başına yeni hosted başarı
+kanıtı değildir. Önceki native koşuların tarihî sonuçları değişmez.
