@@ -2,6 +2,7 @@
 """Synthetic manifest accounting checks; no sample or product quality claim."""
 import copy
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -803,6 +804,60 @@ class ExternalInputTests(unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertEqual(result.stderr, "PRODUCT_PROFILE_FAIL: external input binding rejected\n")
         self.assertNotIn("SOURCE_SENTINEL", result.stdout + result.stderr)
+
+
+class GccStagingTests(unittest.TestCase):
+    def test_adaptation_selects_only_frozen_lines_and_removes_instrumentation(self):
+        lines = ["synthetic line " + str(i) for i in range(1, 67)]
+        lines[7] = "static int __attribute__((noinline))"
+        lines[64] = '  return synthetic; /* { dg-message "synthetic" } */'
+        result = profiles.adapt_gcc_source(("\n".join(lines) + "\n").encode()).decode()
+        self.assertEqual(len(result.splitlines()), 28)
+        self.assertIn("static int\nsynthetic line 9", result)
+        self.assertNotIn("noinline", result.split("*/", 1)[1])
+        self.assertNotIn("synthetic line 59", result)
+        self.assertNotIn("synthetic line 63", result)
+        self.assertNotIn("synthetic line 33", result)
+        self.assertTrue(result.endswith("  return synthetic;\nsynthetic line 66\n"))
+
+    def test_adaptation_rejects_changed_structure_or_non_utf8(self):
+        for payload in (b"short", b"\xff", b"unselected\n" * 66):
+            with self.subTest(payload=payload[:10]), self.assertRaises(ValueError):
+                profiles.adapt_gcc_source(payload)
+
+    def test_download_is_bounded_hash_checked_and_never_follows_redirects(self):
+        row = {"size_bytes": 3, "sha256": hashlib.sha256(b"abc").hexdigest()}
+        def response(payload):
+            stream = io.BytesIO(payload)
+            stream.status = 200
+            return stream
+        with mock.patch.object(profiles.urllib.request, "build_opener") as builder:
+            opener = builder.return_value
+            opener.open.return_value = response(b"abc")
+            self.assertEqual(profiles.fetch_gcc_input("notices/COPYING3", row), b"abc")
+            handler = builder.call_args.args[0]
+            self.assertIsNone(handler.redirect_request(None, None, 302, "redirect", {}, "https://elsewhere.invalid"))
+            argv = opener.open.call_args
+            self.assertEqual(argv.kwargs, {"timeout": 30})
+            self.assertEqual(argv.args[0], "https://raw.githubusercontent.com/gcc-mirror/gcc/5115c7e447fc07457443df874bf57840e8316d5f/COPYING3")
+            for payload in (b"ab", b"abcd", b"xyz"):
+                opener.open.return_value = response(payload)
+                with self.subTest(payload=payload), self.assertRaises(ValueError):
+                    profiles.fetch_gcc_input("notices/COPYING3", row)
+            with self.assertRaises(ValueError):
+                profiles.fetch_gcc_input("unapproved-source", row)
+
+    def test_stage_refuses_existing_or_checkout_destination_before_network(self):
+        root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory(prefix="codeskeptic-gcc-stage-") as directory:
+            existing = Path(directory).resolve()
+            marker = existing / "preserve"
+            marker.write_bytes(b"original")
+            with mock.patch.object(profiles.urllib.request, "build_opener", side_effect=AssertionError("no download")):
+                for destination in (existing, root / "uncreated-case-stage", Path("relative")):
+                    with self.subTest(destination=destination), self.assertRaises(ValueError):
+                        profiles.stage_gcc_inputs(root, destination)
+            self.assertEqual(marker.read_bytes(), b"original")
 
 
 if __name__ == "__main__":

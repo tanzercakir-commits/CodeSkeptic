@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Read-only prospective product-profile accounting, never a quality verdict.
+"""Prospective product-profile accounting, never a quality verdict.
 
 Quota arithmetic authenticates neither source provenance nor semantic sample
 independence. Exact source/label review, content hashing and complete corpus
-selection remain separate gates. No download, execution, rebaseline or pin
-refresh is performed here.
+selection remain separate gates. Checks are read-only. Only the explicit
+stage-gcc-inputs command downloads four pinned ordinary GCC inputs into a new
+external directory. No execution, rebaseline or pin refresh is performed here.
 """
 import argparse
 from collections import Counter
@@ -16,6 +17,7 @@ from pathlib import Path, PurePosixPath
 import re
 import stat
 import sys
+import urllib.request
 
 from product_quality import FAMILIES, fields, nonempty, require
 
@@ -368,6 +370,82 @@ def verify_external_inputs(binding_path, repo, source_root):
         raise ValueError("external input binding rejected") from None
 
 
+GCC_BINDING = "tests/product_corpus/candidates/gcc-mixed-storage-binding.json"
+GCC_REVISION = "5115c7e447fc07457443df874bf57840e8316d5f"
+GCC_INPUTS = {
+    "origin/malloc-vs-local-3.c": "gcc/testsuite/c-c++-common/analyzer/malloc-vs-local-3.c",
+    "lineage/malloc-vs-local-2.c": "gcc/testsuite/c-c++-common/analyzer/malloc-vs-local-2.c",
+    "notices/COPYING3": "COPYING3",
+    "notices/README": "gcc/testsuite/README",
+}
+
+
+def adapt_gcc_source(raw):
+    """Replay the reviewed line selection; the caller binds input/output hashes."""
+    lines = raw.decode("utf-8").splitlines()
+    require(len(lines) == 66 and lines[7] == "static int __attribute__((noinline))"
+            and ' /* { dg-message' in lines[64], "GCC adaptation structure changed")
+    prefix = ["/* Standalone adaptation of GCC malloc-vs-local-3.c: helper and test_2.",
+              "   GCC revision: " + GCC_REVISION + " (15.2.0).",
+              "   Removed diagnostic instrumentation, unrelated cases, and noinline attribute.",
+              "   Standard-library declarations come from the native stdlib.h.",
+              "   Candidate only: source label, independence, licensing and freeze pending. */"]
+    selected = [lines[2], "", "static int", *lines[8:12], "", *lines[47:58],
+                *lines[60:62], lines[64].split(' /* { dg-message', 1)[0], lines[65]]
+    return ("\n".join(prefix + selected) + "\n").encode("utf-8")
+
+
+def fetch_gcc_input(relative, row):
+    """Explicit, size/hash-bound fetch from one revision; never follow redirects."""
+    require(relative in GCC_INPUTS and type(row["size_bytes"]) is int
+            and 0 < row["size_bytes"] <= 16 * 1024 * 1024, "GCC input selection/size")
+    external_digest(row["sha256"])
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+    url = "https://raw.githubusercontent.com/gcc-mirror/gcc/" + GCC_REVISION + "/" + GCC_INPUTS[relative]
+    with urllib.request.build_opener(NoRedirect()).open(url, timeout=30) as response:
+        require(response.status == 200, "GCC input HTTP status")
+        raw = response.read(row["size_bytes"] + 1)
+    require(len(raw) == row["size_bytes"] and hashlib.sha256(raw).hexdigest() == row["sha256"],
+            "GCC input bytes changed")
+    return raw
+
+
+def stage_gcc_inputs(repo, destination):
+    """Materialize only the reviewed candidate, lineage and notices outside Git.
+
+    All upstream bytes are checked before creating the new destination. Failure
+    after creation may leave that owned partial directory; nothing is overwritten
+    or recursively removed. Staging does not resolve the pending rights gate.
+    """
+    try:
+        repo, destination = Path(repo), Path(destination)
+        require(repo.is_absolute() and repo.resolve(strict=True) == repo and repo.is_dir(), "GCC checkout root")
+        require(destination.is_absolute() and destination.parent.resolve(strict=True) == destination.parent
+                and destination.parent.is_dir() and not destination.exists() and not destination.is_symlink()
+                and repo != destination and repo not in destination.parents and destination not in repo.parents,
+                "GCC staging destination must be new and external")
+        binding = read_json(repo / GCC_BINDING)
+        rows = binding["inputs"]
+        require(type(rows) is list and len(rows) == 5
+                and {row["path"] for row in rows} == set(GCC_INPUTS) | {"case.c"}, "GCC input closure changed")
+        payloads = {row["path"]: fetch_gcc_input(row["path"], row) for row in rows if row["path"] != "case.c"}
+        payloads["case.c"] = adapt_gcc_source(payloads["origin/malloc-vs-local-3.c"])
+        for row in rows:
+            require(len(payloads[row["path"]]) == row["size_bytes"]
+                    and hashlib.sha256(payloads[row["path"]]).hexdigest() == row["sha256"], "GCC staged bytes differ")
+        destination.mkdir()
+        for name, payload in payloads.items():
+            path = destination / external_relative(name)
+            path.parent.mkdir(exist_ok=True)
+            with path.open("xb") as stream:
+                stream.write(payload)
+        return verify_external_inputs(repo / GCC_BINDING, repo, destination)
+    except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError):
+        raise ValueError("GCC staging rejected; a newly created partial destination may remain") from None
+
+
 def verify_historical(index, repo, frozen):
     """Reconcile the preserved index with original reports, reviews and sources.
 
@@ -697,7 +775,7 @@ def draft_readiness(manifest):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check"))
+    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--historical-sources", type=Path, default=Path(
         "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S04-U001/corpus-diagnostic-comparison"))
@@ -705,7 +783,10 @@ def main():
     parser.add_argument("--external-root", type=Path, help="explicit external snapshot root (absolute canonical path)")
     args = parser.parse_args()
     try:
-        if args.command == "external-source-check":
+        if args.command == "stage-gcc-inputs":
+            require(args.binding is None, "GCC staging uses its fixed tracked binding")
+            result = stage_gcc_inputs(args.root, args.external_root)
+        elif args.command == "external-source-check":
             result = verify_external_inputs(args.binding, args.root, args.external_root)
         elif args.command == "limits":
             result = {"limits": validate_limits(LIMITS), "measured": False,

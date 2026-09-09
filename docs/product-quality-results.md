@@ -370,3 +370,27 @@ Image içi header/driver byte kayıtları observer metadata'sıdır; bağımsız
 bunları image içinde yeniden açmış gibi sunulmaz. Önceki Fedora ve hosted include
 gözlemleriyle bu yeni Linux per-case kanıtı birbirinin yerine geçirilmez.
 Kabul edilmiş kota **0/1020**; U003 için completion receipt veya POP yoktur.
+
+### Windows/macOS per-case kanıtı için açık hazırlama yolu
+
+`stage-gcc-inputs` yalnız açık çağrıda, sabit GCC `5115c7e…` revizyonundaki dört
+ordinary kaynak/notice dosyasını indirir. Redirect kabul etmez; sonlu boyut ve
+exact hash doğrulamasından sonra yeni bir dış dizine yazar. Mevcut dizin veya
+checkout hedefi reddedilir; başarısız kısmi çıktı otomatik silinmez. İncelenmiş
+satır-seçim uyarlaması aynı 636 byte'lık adayı üretir. Gerçek staging beş dosyanın
+43.256 byte'lık closure'ını doğruladı; kaynak kodu Git'e eklenmedi.
+
+Yeni opt-in `capture-case` / `check-case`, eski include-only v1 belgesinden ayrı
+şema kullanır. Exact-clean HEAD/helper/binding/adjudication kimliklerine aday
+C17 komutunu, ABI probe'unu, iki kontrollü yanlış ABI ret denemesini ve gerçek
+dependency hashlerini bağlar. Compiler tanıları source/SDK metni içerebildiğinden
+yalnız byte sayısı/hashleri ve sabit negatif marker kaydedilir. Child environment
+allowlist'tir; credential ve ambient compiler/include override'ları taşınmaz.
+
+macOS case lane'i açık standalone CLT compiler/SDK ve arm64 macOS 14 hedefi seçer;
+eski Xcode gözlemi yeniden etiketlenmez. Windows aynı vcvars64 seçimini, x64 MSVC
+target'ını ve seçili VC/UCRT INCLUDE/header alt ağaçlarını bağlar. Yapısal safe/ret
+testleri gerçek native çalışmanın yerine geçmez: yeni hosted sonuçlar henüz yoktur.
+Bu hazırlık kaynak lisansını, runtime ABI'yi veya nihai LLVM-20 frontend modelini
+tamamlamaz; `native_qualified/license_qualified/task_ready/product_qualified=false`,
+kota **0/1020**, FRONT U003 ve bütün gerçek tamamlanma kapıları değişmeden kalır.

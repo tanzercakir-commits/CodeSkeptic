@@ -7,6 +7,7 @@ It uses installed tools only. Native SDK/header content is hashed, not exported.
 The fixed Clang -M probes preprocess declarations; they emit no object or executable.
 """
 import argparse
+from contextlib import contextmanager
 import hashlib
 import json
 import os
@@ -17,6 +18,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 
 
 MAX_OUTPUT = 2 * 1024 * 1024
@@ -497,37 +499,327 @@ def capture(args):
     return value
 
 
+CASE_SHA = '5c5563b8ed6e5715cb1913e223276146bc4c8799c11ee4dace55cf6e8a5e4b0a'
+CASE_CLT = '/Library/Developer/CommandLineTools'
+CASE_TARGETS = {'Linux': 'x86_64-unknown-linux-gnu', 'Windows': 'x86_64-pc-windows-msvc',
+                'Darwin': 'arm64-apple-macos14.0'}
+CASE_ENV_KEYS = (*ENV_KEYS, 'PATH', 'SystemRoot', 'SystemDrive', 'WINDIR', 'COMSPEC',
+                 'TEMP', 'TMP', 'TMPDIR', 'ProgramFiles', 'ProgramFiles(x86)', 'LANG', 'LC_ALL', 'VSLANG')
+CASE_SOURCE_FILES = ('scripts/product_profiles.py', 'scripts/product_quality.py',
+                     'tests/product_corpus/candidates/gcc-mixed-storage-binding.json',
+                     'tests/product_corpus/candidates/gcc-mixed-storage-selection.json')
+
+
+def case_environment(environment, system):
+    """Only this opt-in capture uses a minimal environment, never ambient secrets."""
+    require(system in CASE_TARGETS, 'case platform')
+    if system == 'Windows':
+        folded = {}
+        for key, value in environment.items():
+            require(key.upper() not in folded or folded[key.upper()] == value, 'conflicting environment keys')
+            folded[key.upper()] = value
+        environment = {key: folded[key.upper()] for key in (*CASE_ENV_KEYS, *FORBIDDEN_ENV,
+                       'LIBRARY_PATH', 'LD_PRELOAD', 'DYLD_INSERT_LIBRARIES', 'DYLD_LIBRARY_PATH') if key.upper() in folded}
+    checked_environment(environment)
+    require(not any(environment.get(key) for key in
+                    ('LIBRARY_PATH', 'LD_PRELOAD', 'DYLD_INSERT_LIBRARIES', 'DYLD_LIBRARY_PATH')),
+            'case loader/library override')
+    result = {key: environment[key] for key in CASE_ENV_KEYS if key in environment}
+    result.update(LANG='C', LC_ALL='C', VSLANG='1033')
+    return result
+
+
+@contextmanager
+def selected_case_environment(environment):
+    # This CLI is single-threaded. Restore the caller even when a probe fails.
+    previous = dict(os.environ)
+    try:
+        os.environ.clear()
+        os.environ.update(environment)
+        yield
+    finally:
+        os.environ.clear()
+        os.environ.update(previous)
+
+
+def case_abi_sources():
+    source = ('#include <limits.h>\n#include <stdlib.h>\n'
+              '_Static_assert(CHAR_BIT == 8, "selected byte width");\n'
+              '_Static_assert(sizeof(int) == 4, "selected int width");\n'
+              '_Static_assert(sizeof(size_t) == 8, "selected size width");\n'
+              '_Static_assert(sizeof(void *) == 8, "selected pointer width");\n'
+              '_Static_assert(_Generic(&malloc, void *(*)(size_t): 1, default: 0), "selected malloc declaration");\n')
+    return {'abi': source, 'bad-width': source.replace('sizeof(int) == 4', 'sizeof(int) == 8'),
+            'bad-signature': source.replace('void *(*)(size_t)', 'int *(*)(size_t)')}
+
+
+def case_command(native, source, dependencies=False):
+    system = native['platform']['system']
+    tool = native['tools']['clang']
+    argv = [tool['file']['path'], '--no-default-config', '-fno-modules',
+            '-resource-dir', tool['resource_dir'], '-x', 'c', '-std=c17', '--target=' + CASE_TARGETS[system]]
+    if system == 'Darwin':
+        argv += ['-isysroot', native['platform']['metadata']['sdk_root']]
+    return argv + (['-M', '-MT', 'identity-probe'] if dependencies else ['-fsyntax-only']) + [source]
+
+
+def validate_case_selection(native, environment):
+    """Bind the effective case selection; legacy v1 remains observational."""
+    validate_document(native)
+    host, tools = native['platform'], native['tools']
+    system, metadata = host['system'], host['metadata']
+    require(type(environment) is dict and all(type(value) is str for value in environment.values())
+            and case_environment(environment, system) == environment
+            and observed_environment(environment) == host['environment'], 'case child environment mismatch')
+    require(host['machine'].lower() in ({'arm64', 'aarch64'} if system == 'Darwin' else {'x86_64', 'amd64'}),
+            'case native architecture')
+    path_type = PureWindowsPath if system == 'Windows' else PurePosixPath
+    tool = tools['clang']
+    require(('clang version ' in tool['version']['stdout']) and
+            (tool['target'].startswith(('arm64-apple-', 'aarch64-apple-')) if system == 'Darwin'
+             else re.fullmatch(r'x86_64-[a-z0-9_-]*linux-gnu', tool['target']) if system == 'Linux'
+             else tool['target'] == CASE_TARGETS[system]), 'case native compiler target')
+    resource = path_type(tool['resource_dir'])
+    require('..' not in resource.parts, 'case resource path')
+    if system == 'Darwin':
+        developer, sdk = PurePosixPath(CASE_CLT), PurePosixPath(metadata['sdk_root'])
+        require(environment.get('DEVELOPER_DIR') == CASE_CLT
+                and environment.get('SDKROOT') == str(sdk)
+                and environment.get('MACOSX_DEPLOYMENT_TARGET') == '14.0'
+                and metadata['developer_directory']['stdout'].strip() == CASE_CLT
+                and metadata['xcode_version'] is None and metadata['clt_package']['exit_code'] == 0
+                and nonempty(metadata['clt_package']['stdout'])
+                and sdk.is_relative_to(developer / 'SDKs') and resource.is_relative_to(developer / 'usr/lib/clang')
+                and PurePosixPath(metadata['sdk_settings']['resolved_path']).parent.is_relative_to(developer / 'SDKs')
+                and PurePosixPath(metadata['sdk_settings']['resolved_path']).name in ('SDKSettings.json', 'SDKSettings.plist'),
+                'case requires explicit standalone CLT SDK selection')
+        for role, selected in tools.items():
+            expected = developer / 'usr/bin' / ('clang++' if role in ('cxx', 'clangxx') else 'clang')
+            require(PurePosixPath(selected['file']['path']) == expected
+                    and PurePosixPath(selected['file']['resolved_path']).is_relative_to(developer / 'usr/bin'),
+                    'case compiler is not the selected standalone CLT')
+    else:
+        require(not any(environment.get(key) for key in ('SDKROOT', 'DEVELOPER_DIR', 'MACOSX_DEPLOYMENT_TARGET')),
+                'foreign case SDK environment')
+    if system == 'Windows':
+        roots, versions = metadata['selected_roots'], metadata['versions']
+        vc = PureWindowsPath(roots['VCToolsInstallDir'])
+        sdk = PureWindowsPath(roots['WindowsSdkDir']) / 'Include' / versions['WindowsSDKVersion']
+        ucrt = PureWindowsPath(roots['UniversalCRTSdkDir']) / 'Include' / versions['UCRTVersion']
+        includes = [PureWindowsPath(path) for path in environment['INCLUDE'].split(';') if path]
+        require(includes and len(includes) == len(set(includes))
+                and vc.name == versions['VCToolsVersion']
+                and vc.is_relative_to(PureWindowsPath(metadata['installation']['installationPath']))
+                and vc / 'include' in includes and ucrt / 'ucrt' in includes
+                and all(path.is_absolute() and '..' not in path.parts
+                        and any(path.is_relative_to(root) for root in (vc / 'include', vc / 'atlmfc/include', sdk, ucrt))
+                        for path in includes), 'case include roots/toolset selection mismatch')
+
+
+def case_record(command, marker=None):
+    """Do not export compiler diagnostics, which can quote source or SDK bytes."""
+    require(command['exit_code'] == (1 if marker else 0) and command['stdout'] == ''
+            and (('static assertion failed' in command['stderr'] and marker in command['stderr'])
+                 if marker else command['stderr'] == ''), 'case syntax/negative probe failed')
+    return {'argv': command['argv'], 'exit_code': command['exit_code'], 'expected_negative_marker': marker,
+            **{key: {'bytes': len(command[key].encode()), 'sha256': hashlib.sha256(command[key].encode()).hexdigest()}
+               for key in ('stdout', 'stderr')}}
+
+
+def validate_case_document(value):
+    fields(value, 'schema native_identity environment source_files binding input probes '
+           'syntax_checked native_qualified license_qualified independent_quota_examples task_ready product_qualified', 'case')
+    require(value['schema'] == 'codeskeptic-native-case-observation/v1' and value['syntax_checked'] is True
+            and all(value[key] is False for key in ('native_qualified', 'license_qualified', 'task_ready', 'product_qualified'))
+            and type(value['independent_quota_examples']) is int and value['independent_quota_examples'] == 0,
+            'case observation cannot qualify the product or corpus')
+    native = value['native_identity']
+    validate_case_selection(native, value['environment'])
+    system = native['platform']['system']
+    flavor = 'windows' if system == 'Windows' else 'posix'
+    path_type = PureWindowsPath if system == 'Windows' else PurePosixPath
+    fields(value['source_files'], ' '.join(CASE_SOURCE_FILES), 'case source files')
+    require(all(digest(sha) for sha in value['source_files'].values()), 'case helper digests')
+    binding = value['binding']
+    fields(binding, 'schema id binding_sha256 adjudication_sha256 source_bytes_verified verified_inputs verified_bytes '
+           'independent_quota_examples task_ready product_qualified native_commands_bound license_qualified state', 'case binding')
+    require(binding['schema'] == 'codeskeptic-product-external-input-check/v1'
+            and binding['id'] == 'gcc-mixed-storage-local-loss'
+            and binding['state'] == 'SOURCE_BINDING_ONLY_NOT_FROZEN' and binding['source_bytes_verified'] is True
+            and type(binding['verified_inputs']) is int and binding['verified_inputs'] == 5
+            and type(binding['verified_bytes']) is int and binding['verified_bytes'] == 43256
+            and type(binding['independent_quota_examples']) is int and binding['independent_quota_examples'] == 0
+            and all(binding[key] is False for key in ('task_ready', 'product_qualified', 'native_commands_bound', 'license_qualified'))
+            and binding['binding_sha256'] == value['source_files'][CASE_SOURCE_FILES[2]]
+            and binding['adjudication_sha256'] == value['source_files'][CASE_SOURCE_FILES[3]], 'case source binding')
+    validate_file(value['input'], flavor)
+    require(value['input']['sha256'] == CASE_SHA and value['input']['bytes'] == 636
+            and path_type(value['input']['path']).name == 'case.c', 'reviewed case input')
+    fields(value['probes'], 'candidate abi bad-width bad-signature', 'case probes')
+    identities = [value['input'], *[tool['file'] for tool in native['tools'].values()],
+                  *[header for probe in native['probes'].values() for header in probe['headers']]]
+    for name, probe in value['probes'].items():
+        fields(probe, 'source_sha256 command dependencies headers', 'case probe')
+        command = probe['command']
+        fields(command, 'argv exit_code expected_negative_marker stdout stderr', 'case command')
+        require(type(command['argv']) is list and command['argv']
+                and path_type(command['argv'][-1]).is_absolute(), 'case source path')
+        source_path = command['argv'][-1]
+        expected_sha = CASE_SHA if name == 'candidate' else hashlib.sha256(case_abi_sources()[name].encode()).hexdigest()
+        marker = {'bad-width': 'selected int width', 'bad-signature': 'selected malloc declaration'}.get(name)
+        require(command['argv'] == case_command(native, source_path) and probe['source_sha256'] == expected_sha
+                and (source_path == value['input']['path'] if name == 'candidate' else path_type(source_path).name == name + '.c')
+                and type(command['exit_code']) is int and command['exit_code'] == (1 if marker else 0)
+                and command['expected_negative_marker'] == marker, 'case probe recipe/result')
+        for key in ('stdout', 'stderr'):
+            item = command[key]
+            fields(item, 'bytes sha256', 'case stream')
+            require(type(item['bytes']) is int and 0 <= item['bytes'] <= MAX_OUTPUT
+                    and digest(item['sha256']), 'case stream metadata')
+            require((item['bytes'] > 0 and item['sha256'] != hashlib.sha256(b'').hexdigest())
+                    if marker and key == 'stderr' else
+                    item == {'bytes': 0, 'sha256': hashlib.sha256(b'').hexdigest()}, 'case unexpected stream')
+        if marker:
+            require(probe['dependencies'] is None and probe['headers'] == [], 'negative probe dependencies')
+            continue
+        dependency = probe['dependencies']
+        validate_command(dependency)
+        require(dependency['argv'] == case_command(native, source_path, dependencies=True)
+                and dependency['stderr'] == '', 'case dependency command')
+        paths = dependency_paths(dependency['stdout'], flavor)
+        require(type(probe['headers']) is list and len(paths) == len(probe['headers'])
+                and paths[0] == source_path, 'case dependency closure')
+        for record, path in zip(probe['headers'], paths):
+            validate_file(record, flavor)
+            require(path_type(record['path']) == path_type(path), 'case dependency path')
+        require(probe['headers'][0]['sha256'] == expected_sha
+                and sum(row['bytes'] for row in probe['headers']) <= MAX_HEADER_BYTES, 'case dependency bytes')
+        identities.extend(probe['headers'])
+        header_paths = [path_type(row['resolved_path']) for row in probe['headers'][1:]]
+        resource = path_type(native['tools']['clang']['resource_dir']) / 'include'
+        if system == 'Darwin':
+            sdk = path_type(native['platform']['metadata']['sdk_settings']['resolved_path']).parent
+            require(any(path == sdk / 'usr/include/stdlib.h' for path in header_paths)
+                    and all(path.is_relative_to(sdk) or path.is_relative_to(resource) for path in header_paths),
+                    'case headers escaped selected CLT/SDK')
+        elif system == 'Windows':
+            metadata = native['platform']['metadata']
+            roots, versions = metadata['selected_roots'], metadata['versions']
+            ucrt = path_type(roots['UniversalCRTSdkDir']) / 'Include' / versions['UCRTVersion'] / 'ucrt'
+            admitted = [path_type(path) for path in value['environment']['INCLUDE'].split(';') if path] + [resource]
+            require(ucrt / 'stdlib.h' in header_paths and all(any(path.is_relative_to(root) for root in admitted)
+                    for path in header_paths), 'case headers escaped selected Windows SDK')
+    bindings = {}
+    for record in identities:
+        path, resolved = path_type(record['path']), path_type(record['resolved_path'])
+        require('..' not in resolved.parts, 'case noncanonical resolved input')
+        entry = (resolved, record['bytes'], record['sha256'])
+        for key in (path, resolved):
+            require(key not in bindings or bindings[key] == entry, 'case input identity disagreement')
+            bindings[key] = entry
+    return {'syntax_checked': True, 'local_native_bytes_verified': False, 'native_qualified': False,
+            'license_qualified': False, 'independent_quota_examples': 0, 'task_ready': False, 'product_qualified': False}
+
+
+def capture_case(args):
+    import product_profiles as profiles
+    root = args.root.resolve(strict=True)
+    require(Path(profiles.__file__).resolve() == root / CASE_SOURCE_FILES[0], 'case materializer source')
+    environment = case_environment(os.environ, platform.system())
+    with selected_case_environment(environment):
+        native = capture(args)
+        validate_case_selection(native, environment)
+        source_files = {}
+        for relative in CASE_SOURCE_FILES:
+            actual = file_identity(root / relative)
+            committed = run(['git', 'cat-file', 'blob', args.source_sha + ':' + relative], cwd=root)['stdout']
+            require(actual['sha256'] == hashlib.sha256(committed.encode()).hexdigest(), 'case helper differs from commit')
+            source_files[relative] = actual['sha256']
+        binding = profiles.verify_external_inputs(root / profiles.GCC_BINDING, root, args.external_root)
+        candidate = file_identity(args.external_root / 'case.c')
+        require(candidate['sha256'] == CASE_SHA and candidate['bytes'] == 636, 'case source selection')
+        probes = {}
+        with tempfile.TemporaryDirectory(prefix='codeskeptic-case-', dir=args.output.parent) as directory:
+            temporary = Path(directory).resolve(strict=True)
+            for name, source in case_abi_sources().items():
+                with (temporary / (name + '.c')).open('x', encoding='utf-8', newline='\n') as stream:
+                    stream.write(source)
+            paths = {'candidate': Path(candidate['path']), **{name: temporary / (name + '.c') for name in case_abi_sources()}}
+            for name, path in paths.items():
+                marker = {'bad-width': 'selected int width', 'bad-signature': 'selected malloc declaration'}.get(name)
+                command = run(case_command(native, str(path)), allowed=(1,) if marker else (0,))
+                dependency = None if marker else run(case_command(native, str(path), dependencies=True))
+                headers, total = [], 0
+                if dependency:
+                    for dependency_path in dependency_paths(dependency['stdout'], 'windows' if platform.system() == 'Windows' else 'posix'):
+                        item = file_identity(Path(dependency_path), maximum=MAX_HEADER_BYTES - total)
+                        total += item['bytes']
+                        headers.append(item)
+                probes[name] = {'source_sha256': file_identity(path)['sha256'], 'command': case_record(command, marker),
+                                'dependencies': dependency, 'headers': headers}
+            value = {'schema': 'codeskeptic-native-case-observation/v1', 'native_identity': native,
+                     'environment': environment, 'source_files': source_files, 'binding': binding,
+                     'input': candidate, 'probes': probes, 'syntax_checked': True,
+                     'native_qualified': False, 'license_qualified': False, 'independent_quota_examples': 0,
+                     'task_ready': False, 'product_qualified': False}
+            validate_case_document(value)
+            for record in ([tool['file'] for tool in native['tools'].values()]
+                           + [row for probe in native['probes'].values() for row in probe['headers']]
+                           + [row for probe in probes.values() for row in probe['headers']]):
+                require(file_identity(Path(record['path'])) == record, 'case native input changed')
+            require(profiles.verify_external_inputs(root / profiles.GCC_BINDING, root, args.external_root) == binding
+                    and native_metadata(platform.system()) == native['platform']['metadata']
+                    and source_identity(root, args.source_sha) == native['source']
+                    and all(file_identity(root / relative)['sha256'] == sha for relative, sha in source_files.items()),
+                    'case final input/source identity changed')
+        return value
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     check = commands.add_parser('check', help='structural metadata check, not native byte verification')
     check.add_argument('input', type=Path)
+    case_check = commands.add_parser('check-case', help='structural case metadata check, not remote attestation')
+    case_check.add_argument('input', type=Path)
     collect = commands.add_parser('capture', help='installed-tool metadata only; writes one new external JSON')
     collect.add_argument('--root', type=Path, required=True)
     collect.add_argument('--source-sha', required=True)
     for role in TOOL_ROLES:
         collect.add_argument('--' + role, type=Path, required=True)
     collect.add_argument('--output', type=Path, required=True)
+    case_collect = commands.add_parser('capture-case', help='opt-in pinned case syntax/ABI checks; new metadata JSON only')
+    case_collect.add_argument('--root', type=Path, required=True)
+    case_collect.add_argument('--source-sha', required=True)
+    case_collect.add_argument('--external-root', type=Path, required=True)
+    case_collect.add_argument('--output', type=Path, required=True)
+    for role in TOOL_ROLES:
+        case_collect.add_argument('--' + role, type=Path, required=True)
     args = parser.parse_args(argv)
     try:
-        if args.command == 'check':
+        validator = validate_case_document if args.command in ('check-case', 'capture-case') else validate_document
+        if args.command in ('check', 'check-case'):
             require(not args.input.is_symlink() and args.input.resolve() == args.input
                     and args.input.is_file() and args.input.stat().st_size <= 16 * MAX_OUTPUT,
                     'metadata input must be a bounded absolute regular file')
-            result = validate_document(json.loads(args.input.read_text(encoding='utf-8')))
+            if args.command == 'check-case':
+                from product_profiles import parse_json
+                result = validator(parse_json(args.input.read_text(encoding='utf-8')))
+            else:
+                result = validator(json.loads(args.input.read_text(encoding='utf-8')))
         else:
             root = args.root.resolve(strict=True)
             require(args.output.is_absolute() and args.output.parent.resolve(strict=True) == args.output.parent
                     and not args.output.exists() and not args.output.is_symlink()
                     and not args.output.is_relative_to(root), 'output must be new and outside the checkout')
-            value = capture(args)
+            value = capture_case(args) if args.command == 'capture-case' else capture(args)
             with args.output.open('x', encoding='utf-8', newline='\n') as stream:
                 stream.write(canonical(value))
-            result = {**validate_document(value), 'output_sha256': file_identity(args.output)['sha256']}
+            result = {**validator(value), 'output_sha256': file_identity(args.output)['sha256']}
         print(canonical(result), end='')
         return 0
     except (IdentityError, OSError, ValueError, KeyError, TypeError, RuntimeError) as error:
-        print('IDENTITY_INVALID ' + str(error), file=sys.stderr)
+        print('IDENTITY_INVALID ' + ('case observation rejected' if args.command in ('check-case', 'capture-case') else str(error)), file=sys.stderr)
         return 2
 
 

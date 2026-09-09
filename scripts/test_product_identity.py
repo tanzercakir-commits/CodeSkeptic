@@ -555,6 +555,212 @@ class DocumentTests(unittest.TestCase):
             self.assertIn(b'observation must not claim native/product qualification', result.stderr)
 
 
+class CaseCaptureTests(unittest.TestCase):
+    def case_document(self, system):
+        fixture = DocumentTests()
+        fixture.setUp()
+        native = fixture.native_document(system) if system != 'Linux' else copy.deepcopy(fixture.document)
+        host, tools = native['platform'], native['tools']
+        if system == 'Darwin':
+            sdk = identity.CASE_CLT + '/SDKs/MacOSX14.5.sdk'
+            metadata = host['metadata']
+            metadata['developer_directory']['stdout'] = identity.CASE_CLT
+            metadata['xcode_version'] = None
+            metadata['sdk_path_query']['stdout'] = metadata['sdk_root'] = sdk
+            metadata['sdk_settings'].update(path=sdk + '/SDKSettings.json', resolved_path=sdk + '/SDKSettings.json')
+            host['environment'] = {'DEVELOPER_DIR': identity.CASE_CLT, 'SDKROOT': sdk, 'MACOSX_DEPLOYMENT_TARGET': '14.0'}
+            for role, tool in tools.items():
+                path = identity.CASE_CLT + '/usr/bin/' + ('clang++' if role in ('cxx', 'clangxx') else 'clang')
+                tool['file'].update(path=path, resolved_path=path)
+                tool['version'].update(argv=[path, '--version'], stdout='Apple clang version 16.0.0')
+                tool['target'] = 'arm64-apple-darwin23.6.0'
+                if role in ('clang', 'clangxx'):
+                    tool['resource_dir'] = identity.CASE_CLT + '/usr/lib/clang/16'
+            header_path = sdk + '/usr/include/stdlib.h'
+            for language, probe in native['probes'].items():
+                role = 'clang' if language == 'c' else 'clangxx'
+                probe['command'].update(argv=identity.probe_command(tools[role]['file']['path'], language, system, sdk)[0],
+                                        stdout='identity-probe: ' + header_path + '\n')
+                probe['headers'][0].update(path=header_path, resolved_path=header_path)
+        elif system == 'Windows':
+            header_path = 'C:/SDK/Include/10.0.1.0/ucrt/stdlib.h'
+        else:
+            tools['clang']['version']['stdout'] = 'clang version 22.1.0'
+            header_path = '/sdk/stdlib.h'
+        environment = identity.case_environment({**host['environment'], 'PATH': 'C:/bin' if system == 'Windows' else '/bin'}, system)
+        host['environment'] = identity.observed_environment(environment)
+        root = 'C:/case-stage' if system == 'Windows' else '/case-stage'
+        probe_root = 'C:/probe-temp' if system == 'Windows' else '/probe-temp'
+        input_file = {'path': root + '/case.c', 'resolved_path': root + '/case.c', 'bytes': 636, 'sha256': identity.CASE_SHA}
+        value = {'schema': 'codeskeptic-native-case-observation/v1', 'native_identity': native, 'environment': environment,
+                 'source_files': {name: 'a' * 64 for name in identity.CASE_SOURCE_FILES},
+                 'binding': {'schema': 'codeskeptic-product-external-input-check/v1', 'id': 'gcc-mixed-storage-local-loss',
+                             'binding_sha256': 'a' * 64, 'adjudication_sha256': 'a' * 64, 'source_bytes_verified': True,
+                             'verified_inputs': 5, 'verified_bytes': 43256, 'independent_quota_examples': 0,
+                             'task_ready': False, 'product_qualified': False, 'native_commands_bound': False,
+                             'license_qualified': False, 'state': 'SOURCE_BINDING_ONLY_NOT_FROZEN'},
+                 'input': input_file, 'probes': {}, 'syntax_checked': True, 'native_qualified': False,
+                 'license_qualified': False, 'independent_quota_examples': 0, 'task_ready': False, 'product_qualified': False}
+        for name in ('candidate', 'abi', 'bad-width', 'bad-signature'):
+            path = input_file['path'] if name == 'candidate' else probe_root + '/' + name + '.c'
+            source = None if name == 'candidate' else identity.case_abi_sources()[name].encode()
+            source_file = input_file if source is None else {'path': path, 'resolved_path': path, 'bytes': len(source),
+                                                           'sha256': hashlib.sha256(source).hexdigest()}
+            marker = {'bad-width': 'selected int width', 'bad-signature': 'selected malloc declaration'}.get(name)
+            command = {'argv': identity.case_command(native, path), 'exit_code': 1 if marker else 0, 'stdout': '',
+                       'stderr': 'static assertion failed: ' + marker if marker else ''}
+            headers = [] if marker else [copy.deepcopy(source_file), {'path': header_path, 'resolved_path': header_path,
+                                                                     'bytes': 4, 'sha256': 'd' * 64}]
+            dependency = None if marker else {'argv': identity.case_command(native, path, dependencies=True), 'exit_code': 0,
+                                              'stdout': 'identity-probe: ' + path + ' ' + header_path + '\n', 'stderr': ''}
+            value['probes'][name] = {'source_sha256': source_file['sha256'], 'command': identity.case_record(command, marker),
+                                    'dependencies': dependency, 'headers': headers}
+        identity.validate_case_document(value)
+        return value
+
+    def test_case_environment_drops_credentials_and_blocks_overrides(self):
+        selected = identity.case_environment({'PATH': '/bin', 'GITHUB_TOKEN': 'secret',
+                                               'SystemRoot': 'C:/Windows'}, 'Windows')
+        self.assertEqual(selected, {'PATH': '/bin', 'SystemRoot': 'C:/Windows',
+                                     'LANG': 'C', 'LC_ALL': 'C', 'VSLANG': '1033'})
+        for key in (*identity.FORBIDDEN_ENV, 'LIBRARY_PATH', 'LD_PRELOAD', 'DYLD_INSERT_LIBRARIES'):
+            with self.subTest(key=key), self.assertRaises(identity.IdentityError):
+                identity.case_environment({'PATH': '/bin', key: 'override'}, 'Linux')
+        with self.assertRaises(identity.IdentityError):
+            identity.case_environment({'Path': 'one', 'PATH': 'two'}, 'Windows')
+
+    def test_abi_probes_are_fixed_c17_with_two_controlled_negatives(self):
+        probes = identity.case_abi_sources()
+        self.assertEqual(set(probes), {'abi', 'bad-width', 'bad-signature'})
+        self.assertIn('sizeof(int) == 4', probes['abi'])
+        self.assertIn('sizeof(int) == 8', probes['bad-width'])
+        self.assertIn('void *(*)(size_t)', probes['abi'])
+        self.assertIn('int *(*)(size_t)', probes['bad-signature'])
+        self.assertEqual(probes['bad-width'], probes['abi'].replace('sizeof(int) == 4', 'sizeof(int) == 8'))
+        self.assertEqual(probes['bad-signature'], probes['abi'].replace('void *(*)(size_t)', 'int *(*)(size_t)'))
+
+    def test_three_coherent_case_shapes_are_nonqualifying_observations(self):
+        for system in ('Linux', 'Windows', 'Darwin'):
+            with self.subTest(system=system):
+                value = self.case_document(system)
+                result = identity.validate_case_document(value)
+                self.assertTrue(result['syntax_checked'])
+                self.assertFalse(result['native_qualified'])
+                self.assertFalse(result['local_native_bytes_verified'])
+                with self.assertRaises(identity.IdentityError):
+                    identity.validate_document(value)
+                with self.assertRaises(identity.IdentityError):
+                    identity.validate_case_document(value['native_identity'])
+
+    def test_case_environment_and_native_architecture_must_match(self):
+        for system in ('Windows', 'Darwin'):
+            for mutation in ('environment', 'architecture', 'target'):
+                value = self.case_document(system)
+                if mutation == 'environment':
+                    value['environment']['INCLUDE' if system == 'Windows' else 'DEVELOPER_DIR'] = 'foreign'
+                elif mutation == 'architecture':
+                    value['native_identity']['platform']['machine'] = 'x86'
+                else:
+                    value['native_identity']['tools']['clang']['target'] = 'i686-pc-windows-msvc' if system == 'Windows' else 'x86_64-apple-darwin'
+                with self.subTest(system=system, mutation=mutation), self.assertRaisesRegex(identity.IdentityError, 'case child|case native'):
+                    identity.validate_case_document(value)
+
+    def test_effective_clt_cannot_escape_to_xcode_or_prefix_collision(self):
+        for mutation in ('sdk', 'settings', 'compiler', 'developer', 'deployment'):
+            value = self.case_document('Darwin')
+            host = value['native_identity']['platform']
+            if mutation == 'sdk':
+                sdk = identity.CASE_CLT + '-evil/SDKs/MacOSX14.5.sdk'
+                host['metadata']['sdk_root'] = host['metadata']['sdk_path_query']['stdout'] = sdk
+                host['metadata']['sdk_settings'].update(path=sdk + '/SDKSettings.json', resolved_path=sdk + '/SDKSettings.json')
+                value['environment']['SDKROOT'] = host['environment']['SDKROOT'] = sdk
+                for language, probe in value['native_identity']['probes'].items():
+                    role = 'clang' if language == 'c' else 'clangxx'
+                    probe['command']['argv'] = identity.probe_command(value['native_identity']['tools'][role]['file']['path'], language, 'Darwin', sdk)[0]
+            elif mutation == 'settings':
+                host['metadata']['sdk_settings']['resolved_path'] = '/Applications/Xcode.app/SDKs/MacOSX14.5.sdk/SDKSettings.json'
+            elif mutation == 'compiler':
+                for role in ('cc', 'clang'):
+                    value['native_identity']['tools'][role]['file']['resolved_path'] = identity.CASE_CLT + '-evil/usr/bin/clang'
+            else:
+                key = 'DEVELOPER_DIR' if mutation == 'developer' else 'MACOSX_DEPLOYMENT_TARGET'
+                value['environment'][key] = host['environment'][key] = '/Applications/Xcode.app' if mutation == 'developer' else '13.0'
+            with self.subTest(mutation=mutation), self.assertRaisesRegex(identity.IdentityError, 'case requires|case compiler'):
+                identity.validate_case_document(value)
+
+    def test_windows_include_roots_and_version_subtrees_are_not_interchangeable(self):
+        for mutation in ('leading-include', 'missing-vc', 'missing-ucrt', 'vc-version', 'ucrt-version', 'header'):
+            value = self.case_document('Windows')
+            host = value['native_identity']['platform']
+            if 'include' in mutation or mutation.startswith('missing'):
+                selected = value['environment']['INCLUDE']
+                selected = 'C:/Unreviewed;' + selected if mutation == 'leading-include' else selected.split(';')[1 if mutation == 'missing-vc' else 0]
+                value['environment']['INCLUDE'] = host['environment']['INCLUDE'] = selected
+            elif mutation in ('vc-version', 'ucrt-version'):
+                key = 'VCToolsVersion' if mutation == 'vc-version' else 'UCRTVersion'
+                value['environment'][key] = host['environment'][key] = host['metadata']['versions'][key] = '99.0'
+            else:
+                probe = value['probes']['candidate']
+                row = probe['headers'][1]
+                old = row['path']
+                row['path'] = row['resolved_path'] = old.replace('10.0.1.0', '99.0')
+                probe['dependencies']['stdout'] = probe['dependencies']['stdout'].replace(old, row['path'])
+            with self.subTest(mutation=mutation), self.assertRaisesRegex(identity.IdentityError, 'case include|case headers'):
+                identity.validate_case_document(value)
+
+    def test_case_bytes_commands_negative_proofs_and_claims_are_bound(self):
+        for mutation in ('input', 'command', 'negative', 'header-hash', 'binding', 'quota', 'qualification'):
+            value = self.case_document('Linux')
+            if mutation == 'input':
+                value['input']['sha256'] = 'e' * 64
+            elif mutation == 'command':
+                value['probes']['candidate']['command']['argv'].insert(1, '-nostdinc')
+            elif mutation == 'negative':
+                value['probes']['bad-width']['command']['exit_code'] = 0
+            elif mutation == 'header-hash':
+                value['probes']['abi']['headers'][1]['sha256'] = 'f' * 64
+            elif mutation == 'binding':
+                value['binding']['binding_sha256'] = 'f' * 64
+            elif mutation == 'quota':
+                value['independent_quota_examples'] = True
+            else:
+                value['native_qualified'] = True
+            with self.subTest(mutation=mutation), self.assertRaises(identity.IdentityError):
+                identity.validate_case_document(value)
+
+    def test_case_streams_never_retain_compiler_source_diagnostics(self):
+        command = {'argv': ['/clang', 'probe.c'], 'exit_code': 1, 'stdout': '',
+                   'stderr': 'static assertion failed selected int width\nPRIVATE_SOURCE_SENTINEL'}
+        record = identity.case_record(command, 'selected int width')
+        self.assertNotIn('PRIVATE_SOURCE_SENTINEL', json.dumps(record))
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory).resolve() / 'invalid.json'
+            path.write_text('{"bad":PRIVATE_SOURCE_SENTINEL}', encoding='utf-8')
+            result = subprocess.run([sys.executable, '-B', identity.__file__, 'check-case', str(path)], capture_output=True, timeout=10)
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(result.stdout, b'')
+            self.assertEqual(result.stderr, b'IDENTITY_INVALID case observation rejected\n')
+
+    def test_clt_sdk_alias_and_compiler_alias_preserve_resolved_identity(self):
+        value = self.case_document('Darwin')
+        native = value['native_identity']
+        host = native['platform']
+        old_sdk = host['metadata']['sdk_root']
+        sdk_alias = identity.CASE_CLT + '/SDKs/MacOSX.sdk'
+        host['metadata']['sdk_root'] = host['metadata']['sdk_path_query']['stdout'] = sdk_alias
+        host['metadata']['sdk_settings']['path'] = sdk_alias + '/SDKSettings.json'
+        value['environment']['SDKROOT'] = host['environment']['SDKROOT'] = sdk_alias
+        for role in ('cxx', 'clangxx'):
+            native['tools'][role]['file']['resolved_path'] = native['tools']['clang']['file']['resolved_path']
+        for probe in native['probes'].values():
+            probe['command']['argv'] = [sdk_alias if arg == old_sdk else arg for arg in probe['command']['argv']]
+        for probe in value['probes'].values():
+            probe['command']['argv'] = [sdk_alias if arg == old_sdk else arg for arg in probe['command']['argv']]
+            if probe['dependencies']:
+                probe['dependencies']['argv'] = [sdk_alias if arg == old_sdk else arg for arg in probe['dependencies']['argv']]
+        identity.validate_case_document(value)
+
+
 class WorkflowTests(unittest.TestCase):
     def test_each_lane_uses_one_explicit_python_for_tests_and_capture(self):
         workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/product-identity.yml').read_text()
