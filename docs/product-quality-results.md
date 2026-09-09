@@ -494,3 +494,44 @@ relative/parent-traversal/boş değerler reddedilir. Linux/macOS ortamı, secret
 compiler-override retleri ile 30 saniyelik sınır aynı kalır. Bu üç-yol değişikliğinin
 gerçek timeout'u gidermesi henüz kanıtlanmamıştır; odaklı RED/GREEN native sonuç
 yerine geçmez. Önceki run'lar ve U003'ün bütün açık kapıları korunur.
+
+### Aynı kaynak için başarılı üç-platform C17/static-ABI önkontrolü
+
+[`34329928158`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34329928158)
+tam `24ebf9de6864d4cc99b6176fbf0659fdb205caaf` kaynağında üç işi de geçti.
+Bu, yukarıdaki üç Windows profil yolunu koruyan değişiklikten sonraki yeni
+gözlemdir; tek tek hangi yolun gerekli olduğunu izole eden deney değildir.
+Eski beş başarısız run başarısız kalır. Aynı 636 byte'lık adayın SHA-256'sı
+üçünde de `5c5563b8ed6e5715cb1913e223276146bc4c8799c11ee4dace55cf6e8a5e4b0a`.
+
+Her lane'de aday ve ABI probe'u exit 0; yanlış int genişliği ve yanlış malloc
+dönüş tipi ayrı beklenen assertion ile exit 1 verdi. İki pozitif TU için ayrıca
+dependency komutları exit 0 verdi. Byte genişliği 8, int/size_t/pointer boyutları
+4/8/8 ve C17 `void *(*)(size_t)` bildirimi bu sınırda kontrol edilmiştir.
+
+| Hosted lane | Gözlenen case compiler | TU dâhil aday / ABI girdileri |
+| --- | --- | --- |
+| windows-2025, AMD64 | Clang 20.1.8 | 22 / 22 |
+| macos-14, arm64 | Apple Clang 16.0.0 | 73 / 79 |
+| ubuntu-24.04, x86_64 | Ubuntu Clang 18.1.3 | 19 / 21 |
+
+Windows case'i VC toolset 14.51.36231 ve Windows SDK/UCRT 10.0.26100.0
+seçimine bağlıdır. Mac case'i standalone CLT/SDK 15.2 kullanır; ayrı eski v1
+record'undaki Xcode 15.4/SDK 14.5 bunun yerine geçirilmez. Native case komutları
+Clang ile çalıştı; MSVC `/Bv` gözlemi MSVC ile aday derlemesi sayılmaz.
+
+`native-gcc-cross-v1/hosted-34329928158` dış kanıt paketinde ham run/jobs/logs,
+altı artifact ZIP'i ve altı JSON dâhil 31 dosya saklandı. Paket özetinin SHA-256'sı
+`d13177c8fb5091eabc5697b73ece8e80020b29b997d468c95aeaaf1be98b7335`.
+Bağımsız salt-okunur denetim exact source/helper/binding/adjudication bağlarını,
+bütün dosya/ZIP digest'lerini ve altı reader kontrolünü doğruladı; bu dar
+hosted önkontrol için maddi bulgu yoktur. Saklanan SDK/compiler byte kimlikleri
+observer metadata'sıdır: denetçi native makinedeki byte'ları yeniden açmadı.
+
+Bu ek belge yeni bir hosted source sonucu üretmez; test edilmiş SHA yukarıdaki
+`24ebf9d` olarak kalır. Farklı Clang sürümleri nihai LLVM-20 frontend eşdeğerliği,
+runtime/calling-ABI, analyzer kalitesi veya lisans yeterliliği değildir. Kaynak ve
+SDK gövdeleri artifact'e eklenmedi; negatif tanılar yalnız boyut/hash taşır.
+`native_qualified/license_qualified/task_ready/product_qualified=false`, kota
+**0/1020**, aynı FRONT U003 ve bütün gerçek freeze/tamamlanma kapıları korunur.
+Bağımsız U003 completion receipt veya POP yoktur.
