@@ -1018,7 +1018,8 @@ class WindowsDiagnosticTests(unittest.TestCase):
         self.assertLess(diagnostic, failure)
         self.assertIn('$PSNativeCommandUseErrorActionPreference = $false', workflow)
         self.assertIn("if: always() && runner.os == 'Windows'", workflow)
-        self.assertEqual(workflow.count('if: always()'), 3)
+        # Three unchanged legacy uploads plus the separate declaration metadata upload.
+        self.assertEqual(workflow.count('if: always()'), 4)
 
     def test_case_cli_retains_failure_with_fixed_cause_and_no_output_artifact(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -2277,7 +2278,8 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn('& $identityPython -B -m unittest', workflow)
         self.assertIn('& $identityPython -B scripts/product_identity.py capture', workflow)
         self.assertLess(workflow.index('$identityPython ='), workflow.index('$identitySetup ='))
-        self.assertEqual(workflow.count('sys.version_info >= (3, 10)'), 2)
+        # The separate declaration job also pins one interpreter per native shell lane.
+        self.assertEqual(workflow.count('sys.version_info >= (3, 10)'), 4)
 
     def test_identity_lane_has_narrow_push_and_readonly_permissions(self):
         workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/product-identity.yml').read_text()
@@ -2292,6 +2294,66 @@ class WorkflowTests(unittest.TestCase):
         for forbidden in ('sudo ', 'apt-get ', 'brew install', 'cmake ', 'ctest ',
                           'git push', 'contents: write', 'id-token: write', 'pull_request_target:'):
             self.assertNotIn(forbidden, workflow)
+
+
+class HostedDeclarationWorkflowTests(unittest.TestCase):
+    def job(self):
+        workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/product-identity.yml').read_text()
+        self.assertEqual(workflow.count('\n  declarations:\n'), 1)
+        legacy, job = workflow.split('  declarations:\n', 1)
+        self.assertEqual(hashlib.sha256(legacy.encode()).hexdigest(),
+                         'b4b3ab7fd3a5181edcf286708a2e6884cc14c45835d8c1fe8e5cb9f881d9f765')
+        return job.split('\n# Success means', 1)[0]
+
+    def test_separate_three_platform_job_preserves_legacy_lane_and_budget(self):
+        job = self.job()
+        self.assertIn('runner: [ubuntu-24.04, windows-2025, macos-14]', job)
+        self.assertIn('timeout-minutes: 10', job)
+        self.assertIn('fail-fast: false', job)
+        self.assertNotIn('needs:', job)
+        self.assertIn('persist-credentials: false', job)
+        self.assertIn('actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683', job)
+        self.assertLess(job.index('git config --global core.autocrlf false'), job.index('uses: actions/checkout@'))
+        for forbidden in ('continue-on-error', 'stage-gcc-inputs', 'capture-case', 'sudo ',
+                          'apt-get ', 'brew install', 'pip install', 'curl ', 'wget ', 'git push'):
+            self.assertNotIn(forbidden, job)
+
+    def test_selected_installed_libclang_and_profiles_are_explicit(self):
+        job = self.job()
+        posix, windows = job.split('      - name: Capture installed Windows declarations\n', 1)
+        self.assertIn("parent.parent / 'lib/libclang.so.1'", posix)
+        self.assertIn('/Library/Developer/CommandLineTools/usr/lib/libclang.dylib', posix)
+        self.assertIn('resolve(strict=True)', posix)
+        self.assertIn('--declaration-profile c17-posix2008/v1', posix)
+        self.assertIn('export DEVELOPER_DIR=/Library/Developer/CommandLineTools', posix)
+        self.assertIn('export MACOSX_DEPLOYMENT_TARGET=14.0', posix)
+        self.assertIn("with_name('libclang.dll').resolve(strict=True)", windows)
+        self.assertNotIn('--declaration-profile', windows)
+        self.assertIn('$env:INCLUDE = $declarationIncludes -join', windows)
+        self.assertEqual(job.count('scripts/product_identity.py capture-declarations'), 2)
+        self.assertEqual(job.count('--libclang '), 2)
+
+    def test_declaration_tests_and_capture_failures_are_not_masked(self):
+        job = self.job()
+        self.assertEqual(job.count('-m unittest discover -s scripts -p test_product_identity.py -q'), 2)
+        self.assertEqual(job.count('-p test_product_profiles.py -k NativeDeclarationReaderTests -q'), 2)
+        self.assertEqual(job.count('sys.version_info >= (3, 10)'), 2)
+        self.assertIn('set -euo pipefail', job)
+        self.assertIn("throw 'Declaration observation failed; retained RED is not qualification'", job)
+        self.assertIn("throw 'Declaration reader tests failed'", job)
+        self.assertIn("throw 'Selected installed libclang is unavailable'", job)
+        for forbidden in ('|| true', 'exit 0', 'continue-on-error', '-ExecutionPolicy Bypass'):
+            self.assertNotIn(forbidden, job)
+
+    def test_only_declaration_metadata_is_retained_even_after_failure(self):
+        job = self.job()
+        self.assertEqual(job.count('if: always()'), 1)
+        self.assertEqual(job.count('uses: actions/upload-artifact@'), 1)
+        self.assertIn('actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02', job)
+        self.assertIn('name: native-declarations-${{ matrix.runner }}-${{ github.sha }}', job)
+        self.assertIn('path: ${{ runner.temp }}/codeskeptic-native-declarations.json', job)
+        self.assertIn('if-no-files-found: error', job)
+        self.assertIn('retention-days: 30', job)
 
 
 if __name__ == '__main__':

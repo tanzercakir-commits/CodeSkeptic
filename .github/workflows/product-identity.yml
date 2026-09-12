@@ -189,6 +189,131 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  declarations:
+    name: Declare ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, windows-2025, macos-14]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUTF8: "1"
+    steps:
+      - name: Preserve committed declaration source bytes before checkout
+        shell: bash
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Capture installed Linux or macOS declarations
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          declaration_python="$(command -v python3)"
+          "$declaration_python" -B -c 'import sys; assert sys.version_info >= (3, 10), "Python 3.10+ required"'
+          "$declaration_python" -B -m unittest discover -s scripts -p test_product_identity.py -q
+          "$declaration_python" -B -m unittest discover -s scripts -p test_product_profiles.py -k NativeDeclarationReaderTests -q
+          unset SDKROOT DEVELOPER_DIR MACOSX_DEPLOYMENT_TARGET
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            declaration_cc=/usr/bin/gcc
+            declaration_cxx=/usr/bin/g++
+            declaration_clang="$(command -v clang)"
+            declaration_clangxx="$(command -v clang++)"
+            # One explicit installation-relative candidate; no fallback or installation.
+            declaration_libclang="$("$declaration_python" -I -B -c "import sys; from pathlib import Path; print((Path(sys.argv[1]).resolve(strict=True).parent.parent / 'lib/libclang.so.1').resolve(strict=True))" "$declaration_clang")"
+          else
+            export DEVELOPER_DIR=/Library/Developer/CommandLineTools
+            export SDKROOT="$(/usr/bin/xcrun --sdk macosx --show-sdk-path)"
+            export MACOSX_DEPLOYMENT_TARGET=14.0
+            declaration_cc="$DEVELOPER_DIR/usr/bin/clang"
+            declaration_cxx="$DEVELOPER_DIR/usr/bin/clang++"
+            declaration_clang="$declaration_cc"
+            declaration_clangxx="$declaration_cxx"
+            declaration_libclang="$("$declaration_python" -I -B -c "from pathlib import Path; print(Path('/Library/Developer/CommandLineTools/usr/lib/libclang.dylib').resolve(strict=True))")"
+          fi
+          "$declaration_python" -B scripts/product_identity.py capture-declarations \
+            --root "$GITHUB_WORKSPACE" --source-sha "$GITHUB_SHA" \
+            --cc "$declaration_cc" --cxx "$declaration_cxx" \
+            --clang "$declaration_clang" --clangxx "$declaration_clangxx" \
+            --libclang "$declaration_libclang" --declaration-profile c17-posix2008/v1 \
+            --output "$RUNNER_TEMP/codeskeptic-native-declarations.json"
+          "$declaration_python" -B scripts/product_identity.py check-declarations \
+            "$RUNNER_TEMP/codeskeptic-native-declarations.json" --root "$GITHUB_WORKSPACE"
+
+      - name: Capture installed Windows declarations
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          VSLANG: "1033"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $false
+          $declarationPython = (Get-Command python.exe -ErrorAction Stop).Source
+          & $declarationPython -B -c 'import sys; assert sys.version_info >= (3, 10), "Python 3.10+ required"'
+          if ($LASTEXITCODE -ne 0) { throw 'Python 3.10+ required' }
+          & $declarationPython -B -m unittest discover -s scripts -p test_product_identity.py -q
+          if ($LASTEXITCODE -ne 0) { throw 'Declaration metadata tests failed' }
+          & $declarationPython -B -m unittest discover -s scripts -p test_product_profiles.py -k NativeDeclarationReaderTests -q
+          if ($LASTEXITCODE -ne 0) { throw 'Declaration reader tests failed' }
+          $declarationLocator = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $declarationVs = & $declarationLocator -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if ($LASTEXITCODE -ne 0 -or -not $declarationVs) { throw 'No installed x64 VC toolset' }
+          $declarationSetup = Join-Path $declarationVs 'VC\Auxiliary\Build\vcvars64.bat'
+          $declarationEnvironment = & cmd.exe /s /c "`"$declarationSetup`" > NUL 2>&1 && set"
+          if ($LASTEXITCODE -ne 0) { throw 'vcvars64 failed' }
+          foreach ($declarationLine in $declarationEnvironment) {
+            if ($declarationLine -match '^([^=]+)=(.*)$') {
+              [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
+            }
+          }
+          $declarationCl = Join-Path $env:VCToolsInstallDir 'bin\Hostx64\x64\cl.exe'
+          $declarationClang = (Get-Command clang.exe -ErrorAction Stop).Source
+          $declarationClangxx = (Get-Command clang++.exe -ErrorAction Stop).Source
+          $declarationSdk = Join-Path $env:WindowsSdkDir ('Include\' + $env:WindowsSDKVersion.TrimEnd('\', '/'))
+          $declarationUcrt = Join-Path $env:UniversalCRTSdkDir ('Include\' + $env:UCRTVersion.TrimEnd('\', '/'))
+          $declarationIncludes = @(
+            (Join-Path $env:VCToolsInstallDir 'include'),
+            (Join-Path $env:VCToolsInstallDir 'ATLMFC\include'),
+            (Join-Path $declarationUcrt 'ucrt'),
+            (Join-Path $declarationSdk 'shared'),
+            (Join-Path $declarationSdk 'um'),
+            (Join-Path $declarationSdk 'winrt'),
+            (Join-Path $declarationSdk 'cppwinrt')
+          )
+          foreach ($declarationInclude in $declarationIncludes) {
+            if (-not (Test-Path -LiteralPath $declarationInclude -PathType Container)) {
+              throw 'Selected declaration include directory is missing'
+            }
+          }
+          $env:INCLUDE = $declarationIncludes -join ';'
+          # One explicit DLL beside the selected installed driver; default v1 on Windows.
+          $declarationLibclang = & $declarationPython -I -B -c "import sys; from pathlib import Path; print(Path(sys.argv[1]).resolve(strict=True).with_name('libclang.dll').resolve(strict=True))" $declarationClang
+          if ($LASTEXITCODE -ne 0) { throw 'Selected installed libclang is unavailable' }
+          & $declarationPython -B scripts/product_identity.py capture-declarations `
+            --root "$env:GITHUB_WORKSPACE" --source-sha "$env:GITHUB_SHA" `
+            --cc "$declarationCl" --cxx "$declarationCl" `
+            --clang "$declarationClang" --clangxx "$declarationClangxx" `
+            --libclang "$declarationLibclang" `
+            --output "$env:RUNNER_TEMP/codeskeptic-native-declarations.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Declaration observation failed; retained RED is not qualification' }
+          & $declarationPython -B scripts/product_identity.py check-declarations `
+            "$env:RUNNER_TEMP/codeskeptic-native-declarations.json" --root "$env:GITHUB_WORKSPACE"
+          if ($LASTEXITCODE -ne 0) { throw 'Declaration metadata validation failed' }
+
+      - name: Retain declaration metadata without source, headers or binaries
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: native-declarations-${{ matrix.runner }}-${{ github.sha }}
+          path: ${{ runner.temp }}/codeskeptic-native-declarations.json
+          if-no-files-found: error
+          retention-days: 30
+
 # Success means the observation file exists. The collector always records
 # native_qualified=false, product_qualified=false and immutable_image=false.
 # Preinstalled Clang selection is observed, NOT a promised LLVM-20 profile.

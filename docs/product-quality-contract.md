@@ -701,3 +701,29 @@ backend/önişleme hatası aynı issue'yu her isteğe yalnız bir kez ekler. Ba�
 source/header/library identity hataları fatal kalır. Timeout/çıktı sayımı yine
 hard RSS/streaming-memory/descendant bütçesi değildir. Saf ve source-bound
 okuyucular native yol/komut çalıştırmaz; bütün yeterlilik bayrakları false kalır.
+
+### Ayrı hosted bildirim gözlemi
+
+Identity workflow'undaki özgün `observe` işi ve üst düzey trigger/permission/
+concurrency aynen korunur. Ayrı `declarations` işi üç mevcut native runner'da,
+fail-fast=false ve kendi10 dakikalık bütçesiyle çalışır; eski case işinin başarısına
+bağlanmaz veya onun başarısızlığını silmez. Analyzer/korpus çalıştırmaz, yeni
+tool/SDK/library indirmez veya kurmaz. Identity ve NativeDeclarationReaderTests
+kontrolleri yakalamadan önce aynı seçilmiş Python ile çalışır.
+
+Libclang seçimi tek, açık, önceden belirlenmiş installed adaydan yapılır: Linux'ta
+seçilmiş Clang'ın gerçek installation kökündeki `lib/libclang.so.1`, Darwin'de
+standalone CLT'nin `usr/lib/libclang.dylib`, Windows'ta seçilmiş Clang'ın yanındaki
+`libclang.dll`. Aday strict çözülerek fiziksel path açık CLI argümanı yapılır;
+bulunmayan aday başka library araması veya installer fallback ile gizlenmez.
+Bu seçim kuralı library'nin gerçekten kurulu/yüklenebilir olduğunu iddia etmez;
+gerçek koşu ve içerik/version kimlikleri bunu ayrıca gözlemlemelidir.
+
+Linux/Darwin açık c17-posix2008/v1 ile v2; Windows mevcut default v1 kullanır.
+Darwin standalone CLT/SDK/deployment14.0 ve Windows x64 VC/UCRT/SDK include
+seçimleri mevcut collector sözleşmesine bağlıdır. Yeni job yalnız metadata JSON
+dosyasını always upload eder; kaynak/header/binary upload yoktur. Capture veya
+test hatası maskelenmez, eksik packet upload hatasıdır, geçerli RED packet de
+native yeterlilik sayılmaz. SQLite ve 50+3 payda, bütün qualification=false
+bayrakları ve eski packet anlamları değişmez. Hosted başarı ancak gerçekten
+gözlenen exact-head sonuçtur; job varlığı veya yerel statik test yeterli değildir.

@@ -2329,3 +2329,37 @@ test skip edilmez ve üretim kodu değişmez. Focused GREEN capture SHA
 Bu saf iki-flavor deneyi gerçek Windows CI değildir. Yeni exact-head bağımsız
 inceleme ve gerçek hosted sonuç ayrıca gerekir; eski PASS yeni head'e taşınmaz.
 Selection2/1020, native/model/rights kapıları, main ve U003 FRONT değişmez; POP yok.
+
+### f057694 gerçek Windows fixture sonucu ve ayrı bildirim job adayı
+
+Exact f057694 identity run34720540354 yine failure, fakat önceki fixture hatası
+gerçek Windows'ta tekrar etmedi:133 identity testi9.318s içinde OK (altı eski skip),
+identity artifact'ı oluştu. Seçilmiş199 profile testi395.291s içinde OK (bir skip).
+Ardından capture-case'in özgün30s Windows OS metadata sorgusu TIMEOUT oldu;
+native-case artifact'ı yoktur. Sonraki diagnostic30,078ms içinde yalnız STARTED
+işaretini gözleyip TIMEOUT verdi; ayrı policy sorgusu1078ms içinde Unrestricted
+kaydetti. Bunlar başarısız sorgunun kök nedenini veya onarımını kanıtlamaz.
+
+Bağımsız exact-source hosted review HOSTED_OBSERVATIONS_VERIFIED_NOT_QUALIFIED;
+receipt SHA `51653aff93842c07f00a18671dbedcd52757219324fcfff382735f84ff5f3102`.
+Altı ZIP/artifact/payload,31 manifest girdisi ve gerçek üç platform logu denetlendi;
+summary SHA `ed5beef806f49bda28312157aaf2a883a1695ae089ef8788999d1f4339d0f879`.
+Linux/macOS yalnız özgün GCC case'in candidate/ABI exit0 ve bad-width/signature
+exit1 gözlemlerini içerir; CIndex veya tam native yeterlilik değildir. Eski f3
+identity ve genel CI başarısızlıkları bu sonuçla temizlenmez.
+
+Yeni aday özgün workflow/job byte'larını koruyup ayrı üç-platform declarations
+işi ekler. Yeni contract testleri eski workflow'da missing-job RED verdi: SHA
+`eddd75ec83bdb786ebe43b6f396b015cb312a20e95b920d4f7969e18a3e1124e`.
+İş eklenince bu dört test GREEN: SHA
+`d4ac58fcbb09e60900a9460ac7d5bea6aa7b5a027eb605ef01d0d8c8670e6d42`.
+Eski global upload/interpreter sayımları ek job nedeniyle iki RED verdi; özgün
+job'un exact prefix hash'i ayrıca sabitlenirken global sayılar gerçek yeni4/4
+oldu. Hiçbir eski case adımı, timeout veya failure kontrolü azaltılmadı.
+
+Yeni iş kurulum/fallback olmadan açık installed CIndex adaylarını seçer;
+Linux/macOS v2 POSIX ve Windows default v1 yakalaması ile yalnız metadata upload
+eder. Bu paragraf yeni job'un koştuğunu, library adaylarının bulunduğunu veya
+platformların geçtiğini iddia etmez. Yerel statik test/CLI, temiz exact-head
+bağımsız inceleme ve gerçek yeni hosted packet ayrıca gerekir. SQLite seçilmez,
+selection2/1020, native0/50+3, haklar/model/FIFO kapıları aynı kalır; U003 POP yok.
