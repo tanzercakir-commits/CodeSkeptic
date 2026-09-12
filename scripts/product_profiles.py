@@ -1567,9 +1567,10 @@ def verify_retained_ground_truth(repo, record_path, *, _input_guard=None):
                                         json_value=False, maximum=16 * 1024 * 1024)
         require(len(source.decode('utf-8').splitlines()) == value['source']['line_count'],
                 'retained label source line count')
-        for link in value['references']:
-            _ground_truth_input(repo / link['path'], guard, link['sha256'],
-                                json_value=False, maximum=16 * 1024 * 1024)
+        # Semantic references belong to their declared ancestor commit. Read
+        # those actual Git blobs, permitting later implementation/docs changes
+        # without rewriting a frozen source-label decision. Live candidate,
+        # source, rights and stream identities still span the whole read.
         verify_reviewed_files(repo, value['reference_head'], value['references'])
         verify_input_identities(guard)
         return {**result, 'record_sha256': info['sha256'], 'candidate_sha256': candidate_info['sha256'],

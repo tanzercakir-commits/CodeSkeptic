@@ -1417,3 +1417,21 @@ Collector/query bütçesi değişmedi. Başarılı Windows case sonrası diagnos
 eski timeout'un kök nedeni veya kalıcı onarım ispatı değildir; `34689801293`
 başarısız kalır. Yeni all-rule okuyucusu bu eski exact-head koşusunda yoktur;
 ona veya ikinci kaynağa hosted/native/product PASS devredilmez.
+
+### Retained etiketler — tarihsel referans entegrasyon düzeltmesi
+
+`d5dfe86a483091a45512682693b0d8720a3b259c` sonrasında gerçek etiket/index
+okuyucusu exit 2 verdi; bağımsız implementation denetimi de aynı bulguyu
+bildirdi. Sebep, historical `05a5c1d` referans hashlerinin bugünkü checkout
+dokümanlarıyla yanlış karşılaştırılmasıydı. Yeni contract dokümantasyonu bu
+yanlış eşitliği bozdu; sentetik fixture o zamana kadar iki sürümü aynı tutuyordu.
+`exact-d5dfe86-label-index-green.json` adı başarı kanıtı değildir: içindeki
+gerçek exit 2 ve bu başarısız checkpoint korunur.
+
+Yeni regresyon, kaynak kararı sonrasında ayrı dokümantasyon commit'i oluşturur.
+Mevcut ancestor Git-blob doğrulaması kullanıldığında eski kaynak kararı geçer;
+yeni doküman hash'ini eski head'e bağlamak ve yeni öneriyi eski review'la kabul
+etmek reddedilir. Kaynak/rights/stream girdileri hâlâ gerçek dosyalardan okunur
+ve ortak kimlik kontrolünde kalır; historical referanslar yeniden yazılmaz.
+Dar RED/GREEN, tam **170 profile testi** ve gerçek retained index yeniden geçti.
+Bu düzeltme yeni exact-head bağımsız inceleme ister; U003 açık kapıları aynıdır.

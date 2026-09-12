@@ -2545,10 +2545,31 @@ class RetainedGroundTruthTests(unittest.TestCase):
                 labels.check()
         labels.value = original
         labels.write_record()
-        path = labels.repo / profiles.GROUND_TRUTH_REFERENCES[1]
-        path.write_text('Reference bytes changed after their reviewed Git commit\n', encoding='utf-8')
+        labels.value['references'][1]['sha256'] = 'f' * 64
+        labels.write_record()
         with self.assertRaises(ValueError):
             labels.check()
+
+    def test_historical_reference_blobs_survive_later_docs_but_cannot_be_rebound_silently(self):
+        labels = self.labels
+        path = labels.repo / 'docs/product-quality-contract.md'
+        path.write_text('Later documentation after the source-label reference snapshot\n', encoding='utf-8')
+        labels.fixture.git('add', '--', 'docs/product-quality-contract.md')
+        labels.fixture.git('commit', '--no-gpg-sign', '-qm', 'later independent documentation')
+        # The source-label decision refers to actual ancestor blobs, not to
+        # bytes in whatever later implementation is now checked out.
+        self.assertTrue(labels.check()['source_bytes_verified'])
+        self.assertEqual(labels.index_check()['reviewed_sources'], 1)
+        self.assertNotEqual(labels.value['references'][-1]['sha256'], profiles.file_sha(path))
+        labels.value['references'][-1]['sha256'] = profiles.file_sha(path)
+        labels.write_record()
+        with self.assertRaises(ValueError):
+            labels.check()  # New bytes do not belong to the declared old head.
+        labels.value['reference_head'] = labels.fixture.git('rev-parse', 'HEAD')
+        labels.write_record()
+        self.assertTrue(labels.check()['source_bytes_verified'])
+        with self.assertRaises(ValueError):
+            labels.index_check()  # A new proposed record has no matching review.
 
     def test_index_rejects_missing_stale_self_review_and_cross_source_receipts(self):
         labels = self.labels
