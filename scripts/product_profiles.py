@@ -1181,7 +1181,7 @@ def verify_reviewed_files(repo, head, links, *, expected_tree=None):
 SOURCE_SELECTION = "tests/product_corpus/selection.json"
 
 
-def verify_source_selection(repo, link):
+def verify_source_selection(repo, link, *, _input_guard=None):
     """Read an entire partial selection before returning any admitted count.
 
     Exact reviewed commits, actual linked bytes and distinct procedural agent
@@ -1192,7 +1192,7 @@ def verify_source_selection(repo, link):
         repo = Path(repo)
         require(repo.is_absolute() and repo.resolve(strict=True) == repo, "selection checkout root")
         observations = {}
-        input_guard = {}
+        input_guard = {} if _input_guard is None else _input_guard
 
         def read_link(item, external=False, maximum=16 * 1024 * 1024):
             fields(item, "path sha256", "selection link")
@@ -1202,6 +1202,7 @@ def verify_source_selection(repo, link):
             actual, info, raw = external_read(path, capture=True)
             require(actual["sha256"] == item["sha256"] and actual["size_bytes"] <= maximum, "selection evidence drift/size")
             observations[path] = info
+            remember_input_identities(input_guard, {path: info})
             return parse_json(raw.decode("utf-8"))
 
         require(type(link) is dict and link.get("path") == SOURCE_SELECTION, "selection manifest path")
@@ -1237,6 +1238,7 @@ def verify_source_selection(repo, link):
                     "admitted candidate no longer matches actual inputs")
             rows.append(projection)
         result = quota_readiness(rows, set(origins))
+        remember_input_identities(input_guard, observations)
         for path, before in observations.items():
             require(path.resolve(strict=True) == path and external_identity(path.lstat()) == external_identity(before),
                     "selection evidence final identity changed")
@@ -1438,6 +1440,222 @@ def verify_ground_truth_index(repo):
                 "source_selection_quota_examples": selection["quota_examples"], "review_head": review["repository_head"]}
     except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError, subprocess.SubprocessError):
         raise ValueError("reviewed all-rule source labels rejected") from None
+
+
+RETAINED_GROUND_TRUTH_INDEX = 'tests/product_corpus/retained_ground_truth.json'
+RETAINED_GROUND_TRUTH_SCHEMA = 'codeskeptic-product-retained-source-all-rule-ground-truth/v1'
+
+
+def retained_ground_truth_metadata(value, candidate):
+    """Validate proposed label structure, never infer source safety or review."""
+    retained_candidate_metadata(candidate)
+    fields(value, 'schema state id candidate source reference_head references analysis_profile data_model '
+           'assumptions families project_diagnostics boundary additional_quota_examples qualification',
+           'retained source labels')
+    require(value['schema'] == RETAINED_GROUND_TRUTH_SCHEMA
+            and value['state'] == 'SOURCE_DERIVED_LABELS_FOR_INDEPENDENT_REVIEW'
+            and value['id'] == candidate['id'], 'retained label identity')
+    fields(value['candidate'], 'path sha256', 'retained label candidate')
+    relative = external_relative(value['candidate']['path']).as_posix()
+    require(relative.startswith('tests/product_corpus/candidates/'), 'retained label candidate scope')
+    external_digest(value['candidate']['sha256'])
+    fields(value['source'], 'path sha256 language line_count', 'retained label source')
+    source = value['source']
+    require(all(source[key] == candidate['source'][key] for key in ('path', 'sha256', 'language'))
+            and type(source['line_count']) is int and 1 <= source['line_count'] <= 100000,
+            'retained label source binding')
+    require(value['analysis_profile'] == candidate['links']['analysis_profile'], 'retained label recipe binding')
+    require(type(value['reference_head']) is str and re.fullmatch(r'[0-9a-f]{40}', value['reference_head'])
+            and value['reference_head'] != '0' * 40, 'retained label reference head')
+    references = value['references']
+    require(type(references) is list and len(references) == len(GROUND_TRUTH_REFERENCES),
+            'retained label reference coverage')
+    for link, path in zip(references, GROUND_TRUTH_REFERENCES):
+        fields(link, 'path sha256', 'retained label reference')
+        require(link['path'] == path, 'retained label reference order')
+        external_digest(link['sha256'])
+    # This supported retained C17 recipe has a bounded conditional native model.
+    # No claim about a live runtime or another platform follows from these bits.
+    require(canonical(value['data_model']) == canonical(
+        {'char_bit': 8, 'int_bits': 32, 'size_t_bits': 64, 'pointer_bits': 64}),
+        'retained label conditional data model')
+    require(type(value['assumptions']) is list and 1 <= len(value['assumptions']) <= 16
+            and all(nonempty(item) and len(item) <= 2048 for item in value['assumptions'])
+            and nonempty(value['boundary']) and len(value['boundary']) <= 8192,
+            'retained label assumptions and boundary')
+    require(type(value['additional_quota_examples']) is int and value['additional_quota_examples'] == 0
+            and canonical(value['qualification']) == canonical(candidate['qualification']),
+            'retained source labels cannot qualify or add quota')
+
+    def source_basis(row):
+        lines = row['source_lines']
+        require(type(lines) is list and lines
+                and all(type(line) is int and 1 <= line <= source['line_count'] for line in lines)
+                and lines == sorted(set(lines)) and nonempty(row['rationale']) and len(row['rationale']) <= 8192,
+                'retained source rationale')
+
+    families = value['families']
+    require(type(families) is list and len(families) == len(FAMILIES), 'retained label family coverage')
+    occurrences = 0
+    for row, family in zip(families, sorted(FAMILIES)):
+        fields(row, 'rule availability role expected source_lines rationale', 'retained family label')
+        require(row['rule'] == family and row['availability'] == (
+            'PLANNED_NOT_IMPLEMENTED' if family in GROUND_TRUTH_PLANNED else 'INSTALLED_AT_REFERENCE_HEAD'),
+            'retained family order and availability')
+        require(type(row['role']) is str and row['role'] in ('buggy', 'safe', 'unknown', 'unsupported')
+                and type(row['expected']) is list and len(row['expected']) <= 64
+                and bool(row['expected']) == (row['role'] == 'buggy'), 'retained family expectations')
+        identities = set()
+        for occurrence in row['expected']:
+            fields(occurrence, 'rule function line column cwes multiplicity', 'retained label occurrence')
+            require(occurrence['rule'] == family and nonempty(occurrence['function'])
+                    and len(occurrence['function']) <= 512
+                    and type(occurrence['line']) is int and 1 <= occurrence['line'] <= source['line_count']
+                    and all(type(occurrence[key]) is int and 1 <= occurrence[key] <= 1000000
+                            for key in ('column', 'multiplicity'))
+                    and type(occurrence['cwes']) is list and 1 <= len(occurrence['cwes']) <= 26
+                    and all(type(cwe) is int and 1 <= cwe <= 10000 for cwe in occurrence['cwes'])
+                    and occurrence['cwes'] == sorted(set(occurrence['cwes'])), 'retained label occurrence fields')
+            identity = canonical({key: item for key, item in occurrence.items() if key != 'multiplicity'})
+            require(identity not in identities, 'duplicate retained label occurrence')
+            identities.add(identity)
+            occurrences += occurrence['multiplicity']
+        if family == candidate['family']:
+            require(row['role'] == candidate['role']
+                    and canonical(row['expected']) == canonical(candidate['expected']),
+                    'retained labels must preserve admitted target')
+        source_basis(row)
+    projects = value['project_diagnostics']
+    require(type(projects) is list and len(projects) == 3, 'retained project label coverage')
+    for row, rule in zip(projects, ('assumption', 'contract', 'policy')):
+        fields(row, 'rule role expected source_lines rationale', 'retained project label')
+        require(row['rule'] == rule and row['role'] == 'no-trigger' and row['expected'] == [],
+                'retained project label expectation')
+        source_basis(row)
+    return {'family_labels': len(families), 'project_diagnostics': len(projects),
+            'expected_occurrences': occurrences, 'additional_quota_examples': 0,
+            'source_labels_independently_reviewed': False, **candidate['qualification']}
+
+
+def _ground_truth_input(path, guard, expected=None, *, json_value=True, maximum=65536):
+    info, before, raw = external_read(path, capture=True)
+    require(info['size_bytes'] <= maximum and (expected is None or info['sha256'] == expected),
+            'retained label input size or hash')
+    # Register immediately, so a later observation cannot overwrite an earlier
+    # identity. The same guard spans label records, candidates and admissions.
+    remember_input_identities(guard, {path: before})
+    return info, parse_json(raw.decode('utf-8')) if json_value else raw
+
+
+def verify_retained_ground_truth(repo, record_path, *, _input_guard=None):
+    """Reopen an explicit proposed source-label record without accepting it."""
+    try:
+        repo = Path(repo)
+        require(repo.is_absolute() and repo.resolve(strict=True) == repo, 'retained label checkout')
+        guard = {} if _input_guard is None else _input_guard
+        relative = external_relative(record_path).as_posix()
+        require(relative.startswith('tests/product_corpus/candidates/'), 'retained label record scope')
+        info, value = _ground_truth_input(repo / relative, guard)
+        candidate_link = value['candidate']
+        candidate_path = external_relative(candidate_link['path']).as_posix()
+        candidate_info, candidate = _ground_truth_input(repo / candidate_path, guard, candidate_link['sha256'])
+        result = retained_ground_truth_metadata(value, candidate)
+        actual = verify_retained_source_candidate(repo, candidate_path, _input_guard=guard)
+        require(actual['candidate_sha256'] == candidate_info['sha256'], 'retained label candidate changed')
+        source_path = Path(candidate['source']['snapshot_root']) / 'case.c'
+        _, source = _ground_truth_input(source_path, guard, candidate['source']['sha256'],
+                                        json_value=False, maximum=16 * 1024 * 1024)
+        require(len(source.decode('utf-8').splitlines()) == value['source']['line_count'],
+                'retained label source line count')
+        for link in value['references']:
+            _ground_truth_input(repo / link['path'], guard, link['sha256'],
+                                json_value=False, maximum=16 * 1024 * 1024)
+        verify_reviewed_files(repo, value['reference_head'], value['references'])
+        verify_input_identities(guard)
+        return {**result, 'record_sha256': info['sha256'], 'candidate_sha256': candidate_info['sha256'],
+                'source_sha256': value['source']['sha256'], 'reference_head': value['reference_head'],
+                'source_bytes_verified': True}
+    except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError, subprocess.SubprocessError):
+        raise ValueError('retained all-rule source binding rejected') from None
+
+
+def retained_ground_truth_review_metadata(review, value, record_path, record_sha):
+    fields(review, 'schema repository_head record candidate source_sha256 implementer verifier verdict findings '
+           'rationale additional_quota_examples qualification', 'retained source-label review')
+    external_digest(record_sha)
+    require(review['schema'] == 'codeskeptic-retained-all-rule-source-review/v1'
+            and type(review['repository_head']) is str and re.fullmatch(r'[0-9a-f]{40}', review['repository_head'])
+            and review['repository_head'] != '0' * 40
+            and review['record'] == {'path': record_path, 'sha256': record_sha}
+            and review['candidate'] == value['candidate'] and review['source_sha256'] == value['source']['sha256']
+            and review['verdict'] == 'ACCEPT_SOURCE_LABELS' and review['findings'] == [],
+            'retained source-label reviewed binding')
+    for key in ('implementer', 'verifier'):
+        require(type(review[key]) is str and re.fullmatch(r'/[a-z0-9_]+(?:/[a-z0-9_]+)*', review[key])
+                and len(review[key]) <= 128, 'retained source-label reviewer identity')
+    require(review['implementer'] != review['verifier'] and nonempty(review['rationale'])
+            and len(review['rationale']) <= 8192
+            and type(review['additional_quota_examples']) is int and review['additional_quota_examples'] == 0
+            and canonical(review['qualification']) == canonical(value['qualification']),
+            'retained source-label review boundaries')
+    fields(review['qualification'], SOURCE_QUALIFICATION, 'retained source-label review qualification')
+    require(all(item is False for item in review['qualification'].values()), 'retained review cannot qualify')
+
+
+def verify_retained_ground_truth_index(repo):
+    """Separate partial index; preserve the original platform-bound label index."""
+    try:
+        repo = Path(repo)
+        require(repo.is_absolute() and repo.resolve(strict=True) == repo, 'retained label index checkout')
+        guard = {}
+        _, index = _ground_truth_input(repo / RETAINED_GROUND_TRUTH_INDEX, guard, maximum=16 * 1024 * 1024)
+        fields(index, 'schema state entries boundary', 'retained label index')
+        require(index['schema'] == 'codeskeptic-product-reviewed-retained-ground-truth/v1'
+                and index['state'] == 'PARTIAL_REVIEWED_SOURCE_LABELS_NOT_FROZEN'
+                and type(index['entries']) is list and 1 <= len(index['entries']) <= 10000
+                and nonempty(index['boundary']) and len(index['boundary']) <= 8192, 'retained label index state')
+        records, candidates, sources, results, admitted = set(), set(), set(), [], []
+        for entry in index['entries']:
+            fields(entry, 'record review', 'retained label entry')
+            for link in entry.values():
+                fields(link, 'path sha256', 'retained label entry link')
+                external_digest(link['sha256'])
+            relative = external_relative(entry['record']['path']).as_posix()
+            require(relative.startswith('tests/product_corpus/candidates/') and relative.casefold() not in records,
+                    'retained label indexed record path')
+            records.add(relative.casefold())
+            _, value = _ground_truth_input(repo / relative, guard, entry['record']['sha256'])
+            review_path = Path(entry['review']['path'])
+            require(review_path.is_absolute() and repo not in review_path.parents, 'retained review must be external')
+            _, review = _ground_truth_input(review_path, guard, entry['review']['sha256'])
+            retained_ground_truth_review_metadata(review, value, relative, entry['record']['sha256'])
+            verify_reviewed_files(repo, review['repository_head'], [entry['record'], value['candidate']])
+            actual = verify_retained_ground_truth(repo, relative, _input_guard=guard)
+            require(actual['record_sha256'] == entry['record']['sha256'], 'retained reviewed labels changed')
+            candidate_path = value['candidate']['path'].casefold()
+            require(candidate_path not in candidates and value['source']['sha256'] not in sources,
+                    'retained label source or candidate duplicated')
+            candidates.add(candidate_path)
+            sources.add(value['source']['sha256'])
+            admitted.append(value['candidate'])
+            results.append({**actual, 'review_head': review['repository_head'],
+                            'source_labels_independently_reviewed': True})
+        _, manifest = _ground_truth_input(repo / 'scripts/product_profiles.json', guard,
+                                         maximum=16 * 1024 * 1024)
+        source_metadata(manifest)
+        selection = verify_source_selection(repo, manifest['source_selection'], _input_guard=guard)
+        _, selected = _ground_truth_input(repo / SOURCE_SELECTION, guard, manifest['source_selection']['sha256'],
+                                         maximum=16 * 1024 * 1024)
+        require(selection['quota_examples'] == manifest['independent_quota_examples']
+                and all(any(item['candidate'] == candidate for item in selected['admissions'])
+                        for candidate in admitted), 'retained labels require original source admissions')
+        verify_input_identities(guard)
+        return {'state': index['state'], 'records': results, 'reviewed_sources': len(results),
+                'source_selection_quota_examples': selection['quota_examples'], 'additional_quota_examples': 0,
+                'source_labels_independently_reviewed': True,
+                **{key: False for key in SOURCE_QUALIFICATION.split()}}
+    except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError, subprocess.SubprocessError):
+        raise ValueError('reviewed retained all-rule source labels rejected') from None
 
 
 GCC_PLATFORM_FILES = {
@@ -2223,18 +2441,21 @@ def draft_readiness(manifest, root=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check", "ground-truth-candidate-check", "ground-truth-check", "platform-recipes-check", "platform-source-labels-check"))
+    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check", "ground-truth-candidate-check", "ground-truth-check", "retained-ground-truth-check", "platform-recipes-check", "platform-source-labels-check"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--historical-sources", type=Path, default=Path(
         "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S04-U001/corpus-diagnostic-comparison"))
     parser.add_argument("--binding", type=Path, help="tracked binding manifest (absolute path)")
     parser.add_argument('--candidate', help='explicit repository-relative source-candidate record; source-candidate-check only')
+    parser.add_argument('--ground-truth', help='explicit retained label record; ground-truth-candidate-check only')
     parser.add_argument("--external-root", type=Path, help="explicit external snapshot root (absolute canonical path)")
     parser.add_argument("--evidence-root", type=Path, help="explicit external license-reference directory")
     args = parser.parse_args()
     try:
         require(args.command == 'source-candidate-check' or args.candidate is None,
                 'candidate selector is only valid for source-candidate-check')
+        require(args.command == 'ground-truth-candidate-check' or args.ground_truth is None,
+                'ground-truth selector is only valid for ground-truth-candidate-check')
         if args.command == "selection-check":
             require(args.binding is None and args.evidence_root is None and args.external_root is None,
                     "reviewed selection uses its explicit tracked roots")
@@ -2243,11 +2464,18 @@ def main():
                     "native recipes use their fixed tracked roots")
             result = (verify_gcc_platform_recipes(args.root) if args.command == "platform-recipes-check"
                       else verify_gcc_platform_source_labels(args.root))
+        elif args.command == 'retained-ground-truth-check':
+            require(args.binding is None and args.evidence_root is None and args.external_root is None,
+                    'retained source labels use their explicit tracked roots')
+            result = verify_retained_ground_truth_index(args.root)
         elif args.command in ("ground-truth-candidate-check", "ground-truth-check"):
             require(args.binding is None and args.evidence_root is None and args.external_root is None,
                     "all-rule source labels use their fixed tracked roots")
-            result = (verify_gcc_ground_truth(args.root) if args.command == "ground-truth-candidate-check"
-                      else verify_ground_truth_index(args.root))
+            if args.command == 'ground-truth-candidate-check':
+                result = (verify_retained_ground_truth(args.root, args.ground_truth) if args.ground_truth is not None
+                          else verify_gcc_ground_truth(args.root))
+            else:
+                result = verify_ground_truth_index(args.root)
         elif args.command == "source-candidate-check":
             require(args.binding is None and args.evidence_root is None and args.external_root is None,
                     "source candidate uses its explicit tracked roots")

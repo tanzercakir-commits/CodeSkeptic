@@ -2370,6 +2370,283 @@ class RetainedCandidateFixture:
                 'qualification': copy.deepcopy(self.candidate['qualification'])}
 
 
+class RetainedGroundTruthFixture:
+    """Synthetic labels over a real temporary candidate packet and Git history."""
+    index_path = 'tests/product_corpus/retained_ground_truth.json'
+
+    def __init__(self, owner):
+        self.fixture = fixture = RetainedCandidateFixture(owner)
+        self.repo, self.base = fixture.repo, fixture.base
+        self.path = fixture.prefix + '-ground-truth.json'
+        # The candidate fixture is one line, not the real 15-line GCC case.
+        fixture.candidate['expected'][0]['line'] = 1
+        fixture.review['prospective_mapping']['line'] = 1
+        fixture.recipe['expected'][0]['line'] = 1
+        fixture.sync()
+        original_repo = Path(__file__).resolve().parents[1]
+        self.value = profiles.read_json(original_repo / 'tests/product_corpus/candidates/gcc-parent-child-ground-truth.json')
+        for relative in profiles.GROUND_TRUTH_REFERENCES:
+            path = self.repo / relative
+            if not path.exists():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('Synthetic label reference ' + relative + '\n', encoding='utf-8')
+        fixture.git('add', '--', *profiles.GROUND_TRUTH_REFERENCES)
+        fixture.git('commit', '--no-gpg-sign', '-qm', 'synthetic label reference objects')
+        self.value.update(id=fixture.candidate['id'],
+            candidate={'path': fixture.path, 'sha256': profiles.file_sha(self.repo / fixture.path)},
+            source={**{key: fixture.candidate['source'][key] for key in ('path', 'sha256', 'language')}, 'line_count': 1},
+            reference_head=fixture.git('rev-parse', 'HEAD'),
+            references=[{'path': path, 'sha256': profiles.file_sha(self.repo / path)}
+                        for path in profiles.GROUND_TRUTH_REFERENCES],
+            analysis_profile=copy.deepcopy(fixture.candidate['links']['analysis_profile']))
+        self.value['assumptions'] = ['Synthetic labels only; source semantics and native execution are not asserted.']
+        self.value['boundary'] = 'Synthetic protocol fixture, never an independent semantic judgment or source admission.'
+        for row in self.value['families']:
+            row['source_lines'] = [1]
+            row['rationale'] = 'Synthetic per-family schema test only.'
+            row['expected'] = copy.deepcopy(fixture.candidate['expected']) if row['rule'] == 'memory-leak' else []
+        for row in self.value['project_diagnostics']:
+            row['source_lines'] = [1]
+            row['rationale'] = 'Synthetic report-only schema test only.'
+        self.write_record()
+        fixture.git('add', '--', 'tests/product_corpus/candidates')
+        fixture.git('commit', '--no-gpg-sign', '-qm', 'synthetic label and candidate proposal')
+        self.head = fixture.git('rev-parse', 'HEAD')
+        source_review = fixture.admission(self.head)
+        source_review_path = self.base / 'source-admission.json'
+        self.selection = {'schema': 'codeskeptic-product-reviewed-source-selection/v1',
+            'state': 'PARTIAL_REVIEWED_SOURCE_SELECTION_NOT_FROZEN',
+            'origins': {'synthetic-origin': 'https://github.com/example/project'},
+            'admissions': [{'candidate': copy.deepcopy(self.value['candidate']),
+                'review': {'path': str(source_review_path), 'sha256': fixture.write(source_review_path, source_review)}}],
+            'boundary': 'Synthetic procedural source-count fixture, not actual admission.'}
+        selection_sha = fixture.write(self.repo / profiles.SOURCE_SELECTION, self.selection)
+        self.manifest = profiles.read_json(original_repo / 'scripts/product_profiles.json')
+        self.manifest.update(source_selection={'path': profiles.SOURCE_SELECTION, 'sha256': selection_sha},
+                             independent_quota_examples=1)
+        fixture.write(self.repo / 'scripts/product_profiles.json', self.manifest)
+        self.review_path = self.base / 'all-rule-review.json'
+        self.review = {'schema': 'codeskeptic-retained-all-rule-source-review/v1', 'repository_head': self.head,
+            'record': {'path': self.path, 'sha256': profiles.file_sha(self.repo / self.path)},
+            'candidate': copy.deepcopy(self.value['candidate']), 'source_sha256': self.value['source']['sha256'],
+            'implementer': '/root', 'verifier': '/root/synthetic_all_rule_reviewer',
+            'verdict': 'ACCEPT_SOURCE_LABELS', 'findings': [], 'rationale': 'Synthetic review protocol, not source judgment.',
+            'additional_quota_examples': 0, 'qualification': copy.deepcopy(self.value['qualification'])}
+        self.index = {'schema': 'codeskeptic-product-reviewed-retained-ground-truth/v1',
+            'state': 'PARTIAL_REVIEWED_SOURCE_LABELS_NOT_FROZEN',
+            'entries': [{'record': copy.deepcopy(self.review['record']),
+                         'review': {'path': str(self.review_path), 'sha256': 'a' * 64}}],
+            'boundary': 'Synthetic separately reviewed label linkage only; no additional source quota.'}
+        self.write_review()
+
+    def write_record(self):
+        return self.fixture.write(self.repo / self.path, self.value)
+
+    def write_review(self):
+        self.index['entries'][0]['review']['sha256'] = self.fixture.write(self.review_path, self.review)
+        self.fixture.write(self.repo / self.index_path, self.index)
+
+    def check(self):
+        return profiles.verify_retained_ground_truth(self.repo, self.path)
+
+    def index_check(self):
+        return profiles.verify_retained_ground_truth_index(self.repo)
+
+
+class RetainedGroundTruthTests(unittest.TestCase):
+    def setUp(self):
+        self.labels = RetainedGroundTruthFixture(self)
+
+    def test_actual_packet_labels_and_index_remain_source_only_with_no_extra_quota(self):
+        labels = self.labels
+        run = subprocess.run
+        def git_only(argv, *args, **kwargs):
+            self.assertEqual(argv[0], 'git', 'label readers must not run native tools')
+            return run(argv, *args, **kwargs)
+        with mock.patch.object(profiles.subprocess, 'run', side_effect=git_only), \
+                mock.patch.object(profiles.urllib.request, 'urlopen', side_effect=AssertionError('no network')):
+            metadata = profiles.retained_ground_truth_metadata(labels.value, labels.fixture.candidate)
+            candidate = labels.check()
+            reviewed = labels.index_check()
+        for result in (metadata, candidate):
+            self.assertEqual(result['family_labels'], 16)
+            self.assertEqual(result['project_diagnostics'], 3)
+            self.assertEqual(result['expected_occurrences'], 1)
+            self.assertEqual(result['additional_quota_examples'], 0)
+            self.assertFalse(result['source_labels_independently_reviewed'])
+        self.assertTrue(candidate['source_bytes_verified'])
+        self.assertEqual(candidate['record_sha256'], profiles.file_sha(labels.repo / labels.path))
+        self.assertTrue(reviewed['source_labels_independently_reviewed'])
+        self.assertEqual(reviewed['source_selection_quota_examples'], 1)
+        self.assertEqual(reviewed['additional_quota_examples'], 0)
+        for key in labels.value['qualification']:
+            self.assertIs(reviewed[key], False)
+        self.assertNotIn('SOURCE_SENTINEL', profiles.canonical(reviewed))
+
+    def test_generic_nonselected_labels_allow_unknown_unsupported_and_another_buggy_family(self):
+        labels = self.labels
+        for role in ('unknown', 'unsupported', 'buggy'):
+            value = copy.deepcopy(labels.value)
+            row = next(row for row in value['families'] if row['rule'] == 'null-deref')
+            row['role'] = role
+            if role == 'buggy':
+                row['expected'] = [{'rule': 'null-deref', 'function': 'synthetic', 'line': 1, 'column': 1,
+                                    'cwes': [476], 'multiplicity': 1}]
+            with self.subTest(role=role):
+                result = profiles.retained_ground_truth_metadata(value, labels.fixture.candidate)
+                self.assertEqual(result['expected_occurrences'], 2 if role == 'buggy' else 1)
+                self.assertEqual(result['additional_quota_examples'], 0)
+
+    def test_metadata_rejects_bad_coverage_typed_fields_selected_labels_and_quota(self):
+        labels = self.labels
+        variants = [('source', ('line_count',), True), ('source', ('sha256',), 'f' * 64),
+                    ('candidate', ('path',), '../outside.json'), ('data_model', ('char_bit',), True),
+                    ('qualification', ('evaluation_frozen',), 0), ('qualification', ('product_qualified',), True),
+                    ('families', (0, 'source_lines'), [True]), ('families', (0, 'source_lines'), [2]),
+                    ('families', (0, 'role'), 'observed-safe'), ('families', (0, 'rationale'), ''),
+                    ('project_diagnostics', (0, 'expected'), [{'rule': 'assumption'}])]
+        for section, keys, replacement in variants:
+            value = copy.deepcopy(labels.value)
+            target = value[section]
+            for key in keys[:-1]:
+                target = target[key]
+            target[keys[-1]] = replacement
+            with self.subTest(section=section, keys=keys), self.assertRaises(ValueError):
+                profiles.retained_ground_truth_metadata(value, labels.fixture.candidate)
+        for mutation in ('missing-family', 'duplicate-family', 'reordered-families', 'selected-role', 'selected-target',
+                         'cross-family-expected', 'bool-quota', 'extra-quota', 'unexpected-field', 'missing-reference'):
+            value = copy.deepcopy(labels.value)
+            selected = next(row for row in value['families'] if row['rule'] == 'memory-leak')
+            if mutation == 'missing-family': value['families'].pop()
+            elif mutation == 'duplicate-family': value['families'][-1] = value['families'][0]
+            elif mutation == 'reordered-families': value['families'].reverse()
+            elif mutation == 'selected-role': selected['role'] = 'unknown'
+            elif mutation == 'selected-target': selected['expected'][0]['column'] = 2
+            elif mutation == 'cross-family-expected':
+                value['families'][0].update(role='buggy', expected=copy.deepcopy(selected['expected']))
+            elif mutation == 'bool-quota': value['additional_quota_examples'] = False
+            elif mutation == 'extra-quota': value['additional_quota_examples'] = 1
+            elif mutation == 'unexpected-field': value['observed'] = []
+            elif mutation == 'missing-reference': value['references'].pop()
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                profiles.retained_ground_truth_metadata(value, labels.fixture.candidate)
+
+    def test_actual_reader_rejects_wrong_line_count_link_identity_and_reference_bytes(self):
+        labels = self.labels
+        original = copy.deepcopy(labels.value)
+        variants = [('source', 'line_count', 2), ('candidate', 'sha256', 'f' * 64),
+                    ('candidate', 'path', '../outside.json'), ('analysis_profile', 'sha256', 'f' * 64),
+                    ('analysis_profile', 'path', profiles.GCC_CANDIDATE_LINKS['analysis_profile'])]
+        for section, key, replacement in variants:
+            labels.value = copy.deepcopy(original)
+            labels.value[section][key] = replacement
+            labels.write_record()
+            with self.subTest(section=section, key=key), self.assertRaises(ValueError):
+                labels.check()
+        labels.value = original
+        labels.write_record()
+        path = labels.repo / profiles.GROUND_TRUTH_REFERENCES[1]
+        path.write_text('Reference bytes changed after their reviewed Git commit\n', encoding='utf-8')
+        with self.assertRaises(ValueError):
+            labels.check()
+
+    def test_index_rejects_missing_stale_self_review_and_cross_source_receipts(self):
+        labels = self.labels
+        original_review, original_index = copy.deepcopy(labels.review), copy.deepcopy(labels.index)
+        for key, replacement in (('schema', 'codeskeptic-all-rule-source-review/v1'), ('verifier', '/root'),
+                                 ('verdict', 'HOLD'), ('source_sha256', 'f' * 64), ('repository_head', 'f' * 40),
+                                 ('findings', ['Unresolved synthetic finding']), ('additional_quota_examples', False),
+                                 ('candidate', {'path': 'tests/product_corpus/candidates/other.json', 'sha256': 'f' * 64})):
+            labels.review = {**copy.deepcopy(original_review), key: replacement}
+            labels.write_review()
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                labels.index_check()
+        labels.review, labels.index = original_review, original_index
+        labels.write_review()
+        for mutation in ('missing-review', 'stale-review', 'duplicate-entry', 'stale-record', 'traversal', 'no-admission'):
+            original_bytes = labels.review_path.read_bytes()
+            index = copy.deepcopy(original_index)
+            if mutation == 'missing-review': labels.review_path.unlink()
+            elif mutation == 'stale-review': labels.review_path.write_bytes(b'PRIVATE_REVIEW_SENTINEL')
+            elif mutation == 'duplicate-entry': index['entries'].append(copy.deepcopy(index['entries'][0]))
+            elif mutation == 'stale-record': index['entries'][0]['record']['sha256'] = 'f' * 64
+            elif mutation == 'traversal': index['entries'][0]['record']['path'] = '../outside.json'
+            elif mutation == 'no-admission':
+                (labels.repo / profiles.SOURCE_SELECTION).write_text('{}\n', encoding='utf-8')
+            labels.fixture.write(labels.repo / labels.index_path, index)
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                labels.index_check()
+            labels.review_path.write_bytes(original_bytes)
+
+    def test_label_reader_keeps_candidate_transitive_inputs_guarded_after_candidate_returns(self):
+        labels = self.labels
+        actual = profiles.verify_retained_source_candidate
+        paths = [labels.fixture.source / 'case.c', labels.fixture.base / 'project-statement.txt',
+                 labels.fixture.observation / 'cdb-wrong-width.stderr']
+        for path in paths:
+            original = path.read_bytes()
+            mutated = []
+            def mutate(*args, **kwargs):
+                result = actual(*args, **kwargs)
+                if not mutated:
+                    path.write_bytes(original + b'\n')
+                    mutated.append(True)
+                return result
+            with self.subTest(path=path.name), \
+                    mock.patch.object(profiles, 'verify_retained_source_candidate', side_effect=mutate):
+                with self.assertRaises(ValueError):
+                    labels.check()
+                self.assertTrue(mutated)
+            path.write_bytes(original)
+
+    def test_index_keeps_earlier_label_inputs_guarded_through_source_selection(self):
+        labels = self.labels
+        actual = profiles.verify_source_selection
+        paths = [labels.fixture.source / 'case.c', labels.fixture.base / 'project-statement.txt',
+                 labels.fixture.observation / 'cdb-wrong-width.stderr']
+        for path in paths:
+            original = path.read_bytes()
+            mutated = []
+            def mutate(*args, **kwargs):
+                result = actual(*args, **kwargs)
+                if not mutated:
+                    path.write_bytes(original + b'\n')
+                    mutated.append(True)
+                return result
+            with self.subTest(path=path.name), mock.patch.object(profiles, 'verify_source_selection', side_effect=mutate):
+                with self.assertRaises(ValueError):
+                    labels.index_check()
+                self.assertTrue(mutated)
+            path.write_bytes(original)
+
+    def test_explicit_cli_dispatch_and_legacy_selector_remain_separate(self):
+        labels = self.labels
+        script = Path(__file__).resolve().with_name('product_profiles.py')
+        base = [sys.executable, '-B', str(script)]
+        commands = [['ground-truth-candidate-check', '--root', str(labels.repo), '--ground-truth', labels.path],
+                    ['retained-ground-truth-check', '--root', str(labels.repo)]]
+        for args in commands:
+            result = subprocess.run(base + args, capture_output=True, text=True, timeout=30)
+            with self.subTest(command=args[0]):
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(result.stdout)['additional_quota_examples'], 0)
+        for args in (['limits', '--ground-truth', labels.path],
+                     ['ground-truth-candidate-check', '--root', str(labels.repo), '--ground-truth', '../outside.json'],
+                     ['retained-ground-truth-check', '--root', str(labels.repo), '--ground-truth', labels.path]):
+            result = subprocess.run(base + args, capture_output=True, text=True, timeout=30)
+            with self.subTest(args=args):
+                self.assertEqual(result.returncode, 2)
+                self.assertEqual(result.stdout, '')
+                self.assertNotIn('SOURCE_SENTINEL', result.stderr)
+        # No new flag still dispatches to the unchanged legacy reader. This
+        # dispatch-only mock does not replace any proof in the positives above.
+        with mock.patch.object(profiles, 'verify_gcc_ground_truth', return_value={'legacy': True}) as legacy, \
+                mock.patch.object(sys, 'argv', ['product_profiles.py', 'ground-truth-candidate-check', '--root', str(labels.repo)]), \
+                mock.patch.object(sys, 'stdout', io.StringIO()):
+            self.assertEqual(profiles.main(), 0)
+        legacy.assert_called_once_with(labels.repo)
+
+
 class RetainedCandidateTests(unittest.TestCase):
     def setUp(self):
         self.fixture = RetainedCandidateFixture(self)

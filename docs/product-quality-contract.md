@@ -385,3 +385,24 @@ bir ortak okuma kontrolünde tutulur. Sonraki adayı okurken önceki girdinin
 değişmesi, yeniden okunurken üzerine yazılması veya ek dosya oluşması toplam
 sayı dönmeden reddedilir. Bu kimlikler JSON çıktısına/private path export'a
 eklenmez; kilitli filesystem snapshot veya hostile-root direnci iddiası değildir.
+
+Retained kaynakların all-rule etiketleri explicit `--ground-truth` seçicisiyle
+`ground-truth-candidate-check` üzerinden okunur. Seçici yoksa eski GCC okuyucusu
+aynen kullanılır; eski `ground_truth.json` ve ona bağlı platform pinleri değişmez.
+Yeni `retained-ground-truth-check`, ayrı `retained_ground_truth.json` içindeki
+kaynak-bağımsız kayıt/review bağlantılarını doğrular. Her kayıt exact kaynak,
+aday, koşullu C17 tarif ve tarihsel referans Git blob'larını bağlar. Tam 16 aile
+ve üç ayrı proje tanı etiketi gerekir; kaynak seçiminin hedefi değiştirilemez.
+Diğer aileler açık buggy/safe/unknown/unsupported kararlarını taşıyabilir;
+yapısal doğrulama insan kaynak incelemesinin yerine geçmez. Bu sınırlı biçimdeki
+proje tanıları no-trigger'dır; başka durumlar için ayrıca gözden geçirilmiş
+model gerekir. Dört yeni aile hâlâ PLANNED_NOT_IMPLEMENTED kalır.
+
+`retained-all-rule-source-review/v1` kararı kayıt/aday/kaynak hashlerini, gerçek
+ancestor head'i ve ayrı hakemi bağlar. Bütün kayıtlar, dış review'lar, gerçek
+kaynak/rights/stream girdileri ve source admission zinciri tek private kimlik
+kontrolünde korunur. Eksik/stale/çapraz kaynak kanıtı veya okuma sırasında değişim
+başarısızdır. Sonuç yalnız bu ayrı index'in `reviewed_sources` adedini bildirir;
+tam cohort etiketi veya ek örnek kotası değildir. Yedi qualification alanı false,
+ek kota sıfır ve readiness kapısı ayrı kalır. Yeni etiketlerin gerektirdiği
+protected-input farkı ayrıca bağımsız sınıflandırılmış successor ister.

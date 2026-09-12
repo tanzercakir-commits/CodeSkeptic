@@ -1368,3 +1368,52 @@ geçiş negatifi geçti. Negatiflerin bir kısmı ek exact-transition assertion'
 bunlar production validator'ın tek başına sağladığı garanti diye sunulmaz.
 Uygulanmış commit hâlâ yeni bağımsız exact-head denetim ister. Seçim **2/1020**,
 readiness exit 2, eski hosted Windows başarısızlığı ve tüm U003 açık kapıları aynıdır.
+
+### İkinci kaynak — bağımsız all-rule kaynak etiketleri
+
+Exact `de17573eebcd2cf6ac9333c37d9957a0042a2bf8` üzerinde yeni parent/child
+kaydı kaynak bazlı bağımsız `ACCEPT_SOURCE_LABELS` aldı. Kayıt SHA-256
+`b7b470b5b3ccbc7abb09de53ad04e9e4b083a4de72fc6c1504526a7a2294daca`;
+karar U003 `retained-source-labels-v1/retained-label-source-review-de17573.json`,
+SHA-256 `20b2b74f522308aa8c1fafc8837c2bca9d019ae13817b67f66fd5deda3c8991a`.
+Hakem gerçek 193 bayt/15 satırı, beş aday bağlantısını, sekiz referansı ve
+koşullu native kanıtı okudu; compiler veya analyzer çalıştırmadı.
+
+Başarılı iki allocation durumunda yalnız child sızıntısı beklenir; parent
+doğru serbest bırakılır ve allocation failure dalları yeni child yükümlülüğü
+yaratmaz. Diğer 15 aile ve üç proje tanısı ayrı kaynak gerekçeleri taşır.
+Bu safe etiketler ek bağımsız safe örnek veya köken sayılmaz. Desired
+`test_1:15:1` hâlâ unimplemented/unobserved hedeftir; sonuç sonrası unsupported
+etiketine dönüştürülemez. Kaynak hakkı, runtime allocator, embedded analyzer,
+Windows/macOS uygulanabilirliği ve native/product kapıları tamamlanmadı.
+
+Explicit retained etiket okuyucusu ve ayrı index eski label/platform hashlerini
+korur. Sekiz yeni sentetik test gerçek geçici dosya/Git nesneleriyle eksik veya
+stale review, çapraz kaynak, yanlış konum/tür/kota ve source/rights/stream
+okuma pencerelerini sınar. İlk API/CLI eksikliği RED'i ve ilk uygulamanın
+145 KB'lık mevcut manifesti etiketlere özgü 64 KiB sınırında reddettiği RED
+saklanır. Manifest için mevcut 16 MiB girdi sınırı kullanıldıktan sonra sekiz
+test ve tam **169 profile testi** geçti; küçük etiket/review sınırı gevşetilmedi.
+Gerçek yeni index bir retained kaynak etiketi, eski okuyucular eski kaynak
+etiketleri için geçer. Seçim **2/1020**, ek kota sıfır ve readiness exit 2 kalır.
+Uygulama/index yeni exact-head bağımsız inceleme, iki yeni protected input da
+prospective inventory successor ister; bunlar henüz bu kaynak kararının PASS'i değildir.
+
+### Önceki okuyucu checkpoint'inin yeni hosted gözlemi
+
+Exact `05a5c1de2f9045814b7daa424afb4cdc67527391` için
+[34693664339 koşusu](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34693664339)
+attempt 1 üç platformda başarılıdır. Her lane'de 88 identity ve 87 seçili profile
+testi geçti; 12 retained-candidate testi sentetiktir. Üç native-case artifact'i
+eski 636 baytlık mixed-storage kaynağına aittir, parent/child'a değil.
+Yedi API ZIP digest'i ve 34 dosya hash'i ayrı bağımsız ham-kanıt incelemesi aldı:
+`retained-candidate-reader-v1/hosted-review-34693664339.json`, SHA-256
+`bc4fc44ab2d56e52b258a1cfec903408b7e89b334973958070ad92698a37a7ca`.
+Korunan summary SHA-256
+`ed7922ee671813b7478af5cfb6f55d702c35eb84bd88b84d2223bbdc91ec9595`.
+
+Collector/query bütçesi değişmedi. Başarılı Windows case sonrası diagnostic
+22828 ms; CIM_LOADED 22549 ms ve kaydedilen query aralığı 44 ms idi. Bu gözlem
+eski timeout'un kök nedeni veya kalıcı onarım ispatı değildir; `34689801293`
+başarısız kalır. Yeni all-rule okuyucusu bu eski exact-head koşusunda yoktur;
+ona veya ikinci kaynağa hosted/native/product PASS devredilmez.

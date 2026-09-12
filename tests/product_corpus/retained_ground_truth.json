@@ -1,0 +1,17 @@
+{
+  "schema": "codeskeptic-product-reviewed-retained-ground-truth/v1",
+  "state": "PARTIAL_REVIEWED_SOURCE_LABELS_NOT_FROZEN",
+  "entries": [
+    {
+      "record": {
+        "path": "tests/product_corpus/candidates/gcc-parent-child-ground-truth.json",
+        "sha256": "b7b470b5b3ccbc7abb09de53ad04e9e4b083a4de72fc6c1504526a7a2294daca"
+      },
+      "review": {
+        "path": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/retained-source-labels-v1/retained-label-source-review-de17573.json",
+        "sha256": "20b2b74f522308aa8c1fafc8837c2bca9d019ae13817b67f66fd5deda3c8991a"
+      }
+    }
+  ],
+  "boundary": "Separate partial source-label index for one already admitted retained source. The original ground_truth.json and its platform-bound records remain unchanged. Sixteen family labels and three project-diagnostic labels add no quota samples or origins. Conditional source-label acceptance is not analyzer observation, runtime/native/platform qualification, rights clearance, redistribution approval, full cohort freeze, task readiness or product qualification. The desired child-leak target remains unimplemented and unobserved; absence in a later normal report remains FN."
+}
