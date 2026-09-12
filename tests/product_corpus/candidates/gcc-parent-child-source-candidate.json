@@ -1,0 +1,95 @@
+{
+  "schema": "codeskeptic-product-retained-source-candidate/v1",
+  "state": "PRE_RESULT_SOURCE_SELECTION_FOR_REVIEW",
+  "id": "gcc-parent-free-loses-child",
+  "family": "memory-leak",
+  "subprofile": null,
+  "role": "buggy",
+  "selection": "independent-evaluation",
+  "origin": "gcc-analyzer-testsuite",
+  "origin_repository": "https://github.com/gcc-mirror/gcc",
+  "cluster": "heap-parent-release-loses-separately-allocated-child",
+  "source": {
+    "path": "/input/case.c",
+    "sha256": "7e0b0494e9572d46eecce6049b968917044a677608f1f934f6c9ad6bbe85651c",
+    "language": "C17",
+    "snapshot_root": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/gcc-parent-child-binding-v1/inputs"
+  },
+  "links": {
+    "source_binding": {
+      "path": "tests/product_corpus/candidates/gcc-parent-child-binding.json",
+      "sha256": "1e26a356e06361e88324109a7f7949e1e9960fcb29dc08cdbc000b71f86b9bbf"
+    },
+    "source_review": {
+      "path": "tests/product_corpus/candidates/gcc-parent-child-selection.json",
+      "sha256": "7a98b131546ac4ea49eb4ac9b0e1486cbce3cf85fcf8c8e05e7141610dc0679b"
+    },
+    "license_basis": {
+      "path": "tests/product_corpus/candidates/gcc-parent-child-rights-basis.json",
+      "sha256": "a46a341f05c12efde2a225aa6893b6ea4fdd2bba6a21720894e9fdbade52b606"
+    },
+    "analysis_profile": {
+      "path": "tests/product_corpus/candidates/gcc-parent-child-linux.json",
+      "sha256": "7c5c129f4d52916b297be27a971797f4e595670c46f51a23472505acabc1e71c"
+    },
+    "compiler_commands": {
+      "path": "tests/product_corpus/candidates/gcc-parent-child-linux/compile_commands.json",
+      "sha256": "1d49fefb76cbcafd687313a3a7b2f3346268a47209b4ac1c45855a3e32d5777c"
+    }
+  },
+  "analysis_selection": "linux-x86_64-ubuntu24-clang20-c17-retained-native-v1",
+  "limits": {
+    "addressable_recall_min": "0.70",
+    "buggy_min_per_bucket": 30,
+    "campaign_timeout_seconds": 43200,
+    "capture_bytes_per_stream": 2097152,
+    "case_timeout_seconds": 30,
+    "family_precision_min": "0.90",
+    "linux_harness_cpu_quota": 2,
+    "linux_harness_memory_mib": 6144,
+    "linux_harness_memory_plus_swap_mib": 12288,
+    "linux_harness_pids_max": 256,
+    "linux_harness_tmpfs_mib": 1024,
+    "origins_min_per_bucket": 3,
+    "project_timeout_seconds": 1200,
+    "repetitions": 3,
+    "safe_fp_max": 0,
+    "safe_min_per_bucket": 30,
+    "string_flow_call_depth_max": 4,
+    "string_flow_states_per_function_max": 256,
+    "string_flow_transfer_steps_per_function_max": 65536,
+    "unique_quota_sources_min": 1020,
+    "worker_memory_mib": 2048,
+    "worker_timeout_ms": 120000
+  },
+  "expected": [
+    {
+      "rule": "memory-leak",
+      "function": "test_1",
+      "line": 15,
+      "column": 1,
+      "cwes": [
+        401
+      ],
+      "multiplicity": 1
+    }
+  ],
+  "boundaries": {
+    "allocation": "Ordinary C17 native malloc/free semantics with compatible declarations and no allocator replacement or interposition. Source-level ownership label, not an observed analyzer result or measured runtime allocation.",
+    "independence": "One globally counted source in the heap-parent-release/child-loss cluster. The inspected LLVM testMallocIntoMalloc is the same cluster, never another source or origin credit. Unknown genetic history remains explicit.",
+    "addressability": "After actual admission and recipe binding, a normal report missing the expected child occurrence is FN; the released parent contributes no expected leak. No result-driven unsupported relabel or location adjustment. Crash/timeout/OOM/malformed or missing reports remain separate infrastructure RED.",
+    "all_rule_ground_truth": "The selected memory-leak occurrence is source reviewed. Complete all-rule source labels remain pending and mandatory before full evaluation freeze; no all-rule-safe conclusion is made.",
+    "platforms": "This proposal binds a fresh local Ubuntu/Clang20 C17 compiler preflight only. It is not Linux/Windows/macOS product qualification. Native platform recipes and complete qualification remain separate gates.",
+    "measurement": "No analyzer or scored candidate execution. U004 clean Release binary identity and complete corpus freeze are required before any measurement. Desired closing-brace location is not currently implemented or observed.",
+    "rights": "The new case binds project-default source/license reference bytes but inherits no old candidate admission or source-specific rights approval. No source bytes are vendored; exact distribution review remains required."
+  },
+  "qualification": {
+    "evaluation_frozen": false,
+    "native_product_qualified": false,
+    "license_qualified": false,
+    "redistribution_approved": false,
+    "analyzer_run": false,
+    "task_ready": false,
+    "product_qualified": false
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "schema": "codeskeptic-product-retained-rights-basis/v1",
+  "state": "PROJECT_REFERENCES_BOUND_SOURCE_SPECIFIC_RIGHTS_UNRESOLVED",
+  "id": "gcc-parent-free-loses-child",
+  "source_binding": {
+    "path": "tests/product_corpus/candidates/gcc-parent-child-binding.json",
+    "sha256": "1e26a356e06361e88324109a7f7949e1e9960fcb29dc08cdbc000b71f86b9bbf"
+  },
+  "source_sha256": "7e0b0494e9572d46eecce6049b968917044a677608f1f934f6c9ad6bbe85651c",
+  "origin_revision": "5115c7e447fc07457443df874bf57840e8316d5f",
+  "references": [
+    {
+      "role": "license-text",
+      "path": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/gcc-license-basis-v1/COPYING3",
+      "url": "https://raw.githubusercontent.com/gcc-mirror/gcc/5115c7e447fc07457443df874bf57840e8316d5f/COPYING3",
+      "size_bytes": 35147,
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+    },
+    {
+      "role": "project-statement",
+      "path": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/gcc-license-basis-v1/gcc-license-statement.html",
+      "url": "https://gcc.gnu.org/pipermail/gcc/2021-June/236201.html",
+      "size_bytes": 4703,
+      "sha256": "5fb7131b915a314606d51bea32b9d5f521e7125f701f11787e09bdf04747f863"
+    },
+    {
+      "role": "root-notice",
+      "path": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/gcc-license-basis-v1/root-README",
+      "url": "https://raw.githubusercontent.com/gcc-mirror/gcc/5115c7e447fc07457443df874bf57840e8316d5f/README",
+      "size_bytes": 1026,
+      "sha256": "49306c701a64d02dc25de7c89eac5643a3e73c159b4aa9438b47f6b9d86ba0df"
+    }
+  ],
+  "assessment": {
+    "upstream_project_spdx": "GPL-3.0-or-later",
+    "basis": "Retained project-default license statements only. Pinned root README points to COPYING files; retained GCC project statement identifies GPL version 3 or later. COPYING3 and root README match the new source snapshot notice bytes.",
+    "source_specific_boundary": "This exact analyzer testcase has no per-file license or copyright banner. Project-default references do not establish source-specific clearance, full authorship, exceptions or genetic history. No previous mixed-storage source admission or licensing decision is applied to this case.",
+    "distribution_boundary": "No upstream source or license bytes are vendored here. Any future conveyance requires review of the exact source, adaptations, notices and distribution surface; no relicensing or Runtime Library Exception is inferred.",
+    "license_qualified": false,
+    "redistribution_approved": false,
+    "author_completeness_verified": false
+  },
+  "boundary": "Read and link actual reference bytes only. This record grants neither source-specific rights nor source admission."
+}

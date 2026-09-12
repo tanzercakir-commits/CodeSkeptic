@@ -1,0 +1,180 @@
+{
+  "schema": "codeskeptic-product-retained-native-recipe/v1",
+  "state": "PRE_RESULT_COMPILER_PREFLIGHT_REVIEWED_NOT_ANALYZED",
+  "id": "gcc-parent-free-loses-child",
+  "source_binding": {
+    "path": "tests/product_corpus/candidates/gcc-parent-child-binding.json",
+    "sha256": "1e26a356e06361e88324109a7f7949e1e9960fcb29dc08cdbc000b71f86b9bbf"
+  },
+  "source": {
+    "path": "/input/case.c",
+    "sha256": "7e0b0494e9572d46eecce6049b968917044a677608f1f934f6c9ad6bbe85651c",
+    "language": "C17"
+  },
+  "definition_reference": {
+    "head": "36c4f578ecf5e5e3fc6cd96071b7bd517013cf14",
+    "files": [
+      {
+        "path": "src/source_manager/SourceManager.cpp",
+        "sha256": "2b62d346ca8a26ad018f2371e4134d7c013775b79c56f00d7e50687000034f31"
+      },
+      {
+        "path": "src/main.cpp",
+        "sha256": "b314df2bf76d5c36a2738291d77cf2e30b3625a86011cfec68cfc87d78b1b823"
+      },
+      {
+        "path": "src/core/RuleCapabilities.def",
+        "sha256": "17bd1d76e01534b6afd98ad04c105c656c8ed45a2778be8f4ed842716afcaadc"
+      },
+      {
+        "path": "src/rules/MemoryLeakRule_Ex.cpp",
+        "sha256": "93aa251ead8e08e525be97e7f2a813064649ac9125b45324497f6ff12afe6fba"
+      }
+    ]
+  },
+  "environment": {
+    "platform": "linux-x86_64",
+    "kind": "LOCAL_UBUNTU_USERSPACE_NOT_HOSTED_PRODUCT_QUALIFICATION",
+    "image_id": "25640c190484acc04e0dab2c64f8683668ad33930a3670900ff407023efc7fc5",
+    "image_manifest_digest": "sha256:3408b08a92f59d67f5c46347baca76bdb1aafeca34601fae82d6ebd9d8d837ca",
+    "compiler": {
+      "bytes": 132448,
+      "path": "/usr/bin/clang-20",
+      "resolved_path": "/usr/lib/llvm-20/bin/clang",
+      "sha256": "b15e7640bf3082f36ef14321711706b265df3058721e3c2caef3a4b83895d07d"
+    },
+    "resource_directory": "/usr/lib/llvm-20/lib/clang/20",
+    "observed_kernel": "6.19.10-300.fc44.x86_64",
+    "os_release": {
+      "bytes": 400,
+      "path": "/etc/os-release",
+      "resolved_path": "/usr/lib/os-release",
+      "sha256": "01af466feb100306498c86aa6bad1815e33036019aa34d4362c20f374ea5c829"
+    },
+    "image_signature_authenticated": false,
+    "compiler_runtime_closure_verified": false
+  },
+  "preflight": {
+    "head": "36c4f578ecf5e5e3fc6cd96071b7bd517013cf14",
+    "wrapper": {
+      "path": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/native-gcc-parent-child-linux-v1/summary.json",
+      "sha256": "6f07afd4c3b51662521bf37f75307abc1083452f94f9e552f2f6bb2d5b63ca1d"
+    },
+    "observation": {
+      "path": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/native-gcc-parent-child-linux-v1/observation/summary.json",
+      "sha256": "3e5a205f2e2f6aa675b7523e6b68486c072282bb4fbd7fa70c9c6c28ecd2678b"
+    },
+    "review": {
+      "path": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/native-gcc-parent-child-linux-v1/independent-review.json",
+      "sha256": "c313acd3c60c52aba5bf9f18e4b1e871478e455a93dfd820f68a4f8fb8b874fa"
+    }
+  },
+  "compiler_commands": {
+    "path": "tests/product_corpus/candidates/gcc-parent-child-linux/compile_commands.json",
+    "sha256": "1d49fefb76cbcafd687313a3a7b2f3346268a47209b4ac1c45855a3e32d5777c"
+  },
+  "analyzer": {
+    "state": "PREDECLARED_NOT_EXECUTED",
+    "executable_sha256": null,
+    "cwd": "/profile",
+    "environment": {
+      "CODESKEPTIC_RESOURCE_DIR": "/usr/lib/llvm-20/lib/clang/20",
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "/usr/bin:/bin",
+      "TMPDIR": "/tmp"
+    },
+    "selected_rule": [
+      "/product/bin/codeskeptic",
+      "--source",
+      "/input/case.c",
+      "--build-path",
+      "/profile",
+      "--json",
+      "/output/memory-leak.json",
+      "--severity",
+      "info",
+      "--lang",
+      "en",
+      "--worker-timeout-ms",
+      "120000",
+      "--worker-memory-mb",
+      "2048",
+      "--no-analysis-cache",
+      "--disable-rule",
+      "uninit-ptr,uninit-scalar,double-free,use-after-free,resource-leak,div-by-zero,null-deref,bounds,int-overflow,sign-conversion,alloc-size-overflow,assumption,contract,policy"
+    ],
+    "all_current_rules": [
+      "/product/bin/codeskeptic",
+      "--source",
+      "/input/case.c",
+      "--build-path",
+      "/profile",
+      "--json",
+      "/output/all-current-rules.json",
+      "--severity",
+      "info",
+      "--lang",
+      "en",
+      "--worker-timeout-ms",
+      "120000",
+      "--worker-memory-mb",
+      "2048",
+      "--no-analysis-cache",
+      "--assumptions"
+    ],
+    "required_conditions": [
+      "Only the bound standalone C17 CDB in /profile, isolated cwd without .codeskeptic.conf, and no undeclared environment inheritance.",
+      "Exact source and command identity before each future invocation; fresh worker/output state for all three repetitions.",
+      "Complete requested-source/command/function coverage; all findings and multiplicity retained. Normal missing child is FN, infrastructure failures remain RED.",
+      "No baseline, models, suppression, scope filters, partial coverage or result-driven expectation changes. Future U004 clean Release binary identity remains required.",
+      "New injection families remain PLANNED_NOT_IMPLEMENTED/RED, not fake enable-rule or zero-finding PASS."
+    ]
+  },
+  "limits": {
+    "addressable_recall_min": "0.70",
+    "buggy_min_per_bucket": 30,
+    "campaign_timeout_seconds": 43200,
+    "capture_bytes_per_stream": 2097152,
+    "case_timeout_seconds": 30,
+    "family_precision_min": "0.90",
+    "linux_harness_cpu_quota": 2,
+    "linux_harness_memory_mib": 6144,
+    "linux_harness_memory_plus_swap_mib": 12288,
+    "linux_harness_pids_max": 256,
+    "linux_harness_tmpfs_mib": 1024,
+    "origins_min_per_bucket": 3,
+    "project_timeout_seconds": 1200,
+    "repetitions": 3,
+    "safe_fp_max": 0,
+    "safe_min_per_bucket": 30,
+    "string_flow_call_depth_max": 4,
+    "string_flow_states_per_function_max": 256,
+    "string_flow_transfer_steps_per_function_max": 65536,
+    "unique_quota_sources_min": 1020,
+    "worker_memory_mib": 2048,
+    "worker_timeout_ms": 120000
+  },
+  "expected": [
+    {
+      "rule": "memory-leak",
+      "function": "test_1",
+      "line": 15,
+      "column": 1,
+      "cwes": [
+        401
+      ],
+      "multiplicity": 1
+    }
+  ],
+  "qualification": {
+    "evaluation_frozen": false,
+    "native_product_qualified": false,
+    "license_qualified": false,
+    "redistribution_approved": false,
+    "analyzer_run": false,
+    "task_ready": false,
+    "product_qualified": false
+  },
+  "boundary": "Compiler-only preflight supports the selected command forms; no embedded analyzer or scored candidate execution. test_1:15:1 is the independently reviewed desired target, not currently implemented emission. Source admission, all-rule/platform qualification and rights remain separate."
+}

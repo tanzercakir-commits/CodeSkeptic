@@ -680,21 +680,390 @@ def verify_gcc_source_candidate(repo):
         raise ValueError("source candidate binding rejected") from None
 
 
-def admission_review_metadata(review, candidate, candidate_sha):
+RETAINED_CANDIDATE = 'codeskeptic-product-retained-source-candidate/v1'
+SOURCE_QUALIFICATION = ('evaluation_frozen native_product_qualified license_qualified '
+                        'redistribution_approved analyzer_run task_ready product_qualified')
+
+
+def empty_native_stream(path):
+    """Only a declared empty compiler stream; source readers still reject empties."""
+    require(path.is_absolute() and path.suffix in ('.stdout', '.stderr')
+            and path.resolve(strict=True) == path, 'native empty stream path')
+    before = path.lstat()
+    require(stat.S_ISREG(before.st_mode) and before.st_nlink == 1 and before.st_size == 0,
+            'native empty stream identity')
+    descriptor = os.open(path, os.O_RDONLY | getattr(os, 'O_BINARY', 0)
+                         | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_NONBLOCK', 0))
+    try:
+        opened = os.fstat(descriptor)
+        check_external_identity(opened, before, 'native-stream-open', cross_query=True)
+        require(os.read(descriptor, 1) == b'', 'native empty stream grew')
+        final = os.fstat(descriptor)
+        check_external_identity(final, opened, 'native-stream-final')
+        check_external_identity(final, before, 'native-stream-final', cross_query=True)
+        require(path.resolve(strict=True) == path and external_identity(path.lstat()) == external_identity(before),
+                'native empty stream changed')
+    finally:
+        os.close(descriptor)
+    return before
+
+
+def retained_candidate_metadata(value):
+    """Ordinary C17 retained-source proposal; source labels still need ADMIT."""
+    fields(value, 'schema state id family subprofile role selection origin origin_repository cluster source '
+           'links analysis_selection limits expected boundaries qualification', 'retained candidate')
+    require(value['schema'] == RETAINED_CANDIDATE
+            and value['state'] == 'PRE_RESULT_SOURCE_SELECTION_FOR_REVIEW'
+            and value['selection'] == 'independent-evaluation', 'retained candidate state')
+    for key in ('id', 'origin', 'cluster'):
+        require(type(value[key]) is str and re.fullmatch(r'[a-z][a-z0-9-]{0,127}', value[key]),
+                'retained candidate identifier')
+    require(type(value['analysis_selection']) is str
+            and re.fullmatch(r'[a-z][a-z0-9_-]{0,127}', value['analysis_selection']),
+            'retained analysis selection')
+    # The four new families require additional native API/security-fix-pair
+    # evidence; an ordinary retained regression cannot silently satisfy it.
+    require(type(value['family']) is str
+            and value['family'] in FAMILIES - {'command-injection', 'path-traversal', 'sql-injection', 'format-string'}
+            and value['role'] in ('buggy', 'safe')
+            and (value['subprofile'] in ('cwe-121', 'cwe-122') if value['family'] == 'bounds'
+                 else value['subprofile'] is None), 'retained ordinary source family')
+    require(type(value['origin_repository']) is str and re.fullmatch(
+        r'https://github\.com/[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}',
+        value['origin_repository']) and not value['origin_repository'].endswith('.git'), 'retained origin URL')
+    source = value['source']
+    fields(source, 'path sha256 language snapshot_root', 'retained candidate source')
+    require(source['path'] == '/input/case.c' and source['language'] == 'C17'
+            and nonempty(source['snapshot_root']), 'retained candidate source selection')
+    external_digest(source['sha256'])
+    fields(value['links'], ' '.join(GCC_CANDIDATE_LINKS), 'retained candidate links')
+    paths = []
+    for link in value['links'].values():
+        fields(link, 'path sha256', 'retained candidate link')
+        relative = external_relative(link['path']).as_posix()
+        require(relative.startswith('tests/product_corpus/candidates/'), 'retained candidate link scope')
+        external_digest(link['sha256'])
+        paths.append(relative.casefold())
+    require(len(set(paths)) == len(paths), 'duplicate retained candidate link')
+    validate_limits(value['limits'])
+    expected = value['expected']
+    require(type(expected) is list and len(expected) <= 64
+            and bool(expected) == (value['role'] == 'buggy'), 'retained source expectations')
+    for row in expected:
+        fields(row, 'rule function line column cwes multiplicity', 'retained expected occurrence')
+        require(nonempty(row['rule']) and nonempty(row['function'])
+                and all(type(row[key]) is int and 1 <= row[key] <= 1000000
+                        for key in ('line', 'column', 'multiplicity'))
+                and type(row['cwes']) is list and 1 <= len(row['cwes']) <= 26
+                and all(type(cwe) is int and 1 <= cwe <= 10000 for cwe in row['cwes'])
+                and row['cwes'] == sorted(set(row['cwes'])), 'retained occurrence fields')
+    fields(value['boundaries'], 'allocation independence addressability all_rule_ground_truth platforms measurement rights',
+           'retained candidate boundaries')
+    require(all(nonempty(item) and len(item) <= 8192 for item in value['boundaries'].values()),
+            'retained candidate boundary')
+    fields(value['qualification'], SOURCE_QUALIFICATION, 'retained candidate qualification')
+    require(all(item is False for item in value['qualification'].values()), 'retained proposal cannot qualify product')
+    return {key: value[key] for key in ('id', 'family', 'subprofile', 'role', 'origin', 'cluster', 'selection')} | {
+        'sha256': source['sha256'], 'quota': False}
+
+
+def verify_retained_source_candidate(repo, candidate_path):
+    """Read the reviewed source, rights boundary and native preflight, not admit."""
+    try:
+        repo = Path(repo)
+        require(repo.is_absolute() and repo.resolve(strict=True) == repo, 'retained checkout')
+        observations = {}
+
+        def read(path, sha=None):
+            path = Path(path)
+            actual, info, raw = external_read(path, capture=True)
+            require(sha is None or actual['sha256'] == sha, 'retained candidate evidence drift')
+            observations[path] = info
+            return parse_json(raw.decode('utf-8')), actual['sha256']
+
+        def linked(link, external=False):
+            fields(link, 'path sha256', 'retained linked evidence')
+            external_digest(link['sha256'])
+            path = Path(link['path']) if external else repo / external_relative(link['path'])
+            require(not external or (path.is_absolute() and repo not in path.parents), 'retained external evidence')
+            return read(path, link['sha256'])[0]
+
+        relative = external_relative(candidate_path).as_posix()
+        require(relative.startswith('tests/product_corpus/candidates/'), 'retained candidate path')
+        value, candidate_sha = read(repo / relative)
+        projection = retained_candidate_metadata(value)
+        links = value['links']
+        records = {name: linked(link) for name, link in links.items()}
+        binding = verify_external_inputs(repo / links['source_binding']['path'], repo, value['source']['snapshot_root'])
+        require(binding['schema'] == 'codeskeptic-product-retained-github-input-check/v1'
+                and binding['binding_sha256'] == links['source_binding']['sha256']
+                and binding['adjudication_sha256'] == links['source_review']['sha256'], 'retained binding protocol')
+        manifest, review, rights, recipe, cdb = (records[name] for name in
+            ('source_binding', 'source_review', 'license_basis', 'analysis_profile', 'compiler_commands'))
+        require(manifest['id'] == review['id'] == value['id']
+                and manifest['adjudication'] == links['source_review']
+                and review['source']['sha256'] == projection['sha256']
+                and review['source_label']['family'] == projection['family']
+                and review['independence']['cluster'] == projection['cluster']
+                and review['origin']['id'] == projection['origin']
+                and review['origin']['repository'] == value['origin_repository'], 'retained source review linkage')
+        mapping = review['prospective_mapping']
+        expected = (mapping['expected'] if 'expected' in mapping else
+                    [{key: mapping[key] for key in ('rule', 'function', 'line', 'column', 'cwes', 'multiplicity')}])
+        require(canonical(expected) == canonical(value['expected']) and mapping['analyzer_run'] is False,
+                'retained prospective expectation mismatch')
+        source_reviews = review['review']
+        for key in ('proof_evidence', 'initial_review', 'addressability_proposal', 'supplement'):
+            path = Path(source_reviews[key])
+            actual, info, _ = external_read(path)
+            require(path.is_absolute() and repo not in path.parents
+                    and actual['sha256'] == source_reviews[key + '_sha256'], 'retained source review drift')
+            observations[path] = info
+
+        fields(rights, 'schema state id source_binding source_sha256 origin_revision references assessment boundary',
+               'retained rights boundary')
+        require(rights['schema'] == 'codeskeptic-product-retained-rights-basis/v1'
+                and rights['state'] == 'PROJECT_REFERENCES_BOUND_SOURCE_SPECIFIC_RIGHTS_UNRESOLVED'
+                and rights['id'] == value['id'] and rights['source_binding'] == links['source_binding']
+                and rights['source_sha256'] == projection['sha256']
+                and rights['origin_revision'] == review['origin']['revision'] and nonempty(rights['boundary']),
+                'retained rights/source linkage')
+        assessment = rights['assessment']
+        fields(assessment, 'upstream_project_spdx basis source_specific_boundary distribution_boundary '
+               'license_qualified redistribution_approved author_completeness_verified', 'retained rights assessment')
+        require(all(nonempty(assessment[key]) for key in ('upstream_project_spdx', 'basis',
+                    'source_specific_boundary', 'distribution_boundary'))
+                and all(assessment[key] is False for key in
+                        ('license_qualified', 'redistribution_approved', 'author_completeness_verified')),
+                'retained reference bytes are not rights clearance')
+        require(type(rights['references']) is list and len(rights['references']) == 3, 'retained rights references')
+        roles, names = [], set()
+        notices = {row['sha256'] for row in manifest['inputs'] if row['role'] == 'notice'}
+        for row in rights['references']:
+            fields(row, 'role path url size_bytes sha256', 'retained rights reference')
+            require(nonempty(row['url']) and row['url'].startswith('https://')
+                    and type(row['size_bytes']) is int and 0 < row['size_bytes'] <= 262144,
+                    'retained reference location/size')
+            external_digest(row['sha256'])
+            path = Path(row['path'])
+            require(path.is_absolute() and repo not in path.parents and str(path).casefold() not in names,
+                    'retained reference path')
+            names.add(str(path).casefold())
+            actual, info, _ = external_read(path)
+            require(actual == {key: row[key] for key in ('size_bytes', 'sha256')}, 'retained reference bytes')
+            if row['role'] in ('license-text', 'root-notice'):
+                require(row['sha256'] in notices, 'retained reference differs from source notices')
+            observations[path] = info
+            roles.append(row['role'])
+        require(roles == ['license-text', 'project-statement', 'root-notice'], 'retained reference roles')
+
+        fields(recipe, 'schema state id source_binding source definition_reference environment preflight '
+               'compiler_commands analyzer limits expected qualification boundary', 'retained native recipe')
+        require(recipe['schema'] == 'codeskeptic-product-retained-native-recipe/v1'
+                and recipe['state'] == 'PRE_RESULT_COMPILER_PREFLIGHT_REVIEWED_NOT_ANALYZED'
+                and recipe['id'] == value['id'] and recipe['source_binding'] == links['source_binding']
+                and recipe['source'] == {key: value['source'][key] for key in ('path', 'sha256', 'language')}
+                and recipe['compiler_commands'] == links['compiler_commands']
+                and canonical(recipe['expected']) == canonical(value['expected'])
+                and canonical(recipe['qualification']) == canonical(value['qualification']) and nonempty(recipe['boundary']),
+                'retained native recipe source/expectations')
+        validate_limits(recipe['limits'])
+        definition = recipe['definition_reference']
+        fields(definition, 'head files', 'retained recipe definition')
+        verify_reviewed_files(repo, definition['head'], definition['files'])
+        require({'src/source_manager/SourceManager.cpp', 'src/main.cpp', 'src/core/RuleCapabilities.def'}
+                <= {row['path'] for row in definition['files']}, 'retained CLI/frontend definition closure')
+        preflight = recipe['preflight']
+        fields(preflight, 'head wrapper observation review', 'retained preflight')
+        wrapper, native, native_review = (linked(preflight[key], external=True)
+                                          for key in ('wrapper', 'observation', 'review'))
+        for key in ('implementer', 'verifier'):
+            require(type(native_review[key]) is str and len(native_review[key]) <= 128
+                    and re.fullmatch(r'/[a-z0-9_]+(?:/[a-z0-9_]+)*', native_review[key]),
+                    'retained native reviewer identity')
+        fields(native_review['qualification'], 'admission_ready allocator_noninterposition_verified analyzer_run '
+               'calling_abi_verified candidate_executed compiler_runtime_closure_verified embedded_frontend_verified '
+               'evaluation_frozen hosted_qualification_verified image_signature_authenticated implemented_emission_verified '
+               'license_qualified native_product_qualified pop_authorized product_qualified publication_approved '
+               'quota_credit redistribution_approved runtime_allocator_semantics_verified source_admitted task_ready '
+               'upstream_authenticated', 'retained native review qualification')
+        require(native_review['schema'] == 'codeskeptic-native-preflight-review/v1'
+                and wrapper['schema'] == 'codeskeptic-retained-linux-native-preflight-driver/v1'
+                and native['schema'] == 'codeskeptic-retained-linux-native-preflight/v1'
+                and native_review['task_id'] == 'CS3-CH08-S01-U003'
+                and native_review['verdict'] == 'PASS_WITH_STATED_BOUNDARIES' and native_review['findings'] == []
+                and native_review['implementer'] != native_review['verifier']
+                and native_review['head'] == wrapper['head'] == preflight['head'] == definition['head']
+                and native_review['source_sha256'] == native['source_sha256'] == projection['sha256']
+                and native_review['wrapper_summary_sha256'] == preflight['wrapper']['sha256']
+                and native_review['observation_summary_sha256'] == wrapper['observation_sha256'] == preflight['observation']['sha256']
+                and wrapper['exit_code'] == 0 and type(wrapper['exit_code']) is int
+                and wrapper['source_binding'] == binding
+                and native_review['compilation_database_sha256'] == native['compilation_database_sha256'] == links['compiler_commands']['sha256']
+                and canonical(cdb) == canonical(native['compilation_database']), 'retained reviewed native preflight')
+        require(all(item is False for item in native_review['qualification'].values())
+                and native['candidate_and_abi_syntax_verified'] is True
+                and native['same_header_closure_verified'] is True
+                and native['before_after_input_identity_verified'] is True
+                and all(native[key] is False for key in ('analyzer_run', 'candidate_executed', 'native_product_qualified',
+                                                        'quota_credit', 'task_ready')),
+                'retained native evidence cannot qualify product')
+        # Preserve the raw compiler evidence as a live transitive input, not
+        # merely an inventory declared inside the previously reviewed summary.
+        streams = native['files']
+        require(type(streams) is list and len(streams) == 41, 'retained native stream inventory')
+        expected_commands = ['resource-directory', 'compiler-version']
+        for form in ('cdb', 'frontend-adjusted'):
+            expected_commands.extend(form + '-' + name for name in (
+                'candidate-dependencies-before', 'abi-dependencies-before', 'candidate-syntax', 'abi-syntax',
+                'wrong-width', 'wrong-malloc', 'wrong-free', 'candidate-dependencies-after', 'abi-dependencies-after'))
+        require(type(native['commands']) is list and len(native['commands']) == 20
+                and [row['name'] for row in native['commands']] == expected_commands,
+                'retained native command inventory')
+        expected_names = {'compile_commands.json'} | {name + suffix for name in expected_commands
+                                                       for suffix in ('.stdout', '.stderr')}
+        require({row['file'] for row in streams} == expected_names, 'retained native stream names')
+        directory = Path(preflight['observation']['path']).parent
+        expected_tree = {directory / 'summary.json', *(directory / name for name in expected_names)}
+        initial_tree = external_tree(directory, expected_tree)
+        for row in streams:
+            fields(row, 'file sha256 size_bytes', 'retained native stream')
+            require(type(row['size_bytes']) is int and 0 <= row['size_bytes'] <= 2 * 1024 * 1024,
+                    'retained native stream size')
+            external_digest(row['sha256'])
+            path = directory / row['file']
+            if row['size_bytes'] == 0:
+                require(row['sha256'] == hashlib.sha256(b'').hexdigest(), 'retained empty stream digest')
+                observations[path] = empty_native_stream(path)
+            else:
+                actual, info, _ = external_read(path)
+                require(actual == {key: row[key] for key in ('size_bytes', 'sha256')}, 'retained native stream drift')
+                observations[path] = info
+        require(external_tree(directory, expected_tree) == initial_tree, 'retained native stream tree changed')
+        producer_links = []
+        require(type(wrapper['producer_inputs']) is dict and len(wrapper['producer_inputs']) == 9,
+                'retained producer inputs')
+        for name, row in wrapper['producer_inputs'].items():
+            path = Path(name)
+            if repo in path.parents:
+                producer_links.append({'path': path.relative_to(repo).as_posix(), 'sha256': row['content']['sha256']})
+            else:
+                actual, info, _ = external_read(path)
+                require(actual == row['content'], 'retained external producer drift')
+                observations[path] = info
+        require({row['path'] for row in producer_links} == {
+            'scripts/product_profiles.py', 'scripts/product_identity.py', 'scripts/product_quality.py'},
+            'retained producer helper closure')
+        verify_reviewed_files(repo, preflight['head'], producer_links)
+        environment = recipe['environment']
+        require(environment['platform'] == 'linux-x86_64'
+                and environment['image_id'] == wrapper['image']
+                and environment['image_manifest_digest'] == wrapper['image_manifest_digest']
+                and environment['compiler'] == native['initial_identities']['/usr/bin/clang-20']
+                and environment['os_release'] == native['initial_identities']['/etc/os-release']
+                and environment['resource_directory'] == native['resource_directory']
+                and environment['observed_kernel'] == native['observed_kernel']
+                and environment['image_signature_authenticated'] is False
+                and environment['compiler_runtime_closure_verified'] is False, 'retained environment identity')
+        resource = native['resource_directory']
+        compiler = environment['compiler']['path']
+        arguments = [compiler, '--no-default-config', '-fno-modules', '--target=x86_64-pc-linux-gnu',
+                     '-resource-dir', resource, '-x', 'c', '-std=c17', '-fsyntax-only', '/input/case.c']
+        require(canonical(cdb) == canonical([{'directory': '/input', 'file': '/input/case.c', 'arguments': arguments}]),
+                'retained selected C17 command')
+        adjusted = [compiler, '-resource-dir', resource, '-fparse-all-comments', *arguments[1:]]
+        require(native['frontend_adjusted_arguments'] == adjusted, 'retained frontend-adjusted command')
+        base_env = {'PATH': '/usr/bin:/bin', 'LANG': 'C', 'LC_ALL': 'C', 'TMPDIR': '/tmp'}
+        selected_env = {**base_env, 'CODESKEPTIC_RESOURCE_DIR': resource}
+        command_projections = []
+        for name, argument in (('resource-directory', '-print-resource-dir'), ('compiler-version', '--version')):
+            command_projections.append({'name': name, 'argv': [compiler, '--no-default-config', argument],
+                                        'cwd': '/input', 'environment': base_env, 'exit_code': 0,
+                                        'expected_exit': 0, 'stderr_marker': None})
+        for form, argv in (('cdb', arguments), ('frontend-adjusted', adjusted)):
+            for name in expected_commands[2:11]:
+                suffix = name.removeprefix('cdb-')
+                name = form + '-' + suffix
+                bad = suffix in ('wrong-width', 'wrong-malloc', 'wrong-free')
+                path = ('/runner/' + suffix + '.c' if bad else
+                        '/runner/probe.c' if suffix.startswith('abi-') else '/input/case.c')
+                actual_argv = ([arg for arg in argv[:-1] if arg != '-fsyntax-only']
+                               + ['-M', '-MT', 'identity-probe', path] if 'dependencies' in suffix else [*argv[:-1], path])
+                command_projections.append({'name': name, 'argv': actual_argv, 'cwd': '/input', 'environment': selected_env,
+                                            'exit_code': int(bad), 'expected_exit': int(bad),
+                                            'stderr_marker': 'parent-child-' + suffix + '-control' if bad else None})
+                if bad:
+                    _, _, raw = external_read(directory / (name + '.stderr'), capture=True)
+                    require(command_projections[-1]['stderr_marker'].encode() in raw, 'retained failed assertion marker')
+        require(canonical(native['commands']) == canonical(command_projections), 'retained preflight command/status drift')
+        analyzer = recipe['analyzer']
+        fields(analyzer, 'state executable_sha256 cwd environment selected_rule all_current_rules required_conditions',
+               'retained analyzer recipe')
+        require(analyzer['state'] == 'PREDECLARED_NOT_EXECUTED' and analyzer['executable_sha256'] is None
+                and analyzer['cwd'] == '/profile'
+                and analyzer['environment'] == {'CODESKEPTIC_RESOURCE_DIR': resource, 'LANG': 'C', 'LC_ALL': 'C',
+                                               'PATH': '/usr/bin:/bin', 'TMPDIR': '/tmp'}
+                and type(analyzer['required_conditions']) is list and len(analyzer['required_conditions']) >= 1
+                and all(nonempty(row) for row in analyzer['required_conditions']), 'retained analyzer state')
+        common = ['/product/bin/codeskeptic', '--source', '/input/case.c', '--build-path', '/profile', '--json',
+                  '/output/' + value['family'] + '.json', '--severity', 'info', '--lang', 'en',
+                  '--worker-timeout-ms', str(LIMITS['worker_timeout_ms']), '--worker-memory-mb',
+                  str(LIMITS['worker_memory_mib']), '--no-analysis-cache']
+        families = ('memory-leak', 'uninit-ptr', 'uninit-scalar', 'double-free', 'use-after-free', 'resource-leak',
+                    'div-by-zero', 'null-deref', 'bounds', 'int-overflow', 'sign-conversion', 'alloc-size-overflow',
+                    'assumption', 'contract', 'policy')
+        all_current = list(common)
+        all_current[6] = '/output/all-current-rules.json'
+        require(analyzer['selected_rule'] == common + ['--disable-rule', ','.join(name for name in families if name != value['family'])]
+                and analyzer['all_current_rules'] == all_current + ['--assumptions'], 'retained predeclared CLI')
+        for path, before in observations.items():
+            require(path.resolve(strict=True) == path and external_identity(path.lstat()) == external_identity(before),
+                    'retained candidate final identity')
+        return {'candidate_sha256': candidate_sha, 'projection': projection, 'source_bytes_verified': True,
+                'pre_result_recipe_bound': True, 'fresh_independent_admission_required': True,
+                'linked_evidence_files': len(observations), 'independent_quota_examples': 0,
+                'task_ready': False, 'product_qualified': False}
+    except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError, IndexError):
+        raise ValueError('retained source candidate binding rejected') from None
+
+
+def verify_source_candidate(repo, candidate_path=GCC_SOURCE_CANDIDATE):
+    """Explicit schema dispatch; legacy records retain their original reader."""
+    try:
+        relative = external_relative(candidate_path).as_posix()
+        require(relative.startswith('tests/product_corpus/candidates/'), 'source candidate path')
+        _, _, raw = external_read(Path(repo) / relative, capture=True)
+        value = parse_json(raw.decode('utf-8'))
+        require(type(value) is dict, 'source candidate record')
+        if value.get('schema') == RETAINED_CANDIDATE:
+            return verify_retained_source_candidate(repo, relative)
+        require(relative == GCC_SOURCE_CANDIDATE
+                and value.get('schema') == 'codeskeptic-product-source-candidate/v1', 'source candidate schema')
+        return verify_gcc_source_candidate(repo)
+    except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError):
+        raise ValueError('source candidate dispatch rejected') from None
+
+
+def admission_review_metadata(review, candidate, candidate_sha, candidate_path=GCC_SOURCE_CANDIDATE):
     """Check a procedural source-count decision, never authenticate its author."""
     fields(review, "schema repository_head candidate_path candidate_sha256 source_sha256 implementer verifier "
            "verdict admitted_source_count projection reviewed_links rationale remaining_gaps qualification", "source admission review")
-    require(review["schema"] == "codeskeptic-source-admission-review/v1"
+    retained = type(candidate) is dict and candidate.get('schema') == RETAINED_CANDIDATE
+    relative = external_relative(candidate_path).as_posix()
+    require(relative.startswith('tests/product_corpus/candidates/')
+            and (retained or relative == GCC_SOURCE_CANDIDATE), 'source admission candidate path')
+    require(review["schema"] == ("codeskeptic-source-admission-review/v2" if retained
+                                  else "codeskeptic-source-admission-review/v1")
             and type(review["repository_head"]) is str and re.fullmatch(r"[0-9a-f]{40}", review["repository_head"])
             and review["repository_head"] != "0" * 40
-            and review["candidate_path"] == GCC_SOURCE_CANDIDATE and review["candidate_sha256"] == candidate_sha
+            and review["candidate_path"] == relative and review["candidate_sha256"] == candidate_sha
             and review["verdict"] == "ADMIT_ONE_SOURCE" and type(review["admitted_source_count"]) is int
             and review["admitted_source_count"] == 1, "source admission identity/verdict")
     for key in ("implementer", "verifier"):
         require(type(review[key]) is str and re.fullmatch(r"/[a-z0-9_]+(?:/[a-z0-9_]+)*", review[key])
                 and len(review[key]) <= 128, "source admission agent identity")
     require(review["implementer"] != review["verifier"], "source admission is not independent")
-    projection = {**gcc_candidate_metadata(candidate), "quota": True}
+    projection = {**(retained_candidate_metadata(candidate) if retained else gcc_candidate_metadata(candidate)), "quota": True}
     require(review["source_sha256"] == projection["sha256"]
             and canonical(review["projection"]) == canonical(projection)
             and canonical(review["reviewed_links"]) == canonical(candidate["links"])
@@ -794,14 +1163,18 @@ def verify_source_selection(repo, link):
         rows = []
         for entry in value["admissions"]:
             fields(entry, "candidate review", "source admission entry")
-            require(type(entry["candidate"]) is dict and entry["candidate"].get("path") == GCC_SOURCE_CANDIDATE,
-                    "unimplemented source candidate schema")
+            require(type(entry["candidate"]) is dict, "source candidate entry")
+            candidate_path = external_relative(entry['candidate']['path']).as_posix()
+            require(candidate_path.startswith('tests/product_corpus/candidates/'), 'source candidate entry path')
             candidate = read_link(entry["candidate"], maximum=65536)
             review = read_link(entry["review"], external=True, maximum=65536)
-            projection = admission_review_metadata(review, candidate, entry["candidate"]["sha256"])
-            require(origins.get(projection["origin"]) == "https://github.com/gcc-mirror/gcc", "candidate canonical origin")
+            projection = admission_review_metadata(review, candidate, entry["candidate"]["sha256"], candidate_path)
+            retained = candidate.get('schema') == RETAINED_CANDIDATE
+            require(origins.get(projection["origin"]) == (candidate['origin_repository'] if retained
+                                                        else "https://github.com/gcc-mirror/gcc"), "candidate canonical origin")
             verify_reviewed_files(repo, review["repository_head"], [entry["candidate"], *review["reviewed_links"].values()])
-            actual = verify_gcc_source_candidate(repo)
+            actual = (verify_retained_source_candidate(repo, candidate_path) if retained
+                      else verify_gcc_source_candidate(repo))
             require(actual["candidate_sha256"] == entry["candidate"]["sha256"]
                     and canonical({**actual["projection"], "quota": True}) == canonical(projection),
                     "admitted candidate no longer matches actual inputs")
@@ -1797,10 +2170,13 @@ def main():
     parser.add_argument("--historical-sources", type=Path, default=Path(
         "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S04-U001/corpus-diagnostic-comparison"))
     parser.add_argument("--binding", type=Path, help="tracked binding manifest (absolute path)")
+    parser.add_argument('--candidate', help='explicit repository-relative source-candidate record; source-candidate-check only')
     parser.add_argument("--external-root", type=Path, help="explicit external snapshot root (absolute canonical path)")
     parser.add_argument("--evidence-root", type=Path, help="explicit external license-reference directory")
     args = parser.parse_args()
     try:
+        require(args.command == 'source-candidate-check' or args.candidate is None,
+                'candidate selector is only valid for source-candidate-check')
         if args.command == "selection-check":
             require(args.binding is None and args.evidence_root is None and args.external_root is None,
                     "reviewed selection uses its explicit tracked roots")
@@ -1817,7 +2193,8 @@ def main():
         elif args.command == "source-candidate-check":
             require(args.binding is None and args.evidence_root is None and args.external_root is None,
                     "source candidate uses its explicit tracked roots")
-            result = verify_gcc_source_candidate(args.root)
+            result = (verify_source_candidate(args.root, args.candidate) if args.candidate is not None
+                      else verify_gcc_source_candidate(args.root))
         elif args.command == "license-basis-check":
             require(args.binding is None, "GCC licensing uses its fixed tracked binding")
             result = verify_gcc_license_basis(args.root, args.evidence_root, args.external_root)
