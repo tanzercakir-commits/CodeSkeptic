@@ -4343,5 +4343,578 @@ class SourceCohortNativeTests(unittest.TestCase):
         self.assertNotIn(str(self.fixture.base), result.stderr)
 
 
+class SourceCohortGroundTruthFixture(SourceCohortNativeFixture):
+    """Literal synthetic label/recipe protocol; no new production builder.
+
+    The inherited native packet keeps its original behavior. Additional small
+    Git commits bind invented reference and proposal bytes, never real labels,
+    semantic approval, source admission or analyzer execution.
+    """
+
+    reference_paths = (
+        'src/core/RuleCapabilities.def', 'src/core/Capabilities.cpp', 'src/rules/AssumptionRule.cpp',
+        'src/rules/ContractRule.cpp', 'src/rules/PolicyRule.cpp', 'scripts/cwe_quality.py',
+        'scripts/product_quality.py', 'docs/product-quality-contract.md',
+        'src/config/Config.cpp', 'src/config/Config.h', 'src/analyzer/StaticAnalyzer.cpp',
+        'src/rules/MemoryLeakRule_Ex.cpp', 'src/main.cpp', 'src/source_manager/SourceManager.cpp',
+        'src/analyzer/BuiltinRules.h', 'src/core/AnalysisResult.h',
+        'src/source_manager/CompilationDatabaseDiscovery.cpp', 'src/contracts/ContractInfo.cpp',
+        'src/contracts/Sidecar.cpp', 'src/analyzer/SuppressionFilter.cpp',
+        'src/source_manager/InputIdentity.cpp', 'src/source_manager/ResourceDir.cpp')
+    family_names = ('alloc-size-overflow', 'bounds', 'command-injection', 'div-by-zero', 'double-free',
+                    'format-string', 'int-overflow', 'memory-leak', 'null-deref', 'path-traversal',
+                    'resource-leak', 'sign-conversion', 'sql-injection', 'uninit-ptr',
+                    'uninit-scalar', 'use-after-free')
+    planned = frozenset(('command-injection', 'format-string', 'path-traversal', 'sql-injection'))
+
+    def __init__(self, owner):
+        super().__init__(owner)
+        for relative in self.reference_paths:
+            path = self.repo / relative
+            if not path.exists():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('Synthetic all-rule reference: ' + relative + '\n', encoding='utf-8')
+        self.git('add', '--', *self.reference_paths)
+        self.git('commit', '--no-gpg-sign', '-qm', 'Synthetic label reference definitions')
+        self.reference_head = self.git('rev-parse', 'HEAD')
+        recipe = {
+            'schema': 'codeskeptic-product-cohort-analysis-recipe/v1', 'state': 'UNEXECUTED_NOT_REALIZED',
+            'binary': None, 'inherit_environment': False, 'realized': False, 'source_entries': list(self.names),
+            'working_directory_template': '{profile_directory}',
+            'argv_template': ['{binary}', '--source', '{source}', '--build-path', '{profile_directory}',
+                              '--json', '{report}', '--severity', 'info', '--lang', 'en',
+                              '--worker-timeout-ms', '120000', '--worker-memory-mb', '2048',
+                              '--no-analysis-cache', '--assumptions'],
+            'environment_template': {'LANG': 'C', 'LC_ALL': 'C', 'PATH': '{binary_directory}:/usr/bin:/bin',
+                                     'TMPDIR': '{temporary_directory}',
+                                     'CODESKEPTIC_RESOURCE_DIR': '/usr/lib/llvm-20/lib/clang/20'},
+            'compilation_database_template': [{
+                'directory': '{source_directory}', 'file': '{source}',
+                'arguments': ['/usr/bin/clang-20', '--no-default-config', '-fno-modules',
+                              '--target=x86_64-pc-linux-gnu', '-resource-dir', '/usr/lib/llvm-20/lib/clang/20',
+                              '-x', 'c', '-std=c17', '-fsyntax-only', '{source}']}],
+            'native_compilation_database_sha256': profiles.file_sha(self.output / 'compile_commands.json'),
+            'settings': {'rule_mode': 'all-installed-defaults', 'assumptions': True, 'severity': 'info',
+                         'analysis_cache': False, 'warm_cache': False, 'assert_recovery': True,
+                         'scope': 'full-functions-selected-tu',
+                         'repetitions': 3, 'case_timeout_seconds': 30, 'worker_timeout_ms': 120000,
+                         'worker_memory_mib': 2048, 'capture_bytes_per_stream': 2097152},
+            'pending_bindings': ['binary-source-build-content-identity', 'source-path-mapping',
+                                 'per-invocation-cdb-bytes', 'profile-directory-and-config-absence',
+                                 'report-destination', 'temporary-directory', 'environment-realization',
+                                 'compiler-resource-header-identity', 'header-and-source-contract-absence',
+                                 'embedded-frontend-identity-and-adjustment'],
+            'required_absences': ['cwd-project-config', 'undeclared-source-and-header-csk-sidecars',
+                                  'undeclared-cs-contract-comments', 'codeskeptic-suppression-directives',
+                                  'response-files-and-undeclared-cdb-inputs', 'baseline-and-write-baseline',
+                                  'custom-models-and-registries', 'summary-input-output-diff',
+                                  'custom-policy-settings', 'function-line-report-filters',
+                                  'whole-program-checkpoint-resume-server', 'broken-tu-recovery-and-partial-coverage-acceptance',
+                                  'inherited-loader-compiler-sdk-home-environment']}
+        entries = []
+        for offset, wrapped in enumerate(self.value['records']):
+            source = wrapped['value']
+            line_count = len(source['source']['text'].splitlines())
+            lines = list(range(1, line_count + 1))
+            families = []
+            for rule in self.family_names:
+                role = 'unsupported' if rule in self.planned else 'unknown' if rule == 'uninit-ptr' else 'safe'
+                expected = None if role in ('unknown', 'unsupported') else []
+                if rule == source['family']:
+                    role, expected = source['role'], copy.deepcopy(source['expected'])
+                families.append({'rule': rule,
+                                 'availability': 'PLANNED_NOT_IMPLEMENTED' if rule in self.planned else 'INSTALLED_AT_REFERENCE_HEAD',
+                                 'role': role, 'expected': expected, 'source_lines': list(lines),
+                                 'rationale': 'PRIVATE_SYNTHETIC_RATIONALE: structure only, no semantic authority.'})
+            assumption = {'rule': 'assumption', 'role': 'trigger', 'expected': [{
+                'rule': 'assumption', 'function': 'candidate' if offset == 0 else 'safe_control',
+                'line': 4, 'column': 3, 'cwes': [], 'multiplicity': 2, 'severity': 'Info'}],
+                'source_lines': list(lines), 'rationale': 'Synthetic Info assumption occurrence, never a CWE metric.'}
+            project = [assumption,
+                       {'rule': 'contract', 'role': 'no-trigger', 'expected': [], 'source_lines': list(lines),
+                        'rationale': 'Synthetic no-trigger fixture.'},
+                       {'rule': 'policy', 'role': 'unsupported', 'expected': None, 'source_lines': list(lines),
+                        'rationale': 'Synthetic unsupported fixture, not scored safe.'}]
+            entries.append({'entry': self.entry_link(offset), 'source': {'language': 'C17', 'line_count': line_count},
+                            'assumptions': copy.deepcopy(source['assumptions']), 'families': families,
+                            'project_diagnostics': project})
+        self.labels = {'schema': 'codeskeptic-product-cohort-all-rule-ground-truth/v1',
+                       'state': 'SOURCE_DERIVED_LABELS_FOR_INDEPENDENT_REVIEW', 'id': 'llvm-caller-slot-labels-v1',
+                       'profile': 'caller-slot-all-installed-assumptions-v1', 'reference_head': self.reference_head,
+                       'references': [{'path': relative, 'sha256': profiles.file_sha(self.repo / relative)}
+                                      for relative in self.reference_paths],
+                       'native_evidence': {'path': self.evidence_path, 'sha256': profiles.file_sha(self.packet_path)},
+                       'analysis_recipe': recipe, 'data_model': {'char_bit': 8, 'int_bits': 32, 'size_t_bits': 64, 'pointer_bits': 64},
+                       'entries': entries, 'limits': copy.deepcopy(profiles.LIMITS), 'additional_quota_examples': 0,
+                       'qualification': copy.deepcopy(self.value['qualification']),
+                       'boundary': 'Synthetic proposal only; no analyzer, semantic authority, admission, quota or qualification.'}
+        self.labels_path = 'tests/product_corpus/cohort_labels/synthetic-caller-slot-labels.json'
+        self.labels_file = self.repo / self.labels_path
+        self.save_labels()
+        self.git('add', '--', self.labels_path, self.evidence_path)
+        self.git('commit', '--no-gpg-sign', '-qm', 'Synthetic standalone label proposal')
+        self.review_head = self.git('rev-parse', 'HEAD')
+        self.semantic_review_path = self.base / 'PRIVATE_SEMANTIC_REVIEW.json'
+        self.semantic_review = {'schema': 'codeskeptic-cohort-all-rule-review/v1', 'repository_head': self.review_head,
+                                'record': {'path': self.labels_path, 'sha256': profiles.file_sha(self.labels_file)},
+                                'native_evidence': copy.deepcopy(self.labels['native_evidence']),
+                                'entries': [copy.deepcopy(row['entry']) for row in entries],
+                                'analysis_recipe_sha256': self.digest(profiles.canonical(recipe).encode('utf-8')),
+                                'implementer': '/root', 'verifier': '/root/synthetic_labels_verifier',
+                                'verdict': 'ACCEPT_SOURCE_LABELS', 'findings': [],
+                                'rationale': 'PRIVATE_SYNTHETIC_REVIEW: fabricated protocol fixture, never actual semantic approval.',
+                                'additional_quota_examples': 0, 'qualification': copy.deepcopy(self.value['qualification'])}
+        self.write_semantic_review()
+
+    def save_labels(self):
+        self.write(self.labels_file, self.labels)
+
+    def write_semantic_review(self):
+        digest = self.write(self.semantic_review_path, self.semantic_review)
+        self.semantic_review_link = {'path': str(self.semantic_review_path), 'sha256': digest}
+
+    def family(self, rule, entry=0):
+        return next(row for row in self.labels['entries'][entry]['families'] if row['rule'] == rule)
+
+
+class SourceCohortGroundTruthTests(unittest.TestCase):
+    """Standalone synthetic labels preserve source targets and every credit boundary."""
+
+    def setUp(self):
+        self.fixture = SourceCohortGroundTruthFixture(self)
+
+    def assert_result(self, result, *, reviewed=False, cwe=1, project=4, unscored=10):
+        expected = {'total_sources': 2, 'family_labels': 32, 'project_diagnostics': 6,
+                    'proposed_cwe_occurrences': cwe, 'proposed_project_occurrences': project,
+                    'unscored_family_rows': unscored, 'admitted_sources': 0, 'additional_quota_examples': 0}
+        for key, value in expected.items():
+            self.assertEqual(result[key], value)
+        self.assertIs(result['source_bytes_verified'], True)
+        self.assertIs(result['source_labels_independently_reviewed'], reviewed)
+        self.assertEqual(result['review_head'], self.fixture.review_head if reviewed else None)
+        self.assertEqual(result['reference_head'], self.fixture.reference_head)
+        self.assertEqual(result['record_sha256'], profiles.file_sha(self.fixture.labels_file))
+        self.assertEqual(result['native_packet_sha256'], profiles.file_sha(self.fixture.packet_path))
+        for key in profiles.SOURCE_QUALIFICATION.split():
+            self.assertIs(result[key], False)
+        public = profiles.canonical(result)
+        for private in ('PRIVATE_', '#include', str(self.fixture.base), 'argv_template', 'rationale', 'assumptions'):
+            self.assertNotIn(private, public)
+        for metric in ('tp', 'fp', 'fn', 'precision', 'recall'):
+            self.assertNotIn(metric, result)
+
+    def assert_rejected(self, read, fixture=None, *, review=None, path=None):
+        fixture = fixture or self.fixture
+        output = io.StringIO()
+        with mock.patch.object(sys, 'stdout', output), \
+                self.assertRaisesRegex(ValueError, '^source cohort all-rule labels rejected$'):
+            read(fixture.repo, path if path is not None else fixture.labels_path, review=review)
+        self.assertEqual(output.getvalue(), '')
+
+    def assert_label_variants(self, variants):
+        read = profiles.verify_cohort_ground_truth
+        original = copy.deepcopy(self.fixture.labels)
+        for keys, replacement in variants:
+            self.fixture.labels = copy.deepcopy(original)
+            SourceCohortTests.replace(self.fixture.labels, keys, replacement)
+            self.fixture.save_labels()
+            with self.subTest(path=keys, replacement=repr(replacement)[:80]):
+                self.assert_rejected(read)
+
+    def cli(self, *arguments):
+        return subprocess.run([sys.executable, '-B', str(Path(__file__).resolve().with_name('product_profiles.py')),
+                               *arguments], capture_output=True, text=True, check=False, timeout=15)
+
+    def test_unreviewed_labels_bind_actual_source_native_recipe_and_git_without_admission(self):
+        read = profiles.verify_cohort_ground_truth
+        execute = subprocess.run
+        calls = []
+        def git_reads_only(argv, *args, **kwargs):
+            self.assertEqual(argv[0], 'git')
+            self.assertTrue(any(item in argv for item in ('cat-file', 'ls-tree', 'merge-base', 'rev-parse')))
+            calls.append(argv)
+            return execute(argv, *args, **kwargs)
+        with mock.patch.object(profiles.subprocess, 'run', side_effect=git_reads_only), \
+                mock.patch.object(profiles.urllib.request, 'urlopen', side_effect=AssertionError('no network')), \
+                mock.patch.object(profiles.urllib.request, 'build_opener', side_effect=AssertionError('no network')), \
+                mock.patch.object(profiles, 'verify_source_selection', side_effect=AssertionError('no admission prerequisite')), \
+                mock.patch.object(profiles, 'admission_review_metadata', side_effect=AssertionError('no admission prerequisite')), \
+                mock.patch.object(Path, 'write_bytes', side_effect=AssertionError('reader cannot write')), \
+                mock.patch.object(Path, 'write_text', side_effect=AssertionError('reader cannot write')):
+            result = read(self.fixture.repo, self.fixture.labels_path)
+        self.assertTrue(calls)
+        self.assert_result(result)
+        self.assertEqual(len(self.fixture.labels['analysis_recipe']['compilation_database_template']), 1)
+        self.assertEqual(len(self.fixture.cdb), 2)
+
+    def test_optional_review_binds_exact_proposal_without_granting_source_or_control_credit(self):
+        read = profiles.verify_cohort_ground_truth
+        guard = {}
+        with mock.patch.object(profiles, 'verify_source_selection', side_effect=AssertionError('no source admission')):
+            result = read(self.fixture.repo, self.fixture.labels_path,
+                          review=self.fixture.semantic_review_link, _input_guard=guard)
+        self.assert_result(result, reviewed=True)
+        self.assertTrue({self.fixture.labels_file, self.fixture.packet_path, self.fixture.cohort_path,
+                         self.fixture.source_path, self.fixture.capture_path, self.fixture.semantic_review_path,
+                         self.fixture.output / 'compile_commands.json'} <= set(guard))
+
+    def test_info_diagnostics_with_empty_cwes_have_separate_multiplicity_counts(self):
+        read = profiles.verify_cohort_ground_truth
+        assumption = self.fixture.labels['entries'][0]['project_diagnostics'][0]
+        self.assertEqual(assumption['expected'][0]['cwes'], [])
+        assumption['expected'][0]['multiplicity'] = 7
+        self.fixture.save_labels()
+        self.assert_result(read(self.fixture.repo, self.fixture.labels_path), cwe=1, project=9)
+
+    def test_unknown_and_unsupported_are_null_and_never_counted_as_scored_safe(self):
+        read = profiles.verify_cohort_ground_truth
+        row = self.fixture.family('uninit-ptr')
+        for role in ('unknown', 'unsupported'):
+            row.update(role=role, expected=None)
+            self.fixture.save_labels()
+            self.assert_result(read(self.fixture.repo, self.fixture.labels_path), unscored=10)
+        for entry in self.fixture.labels['entries']:
+            next(row for row in entry['families'] if row['rule'] == 'uninit-ptr').update(role='safe', expected=[])
+        self.fixture.save_labels()
+        self.assert_result(read(self.fixture.repo, self.fixture.labels_path), unscored=8)
+
+    def test_label_envelope_native_link_data_model_limits_and_qualifications_are_strict(self):
+        variants = [(('schema',), 'codeskeptic-product-retained-source-all-rule-ground-truth/v1'),
+                    (('state',), 'ACCEPTED'), (('id',), 'other-labels'), (('profile',), 'other-profile'),
+                    (('extra',), 'PRIVATE_EXTRA_SENTINEL'), (('boundary',), ''), (('boundary',), 'x' * 8193),
+                    (('native_evidence', 'sha256'), 'e' * 64),
+                    (('native_evidence', 'path'), 'tests/product_corpus/candidates/borrowed.json'),
+                    (('data_model', 'char_bit'), True), (('data_model', 'pointer_bits'), 32),
+                    (('data_model', 'extra'), 1), (('additional_quota_examples',), False),
+                    (('additional_quota_examples',), 1), (('limits', 'repetitions'), True)]
+        variants += [(('qualification', key), value) for key in profiles.SOURCE_QUALIFICATION.split() for value in (True, 0)]
+        self.assert_label_variants(variants)
+
+    def test_recipe_templates_settings_environment_pending_bindings_and_absences_are_exact(self):
+        recipe = self.fixture.labels['analysis_recipe']
+        prefix = ('analysis_recipe',)
+        variants = [(prefix + (key,), replacement) for key, replacement in (
+            ('schema', 'legacy-recipe'), ('state', 'REALIZED'), ('binary', '/PRIVATE_BINARY_SENTINEL'),
+            ('inherit_environment', 0), ('realized', True), ('source_entries', list(reversed(self.fixture.names))),
+            ('working_directory_template', '{source_directory}'), ('pending_bindings', recipe['pending_bindings'][:-1]),
+            ('required_absences', recipe['required_absences'][:-1]), ('native_compilation_database_sha256', 'e' * 64),
+            ('argv_template', recipe['argv_template'][:-1]), ('extra', True),
+            ('compilation_database_template', recipe['compilation_database_template'] * 2))]
+        variants.extend([(prefix + ('environment_template', 'LD_PRELOAD'), 'PRIVATE_ENV_SENTINEL'),
+                         (prefix + ('environment_template', 'CODESKEPTIC_RESOURCE_DIR'), '/other-resource'),
+                         (prefix + ('compilation_database_template', 0, 'directory'), '/input'),
+                         (prefix + ('settings', 'rule_mode'), 'memory-leak-only'),
+                         (prefix + ('settings', 'assumptions'), 1), (prefix + ('settings', 'analysis_cache'), True),
+                         (prefix + ('settings', 'assert_recovery'), False),
+                         (prefix + ('settings', 'warm_cache'), True), (prefix + ('settings', 'scope'), 'selected-function'),
+                         (prefix + ('settings', 'severity'), 'warning'), (prefix + ('settings', 'repetitions'), 1),
+                         (prefix + ('settings', 'case_timeout_seconds'), True),
+                         (prefix + ('settings', 'capture_bytes_per_stream'), 4096)])
+        self.assert_label_variants(variants)
+
+    def test_exact_pair_ids_source_hashes_assumptions_and_line_counts_cannot_be_borrowed(self):
+        variants = [(('entries',), self.fixture.labels['entries'][:1]),
+                    (('entries',), list(reversed(self.fixture.labels['entries']))),
+                    (('entries', 0, 'entry', 'id'), self.fixture.names[1]),
+                    (('entries', 1, 'entry', 'record_sha256'), 'e' * 64),
+                    (('entries', 0, 'entry', 'source_sha256'), 'e' * 64),
+                    (('entries', 0, 'entry', 'sha256'), 'e' * 64),
+                    (('entries', 0, 'entry', 'path'), 'tests/product_corpus/cohorts/foreign.json'),
+                    (('entries', 1, 'assumptions'), ['Silently relaxed caller-slot condition']),
+                    (('entries', 0, 'source', 'language'), 'C++17'),
+                    (('entries', 0, 'source', 'line_count'), True),
+                    (('entries', 1, 'source', 'line_count'), 999),
+                    (('entries', 0, 'source', 'text'), 'PRIVATE_SOURCE_SENTINEL')]
+        self.assert_label_variants(variants)
+
+    def test_all_families_and_project_rules_have_exact_coverage_order_and_availability(self):
+        entries = self.fixture.labels['entries']
+        planned = self.fixture.family_names.index('sql-injection')
+        variants = [(('entries', 0, 'families'), entries[0]['families'][:-1]),
+                    (('entries', 0, 'families'), list(reversed(entries[0]['families']))),
+                    (('entries', 0, 'families', planned, 'availability'), 'INSTALLED_AT_REFERENCE_HEAD'),
+                    (('entries', 0, 'families', 0, 'availability'), 'PLANNED_NOT_IMPLEMENTED'),
+                    (('entries', 0, 'families', 0, 'rule'), 'foreign-family'),
+                    (('entries', 1, 'project_diagnostics'), list(reversed(entries[1]['project_diagnostics']))),
+                    (('entries', 0, 'project_diagnostics'), entries[0]['project_diagnostics'][:2]),
+                    (('entries', 1, 'project_diagnostics', 0, 'availability'), 'INSTALLED_AT_REFERENCE_HEAD')]
+        self.assert_label_variants(variants)
+
+    def test_source_target_role_coordinates_cwes_and_multiplicity_are_preserved_exactly(self):
+        offset = self.fixture.family_names.index('memory-leak')
+        prefix = ('entries', 0, 'families', offset)
+        variants = [(prefix + ('role',), 'safe'), (prefix + ('expected',), []),
+                    (prefix + ('expected', 0, 'function'), 'another_function'),
+                    (prefix + ('expected', 0, 'line'), 5), (prefix + ('expected', 0, 'column'), 2),
+                    (prefix + ('expected', 0, 'cwes'), [415]), (prefix + ('expected', 0, 'multiplicity'), 2),
+                    (('entries', 1, 'families', offset, 'role'), 'unknown'),
+                    (('entries', 1, 'families', offset, 'expected'), None)]
+        self.assert_label_variants(variants)
+
+    def test_family_and_project_roles_enforce_nonempty_empty_and_null_distinctions(self):
+        read = profiles.verify_cohort_ground_truth
+        original = copy.deepcopy(self.fixture.labels)
+        for project in (False, True):
+            cases = (('trigger', []), ('trigger', None), ('no-trigger', None), ('unknown', []), ('unsupported', [])) if project else (
+                ('buggy', []), ('buggy', None), ('safe', None), ('unknown', []), ('unsupported', []))
+            for role, expected in cases:
+                self.fixture.labels = copy.deepcopy(original)
+                row = (self.fixture.labels['entries'][0]['project_diagnostics'][1] if project
+                       else self.fixture.family('double-free'))
+                row.update(role=role, expected=expected)
+                self.fixture.save_labels()
+                with self.subTest(project=project, role=role, expected=expected):
+                    self.assert_rejected(read)
+
+    def test_occurrence_and_source_line_shapes_reject_bool_foreign_and_duplicate_fields(self):
+        prefix = ('entries', 0, 'project_diagnostics', 0)
+        variants = [(prefix + ('expected', 0, key), replacement) for key, replacement in (
+            ('rule', 'policy'), ('function', ''), ('function', 'x' * 513), ('line', True), ('line', 999),
+            ('column', True), ('column', 0), ('column', 999), ('multiplicity', False), ('multiplicity', 1000001),
+            ('cwes', [401]), ('severity', 'Warning'), ('extra', True))]
+        variants += [(prefix + (key,), replacement) for key, replacement in (
+            ('source_lines', []), ('source_lines', [True]), ('source_lines', [1, 1]), ('source_lines', [2, 1]),
+            ('source_lines', [999]), ('rationale', ''), ('rationale', 'x' * 8193), ('extra', True))]
+        occurrence = self.fixture.labels['entries'][0]['project_diagnostics'][0]['expected'][0]
+        duplicate = copy.deepcopy(occurrence)
+        duplicate['multiplicity'] = 3
+        variants.append((prefix + ('expected',), [occurrence, duplicate]))
+        self.assert_label_variants(variants)
+
+    def test_utf8_byte_column_bound_and_non_target_cwe_multiplicity_are_structural(self):
+        read = profiles.verify_cohort_ground_truth
+        line = self.fixture.value['records'][0]['value']['source']['text'].splitlines()[2]
+        self.assertGreater(len(line.encode('utf-8')), len(line))
+        row = self.fixture.family('double-free')
+        row.update(role='buggy', expected=[{'rule': 'double-free', 'function': 'synthetic_only', 'line': 3,
+                                          'column': len(line.encode('utf-8')) + 1, 'cwes': [415], 'multiplicity': 3}])
+        self.fixture.save_labels()
+        self.assert_result(read(self.fixture.repo, self.fixture.labels_path), cwe=4)
+        row['expected'][0]['column'] += 1
+        self.fixture.save_labels()
+        self.assert_rejected(read)
+
+    def test_family_cwes_and_duplicate_occurrence_identity_are_strict(self):
+        read = profiles.verify_cohort_ground_truth
+        original = copy.deepcopy(self.fixture.labels)
+        occurrence = {'rule': 'double-free', 'function': 'synthetic_only', 'line': 4,
+                      'column': 1, 'cwes': [415], 'multiplicity': 1}
+        for mutation in ('empty', 'bool', 'duplicate-cwe', 'unsorted', 'too-many', 'duplicate-occurrence'):
+            self.fixture.labels = copy.deepcopy(original)
+            row = self.fixture.family('double-free')
+            row.update(role='buggy', expected=[copy.deepcopy(occurrence)])
+            if mutation == 'duplicate-occurrence': row['expected'].append({**occurrence, 'multiplicity': 2})
+            else: row['expected'][0]['cwes'] = {'empty': [], 'bool': [True], 'duplicate-cwe': [415, 415],
+                                               'unsorted': [415, 401], 'too-many': list(range(1, 28))}[mutation]
+            self.fixture.save_labels()
+            with self.subTest(mutation=mutation):
+                self.assert_rejected(read)
+
+    def test_references_require_exact_order_hash_and_actual_ancestor_blobs(self):
+        read = profiles.verify_cohort_ground_truth
+        original = copy.deepcopy(self.fixture.labels)
+        for mutation in ('reorder', 'missing', 'duplicate', 'stale-sha', 'current-only', 'nonancestor'):
+            self.fixture.labels = copy.deepcopy(original)
+            refs = self.fixture.labels['references']
+            if mutation == 'reorder': refs.reverse()
+            elif mutation == 'missing': refs.pop()
+            elif mutation == 'duplicate': refs.append(copy.deepcopy(refs[0]))
+            elif mutation == 'stale-sha': refs[-1]['sha256'] = 'e' * 64
+            elif mutation == 'current-only':
+                path = self.fixture.repo / refs[-1]['path']
+                path.write_bytes(b'PRIVATE_CURRENT_CHECKOUT_SENTINEL\n')
+                refs[-1]['sha256'] = profiles.file_sha(path)
+            else:
+                tree = self.fixture.git('rev-parse', 'HEAD^{tree}')
+                self.fixture.labels['reference_head'] = self.fixture.git('commit-tree', tree, '-m', 'Synthetic unparented reference')
+            self.fixture.save_labels()
+            with self.subTest(mutation=mutation):
+                self.assert_rejected(read)
+
+    def test_later_checkout_and_helper_changes_preserve_historical_reference_and_review(self):
+        read = profiles.verify_cohort_ground_truth
+        self.assert_result(read(self.fixture.repo, self.fixture.labels_path, review=self.fixture.semantic_review_link), reviewed=True)
+        helper = self.fixture.repo / 'scripts/product_quality.py'
+        helper.write_bytes(b'Later helper implementation; historical source/native/reference blobs remain pinned.\n')
+        self.fixture.git('add', '--', 'scripts/product_quality.py')
+        self.fixture.git('commit', '--no-gpg-sign', '-qm', 'Synthetic later unrelated helper integration')
+        self.assertNotEqual(self.fixture.git('rev-parse', 'HEAD'), self.fixture.review_head)
+        self.assert_result(read(self.fixture.repo, self.fixture.labels_path, review=self.fixture.semantic_review_link), reviewed=True)
+
+    def test_optional_review_schema_agents_links_recipe_findings_and_credit_are_bound(self):
+        read = profiles.verify_cohort_ground_truth
+        original = copy.deepcopy(self.fixture.semantic_review)
+        variants = [(('schema',), 'codeskeptic-source-admission-review/v2'), (('verdict',), 'PASS'),
+                    (('implementer',), '/root/synthetic_labels_verifier'), (('verifier',), 'bad identity'),
+                    (('findings',), ['PRIVATE_FINDING_SENTINEL']), (('record', 'sha256'), 'e' * 64),
+                    (('native_evidence', 'sha256'), 'e' * 64), (('entries',), list(reversed(original['entries']))),
+                    (('analysis_recipe_sha256',), 'e' * 64), (('additional_quota_examples',), True),
+                    (('additional_quota_examples',), 1), (('rationale',), ''), (('rationale',), 'x' * 8193),
+                    (('qualification', 'evaluation_frozen'), True), (('extra',), True)]
+        for keys, replacement in variants:
+            self.fixture.semantic_review = copy.deepcopy(original)
+            SourceCohortTests.replace(self.fixture.semantic_review, keys, replacement)
+            self.fixture.write_semantic_review()
+            with self.subTest(path=keys):
+                self.assert_rejected(read, review=self.fixture.semantic_review_link)
+
+    def test_review_requires_proposal_native_and_cohort_bytes_at_its_actual_git_head(self):
+        read = profiles.verify_cohort_ground_truth
+        self.fixture.semantic_review['repository_head'] = self.fixture.head  # Ancestor predates the label/native proposal.
+        self.fixture.write_semantic_review()
+        self.assert_rejected(read, review=self.fixture.semantic_review_link)
+        self.fixture.semantic_review['repository_head'] = self.fixture.review_head
+        self.fixture.labels['boundary'] += ' Current-only label change absent from reviewed Git bytes.'
+        self.fixture.save_labels()
+        self.fixture.semantic_review['record']['sha256'] = profiles.file_sha(self.fixture.labels_file)
+        self.fixture.write_semantic_review()
+        self.assert_rejected(read, review=self.fixture.semantic_review_link)
+
+    def test_changed_native_cdb_source_or_api_is_reopened_even_with_valid_label_metadata(self):
+        read = profiles.verify_cohort_ground_truth
+        for name in ('source_path', 'capture_path', 'native-cdb'):
+            fixture = SourceCohortGroundTruthFixture(self)
+            path = fixture.output / 'compile_commands.json' if name == 'native-cdb' else getattr(fixture, name)
+            path.write_bytes(b'PRIVATE_REOPEN_SENTINEL\n')
+            with self.subTest(input=name):
+                self.assert_rejected(read, fixture)
+
+    def test_drift_after_native_reader_cannot_replace_the_first_shared_identity(self):
+        read = profiles.verify_cohort_ground_truth
+        native = profiles.verify_cohort_native
+        for name in ('labels_file', 'source_path', 'capture_path', 'native-cdb'):
+            fixture = SourceCohortGroundTruthFixture(self)
+            changed = []
+            def mutate(*args, **kwargs):
+                result = native(*args, **kwargs)
+                target = fixture.output / 'compile_commands.json' if name == 'native-cdb' else getattr(fixture, name)
+                target.write_bytes(target.read_bytes() + b'\nPRIVATE_LATE_BINDING_SENTINEL\n')
+                changed.append(target)
+                return result
+            with mock.patch.object(profiles, 'verify_cohort_native', side_effect=mutate), self.subTest(input=name):
+                self.assert_rejected(read, fixture)
+            self.assertTrue(changed, 'must reach successful native binding before mutation')
+
+    def test_late_optional_review_and_source_mutation_fail_without_partial_counts(self):
+        read = profiles.verify_cohort_ground_truth
+        original = profiles.external_read
+        for name in ('semantic_review_path', 'labels_file', 'source_path'):
+            fixture = SourceCohortGroundTruthFixture(self)
+            changed = []
+            def mutate(path, capture=False):
+                result = original(path, capture)
+                if Path(path) == fixture.semantic_review_path and not changed:
+                    target = getattr(fixture, name)
+                    target.write_bytes(target.read_bytes() + b'\nPRIVATE_REVIEW_DRIFT_SENTINEL\n')
+                    changed.append(target)
+                return result
+            with mock.patch.object(profiles, 'external_read', side_effect=mutate), self.subTest(input=name):
+                self.assert_rejected(read, fixture, review=fixture.semantic_review_link)
+            self.assertTrue(changed, 'must read the optional review after earlier source binding')
+
+    def test_label_and_review_path_scope_alias_size_duplicate_keys_and_errors_are_redacted(self):
+        read = profiles.verify_cohort_ground_truth
+        def unavailable_windows_link(fixture, target, error, *, review=None):
+            if os.name != 'nt':
+                raise error
+            # This fallback covers canonical-path rejection when Windows link
+            # creation is unavailable; it does not claim physical NTFS coverage.
+            resolve, reached = Path.resolve, []
+            def alias(path, *args, **kwargs):
+                if path == target:
+                    reached.append(path)
+                    return fixture.base / 'PRIVATE_RESOLVED_LABEL_ALIAS_SENTINEL'
+                return resolve(path, *args, **kwargs)
+            with mock.patch.object(Path, 'resolve', autospec=True, side_effect=alias):
+                self.assert_rejected(read, fixture, review=review)
+            self.assertTrue(reached, 'reader must inspect and reject the observed alias')
+        for path in (str(self.fixture.labels_file), '../PRIVATE_ESCAPE_SENTINEL.json',
+                     'tests/product_corpus/cohorts/foreign.json',
+                     'tests/product_corpus/cohort_labels/../PRIVATE_ESCAPE_SENTINEL.json'):
+            with self.subTest(path=path):
+                self.assert_rejected(read, path=path)
+        for kind in ('oversize', 'duplicate-json', 'symlink', 'hardlink', 'review-relative', 'review-in-repo',
+                     'review-symlink', 'review-hardlink', 'review-extra', 'review-sha'):
+            fixture = SourceCohortGroundTruthFixture(self)
+            review = None
+            if kind == 'oversize': fixture.labels_file.write_bytes(fixture.labels_file.read_bytes() + b' ' * 262144)
+            elif kind == 'duplicate-json':
+                fixture.labels_file.write_bytes(b'{"id":"PRIVATE_DUPLICATE_SENTINEL",' + fixture.labels_file.read_bytes()[1:])
+            elif kind == 'symlink':
+                saved = fixture.base / 'PRIVATE_SYMLINK_LABELS.json'
+                fixture.labels_file.rename(saved)
+                try: fixture.labels_file.symlink_to(saved)
+                except OSError as error:
+                    saved.rename(fixture.labels_file)
+                    unavailable_windows_link(fixture, fixture.labels_file, error)
+                    continue
+            elif kind == 'hardlink':
+                try: os.link(fixture.labels_file, fixture.base / 'PRIVATE_HARDLINK_LABELS.json')
+                except OSError as error:
+                    unavailable_windows_link(fixture, fixture.labels_file, error)
+                    continue
+            else:
+                review = copy.deepcopy(fixture.semantic_review_link)
+                if kind == 'review-relative': review['path'] = 'PRIVATE_RELATIVE_REVIEW.json'
+                elif kind == 'review-in-repo':
+                    path = fixture.repo / 'PRIVATE_REVIEW.json'
+                    path.write_bytes(fixture.semantic_review_path.read_bytes())
+                    review['path'] = str(path)
+                elif kind == 'review-symlink':
+                    saved = fixture.base / 'PRIVATE_SAVED_REVIEW.json'
+                    fixture.semantic_review_path.rename(saved)
+                    try: fixture.semantic_review_path.symlink_to(saved)
+                    except OSError as error:
+                        saved.rename(fixture.semantic_review_path)
+                        unavailable_windows_link(fixture, fixture.semantic_review_path, error, review=review)
+                        continue
+                elif kind == 'review-hardlink':
+                    try: os.link(fixture.semantic_review_path, fixture.base / 'PRIVATE_HARDLINK_REVIEW.json')
+                    except OSError as error:
+                        unavailable_windows_link(fixture, fixture.semantic_review_path, error, review=review)
+                        continue
+                elif kind == 'review-extra': review['extra'] = 'PRIVATE_REVIEW_LINK_SENTINEL'
+                else: review['sha256'] = 'e' * 64
+            with self.subTest(kind=kind):
+                self.assert_rejected(read, fixture, review=review)
+        with mock.patch.object(profiles, 'external_read', side_effect=OSError('PRIVATE_INPUT_ERROR_SENTINEL')):
+            self.assert_rejected(read)
+
+    def test_real_cli_reports_unreviewed_and_reviewed_metadata_without_execution(self):
+        base = ['cohort-ground-truth-check', '--root', str(self.fixture.repo), '--cohort-labels', self.fixture.labels_path]
+        for reviewed in (False, True):
+            args = [*base, '--cohort-review', str(self.fixture.semantic_review_path),
+                    '--cohort-review-sha256', self.fixture.semantic_review_link['sha256']] if reviewed else base
+            result = self.cli(*args)
+            with self.subTest(reviewed=reviewed):
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stderr, '')
+                self.assert_result(json.loads(result.stdout), reviewed=reviewed)
+
+    def test_real_cli_requires_paired_review_selectors_and_rejects_all_other_overrides(self):
+        base = ['cohort-ground-truth-check', '--root', str(self.fixture.repo), '--cohort-labels', self.fixture.labels_path]
+        variants = [['cohort-ground-truth-check', '--root', str(self.fixture.repo)],
+                    [*base, '--cohort-review', str(self.fixture.semantic_review_path)],
+                    [*base, '--cohort-review-sha256', self.fixture.semantic_review_link['sha256']],
+                    ['limits', '--cohort-labels', self.fixture.labels_path],
+                    ['limits', '--cohort-review', str(self.fixture.semantic_review_path)],
+                    ['limits', '--cohort-review-sha256', self.fixture.semantic_review_link['sha256']]]
+        for option in ('--binding', '--candidate', '--ground-truth', '--cohort', '--cohort-evidence',
+                       '--external-root', '--evidence-root', '--historical-sources'):
+            variants.append([*base, option, 'PRIVATE_OPTION_SENTINEL'])
+        for args in variants:
+            result = self.cli(*args)
+            with self.subTest(args=args):
+                self.assertEqual(result.returncode, 2)
+                self.assertEqual(result.stdout, '')
+                self.assertNotIn('PRIVATE_', result.stderr)
+        self.fixture.capture_path.write_bytes(b'PRIVATE_CLI_INPUT_SENTINEL\n')
+        result = self.cli(*base)
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, '')
+        self.assertNotIn('PRIVATE_', result.stderr)
+        self.assertNotIn(str(self.fixture.base), result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

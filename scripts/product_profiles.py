@@ -3013,9 +3013,233 @@ def draft_readiness(manifest, root=None):
     return result
 
 
+COHORT_GROUND_TRUTH_REFERENCES = GROUND_TRUTH_REFERENCES + (
+    'src/config/Config.cpp', 'src/config/Config.h', 'src/analyzer/StaticAnalyzer.cpp',
+    'src/rules/MemoryLeakRule_Ex.cpp', 'src/main.cpp', 'src/source_manager/SourceManager.cpp',
+    'src/analyzer/BuiltinRules.h', 'src/core/AnalysisResult.h',
+    'src/source_manager/CompilationDatabaseDiscovery.cpp', 'src/contracts/ContractInfo.cpp',
+    'src/contracts/Sidecar.cpp', 'src/analyzer/SuppressionFilter.cpp',
+    'src/source_manager/InputIdentity.cpp', 'src/source_manager/ResourceDir.cpp',
+)
+
+
+def _cohort_analysis_recipe(identifiers, native_cdb_sha):
+    """Frozen unexecuted template, not a launcher or realized input identity."""
+    return {
+        'schema': 'codeskeptic-product-cohort-analysis-recipe/v1', 'state': 'UNEXECUTED_NOT_REALIZED',
+        'binary': None, 'inherit_environment': False, 'realized': False, 'source_entries': identifiers,
+        'working_directory_template': '{profile_directory}',
+        'argv_template': ['{binary}', '--source', '{source}', '--build-path', '{profile_directory}',
+                          '--json', '{report}', '--severity', 'info', '--lang', 'en',
+                          '--worker-timeout-ms', '120000', '--worker-memory-mb', '2048',
+                          '--no-analysis-cache', '--assumptions'],
+        'environment_template': {'LANG': 'C', 'LC_ALL': 'C', 'PATH': '{binary_directory}:/usr/bin:/bin',
+                                 'TMPDIR': '{temporary_directory}',
+                                 'CODESKEPTIC_RESOURCE_DIR': '/usr/lib/llvm-20/lib/clang/20'},
+        'compilation_database_template': [{
+            'directory': '{source_directory}', 'file': '{source}',
+            'arguments': ['/usr/bin/clang-20', '--no-default-config', '-fno-modules',
+                          '--target=x86_64-pc-linux-gnu', '-resource-dir', '/usr/lib/llvm-20/lib/clang/20',
+                          '-x', 'c', '-std=c17', '-fsyntax-only', '{source}']}],
+        'native_compilation_database_sha256': native_cdb_sha,
+        'settings': {'rule_mode': 'all-installed-defaults', 'assumptions': True, 'severity': 'info',
+                     'analysis_cache': False, 'warm_cache': False, 'assert_recovery': True,
+                     'scope': 'full-functions-selected-tu',
+                     'repetitions': 3, 'case_timeout_seconds': 30, 'worker_timeout_ms': 120000,
+                     'worker_memory_mib': 2048, 'capture_bytes_per_stream': 2097152},
+        'pending_bindings': ['binary-source-build-content-identity', 'source-path-mapping',
+                             'per-invocation-cdb-bytes', 'profile-directory-and-config-absence',
+                             'report-destination', 'temporary-directory', 'environment-realization',
+                             'compiler-resource-header-identity', 'header-and-source-contract-absence',
+                             'embedded-frontend-identity-and-adjustment'],
+        'required_absences': ['cwd-project-config', 'undeclared-source-and-header-csk-sidecars',
+                              'undeclared-cs-contract-comments', 'codeskeptic-suppression-directives',
+                              'response-files-and-undeclared-cdb-inputs', 'baseline-and-write-baseline',
+                              'custom-models-and-registries', 'summary-input-output-diff',
+                              'custom-policy-settings', 'function-line-report-filters',
+                              'whole-program-checkpoint-resume-server', 'broken-tu-recovery-and-partial-coverage-acceptance',
+                              'inherited-loader-compiler-sdk-home-environment'],
+    }
+
+
+def _cohort_label_rows(entry, record):
+    """Validate proposed labels without inferring safety or accepting semantics."""
+    fields(entry, 'entry source assumptions families project_diagnostics', 'cohort label entry')
+    lines = record['source']['text'].splitlines()
+    fields(entry['source'], 'language line_count', 'cohort label source')
+    require(entry['source']['language'] == 'C17' and type(entry['source']['line_count']) is int
+            and entry['source']['line_count'] == len(lines)
+            and canonical(entry['assumptions']) == canonical(record['assumptions']), 'cohort label source model')
+
+    def row_targets(row, rule, project):
+        fields(row, ('rule role expected source_lines rationale' if project else
+                     'rule availability role expected source_lines rationale'), 'cohort label row')
+        require(row['rule'] == rule, 'cohort label rule order')
+        if not project:
+            require(row['availability'] == ('PLANNED_NOT_IMPLEMENTED' if rule in GROUND_TRUTH_PLANNED
+                                            else 'INSTALLED_AT_REFERENCE_HEAD'), 'cohort label availability')
+        source_lines = row['source_lines']
+        require(type(source_lines) is list and source_lines
+                and all(type(line) is int and 1 <= line <= len(lines) for line in source_lines)
+                and source_lines == sorted(set(source_lines)) and nonempty(row['rationale'])
+                and len(row['rationale']) <= 8192, 'cohort label source basis')
+        scored, safe = ('trigger', 'no-trigger') if project else ('buggy', 'safe')
+        require(type(row['role']) is str and row['role'] in (scored, safe, 'unknown', 'unsupported'),
+                'cohort label role')
+        expected = row['expected']
+        if row['role'] in ('unknown', 'unsupported'):
+            require(expected is None, 'unscored cohort label must use null')
+            return 0, 1
+        require(type(expected) is list and len(expected) <= 64
+                and bool(expected) == (row['role'] == scored), 'cohort label role/targets')
+        seen, count = set(), 0
+        for occurrence in expected:
+            fields(occurrence, 'rule function line column cwes multiplicity' + (' severity' if project else ''),
+                   'cohort label occurrence')
+            require(occurrence['rule'] == rule and nonempty(occurrence['function'])
+                    and len(occurrence['function']) <= 512
+                    and type(occurrence['line']) is int and 1 <= occurrence['line'] <= len(lines)
+                    and type(occurrence['column']) is int
+                    and 1 <= occurrence['column'] <= len(lines[occurrence['line'] - 1].encode('utf-8')) + 1
+                    and type(occurrence['multiplicity']) is int and 1 <= occurrence['multiplicity'] <= 1000000,
+                    'cohort label occurrence location')
+            cwes = occurrence['cwes']
+            if project:
+                require(type(cwes) is list and cwes == [] and type(occurrence['severity']) is str
+                        and occurrence['severity'] in (('Info',) if rule == 'assumption' else ('Info', 'Warning', 'Error')),
+                        'cohort project diagnostic is not a CWE target')
+            else:
+                require(type(cwes) is list and 1 <= len(cwes) <= 26
+                        and all(type(cwe) is int and 1 <= cwe <= 10000 for cwe in cwes)
+                        and cwes == sorted(set(cwes)), 'cohort label CWE targets')
+            identity = canonical({key: value for key, value in occurrence.items() if key != 'multiplicity'})
+            require(identity not in seen, 'cohort label duplicate occurrence')
+            seen.add(identity)
+            count += occurrence['multiplicity']
+        return count, 0
+
+    require(type(entry['families']) is list and len(entry['families']) == len(FAMILIES)
+            and type(entry['project_diagnostics']) is list and len(entry['project_diagnostics']) == 3,
+            'cohort all-rule coverage')
+    family_count, project_count, unscored = 0, 0, 0
+    for row, family in zip(entry['families'], sorted(FAMILIES)):
+        count, boundary = row_targets(row, family, False)
+        if family == record['family']:
+            require(row['role'] == record['role'] and canonical(row['expected']) == canonical(record['expected']),
+                    'cohort labels preserve original source target')
+        family_count += count
+        unscored += boundary
+    for row, rule in zip(entry['project_diagnostics'], ('assumption', 'contract', 'policy')):
+        count, _ = row_targets(row, rule, True)
+        project_count += count
+    return family_count, project_count, unscored
+
+
+def verify_cohort_ground_truth(repo, record_path, *, review=None, _input_guard=None):
+    """Read standalone cohort labels; optional source review never admits them."""
+    try:
+        repo = Path(repo)
+        require(repo.is_absolute() and repo.resolve(strict=True) == repo, 'cohort label repository')
+        guard = {} if _input_guard is None else _input_guard
+        relative = external_relative(record_path).as_posix()
+        require(relative.startswith('tests/product_corpus/cohort_labels/'), 'cohort label scope')
+        info, value = _ground_truth_input(repo / relative, guard, maximum=256 * 1024)
+        fields(value, 'schema state id profile reference_head references native_evidence analysis_recipe data_model '
+               'entries limits additional_quota_examples qualification boundary', 'cohort labels')
+        require(value['schema'] == 'codeskeptic-product-cohort-all-rule-ground-truth/v1'
+                and value['state'] == 'SOURCE_DERIVED_LABELS_FOR_INDEPENDENT_REVIEW'
+                and value['id'] == 'llvm-caller-slot-labels-v1'
+                and value['profile'] == 'caller-slot-all-installed-assumptions-v1'
+                and nonempty(value['boundary']) and len(value['boundary']) <= 8192, 'cohort label identity')
+        validate_limits(value['limits'])
+        fields(value['qualification'], SOURCE_QUALIFICATION, 'cohort label qualification')
+        require(all(item is False for item in value['qualification'].values())
+                and type(value['additional_quota_examples']) is int and value['additional_quota_examples'] == 0,
+                'cohort labels cannot qualify or add quota')
+        require(canonical(value['data_model']) == canonical(
+            {'char_bit': 8, 'int_bits': 32, 'size_t_bits': 64, 'pointer_bits': 64}), 'cohort label data model')
+        link = value['native_evidence']
+        fields(link, 'path sha256', 'cohort label native link')
+        external_digest(link['sha256'])
+        native_path = external_relative(link['path']).as_posix()
+        require(native_path.startswith('tests/product_corpus/cohort_evidence/'), 'cohort label native scope')
+        _, native_value = _ground_truth_input(repo / native_path, guard, link['sha256'])
+        native = verify_cohort_native(repo, native_path, _input_guard=guard)
+        require(native['packet_sha256'] == link['sha256'] and native['profile'] == 'caller-slot-publication-c17-v1',
+                'cohort label native profile')
+        cdb, _ = _ground_truth_input(Path(native_value['native']['root']) / 'observation/compile_commands.json',
+                                    guard, json_value=False, maximum=2 * 1024 * 1024)
+        require(canonical(value['analysis_recipe']) == canonical(_cohort_analysis_recipe(
+            [row['id'] for row in native['records']], cdb['sha256'])), 'cohort label prospective recipe')
+        require(type(value['references']) is list
+                and len(value['references']) == len(COHORT_GROUND_TRUTH_REFERENCES), 'cohort label references')
+        for reference, path in zip(value['references'], COHORT_GROUND_TRUTH_REFERENCES):
+            fields(reference, 'path sha256', 'cohort label reference')
+            require(reference['path'] == path, 'cohort label reference order')
+        verify_reviewed_files(repo, value['reference_head'], value['references'])
+        require(type(value['entries']) is list and len(value['entries']) == len(native['records']) == 2,
+                'cohort label complete native pair')
+        cwe_count, project_count, unscored = 0, 0, 0
+        entry_links, cohort_links = [], {}
+        for entry, expected in zip(value['entries'], native['records']):
+            fields(entry, 'entry source assumptions families project_diagnostics', 'cohort label entry')
+            source_link = entry['entry']
+            source = verify_source_cohort_entry(repo, source_link, _input_guard=guard)
+            require(all(source[key] == expected[key] for key in expected)
+                    and source_link['path'] == native_value['cohort']['path']
+                    and source_link['sha256'] == native_value['cohort']['sha256'], 'cohort label source/native join')
+            _, cohort = _ground_truth_input(repo / source_link['path'], guard, source_link['sha256'],
+                                           maximum=16 * 1024 * 1024)
+            record = next(row['value'] for row in cohort['records'] if row['value']['id'] == source['id'])
+            family_targets, project_targets, boundary_rows = _cohort_label_rows(entry, record)
+            cwe_count += family_targets
+            project_count += project_targets
+            unscored += boundary_rows
+            entry_links.append(source_link)
+            cohort_links[source_link['path']] = {'path': source_link['path'], 'sha256': source_link['sha256']}
+        reviewed_head = None
+        if review is not None:
+            fields(review, 'path sha256', 'cohort label external review link')
+            external_digest(review['sha256'])
+            path = Path(review['path'])
+            require(path.is_absolute() and str(path) == review['path'] and repo not in path.parents,
+                    'cohort label external review scope')
+            _, receipt = _ground_truth_input(path, guard, review['sha256'])
+            fields(receipt, 'schema repository_head record native_evidence entries analysis_recipe_sha256 '
+                   'implementer verifier verdict findings rationale additional_quota_examples qualification',
+                   'cohort label source review')
+            require(receipt['schema'] == 'codeskeptic-cohort-all-rule-review/v1'
+                    and receipt['verdict'] == 'ACCEPT_SOURCE_LABELS' and receipt['findings'] == []
+                    and receipt['record'] == {'path': relative, 'sha256': info['sha256']}
+                    and canonical(receipt['native_evidence']) == canonical(value['native_evidence'])
+                    and canonical(receipt['entries']) == canonical(entry_links)
+                    and receipt['analysis_recipe_sha256'] == hashlib.sha256(
+                        canonical(value['analysis_recipe']).encode('utf-8')).hexdigest(), 'cohort label review bindings')
+            for key in ('implementer', 'verifier'):
+                require(type(receipt[key]) is str and len(receipt[key]) <= 128
+                        and re.fullmatch(r'/[a-z0-9_]+(?:/[a-z0-9_]+)*', receipt[key]), 'cohort label review agent')
+            require(receipt['implementer'] != receipt['verifier'] and nonempty(receipt['rationale'])
+                    and len(receipt['rationale']) <= 8192
+                    and type(receipt['additional_quota_examples']) is int and receipt['additional_quota_examples'] == 0
+                    and canonical(receipt['qualification']) == canonical(value['qualification']),
+                    'cohort label review independence/boundaries')
+            reviewed_head = receipt['repository_head']
+            verify_reviewed_files(repo, reviewed_head, [receipt['record'], link, *cohort_links.values()])
+        verify_input_identities(guard)
+        return {'record_sha256': info['sha256'], 'native_packet_sha256': native['packet_sha256'],
+                'reference_head': value['reference_head'], 'total_sources': 2, 'family_labels': 2 * len(FAMILIES),
+                'project_diagnostics': 6, 'proposed_cwe_occurrences': cwe_count,
+                'proposed_project_occurrences': project_count, 'unscored_family_rows': unscored,
+                'source_bytes_verified': True, 'source_labels_independently_reviewed': review is not None,
+                'review_head': reviewed_head, 'admitted_sources': 0, 'additional_quota_examples': 0,
+                **value['qualification']}
+    except (ValueError, OSError, TypeError, KeyError, StopIteration, RecursionError, RuntimeError, subprocess.SubprocessError):
+        raise ValueError('source cohort all-rule labels rejected') from None
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check", "ground-truth-candidate-check", "ground-truth-check", "retained-ground-truth-check", "source-cohort-check", "cohort-native-check", "platform-recipes-check", "platform-source-labels-check"))
+    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check", "ground-truth-candidate-check", "ground-truth-check", "retained-ground-truth-check", "source-cohort-check", "cohort-native-check", "cohort-ground-truth-check", "platform-recipes-check", "platform-source-labels-check"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--historical-sources", type=Path, default=Path(
         "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S04-U001/corpus-diagnostic-comparison"))
@@ -3024,6 +3248,9 @@ def main():
     parser.add_argument('--ground-truth', help='explicit retained label record; ground-truth-candidate-check only')
     parser.add_argument('--cohort', help='explicit repository-relative source preparation shard; source-cohort-check only')
     parser.add_argument('--cohort-evidence', help='explicit repository-relative compiler packet; cohort-native-check only')
+    parser.add_argument('--cohort-labels', help='explicit repository-relative labels; cohort-ground-truth-check only')
+    parser.add_argument('--cohort-review', help='optional absolute external source-label review; cohort-ground-truth-check only')
+    parser.add_argument('--cohort-review-sha256', help='required digest with --cohort-review')
     parser.add_argument("--external-root", type=Path, help="explicit external snapshot root (absolute canonical path)")
     parser.add_argument("--evidence-root", type=Path, help="explicit external license-reference directory")
     args = parser.parse_args()
@@ -3036,10 +3263,21 @@ def main():
                 'cohort selector is only valid for source-cohort-check')
         require(args.command == 'cohort-native-check' or args.cohort_evidence is None,
                 'cohort evidence selector is only valid for cohort-native-check')
+        require(args.command == 'cohort-ground-truth-check' or
+                all(item is None for item in (args.cohort_labels, args.cohort_review, args.cohort_review_sha256)),
+                'cohort label selectors are only valid for cohort-ground-truth-check')
         if args.command == "selection-check":
             require(args.binding is None and args.evidence_root is None and args.external_root is None,
                     "reviewed selection uses its explicit tracked roots")
-        if args.command == 'cohort-native-check':
+        if args.command == 'cohort-ground-truth-check':
+            require(args.cohort_labels is not None and args.binding is None and args.evidence_root is None
+                    and args.external_root is None and args.historical_sources == parser.get_default('historical_sources')
+                    and (args.cohort_review is None) == (args.cohort_review_sha256 is None),
+                    'cohort labels use their explicit linked inputs and paired review selectors')
+            review = (None if args.cohort_review is None else
+                      {'path': args.cohort_review, 'sha256': args.cohort_review_sha256})
+            result = verify_cohort_ground_truth(args.root, args.cohort_labels, review=review)
+        elif args.command == 'cohort-native-check':
             require(args.cohort_evidence is not None and args.binding is None and args.evidence_root is None
                     and args.external_root is None and args.historical_sources == parser.get_default('historical_sources'),
                     'cohort native packet uses its explicit linked inputs')

@@ -1,0 +1,718 @@
+{
+  "schema": "codeskeptic-product-cohort-all-rule-ground-truth/v1",
+  "state": "SOURCE_DERIVED_LABELS_FOR_INDEPENDENT_REVIEW",
+  "id": "llvm-caller-slot-labels-v1",
+  "profile": "caller-slot-all-installed-assumptions-v1",
+  "reference_head": "37e99c7f660f5cebc8f3b8a78a884cd01810a0ed",
+  "references": [
+    {
+      "path": "src/core/RuleCapabilities.def",
+      "sha256": "17bd1d76e01534b6afd98ad04c105c656c8ed45a2778be8f4ed842716afcaadc"
+    },
+    {
+      "path": "src/core/Capabilities.cpp",
+      "sha256": "933cb3ebe6e7b3606903303029f8f8912d9d48086ab896732cdd92ca8a44180f"
+    },
+    {
+      "path": "src/rules/AssumptionRule.cpp",
+      "sha256": "98b82bf4d418137c72f3fd6b9c33bc05d672bea4e3ea7047bea4a478c957e2b8"
+    },
+    {
+      "path": "src/rules/ContractRule.cpp",
+      "sha256": "c0aab1979e70ebe128eaa23941f462efc0b37f7b5dc5536e90af14dc83346ec2"
+    },
+    {
+      "path": "src/rules/PolicyRule.cpp",
+      "sha256": "9b9a57d65b1520f388352c30e174595a6434060f0409a23adf0ebf8d4c9d00bd"
+    },
+    {
+      "path": "scripts/cwe_quality.py",
+      "sha256": "c888bef1c2ebe1535a771758c2db58e18e1bafb3f7f06404c652104a02741108"
+    },
+    {
+      "path": "scripts/product_quality.py",
+      "sha256": "e98ff3acddd7fb5b16b28acc15ef9c5cf79cce5424bb969e45e7156d86ceff69"
+    },
+    {
+      "path": "docs/product-quality-contract.md",
+      "sha256": "07cb715abef85d16445dbd17f01fc9ff7e33700495bf94629f4df895e5cfff16"
+    },
+    {
+      "path": "src/config/Config.cpp",
+      "sha256": "4e2c4e8dfb5fa7a389de49d0e55ac47632fabf21804c24c701a4fb486603dbd9"
+    },
+    {
+      "path": "src/config/Config.h",
+      "sha256": "95b7614e1dd52a37df0c39e5aa229736e1b15478a369d1c8a378ebf7b29a6eb0"
+    },
+    {
+      "path": "src/analyzer/StaticAnalyzer.cpp",
+      "sha256": "2be4dcdced413a9802fc158827d8d6ddbf7f9dfddcf0d8c80e0ad331e8c4cc58"
+    },
+    {
+      "path": "src/rules/MemoryLeakRule_Ex.cpp",
+      "sha256": "93aa251ead8e08e525be97e7f2a813064649ac9125b45324497f6ff12afe6fba"
+    },
+    {
+      "path": "src/main.cpp",
+      "sha256": "b314df2bf76d5c36a2738291d77cf2e30b3625a86011cfec68cfc87d78b1b823"
+    },
+    {
+      "path": "src/source_manager/SourceManager.cpp",
+      "sha256": "2b62d346ca8a26ad018f2371e4134d7c013775b79c56f00d7e50687000034f31"
+    },
+    {
+      "path": "src/analyzer/BuiltinRules.h",
+      "sha256": "9144fae22b4b2a974f8f620972327f739f2da53382b57279103269f8440738fb"
+    },
+    {
+      "path": "src/core/AnalysisResult.h",
+      "sha256": "b33cb54cd3fb92cea9dc0119afe93b4ce20bd27fbb6198743d1e093f07b36a2e"
+    },
+    {
+      "path": "src/source_manager/CompilationDatabaseDiscovery.cpp",
+      "sha256": "b136bb252f043cb43765bee40e5e01c47bc8a9c5270cc45411ff9868e46e3256"
+    },
+    {
+      "path": "src/contracts/ContractInfo.cpp",
+      "sha256": "20ae393b8f82a1754f2e02bddf84e9691da130bc2e9f9f5fc39ffbfe4d2ce826"
+    },
+    {
+      "path": "src/contracts/Sidecar.cpp",
+      "sha256": "21a2faf9f28305abe262cf3393140a9c2a4b78d3e09bf705827749b1c83c0dd3"
+    },
+    {
+      "path": "src/analyzer/SuppressionFilter.cpp",
+      "sha256": "e4320836c04822a5e0d0ec5b5fdbcb88852924f96c3a1b62cce3d86043932e9a"
+    },
+    {
+      "path": "src/source_manager/InputIdentity.cpp",
+      "sha256": "e8c639422bddb29177f43dc74ea1ac6bb9202473f434ff8afa89beaf3be01fd5"
+    },
+    {
+      "path": "src/source_manager/ResourceDir.cpp",
+      "sha256": "ffaf19b177da5fe5526873b75860348661ab298e3c8161a558008405168fa6d3"
+    }
+  ],
+  "native_evidence": {
+    "path": "tests/product_corpus/cohort_evidence/llvm-caller-slot-v1.json",
+    "sha256": "0e8aebb79d802c9353f329ba8b5971744aa486fe8e546b8549481069c7d68275"
+  },
+  "analysis_recipe": {
+    "schema": "codeskeptic-product-cohort-analysis-recipe/v1",
+    "state": "UNEXECUTED_NOT_REALIZED",
+    "binary": null,
+    "inherit_environment": false,
+    "realized": false,
+    "source_entries": [
+      "llvm-caller-slot-overwrite",
+      "llvm-caller-slot-retained-control"
+    ],
+    "working_directory_template": "{profile_directory}",
+    "argv_template": [
+      "{binary}",
+      "--source",
+      "{source}",
+      "--build-path",
+      "{profile_directory}",
+      "--json",
+      "{report}",
+      "--severity",
+      "info",
+      "--lang",
+      "en",
+      "--worker-timeout-ms",
+      "120000",
+      "--worker-memory-mb",
+      "2048",
+      "--no-analysis-cache",
+      "--assumptions"
+    ],
+    "environment_template": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "{binary_directory}:/usr/bin:/bin",
+      "TMPDIR": "{temporary_directory}",
+      "CODESKEPTIC_RESOURCE_DIR": "/usr/lib/llvm-20/lib/clang/20"
+    },
+    "compilation_database_template": [
+      {
+        "directory": "{source_directory}",
+        "file": "{source}",
+        "arguments": [
+          "/usr/bin/clang-20",
+          "--no-default-config",
+          "-fno-modules",
+          "--target=x86_64-pc-linux-gnu",
+          "-resource-dir",
+          "/usr/lib/llvm-20/lib/clang/20",
+          "-x",
+          "c",
+          "-std=c17",
+          "-fsyntax-only",
+          "{source}"
+        ]
+      }
+    ],
+    "native_compilation_database_sha256": "7da7ffc95ab307bae666f161fefa83d87dc138442664256a771cf0ee1a5c5d67",
+    "settings": {
+      "rule_mode": "all-installed-defaults",
+      "assumptions": true,
+      "severity": "info",
+      "analysis_cache": false,
+      "warm_cache": false,
+      "assert_recovery": true,
+      "scope": "full-functions-selected-tu",
+      "repetitions": 3,
+      "case_timeout_seconds": 30,
+      "worker_timeout_ms": 120000,
+      "worker_memory_mib": 2048,
+      "capture_bytes_per_stream": 2097152
+    },
+    "pending_bindings": [
+      "binary-source-build-content-identity",
+      "source-path-mapping",
+      "per-invocation-cdb-bytes",
+      "profile-directory-and-config-absence",
+      "report-destination",
+      "temporary-directory",
+      "environment-realization",
+      "compiler-resource-header-identity",
+      "header-and-source-contract-absence",
+      "embedded-frontend-identity-and-adjustment"
+    ],
+    "required_absences": [
+      "cwd-project-config",
+      "undeclared-source-and-header-csk-sidecars",
+      "undeclared-cs-contract-comments",
+      "codeskeptic-suppression-directives",
+      "response-files-and-undeclared-cdb-inputs",
+      "baseline-and-write-baseline",
+      "custom-models-and-registries",
+      "summary-input-output-diff",
+      "custom-policy-settings",
+      "function-line-report-filters",
+      "whole-program-checkpoint-resume-server",
+      "broken-tu-recovery-and-partial-coverage-acceptance",
+      "inherited-loader-compiler-sdk-home-environment"
+    ]
+  },
+  "data_model": {
+    "char_bit": 8,
+    "int_bits": 32,
+    "size_t_bits": 64,
+    "pointer_bits": 64
+  },
+  "entries": [
+    {
+      "entry": {
+        "path": "tests/product_corpus/cohorts/llvm-caller-slot-v1.json",
+        "sha256": "65f26a88ef90326a05db8de927f175d70097c5abf765625e45b389171d93b9be",
+        "id": "llvm-caller-slot-overwrite",
+        "record_sha256": "f5254e063a97a81e06197a6c1bbcb85889ffe7ff4c91f1159131861b3bd56203",
+        "source_sha256": "a118c66873a197c3b55534f86500828492724ebd2e347df4414e2a71d322617a"
+      },
+      "source": {
+        "language": "C17",
+        "line_count": 6
+      },
+      "assumptions": [
+        "p designates a live, properly aligned, writable int * object throughout the call; NULL or invalid p is outside this conditional source model.",
+        "The caller-owned slot initially contains NULL and owns no prior allocation whose preservation is required.",
+        "Native C17 malloc has ordinary allocation-failure and successful-allocation semantics, with no replacement, interposition, concurrent access or asynchronous retention of the transient handle.",
+        "The conditional native model assumes CHAR_BIT=8, int=32 bits and size_t, void *, int * and int ** all 64 bits; proposed compiler probes must establish their applicable syntax/ABI facts separately.",
+        "This is pre-result source preparation only. No analyzer output, function execution, native product qualification or all-rule source-label acceptance is asserted."
+      ],
+      "families": [
+        {
+          "rule": "alloc-size-overflow",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4,
+            5
+          ],
+          "rationale": "The allocation request is exactly sizeof(int); no multiplication or variable size calculation can wrap."
+        },
+        {
+          "rule": "bounds",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4,
+            5
+          ],
+          "rationale": "Writes address one valid int-pointer slot without pointer arithmetic, arrays, offsets or heap-payload access. This conditional source safety grants no stack/heap subprofile quota."
+        },
+        {
+          "rule": "command-injection",
+          "availability": "PLANNED_NOT_IMPLEMENTED",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4,
+            5
+          ],
+          "rationale": "There is no command-execution source/sink operation. Source-safe absence is not an implemented detector or real security-fix evaluation pair."
+        },
+        {
+          "rule": "div-by-zero",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4,
+            5
+          ],
+          "rationale": "The function contains no division or remainder operation."
+        },
+        {
+          "rule": "double-free",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4,
+            5
+          ],
+          "rationale": "Neither function releases an allocation; repeated release is absent in this source model."
+        },
+        {
+          "rule": "format-string",
+          "availability": "PLANNED_NOT_IMPLEMENTED",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4,
+            5
+          ],
+          "rationale": "There is no formatting API or format string. This is source-safe absence only; the family remains PLANNED_NOT_IMPLEMENTED, not measured PASS."
+        },
+        {
+          "rule": "int-overflow",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4,
+            5
+          ],
+          "rationale": "There is no overflowing integer arithmetic. sizeof(int) is representable in the recorded conditional native model."
+        },
+        {
+          "rule": "memory-leak",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "buggy",
+          "expected": [
+            {
+              "column": 3,
+              "cwes": [
+                401
+              ],
+              "function": "testMallocWithParam",
+              "line": 5,
+              "multiplicity": 1,
+              "rule": "memory-leak"
+            }
+          ],
+          "source_lines": [
+            4,
+            5
+          ],
+          "rationale": "On successful allocation, the fresh handle is published to the caller-owned slot at line 4 and synchronously erased at line 5. With the declared initially NULL slot and no concurrent/asynchronous retained alias, the new allocation loses its only handle. Allocation failure creates no fresh leak. The preserved line-5 CWE-401 target is UNOBSERVED. Current tracking of allocation through *p is unsupported by the direct-variable matcher; a later normally completed missing report remains FN."
+        },
+        {
+          "rule": "null-deref",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4,
+            5
+          ],
+          "rationale": "Only the declared valid, live, aligned, writable caller slot p is dereferenced. The potentially NULL malloc result is never dereferenced. Invalid p is outside this conditional model."
+        },
+        {
+          "rule": "path-traversal",
+          "availability": "PLANNED_NOT_IMPLEMENTED",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4,
+            5
+          ],
+          "rationale": "There is no path-bearing operation or filesystem sink. Source-safe absence is not a real security-fix pair or measured detector PASS."
+        },
+        {
+          "rule": "resource-leak",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4,
+            5
+          ],
+          "rationale": "The source uses memory allocation, not descriptor or stream acquisition/release modeled by this family."
+        },
+        {
+          "rule": "sign-conversion",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4,
+            5
+          ],
+          "rationale": "The explicit conversion is a pointer cast and the zero assignment is a null pointer constant, not a lossy integer sink conversion."
+        },
+        {
+          "rule": "sql-injection",
+          "availability": "PLANNED_NOT_IMPLEMENTED",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4,
+            5
+          ],
+          "rationale": "There is no SQL/SQLite API or query construction. Source-safe absence is not a SQLite native API qualification or measured detector PASS."
+        },
+        {
+          "rule": "uninit-ptr",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4,
+            5
+          ],
+          "rationale": "p is an initialized function parameter under the valid-slot model; the source reads neither an uninitialized local pointer nor the allocated payload."
+        },
+        {
+          "rule": "uninit-scalar",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4,
+            5
+          ],
+          "rationale": "No uninitialized automatic scalar or allocated int payload is read."
+        },
+        {
+          "rule": "use-after-free",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4,
+            5
+          ],
+          "rationale": "There is no release or access to released allocation storage; the caller slot remains live by the declared assumption."
+        }
+      ],
+      "project_diagnostics": [
+        {
+          "rule": "assumption",
+          "role": "trigger",
+          "expected": [
+            {
+              "rule": "assumption",
+              "function": "testMallocWithParam",
+              "line": 3,
+              "column": 32,
+              "cwes": [],
+              "multiplicity": 1,
+              "severity": "Info"
+            }
+          ],
+          "source_lines": [
+            3,
+            4
+          ],
+          "rationale": "Under the explicit assumptions-enabled full-function recipe, p is a pointer parameter dereferenced without a guard or applicable declared nonnull contract. The rule infers one Info assumption at the parameter name. External valid-slot metadata is not an analyzer contract and does not suppress this target. This is a statically derived UNOBSERVED target, separate from CWE TP/FP/FN and exit-code success."
+        },
+        {
+          "rule": "contract",
+          "role": "no-trigger",
+          "expected": [],
+          "source_lines": [
+            3,
+            4
+          ],
+          "rationale": "The adapted function has no cs: contract, annotation or contract API trigger. This proposal is conditional on the declared future exclusion of undeclared source/header .csk sidecars and contract comments, including lexical aliases. Future absence checks are not yet realized."
+        },
+        {
+          "rule": "policy",
+          "role": "no-trigger",
+          "expected": [],
+          "source_lines": [
+            3,
+            4
+          ],
+          "rationale": "This source has no policy annotation or enabled custom policy operation. The explicit default-rule recipe excludes project configuration, custom policy settings and undeclared external inputs. No runtime or future configuration-absence evidence is claimed."
+        }
+      ]
+    },
+    {
+      "entry": {
+        "path": "tests/product_corpus/cohorts/llvm-caller-slot-v1.json",
+        "sha256": "65f26a88ef90326a05db8de927f175d70097c5abf765625e45b389171d93b9be",
+        "id": "llvm-caller-slot-retained-control",
+        "record_sha256": "b2010e8886f09eb7323c299ef6b5fd30511581e85f48035b4032c2150abbfc57",
+        "source_sha256": "a99952fd6198cb713db7d260925467f68181fcba3f9d6acc571eb2c87386381a"
+      },
+      "source": {
+        "language": "C17",
+        "line_count": 5
+      },
+      "assumptions": [
+        "p designates a live, properly aligned, writable int * object throughout the call; NULL or invalid p is outside this conditional source model.",
+        "The caller-owned slot initially contains NULL and owns no prior allocation whose preservation is required.",
+        "Native C17 malloc has ordinary allocation-failure and successful-allocation semantics, with no replacement, interposition, concurrent access or asynchronous retention of the transient handle.",
+        "The conditional native model assumes CHAR_BIT=8, int=32 bits and size_t, void *, int * and int ** all 64 bits; proposed compiler probes must establish their applicable syntax/ABI facts separately.",
+        "This is pre-result source preparation only. No analyzer output, function execution, native product qualification or all-rule source-label acceptance is asserted."
+      ],
+      "families": [
+        {
+          "rule": "alloc-size-overflow",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4
+          ],
+          "rationale": "The allocation request is exactly sizeof(int); no multiplication or variable size calculation can wrap."
+        },
+        {
+          "rule": "bounds",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4
+          ],
+          "rationale": "Writes address one valid int-pointer slot without pointer arithmetic, arrays, offsets or heap-payload access. This conditional source safety grants no stack/heap subprofile quota."
+        },
+        {
+          "rule": "command-injection",
+          "availability": "PLANNED_NOT_IMPLEMENTED",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4
+          ],
+          "rationale": "There is no command-execution source/sink operation. Source-safe absence is not an implemented detector or real security-fix evaluation pair."
+        },
+        {
+          "rule": "div-by-zero",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4
+          ],
+          "rationale": "The function contains no division or remainder operation."
+        },
+        {
+          "rule": "double-free",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4
+          ],
+          "rationale": "Neither function releases an allocation; repeated release is absent in this source model."
+        },
+        {
+          "rule": "format-string",
+          "availability": "PLANNED_NOT_IMPLEMENTED",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4
+          ],
+          "rationale": "There is no formatting API or format string. This is source-safe absence only; the family remains PLANNED_NOT_IMPLEMENTED, not measured PASS."
+        },
+        {
+          "rule": "int-overflow",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4
+          ],
+          "rationale": "There is no overflowing integer arithmetic. sizeof(int) is representable in the recorded conditional native model."
+        },
+        {
+          "rule": "memory-leak",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4
+          ],
+          "rationale": "The fresh allocation handle remains published in the caller-owned slot at line 4; no same-function overwrite or ownership loss occurs. This is conditional on an initially NULL slot and says nothing about eventual caller cleanup. A preexisting owned handle would change the model. The neighboring control is the same mechanism/cluster and remains nonquota."
+        },
+        {
+          "rule": "null-deref",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4
+          ],
+          "rationale": "Only the declared valid, live, aligned, writable caller slot p is dereferenced. The potentially NULL malloc result is never dereferenced. Invalid p is outside this conditional model."
+        },
+        {
+          "rule": "path-traversal",
+          "availability": "PLANNED_NOT_IMPLEMENTED",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4
+          ],
+          "rationale": "There is no path-bearing operation or filesystem sink. Source-safe absence is not a real security-fix pair or measured detector PASS."
+        },
+        {
+          "rule": "resource-leak",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4
+          ],
+          "rationale": "The source uses memory allocation, not descriptor or stream acquisition/release modeled by this family."
+        },
+        {
+          "rule": "sign-conversion",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4
+          ],
+          "rationale": "The explicit conversion is a pointer cast, not a lossy integer sink conversion. This control has no zero assignment."
+        },
+        {
+          "rule": "sql-injection",
+          "availability": "PLANNED_NOT_IMPLEMENTED",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4
+          ],
+          "rationale": "There is no SQL/SQLite API or query construction. Source-safe absence is not a SQLite native API qualification or measured detector PASS."
+        },
+        {
+          "rule": "uninit-ptr",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4
+          ],
+          "rationale": "p is an initialized function parameter under the valid-slot model; the source reads neither an uninitialized local pointer nor the allocated payload."
+        },
+        {
+          "rule": "uninit-scalar",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4
+          ],
+          "rationale": "No uninitialized automatic scalar or allocated int payload is read."
+        },
+        {
+          "rule": "use-after-free",
+          "availability": "INSTALLED_AT_REFERENCE_HEAD",
+          "role": "safe",
+          "expected": [],
+          "source_lines": [
+            4
+          ],
+          "rationale": "There is no release or access to released allocation storage; the caller slot remains live by the declared assumption."
+        }
+      ],
+      "project_diagnostics": [
+        {
+          "rule": "assumption",
+          "role": "trigger",
+          "expected": [
+            {
+              "rule": "assumption",
+              "function": "testMallocWithParam_2",
+              "line": 3,
+              "column": 34,
+              "cwes": [],
+              "multiplicity": 1,
+              "severity": "Info"
+            }
+          ],
+          "source_lines": [
+            3,
+            4
+          ],
+          "rationale": "Under the explicit assumptions-enabled full-function recipe, p is a pointer parameter dereferenced without a guard or applicable declared nonnull contract. The rule infers one Info assumption at the parameter name. External valid-slot metadata is not an analyzer contract and does not suppress this target. This is a statically derived UNOBSERVED target, separate from CWE TP/FP/FN and exit-code success."
+        },
+        {
+          "rule": "contract",
+          "role": "no-trigger",
+          "expected": [],
+          "source_lines": [
+            3,
+            4
+          ],
+          "rationale": "The adapted function has no cs: contract, annotation or contract API trigger. This proposal is conditional on the declared future exclusion of undeclared source/header .csk sidecars and contract comments, including lexical aliases. Future absence checks are not yet realized."
+        },
+        {
+          "rule": "policy",
+          "role": "no-trigger",
+          "expected": [],
+          "source_lines": [
+            3,
+            4
+          ],
+          "rationale": "This source has no policy annotation or enabled custom policy operation. The explicit default-rule recipe excludes project configuration, custom policy settings and undeclared external inputs. No runtime or future configuration-absence evidence is claimed."
+        }
+      ]
+    }
+  ],
+  "limits": {
+    "repetitions": 3,
+    "family_precision_min": "0.90",
+    "addressable_recall_min": "0.70",
+    "safe_fp_max": 0,
+    "buggy_min_per_bucket": 30,
+    "safe_min_per_bucket": 30,
+    "origins_min_per_bucket": 3,
+    "unique_quota_sources_min": 1020,
+    "case_timeout_seconds": 30,
+    "project_timeout_seconds": 1200,
+    "campaign_timeout_seconds": 43200,
+    "capture_bytes_per_stream": 2097152,
+    "linux_harness_cpu_quota": 2,
+    "linux_harness_memory_mib": 6144,
+    "linux_harness_memory_plus_swap_mib": 12288,
+    "linux_harness_pids_max": 256,
+    "linux_harness_tmpfs_mib": 1024,
+    "worker_timeout_ms": 120000,
+    "worker_memory_mib": 2048,
+    "string_flow_call_depth_max": 4,
+    "string_flow_states_per_function_max": 256,
+    "string_flow_transfer_steps_per_function_max": 65536
+  },
+  "additional_quota_examples": 0,
+  "qualification": {
+    "analyzer_run": false,
+    "evaluation_frozen": false,
+    "license_qualified": false,
+    "native_product_qualified": false,
+    "product_qualified": false,
+    "redistribution_approved": false,
+    "task_ready": false
+  },
+  "boundary": "Actual source-derived proposed all-rule labels, conditional on the unchanged source assumptions and explicit UNEXECUTED recipe preconditions. Compiler-only evidence is not embedded frontend, calling ABI, allocator runtime, source independence, rights, redistribution, admission, all-rule qualification or U003 completion. Future binary/CDB/path/environment/native identity bindings and config/header-sidecar absence checks remain unverified. No analyzer output has been observed; all qualification flags are false and the neighboring control remains nonquota. A separate genuine source-label review is required and is not self-embedded in this proposal."
+}

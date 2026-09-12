@@ -484,6 +484,62 @@ ise zorunludur. Bu kontrol hostile-root snapshot veya kriptografik hakem imzası
 değildir. Native compiler/header kimlikleri retained kayıtlardır; image yeniden
 açılmış, imzası doğrulanmış veya kernel sınırları yeniden denenmiş sayılmaz.
 
+### Bağımsız cohort all-rule etiketleri
+
+`cohort-ground-truth-check --cohort-labels tests/product_corpus/cohort_labels/<name>.json`
+ayrı `codeskeptic-product-cohort-all-rule-ground-truth/v1` önerisini okur.
+İlk açık profil mevcut caller-slot çiftidir: aynı sırada iki tam source-entry
+bağı, her kaynak için 16 aile ve assumption/contract/policy satırları gerekir.
+Eski retained etiket şeması veya onun önceden admission isteyen index'i
+değişmez. Native packet doğrulaması bir etiket kararı olarak kullanılmaz.
+
+Her ailede buggy, safe, unknown ve unsupported ayrı rollerdir; son ikisinin
+expected alanı null olmalıdır, boş scored-safe listeye çevrilemez. Kaynak
+kaydının özgün hedef ailesi, koordinatları, CWE ve multiplicity'si korunur.
+Dört planlı aile `PLANNED_NOT_IMPLEMENTED` kalır; source-safe yokluk etiketi
+çalıştırılmış sıfır-finding başarısı değildir. Proje-diagnostiği trigger hedefi
+ayrı severity ve boş CWE listesi taşır; assumption hedefinin severity'si Info
+olmalıdır. Proje hedefleri CWE TP/FP/FN hesabına girmez. Bütün satırlarda gerçek
+kaynak sınırları içindeki satırlar ve sınırlı gerekçe zorunludur.
+
+Caller-slot çiftinin varsayımları değişmez: geçerli/live/aligned/writable ve
+başlangıçta NULL caller slot, olağan allocator ve kaydedilen koşullu C17 modeli.
+`--assumptions` açıkken dış valid-slot açıklaması analyzer contract'ı değildir:
+kontrolsüz dereference edilen parametre bir Info hedefi oluşturur. Control'ın
+aynı fonksiyon içinde ownership kaybetmemesi, eventual caller cleanup veya
+bağımsız safe quota anlamına gelmez. Normal eksik CWE raporu sonradan FN kalır.
+
+Önerideki komut `UNEXECUTED_NOT_REALIZED` şablonudur. Her kaynak ve tekrar için
+ayrı tek-TU CDB, taze dizinler, bütün installed-default kurallar, `--assumptions`,
+Info dahil çıktı, cache kapalı ve mevcut LIMITS sabittir. Eski gerçek iki-entry
+compiler CDB hash'i ayrı bağlanır; gelecekteki tek-entry ürün CDB baytları veya
+Release binary kimliği zaten varmış gibi gösterilmez. Yer tutucular çalıştırma
+yetkisi değildir; somut binary/source/path/CDB/environment/embedded-frontend
+kimlikleri ve kalan şartlar gerçekleşmeden şablon execution kanıtı sayılmaz.
+
+Çalışma dizinindeki otomatik `.codeskeptic.conf`, kaynak/header lexical
+alias'larına eklenen `.csk` sidecar'ları, `cs:` contract yorumları ve suppression
+direktifleri ilgili girdilerdir. Cache kapatmak bunları devre dışı bırakmaz.
+Şablonun açık absence koşulları daha sonra gerçek bütün native header/sidecar
+kapsamında doğrulanmalıdır; yalnız TU yanındaki iki dosyaya bakmak yetmez.
+Response file, ek model/registry, baseline, policy, scope/summary/checkpoint,
+broken-TU recovery/partial coverage ve inherited loader/compiler/SDK/home environment
+girdileri bu açık profilde yasaktır. Resource fallback ve frontend argument
+adjustment kimliği ayrıca gerçekleşmelidir; compiler preflight bunu kanıtlamaz.
+Default assert recovery açık olarak bağlanır; bu seçenek broken/recovery AST
+veya partial coverage kabulüyle aynı şey değildir. Mevcut argv onu kapatmaz.
+
+Okuyucu tek ortak guard altında label/native/cohort/API/source/CDB ve isteğe
+bağlı external review baytlarını yeniden açar. Definition referansları gerçek
+ancestor Git blob'larıyla bağlıdır. İsteğe bağlı `--cohort-review PATH` ve
+`--cohort-review-sha256 SHA` birlikte verilir; gerçek ayrı review, proposal/head,
+iki entry, native sidecar ve recipe hash'ini bağlar. Öneri kendi gelecekteki
+review hash'ini içermez; önce admission istemeyen bu yol döngü oluşturmaz.
+`source_labels_independently_reviewed` yalnız bu ayrı link/ancestor kontrolü
+geçince true olur. Bu ortak-hesap prosedürü kriptografik reviewer imzası değildir.
+Her iki modda admission/ek kota sıfır, yedi qualification false; kaynak metni,
+gerekçeler, private yollar ve komut şablonları CLI metadata çıktısına sızmaz.
+
 PASS yalnız mevcut bağımsız compiler preflight packet'inin doğrulanmış bağını
 ifade eder. Function/analyzer yürütümü, calling ABI/allocator runtime davranışı,
 compiler runtime closure, tüm native platformlar, all-rule etiket kabulü,

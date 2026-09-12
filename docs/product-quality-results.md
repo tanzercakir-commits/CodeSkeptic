@@ -1722,3 +1722,47 @@ retained etiket şeması bu girdilere zorlanmaz. Henüz all-rule etiket PASS'i y
 koşusunun tamamlanmış başarı durumu API'den ayrıca okundu. Bu durum kontrolü
 yeni reader'ın hosted başarısı veya ham Windows suite denetimi değildir;
 önceden kaydedilen genel CI deadline RED'i değişmez.
+
+### Caller-slot çiftinin bağımsız all-rule etiket önerisi
+
+Yeni `tests/product_corpus/cohort_labels/llvm-caller-slot-v1.json`, aynı iki
+kaynağı değiştirmeden 32 aile ve altı proje-diagnostiği satırına bağlar.
+Öneri SHA-256 `a9b8d266b43881aa950cb0fa19ba5d59900e3403966352b87cc198ed817d6ef0`.
+Özgün memory-leak hedefi `testMallocWithParam:5:3`, CWE-401, multiplicity 1
+korunur. Assumptions-enabled profil iki ayrı Info hedefi önerir: candidate
+`3:32`, control `3:34`, her biri multiplicity 1 ve boş CWE listesi. Bunlar
+statik kaynak çıkarımlarıdır, gözlenmiş analyzer çıktısı veya CWE metric'i değil.
+
+İlk semantik ön inceleme bütün satırları, gerçek kaynak/API extraction'ı,
+22 definition referansını ve native CDB bağını inceledi. İki ifade düzeltildi:
+control'da bulunmayan zero assignment gerekçeden çıkarıldı; default assert
+recovery açık olarak kaydedilip yasak broken-TU recovery/partial coverage
+kabulünden ayrıldı. Bu ön inceleme ACCEPT_SOURCE_LABELS veya implementation
+PASS vermedi; temiz exact-head incelemeleri ayrı gerekir.
+
+Bağımsız kurulan 23 yeni sentetik etiket testi gerçek eski `37e99c7` kodunda
+RED verdi: 21 eksik API hatası ve üç CLI alt-test başarısızlığı. Son test dosyası
+baseline ile byte eşittir. Capture SHA-256
+`d3a195a810c2459c86ef5a12f7a3cae9c542de12f667b3f8e5b4e8bce79ec077`;
+aynı testlerin geliştirme ağacındaki GREEN capture'ı
+`2b520b2f8c16829951ddb671015ddf27f1355264414b9fcbcecd97a945e7c2a1`.
+Sentetik review kayıtları gerçek semantik onay değildir. Unknown/unsupported
+null hedefleri scored-safe boş listeden; proje multiplicity sayımı CWE
+sayımından ayrı sınanır. Windows'ta fiziksel link oluşturulamazsa gözlenen
+canonical-path alias reddi zorlanır; sessiz skip veya NTFS kapsamı iddiası yoktur.
+
+237 profile, 88 identity ve 24 quality testi; workflow'un 163 seçili profile
+testi ve gerçek öneri CLI okuması geçti. CLI yalnız 1 önerilen CWE occurrence,
+2 proje occurrence ve doğrulanmış kaynak bağları döndürdü; henüz semantik
+review false, review_head null, admission/ek kota sıfır ve qualification false.
+Gerçek native çift, eski labels/selection ve quota 2/1020 değiştirilmedi.
+Yeni label input'u için protected inventory RED'i beklenendir; yalnız yeni
+bağımsız prospective successor sonrası integrity GREEN elde edilebilir.
+
+Komut tek-TU/üç tekrar için UNEXECUTED şablondur. Eski gerçek iki-entry native
+CDB hash'i ile gelecekteki tek-entry ürün CDB kimliği ayrıdır. Binary, path,
+environment, compiler/resource/header ve embedded-frontend bağları bekler.
+Otomatik config ve bütün source/header lexical alias .csk girdilerinin yokluğu
+bir gelecek çalıştırma şartıdır; şimdi doğrulanmış yokluk gibi sunulmaz.
+Dört planlı aile hâlâ PLANNED_NOT_IMPLEMENTED, control aynı cluster'da nonquota.
+All-rule kabulü, source/origin bağımsızlığı, haklar ve U003 bitişi ayrı kapılardır.
