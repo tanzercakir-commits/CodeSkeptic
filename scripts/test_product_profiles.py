@@ -2424,6 +2424,13 @@ class RetainedGroundTruthFixture:
         self.manifest = profiles.read_json(original_repo / 'scripts/product_profiles.json')
         self.manifest.update(source_selection={'path': profiles.SOURCE_SELECTION, 'sha256': selection_sha},
                              independent_quota_examples=1)
+        # The template retains real Linux snapshot paths. This synthetic
+        # metadata fixture must use this host's paths, including on Windows;
+        # these empty directories are not qualified project source snapshots.
+        for project in self.manifest['projects']:
+            snapshot = self.base / 'project-snapshots' / project['id']
+            snapshot.mkdir(parents=True)
+            project['local_snapshot'] = str(snapshot)
         fixture.write(self.repo / 'scripts/product_profiles.json', self.manifest)
         self.review_path = self.base / 'all-rule-review.json'
         self.review = {'schema': 'codeskeptic-retained-all-rule-source-review/v1', 'repository_head': self.head,
@@ -2456,6 +2463,27 @@ class RetainedGroundTruthFixture:
 class RetainedGroundTruthTests(unittest.TestCase):
     def setUp(self):
         self.labels = RetainedGroundTruthFixture(self)
+
+    def test_fixture_project_snapshots_are_host_local_and_foreign_paths_still_reject(self):
+        labels = self.labels
+        for project in labels.manifest['projects']:
+            snapshot = Path(project['local_snapshot'])
+            self.assertEqual(snapshot, labels.base / 'project-snapshots' / project['id'])
+            self.assertTrue(snapshot.is_absolute() and snapshot.is_dir())
+        self.assertEqual(labels.index_check()['reviewed_sources'], 1)
+        # These paths are metadata only in this synthetic fixture. Preserve
+        # the production rejection of another host's non-absolute spelling.
+        foreign = '/foreign/project' if os.name == 'nt' else 'Z:\\foreign\\project'
+        self.assertFalse(Path(foreign).is_absolute())
+        original = copy.deepcopy(labels.manifest)
+        for index, project in enumerate(original['projects']):
+            changed = copy.deepcopy(original)
+            changed['projects'][index]['local_snapshot'] = foreign
+            labels.fixture.write(labels.repo / 'scripts/product_profiles.json', changed)
+            with self.subTest(project=project['id']), self.assertRaises(ValueError):
+                labels.index_check()
+        labels.fixture.write(labels.repo / 'scripts/product_profiles.json', original)
+        self.assertEqual(labels.index_check()['reviewed_sources'], 1)
 
     def test_actual_packet_labels_and_index_remain_source_only_with_no_extra_quota(self):
         labels = self.labels

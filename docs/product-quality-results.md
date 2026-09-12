@@ -1470,3 +1470,37 @@ Başarılı kimlik workflow'u ayrı kalır; bütün CI veya ürün yeterliliği 
 U004 bu çözülmemiş RED'i kaydeder, CH12-S01-U003 ilgili dayanıklılık kapısını
 ele alır. Burada cache kodu, süre bütçesi veya warmup değiştirilmedi/çalıştırılmadı;
 FIFO atlanmadı ve kör tekrar yapılmadı.
+
+### Retained etiket testleri — Windows host yolu regresyonu
+
+Exact `6c61f92250e3916b1760a21831d33fa19050daa1` için
+[identity 34695543309](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34695543309)
+attempt 1 başarısızdır. Linux/macOS işleri geçti; Windows'ta 88 identity testi,
+gerçek identity capture ve pinned source staging başarılı olduktan sonra
+96 seçili profile testinde dört failure ve iki error oluştu. Yeni retained
+etiket fixture'ı canlı manifestin üç Linux `local_snapshot` yolunu kopyalıyordu;
+Windows'ta bunlar host-absolute değildir. `source_metadata` doğru biçimde
+reddetti. Bu koşu önceki CIM timeout'u değildir: native-case ve post-case
+diagnostic adımlarına ulaşılamadı; eksik artifact'ler PASS sayılamaz.
+
+Ham API/job/log/ZIP ve beş metadata observation, U003 kanıt kökündeki
+`retained-label-host-path-v1/hosted-34695543309` altında korunur. Summary SHA-256
+`576e00c136cddca1402e1bd09cdb7676e0f1bcede32227f2af41e63a2e0a4dd7`.
+Salt-okunur bağımsız teşhis, aynı manifestin POSIX yol semantiğinde geçip
+Windows semantiğinde reddedildiğini, yalnız üç snapshot yolunu Windows'a
+uygunlaştırınca metadata kontrolünün geçtiğini doğruladı.
+
+Düzeltme yalnız sentetik test fixture'ına host-local boş snapshot dizinleri
+verir; gerçek kaynak snapshot'ı veya proje yeterliliği üretmez. Production
+okuyucu, mutlak yol şartı, workflow, collector, süre bütçesi, korunan korpus
+ve katalog/inventory baytları değişmez. Dar regresyon önce gerçek yol farkıyla
+RED verdi, sonra GREEN; ayrıca her proje için yabancı-host yolu yeniden
+reddedilir. Tam 171 profile, 88 identity, workflow'un 97 seçili profile testi,
+gerçek retained index ve integrity kontrolü yerelde geçti. Bunlar yeni bir
+Windows hosted başarı iddiası değildir; değişen head bağımsız inceleme ve
+yeni gerçek CI sonucu ister. U003 seçimi 2/1020 ve readiness exit 2 kalır.
+
+İlk taslak regresyonun list/dict hatası, yanlış `validate` CLI çağrısı ve
+commit öncesi dirty-tree guard reddi ayrı başarısız denemeler olarak saklanır;
+hedef RED veya ürün regresyonu kanıtı yerine kullanılmaz. Dosya adında
+`green` bulunması gerçek exit değerini değiştirmez.
