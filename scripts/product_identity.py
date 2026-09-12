@@ -1581,7 +1581,9 @@ def declaration_macro_projection(stdout):
     require(type(stdout) is str and len(stdout.encode('utf-8')) <= MAX_OUTPUT and '\x00' not in stdout,
             'declaration macro output')
     selected, seen = dict.fromkeys(DECLARATION_MACROS), set()
-    for line in stdout.splitlines():
+    # Only physical LF (including CRLF) terminates a dumped directive. Unicode
+    # splitlines() also splits FF/VT/NEL/LS/PS and can invent selected macros.
+    for line in stdout.split('\n'):
         if not line.strip():
             continue
         match = re.fullmatch(r'#define ([A-Za-z_][A-Za-z_0-9]*)(.*)', line)

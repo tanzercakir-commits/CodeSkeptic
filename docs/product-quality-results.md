@@ -2263,3 +2263,26 @@ ayrı sonuç listesi düzeltmesi GREEN verdi (SHA
 Temiz exact-head native CLI yakalaması ve bağımsız uygulama review'u ayrıca
 gereklidir; bu aday paragrafı onları olmuş saymaz. U003, selection2/1020, LLVM HOLD,
 model/rights/admission ve Windows failure kapıları değişmez; POP yapılmaz.
+
+Temiz `001e786661b88e7284df2bb0cce9ec5def3941a6` üzerinde gerçek v1 capture exit2
+ile eski14 INCOMPLETE/popen-openat RED'ini korudu; ayrı v2 capture exit0 ile14
+issue-free OBSERVED_UNADJUDICATED kaydetti. Paket SHA'ları sırasıyla
+`53a0fea7221dcfaca894a106225477078aa7b613a5bce32c1a673b581b0f372e` ve
+`b380863620ea6e8097f0f19f1962b8d7027c37e213b1f84e0faceab7be0557f1`.
+Bağımsız denetçi444 testi yeniden çalıştırdı,300 güncel fiziksel kimliği kontrol
+etti ve bu gerçek paketleri doğruladı; fakat uygulama **BLOCKED_IMPLEMENTATION**
+aldı. Review SHA `4803c0cac7f9e06c8503e7b882977d33e2bb8a112e14ad493c4de8c02626fd53`.
+
+F1: Python splitlines, fiziksel directive sonu olmayan FF/VT/NEL/LS/PS ayraçlarını
+yeni makro satırı sanabiliyordu. Denetçi gerçek v2 paketin beş mutasyonunun full
+validator'da yanlış visibility_pass aldığını ayrıca üretti. Özgün capture'lar
+geçerli gözlemler olarak kalır; bu hata başka girdiler için uygulama onayını engeller.
+Primary'nin saf RED capture SHA'sı
+`7731e4a1704d897e33236648e6694a3e2a66f476a4c0c7f934164c72ca4a563c`; depo içi full-packet
+regresyon RED SHA'sı
+`360e6c91dfc9415e8e31d4a0b84ec76498c27401e7ca1a3b03383175b61fcc6c`.
+Dar düzeltme yalnız fiziksel LF üzerinden ayırır; LF/CRLF pozitifleri korunur,
+tek CR dahil fiziksel olmayan ayraçlar yeni directive üretmez. Tutarlı yeniden
+hesaplanmış eksik projection INCOMPLETE kalır; uydurulmuş olumlu projection ret alır.
+F1 sonrası temiz exact-head inceleme ayrıca gereklidir; eski BLOCKED kaydı ve
+native/task/productfalse sınırları değişmez.

@@ -2006,6 +2006,26 @@ class PosixDeclarationProfileTests(unittest.TestCase):
             with self.subTest(suffix=repr(suffix)), self.assertRaises(ValueError):
                 self.check(value, sha)
 
+    def test_projection_and_full_packet_preserve_physical_directive_boundaries(self):
+        for separator in ('\n', '\r\n', '\f', '\v', '\x85', '\u2028', '\u2029', '\r'):
+            with self.subTest(separator=repr(separator)):
+                value, sha = self.packet()
+                raw = '#define __STRICT_ANSI__ 1' + separator + '#define _POSIX_C_SOURCE 200809L\n'
+                value['probe']['preprocessor']['command']['stdout'] = raw
+                physical_newline = separator in ('\n', '\r\n')
+                projection = identity.declaration_macro_projection(raw)
+                self.assertEqual(projection['__STRICT_ANSI__'] == '1' and projection['_POSIX_C_SOURCE'] == '200809L',
+                                 physical_newline)
+                if physical_newline:
+                    self.assertTrue(self.check(value, sha)['visibility_pass'])
+                else:
+                    with self.assertRaisesRegex(ValueError, 'projection mismatch'):
+                        self.check(value, sha)
+                    value['probe']['preprocessor']['selected_macros'] = projection
+                    result = self.check(value, sha)
+                    self.assertFalse(result['visibility_pass'])
+                    self.assertTrue(all('VISIBILITY_NOT_OBSERVED' in row['issues'] for row in result['requests']))
+
     def test_later_preprocessor_timeout_retains_prior_syntax_red(self):
         value, sha = self.packet()
         probe = value['probe']['preprocessor']
