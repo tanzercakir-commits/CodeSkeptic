@@ -228,7 +228,8 @@ jobs:
             declaration_libclang="$("$declaration_python" -I -B -c "import sys; from pathlib import Path; print((Path(sys.argv[1]).resolve(strict=True).parent.parent / 'lib/libclang.so.1').resolve(strict=True))" "$declaration_clang")"
           else
             export DEVELOPER_DIR=/Library/Developer/CommandLineTools
-            export SDKROOT="$(/usr/bin/xcrun --sdk macosx --show-sdk-path)"
+            declaration_sdk="$(/usr/bin/xcrun --sdk macosx --show-sdk-path)"
+            export SDKROOT="$declaration_sdk"
             export MACOSX_DEPLOYMENT_TARGET=14.0
             declaration_cc="$DEVELOPER_DIR/usr/bin/clang"
             declaration_cxx="$DEVELOPER_DIR/usr/bin/clang++"

@@ -2363,3 +2363,22 @@ eder. Bu paragraf yeni job'un koştuğunu, library adaylarının bulunduğunu ve
 platformların geçtiğini iddia etmez. Yerel statik test/CLI, temiz exact-head
 bağımsız inceleme ve gerçek yeni hosted packet ayrıca gerekir. SQLite seçilmez,
 selection2/1020, native0/50+3, haklar/model/FIFO kapıları aynı kalır; U003 POP yok.
+
+Exact `98e932fc9ee2ad6eb99fae4b8690f83632a0ad2c` bağımsız incelemesi452 testi
+yeniden çalıştırdı, fakat yeni Darwin SDK selector'ında F1 nedeniyle
+BLOCKED_IMPLEMENTATION verdi. Receipt SHA
+`74f79bda17467c3559dcbe1195a889fc2bc4a8314c5185fdba497ea44ea7927a`.
+`export SDKROOT="$(xcrun ...)"`, makul SDK stdout'u ile exit7 dönen seçicinin
+hatasını export exit0 altında maskeliyordu. Gerçek yeni job fragment'ini yalnız
+Bash built-in stub ile çalıştıran regresyon RED verdi; capture SHA
+`f255839d1fc6ec586fe45055ee445610df13319b75f1ca01618dc142fcbc0ead`.
+
+İlk patch yanlışlıkla eski job'daki aynı ifadeye eşleşti; sabit prefix denetimi
+beş testi durdurdu. Başarısız capture, adına rağmen GREEN değildir ve korunur:
+`4133ed5f649573b6902980a6648415c5623fa0f14ac3fb1c79af6cea9d0721dc`.
+Bu yerel değişiklik geri alındı; yalnız yeni declarations job'unda önce assignment,
+sonra export uygulanınca beş focused test GREEN verdi. Capture SHA
+`bb1ad68ba678d2e1b145403d2499e79964f49e4d7ecb70a3311dd7a61efdb000`.
+Pozitif exit0 SDK'yı geçirir; negatif exit7 continuation/capture'a ulaşmaz. Eski
+job byte'ları ve bütün önceki failure kayıtları korunur. Gerçek xcrun/SDK çalışması,
+yeni exact-head PASS veya hosted başarı bu dar yerel deneyin iddiası değildir.

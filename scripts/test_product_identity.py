@@ -2355,6 +2355,29 @@ class HostedDeclarationWorkflowTests(unittest.TestCase):
         self.assertIn('if-no-files-found: error', job)
         self.assertIn('retention-days: 30', job)
 
+    @unittest.skipIf(sys.platform == 'win32', 'Bash SDK selection belongs only to the Linux/macOS shell lane.')
+    def test_sdk_selector_nonzero_with_plausible_stdout_stops_capture(self):
+        lines = [line.strip() for line in self.job().splitlines()]
+        selector = '/usr/bin/xcrun --sdk macosx --show-sdk-path'
+        indexes = [index for index, line in enumerate(lines) if selector in line]
+        self.assertEqual(len(indexes), 1)
+        index = indexes[0]
+        selection = [lines[index]]
+        if lines[index + 1].startswith('export SDKROOT='):
+            selection.append(lines[index + 1])
+        fragment = '\n'.join(selection).replace(selector, 'select_sdk')
+        self.assertNotIn('/usr/bin/xcrun', fragment)
+        for status in (0, 7):
+            script = ("set -euo pipefail\nselect_sdk() { printf '%s\\n' '/fixture/SDK'; return "
+                      + str(status) + '; }\n' + fragment
+                      + '\nprintf \'CONTINUED:%s\\n\' "$SDKROOT"\n')
+            with self.subTest(selector_exit=status):
+                result = subprocess.run(['/bin/bash', '-c', script], capture_output=True, text=True,
+                                        timeout=5, env={'PATH': '/usr/bin:/bin', 'LC_ALL': 'C'})
+                self.assertEqual(result.returncode, status)
+                self.assertEqual(result.stdout, 'CONTINUED:/fixture/SDK\n' if status == 0 else '')
+                self.assertEqual(result.stderr, '')
+
 
 if __name__ == '__main__':
     unittest.main()

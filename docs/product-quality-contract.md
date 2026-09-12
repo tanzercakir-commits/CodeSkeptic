@@ -727,3 +727,7 @@ test hatası maskelenmez, eksik packet upload hatasıdır, geçerli RED packet d
 native yeterlilik sayılmaz. SQLite ve 50+3 payda, bütün qualification=false
 bayrakları ve eski packet anlamları değişmez. Hosted başarı ancak gerçekten
 gözlenen exact-head sonuçtur; job varlığı veya yerel statik test yeterli değildir.
+
+Yeni Darwin job'unda SDK seçimi önce ayrı assignment ile yapılır, ardından başarılı
+değer export edilir. Makul stdout üretse bile nonzero selector sonucu capture'a
+geçmeden durur; export built-in'inin exit durumu selector failure'ını örtemez.
