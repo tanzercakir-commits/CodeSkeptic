@@ -2129,3 +2129,25 @@ Retained karar SHA-256 `0beb790df2a161f4deceab6d026d7465fe4a7df554a469e2d1674d74
 bu yeniden kaydedilmiş JSON'da `lines` alanı `decoded_stdout_lines` olarak
 adlandırılmıştır. Hakem yukarıdaki 0b hosted review'da bütün esas iddiaları
 doğruladı; kayıt byte/alan bazında özgün receipt kopyası diye sunulmaz.
+
+### Adlandırılmış skip gözlemi; aynı kabul sınırı
+
+Temiz `2e810b3cd84beee7f3df854df4cbbe40caa4da5a` bağımsız
+`PASS_IMPLEMENTATION_ONLY` aldı; review SHA-256
+`270d12c873b756e316e09b7c88af12806881f73622d989bcb236c735325b3a09`.
+Hakem 36/273/88/24 test, 199-test workflow seçimi, gerçek CLI ve queue guard'ı
+doğruladı. Fakat sessiz macOS `skipped=1` toplamı bu fiziksel testi tanımlamaz:
+seçili NativeRecipeTests ve ExternalInputTests içinde de koşullu skip vardır.
+Toplamdan gerçek mkdir EILSEQ veya belirli skip kimliği çıkarılmayacak.
+
+Gönderim öncesi bu kanıt boşluğu için yalnız mevcut Darwin mkdir EILSEQ dalına
+sabit `REVIEWED_BYTE_ROOT_SKIP` ve aynı gerekçeyi stderr'e yazma eklendi; koşul,
+SkipTest, positive control ve diğer hata davranışları değişmedi. Path veya Git
+stderr'i bu işarete eklenmez. İzole exact-2e test-only baseline 36 testte tek
+beklenen failure, sıfır error/skip verdi; capture SHA-256
+`5d38c352a426efc2a4aac4bbd35f8d071a3bd969ea8f74626c4a740a766d668b`.
+Sentetik sys görünümünün ayrı StringIO'su yalnız bu dalda exact marker üretimini,
+diğer bütün akışlarda boş kalmasını doğrular. 36 focused GREEN capture
+`c43cf386a4a4722b1d560819f5476c5cbef156cfa73b7dc50087664b02b1f25a`.
+Bu sonraki satırlar 2e incelemesinin PASS kapsamına girmez; yeni temiz exact-head
+denetimi ve gerçek hosted gözlem gerekir. Native/ürün/U003 yeterliliği değişmez.

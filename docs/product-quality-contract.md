@@ -616,3 +616,10 @@ Bu fiziksel byte-filesystem kanıtı değildir. Portable ASCII probe üzerine a�
 sentetik errno/platform enjeksiyonları yalnız test-helper kontrol akışını sınar;
 gerçek POSIX testi aynı undecodable byte adını kullanır. Windows decorator'ı,
 önceki ortak testler, üretim okuyucusu ve başarısız hosted kayıtları korunur.
+
+Sessiz suite'in toplam skip sayısı bu fiziksel vakayı tek başına tanımlamaz;
+seçili diğer testlerde de koşullu skip vardır. Yalnız gerçek helper'ın Darwin
+mkdir EILSEQ dalı, aynı skip'ten önce sabit `REVIEWED_BYTE_ROOT_SKIP` işareti ve
+mevcut gerekçesini stderr'e yazar. Bu kayıt path, Git çıktısı veya değişken özel
+veri taşımaz; başka hata/başarı yolu aynı işareti üretmez. Sentetik testlerin
+işareti ayrı StringIO'da tutulur ve gerçek hosted syscall gözlemi diye sunulmaz.

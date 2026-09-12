@@ -5249,8 +5249,12 @@ class ReviewedFilesTests(unittest.TestCase):
             repo.mkdir()
         except OSError as error:
             if sys.platform == 'darwin' and error.errno == errno.EILSEQ:
-                self.skipTest('Darwin temporary-directory creation rejected this requested byte name with EILSEQ '
-                              'after the ordinary clone/reader control passed')
+                reason = ('Darwin temporary-directory creation rejected this requested byte name with EILSEQ '
+                          'after the ordinary clone/reader control passed')
+                # Quiet suite totals cannot distinguish other conditional skips.
+                # This fixed marker contains no path or captured Git content.
+                print('REVIEWED_BYTE_ROOT_SKIP ' + reason, file=sys.stderr)
+                self.skipTest(reason)
             raise
         self.assertIn(os.fsencode(repo.name), os.listdir(os.fsencode(repo.parent)))
         self.fixture.git('clone', '--quiet', '--shared', '--no-checkout', str(self.fixture.repo), str(repo))
@@ -5624,6 +5628,7 @@ class ReviewedFilesTests(unittest.TestCase):
         parent = Path(temporary.name).resolve()
         repo, control = parent / 'portable-probe', parent / 'ordinary-control'
         events, clones, verified, mkdirs, listings, failures = [], [], [], [], [], []
+        diagnostic = io.StringIO()
         original_git = self.fixture.git
         original_read = profiles.verify_reviewed_files
         original_mkdir, original_listdir = Path.mkdir, os.listdir
@@ -5701,7 +5706,7 @@ class ReviewedFilesTests(unittest.TestCase):
         error = None
         # Only the test module sees this synthetic platform. pathlib, Git and
         # subprocess retain their real platform behavior and successful bytes.
-        with mock.patch.object(module, 'sys', SimpleNamespace(platform=platform)), \
+        with mock.patch.object(module, 'sys', SimpleNamespace(platform=platform, stderr=diagnostic)), \
              mock.patch.object(self.fixture, 'git', side_effect=clone), \
              mock.patch.object(profiles, 'verify_reviewed_files', side_effect=read), \
              mock.patch.object(Path, 'mkdir', mkdir), mock.patch.object(os, 'listdir', side_effect=listdir):
@@ -5709,8 +5714,11 @@ class ReviewedFilesTests(unittest.TestCase):
                 self._check_surrogateescape_checkout(repo)
             except Exception as caught:
                 error = caught
+        if not isinstance(error, unittest.SkipTest):
+            self.assertEqual(diagnostic.getvalue(), '', 'Only the addressed capability skip emits a marker')
         return SimpleNamespace(error=error, events=events, clones=clones, verified=verified,
-                               mkdirs=mkdirs, listings=listings, failures=failures, repo=repo)
+                               mkdirs=mkdirs, listings=listings, failures=failures, repo=repo,
+                               diagnostic=diagnostic.getvalue())
 
     def test_capability_darwin_eilseq_skips_only_after_real_ordinary_control(self):
         injected = OSError(errno.EILSEQ, 'SYNTHETIC_ADDRESSED_MKDIR_EILSEQ')
@@ -5725,6 +5733,7 @@ class ReviewedFilesTests(unittest.TestCase):
         for required in ('temporary', 'ordinary', 'clone', 'reader', 'passed'):
             self.assertIn(required, reason)
         self.assertNotIn('apfs', reason)
+        self.assertEqual(result.diagnostic, 'REVIEWED_BYTE_ROOT_SKIP ' + str(result.error) + '\n')
 
     def test_capability_other_mkdir_errors_and_linux_eilseq_propagate_unchanged(self):
         cases = [('darwin', OSError(errno.EACCES, 'SYNTHETIC_MKDIR_EACCES')),
