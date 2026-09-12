@@ -1253,13 +1253,675 @@ def capture_windows_context(args):
     return value
 
 
+DECLARATION_PLATFORM = {'Linux': 'linux-x86_64', 'Windows': 'windows-x64', 'Darwin': 'macos-arm64'}
+DECLARATION_PRODUCERS = ('scripts/product_profiles.py',)
+DECLARATION_TYPES = {'Void', 'Bool', 'Char_S', 'Char_U', 'SChar', 'UChar', 'Short', 'UShort',
+                     'Int', 'UInt', 'Long', 'ULong', 'LongLong', 'ULongLong', 'Float', 'Double', 'LongDouble'}
+
+
+def declaration_requests(model, system):
+    """The fixed draft requests; omitted SQLite is a gap, not a smaller denominator."""
+    from product_profiles import native_api_metadata
+    native_api_metadata(model)
+    require(system in DECLARATION_PLATFORM, 'declaration platform')
+    return [row for row in model['sources'] + model['sinks']
+            if row['header'] not in (None, 'sqlite3.h') and DECLARATION_PLATFORM[system] in row['platforms']]
+
+
+def declaration_coverage(model):
+    declaration_requests(model, 'Linux')
+    return {'required_library_pairs': sum(len(row['platforms']) for row in model['sources'] + model['sinks']
+                                          if row['header'] is not None),
+            'required_entry_pairs': sum(len(row['platforms']) for row in model['sources'] if row['header'] is None),
+            'qualified_library_pairs': 0, 'qualified_entry_pairs': 0}
+
+
+def declaration_source(model, system):
+    rows = declaration_requests(model, system)
+    headers = (['winsock2.h', 'io.h', 'fcntl.h'] if system == 'Windows'
+               else ['sys/types.h', 'sys/socket.h', 'unistd.h', 'fcntl.h']) + ['stdio.h', 'stdlib.h']
+    lines = ['#include <' + header + '>' for header in headers]
+    for row in rows:
+        symbol, signature = row['symbol'], row['signature']
+        parameters = signature['parameters'] + (['...'] if signature['variadic'] else [])
+        lines += ['typedef ' + signature['result'] + ' (*cs_expected_' + symbol + ')(' +
+                  ', '.join(parameters or ['void']) + ');',
+                  '_Static_assert(_Generic(&' + symbol + ', cs_expected_' + symbol +
+                  ': 1, default: 0), "native signature ' + symbol + '");',
+                  '__typeof__(&' + symbol + ') cs_native_' + symbol + ' = &' + symbol + ';']
+    return '\n'.join(lines + ['int main(int argc, char **argv) { return argc == 0 || argv == 0; }', ''])
+
+
+def declaration_command(compiler, system, metadata, source, dependencies=False):
+    require(system in DECLARATION_PLATFORM, 'declaration command platform')
+    argv = [compiler['file']['resolved_path'], '--no-default-config', '-fno-modules',
+            '-resource-dir', compiler['resource_dir'], '-x', 'c', '-std=c17', '--target=' + compiler['target']]
+    if system == 'Darwin':
+        argv += ['-isysroot', metadata['sdk_root']]
+    return argv + (['-M', '-MT', 'identity-probe'] if dependencies else ['-fsyntax-only']) + [source]
+
+
+def declaration_type_key(value):
+    """Type identity is separate from declaration-level qualifiers/spelling."""
+    if type(value) is list:
+        return [declaration_type_key(item) for item in value]
+    if type(value) is not dict:
+        return value
+    return {key: declaration_type_key(item) for key, item in value.items()
+            if key not in ('spelling', 'canonical_spelling', 'qualifiers')}
+
+
+def declaration_parameter_key(value):
+    result = declaration_type_key(value)
+    # C function-type identity discards top-level parameter qualifiers. Their
+    # separately captured declaration values are retained, never reconstructed.
+    result['canonical_qualifiers'] = dict.fromkeys(('const', 'volatile', 'restrict'), False)
+    return result
+
+
+def declaration_type_incomplete(value):
+    if type(value) is list:
+        return any(declaration_type_incomplete(item) for item in value)
+    if type(value) is not dict:
+        return False
+    return (value.get('unsupported') is True
+            or any(type(value.get(k)) is int and value[k] < 0 for k in ('size', 'alignment'))
+            or ('declaration' in value and value['declaration'] is None)
+            or any(declaration_type_incomplete(item) for item in value.values()))
+
+
+def declaration_backend(library):
+    """Instantiate only inside the bounded capture child, never a metadata reader.
+
+    Public CIndex layouts/prototypes: clang-c/Index.h, CXString.h and
+    CXSourceLocation.h. The supported adapter ABI is 64-bit pointers/32-bit
+    int/unsigned. This does not establish parser/driver or hosted equivalence.
+    """
+    import ctypes as c
+
+    class String(c.Structure):
+        _fields_ = [('data', c.c_void_p), ('flags', c.c_uint)]
+
+    class Cursor(c.Structure):
+        _fields_ = [('kind', c.c_int), ('xdata', c.c_int), ('data', c.c_void_p * 3)]
+
+    class Type(c.Structure):
+        _fields_ = [('kind', c.c_int), ('data', c.c_void_p * 2)]
+
+    class Location(c.Structure):
+        _fields_ = [('data', c.c_void_p * 2), ('offset_data', c.c_uint)]
+
+    require(c.sizeof(c.c_void_p) == 8 and c.sizeof(c.c_int) == c.sizeof(c.c_uint) == 4
+            and [c.sizeof(t) for t in (String, Cursor, Type, Location)] == [16, 32, 24, 24],
+            'unsupported declaration adapter ABI')
+    visitor = c.CFUNCTYPE(c.c_uint, Cursor, Cursor, c.c_void_p)
+    inclusion = c.CFUNCTYPE(None, c.c_void_p, c.POINTER(Location), c.c_uint, c.c_void_p)
+    library = Path(library)
+    require(library.is_absolute() and library.resolve(strict=True) == library and library.is_file(),
+            'declaration library must be explicit and physical')
+    lib = c.CDLL(str(library))
+    signatures = {
+        'createIndex': (c.c_void_p, c.c_int, c.c_int), 'disposeIndex': (None, c.c_void_p),
+        'disposeTranslationUnit': (None, c.c_void_p),
+        'parseTranslationUnit2FullArgv': (c.c_int, c.c_void_p, c.c_char_p, c.POINTER(c.c_char_p),
+            c.c_int, c.c_void_p, c.c_uint, c.c_uint, c.POINTER(c.c_void_p)),
+        'getCString': (c.c_char_p, String), 'disposeString': (None, String), 'getClangVersion': (String,),
+        'getTranslationUnitCursor': (Cursor, c.c_void_p), 'visitChildren': (c.c_uint, Cursor, visitor, c.c_void_p),
+        'getCursorSpelling': (String, Cursor), 'getCursorUSR': (String, Cursor),
+        'getCursorKindSpelling': (String, c.c_int), 'getCursorReferenced': (Cursor, Cursor),
+        'getCanonicalCursor': (Cursor, Cursor), 'getCursorDefinition': (Cursor, Cursor),
+        'Cursor_isNull': (c.c_int, Cursor), 'isCursorDefinition': (c.c_uint, Cursor),
+        'getCursorLinkage': (c.c_int, Cursor), 'getCursorLanguage': (c.c_int, Cursor),
+        'Cursor_getMangling': (String, Cursor), 'getCursorLocation': (Location, Cursor),
+        'getSpellingLocation': (None, Location, c.POINTER(c.c_void_p), c.POINTER(c.c_uint),
+                                c.POINTER(c.c_uint), c.POINTER(c.c_uint)),
+        'getExpansionLocation': (None, Location, c.POINTER(c.c_void_p), c.POINTER(c.c_uint),
+                                 c.POINTER(c.c_uint), c.POINTER(c.c_uint)),
+        'getFileName': (String, c.c_void_p), 'getCursorType': (Type, Cursor),
+        'getCanonicalType': (Type, Type), 'getTypeSpelling': (String, Type),
+        'getTypeKindSpelling': (String, c.c_int), 'isConstQualifiedType': (c.c_uint, Type),
+        'isVolatileQualifiedType': (c.c_uint, Type), 'isRestrictQualifiedType': (c.c_uint, Type),
+        'getPointeeType': (Type, Type), 'getResultType': (Type, Type),
+        'getNumArgTypes': (c.c_int, Type), 'getArgType': (Type, Type, c.c_uint),
+        'isFunctionTypeVariadic': (c.c_uint, Type), 'getFunctionTypeCallingConv': (c.c_int, Type),
+        'getTypeDeclaration': (Cursor, Type), 'Type_getSizeOf': (c.c_longlong, Type),
+        'Type_getAlignOf': (c.c_longlong, Type), 'Cursor_getNumArguments': (c.c_int, Cursor),
+        'Cursor_getArgument': (Cursor, Cursor, c.c_uint),
+        'getNumDiagnostics': (c.c_uint, c.c_void_p), 'getDiagnostic': (c.c_void_p, c.c_void_p, c.c_uint),
+        'getDiagnosticSeverity': (c.c_int, c.c_void_p), 'getDiagnosticSpelling': (String, c.c_void_p),
+        'disposeDiagnostic': (None, c.c_void_p), 'getInclusions': (None, c.c_void_p, inclusion, c.c_void_p)}
+    for name, (result, *arguments) in signatures.items():
+        function = getattr(lib, 'clang_' + name)
+        function.restype, function.argtypes = result, arguments
+        setattr(lib, name, function)
+
+    class Backend:
+        def text(self, value):
+            try:
+                raw = lib.getCString(value) or b''
+                require(len(raw) <= 8192, 'CIndex string bound')
+                return raw.decode('utf-8')
+            finally:
+                lib.disposeString(value)
+
+        def children(self, cursor, recursive=False):
+            children, errors = [], []
+            @visitor
+            def visit(child, parent, data):
+                try:
+                    require(len(children) < 16384, 'CIndex child bound')
+                    children.append(child)
+                    return 2 if recursive else 1
+                except BaseException as error:
+                    errors.append(error)
+                    return 0
+            lib.visitChildren(cursor, visit, None)
+            if errors:
+                raise errors[0]
+            return children
+
+        def location(self, cursor):
+            result = {}
+            for name, function in (('spelling', lib.getSpellingLocation), ('expansion', lib.getExpansionLocation)):
+                file, line, column, offset = c.c_void_p(), c.c_uint(), c.c_uint(), c.c_uint()
+                function(lib.getCursorLocation(cursor), c.byref(file), c.byref(line), c.byref(column), c.byref(offset))
+                result[name] = {'file': self.text(lib.getFileName(file)) if file else None,
+                                'line': line.value, 'column': column.value, 'offset': offset.value}
+            return result
+
+        def qualifiers(self, type_):
+            return {name: bool(function(type_)) for name, function in (
+                ('const', lib.isConstQualifiedType), ('volatile', lib.isVolatileQualifiedType),
+                ('restrict', lib.isRestrictQualifiedType))}
+
+        def cursor(self, cursor):
+            if lib.Cursor_isNull(cursor):
+                return None
+            result = {'name': self.text(lib.getCursorSpelling(cursor)),
+                      'kind': self.text(lib.getCursorKindSpelling(cursor.kind)),
+                      'usr': self.text(lib.getCursorUSR(cursor)), 'location': self.location(cursor),
+                      'linkage_kind': lib.getCursorLinkage(cursor), 'language_kind': lib.getCursorLanguage(cursor),
+                      'mangling': self.text(lib.Cursor_getMangling(cursor)),
+                      'is_definition': bool(lib.isCursorDefinition(cursor)), 'parameters': None}
+            if cursor.kind == 8:  # CXCursor_FunctionDecl, not a printed-name match.
+                count = lib.Cursor_getNumArguments(cursor)
+                require(0 <= count <= 32, 'CIndex declared parameter bound')
+                result['parameters'] = []
+                for index in range(count):
+                    parameter = lib.Cursor_getArgument(cursor, index)
+                    require(parameter.kind == 10, 'CIndex parameter declaration missing')
+                    result['parameters'].append({'name': self.text(lib.getCursorSpelling(parameter)),
+                        'location': self.location(parameter), 'type': self.type(lib.getCursorType(parameter))})
+            return result
+
+        def type(self, original, depth=0):
+            require(depth < 12, 'CIndex type depth')
+            value = lib.getCanonicalType(original)
+            kind = self.text(lib.getTypeKindSpelling(value.kind))
+            result = {'kind': kind, 'spelling': self.text(lib.getTypeSpelling(original)),
+                      'canonical_spelling': self.text(lib.getTypeSpelling(value)),
+                      'qualifiers': self.qualifiers(original), 'canonical_qualifiers': self.qualifiers(value),
+                      'size': None, 'alignment': None, 'detail': None}
+            if kind == 'Pointer':
+                result['detail'] = {'pointee': self.type(lib.getPointeeType(value), depth + 1)}
+            elif kind == 'FunctionProto':
+                count = lib.getNumArgTypes(value)
+                require(0 <= count <= 32, 'CIndex type parameter bound')
+                result['detail'] = {'result': self.type(lib.getResultType(value), depth + 1),
+                    'parameters': [self.type(lib.getArgType(value, i), depth + 1) for i in range(count)],
+                    'variadic': bool(lib.isFunctionTypeVariadic(value)),
+                    'calling_convention': lib.getFunctionTypeCallingConv(value)}
+            elif kind in ('Record', 'Enum'):
+                result['detail'] = {'declaration': self.cursor(lib.getCanonicalCursor(lib.getTypeDeclaration(value)))}
+            elif kind not in DECLARATION_TYPES:
+                result['detail'] = {'unsupported': True}
+            if kind not in ('Void', 'FunctionProto'):
+                result.update(size=lib.Type_getSizeOf(value), alignment=lib.Type_getAlignOf(value))
+            return result
+
+        def observe(self, argv, requests):
+            index, unit = lib.createIndex(0, 0), c.c_void_p()
+            require(bool(index), 'CIndex index unavailable')
+            try:
+                arguments = (c.c_char_p * len(argv))(*(arg.encode('utf-8') for arg in argv))
+                status = lib.parseTranslationUnit2FullArgv(index, None, arguments, len(argv), None, 0, 0, c.byref(unit))
+                require(status == 0 and unit, 'CIndex translation unit unavailable')
+                diagnostics = []
+                require(lib.getNumDiagnostics(unit) <= 128, 'CIndex diagnostic bound')
+                for i in range(lib.getNumDiagnostics(unit)):
+                    diagnostic = lib.getDiagnostic(unit, i)
+                    try:
+                        raw = self.text(lib.getDiagnosticSpelling(diagnostic)).encode('utf-8')
+                        diagnostics.append({'severity': lib.getDiagnosticSeverity(diagnostic),
+                                            'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
+                    finally:
+                        lib.disposeDiagnostic(diagnostic)
+                nodes = self.children(lib.getTranslationUnitCursor(unit))
+                rows = []
+                for request in requests:
+                    symbol = request['symbol']
+                    typedefs = [node for node in nodes if node.kind == 20 and
+                                self.text(lib.getCursorSpelling(node)) == 'cs_expected_' + symbol]
+                    variables = [node for node in nodes if node.kind == 9 and
+                                 self.text(lib.getCursorSpelling(node)) == 'cs_native_' + symbol]
+                    require(len(typedefs) <= 1 and len(variables) <= 1, 'duplicate CIndex request declaration')
+                    targets = []
+                    for variable in variables:
+                        for child in self.children(variable, recursive=True):
+                            if child.kind == 101:  # CXCursor_DeclRefExpr
+                                target = lib.getCursorReferenced(child)
+                                targets.append({'reference': self.cursor(target),
+                                    'canonical': self.cursor(lib.getCanonicalCursor(target)),
+                                    'definition': self.cursor(lib.getCursorDefinition(target)),
+                                    'type': self.type(lib.getCursorType(target))})
+                    rows.append({'id': request['id'], 'symbol': symbol,
+                                 'expected_type': self.type(lib.getCursorType(typedefs[0])) if typedefs else None,
+                                 'variable_location': self.location(variables[0]) if variables else None,
+                                 'targets': targets})
+                included, errors = set(), []
+                @inclusion
+                def include(file, stack, length, data):
+                    try:
+                        included.add(self.text(lib.getFileName(file)))
+                        require(len(included) <= MAX_HEADERS, 'CIndex include bound')
+                    except BaseException as error:
+                        errors.append(error)
+                lib.getInclusions(unit, include, None)
+                if errors:
+                    raise errors[0]
+                return {'parse_status': status, 'library_version': self.text(lib.getClangVersion()),
+                        'diagnostics': diagnostics, 'requests': rows, 'inclusions': sorted(included),
+                        'entry': [self.cursor(node) for node in nodes if node.kind == 8 and
+                                  self.text(lib.getCursorSpelling(node)) == 'main']}
+            finally:
+                if unit:
+                    lib.disposeTranslationUnit(unit)
+                lib.disposeIndex(index)
+    return Backend()
+
+
+def declaration_model(root):
+    from product_profiles import parse_json
+    path = Path(root) / SOURCE_FILES['api_models_sha256']
+    require(not path.is_symlink() and path.stat().st_size <= MAX_OUTPUT, 'declaration model file')
+    raw = path.read_bytes()
+    model = parse_json(raw.decode('utf-8'))
+    declaration_coverage(model)
+    return model, hashlib.sha256(raw).hexdigest()
+
+
+def declaration_streams(command):
+    return {'argv': command['argv'], 'exit_code': command['exit_code'],
+            **{key: {'bytes': len(command[key].encode('utf-8')),
+                     'sha256': hashlib.sha256(command[key].encode('utf-8')).hexdigest()}
+               for key in ('stdout', 'stderr')}}
+
+
+def validate_declaration_document(value, model, model_sha256):
+    """Pure consistency checking. Never opens native paths, loads a library or runs argv."""
+    fields(value, 'schema native_identity environment producer_files library probe metadata_only '
+           'native_qualified task_ready product_qualified', 'declaration observation')
+    require(value['schema'] == 'codeskeptic-native-declarations/v1' and value['metadata_only'] is True
+            and all(value[key] is False for key in ('native_qualified', 'task_ready', 'product_qualified')),
+            'declaration observation cannot claim qualification')
+    native = value['native_identity']
+    validate_case_selection(native, value['environment'])
+    require(digest(model_sha256) and native['source']['api_models_sha256'] == model_sha256,
+            'declaration model bytes mismatch')
+    fields(value['producer_files'], ' '.join(DECLARATION_PRODUCERS), 'declaration producers')
+    require(all(digest(sha) for sha in value['producer_files'].values()), 'declaration producer digest')
+    system = native['platform']['system']
+    flavor = 'windows' if system == 'Windows' else 'posix'
+    path_type = PureWindowsPath if flavor == 'windows' else PurePosixPath
+    validate_file(value['library'], flavor)
+    require(value['library']['path'] == value['library']['resolved_path'], 'physical declaration library')
+    probe = value['probe']
+    fields(probe, 'input dependency headers syntax cindex backend_failure', 'declaration probe')
+    validate_file(probe['input'], flavor)
+    source = declaration_source(model, system).encode('utf-8')
+    require(probe['input']['sha256'] == hashlib.sha256(source).hexdigest()
+            and probe['input']['bytes'] == len(source), 'declaration fixed source mismatch')
+    input_path = probe['input']['path']
+    compiler, metadata = native['tools']['clang'], native['platform']['metadata']
+    dependency = probe['dependency']
+    validate_command(dependency)
+    require(dependency['argv'] == declaration_command(compiler, system, metadata, input_path, True)
+            and dependency['stderr'] == '', 'declaration dependency command')
+    paths = dependency_paths(dependency['stdout'], flavor)
+    headers = probe['headers']
+    require(type(headers) is list and 0 < len(headers) <= MAX_HEADERS, 'declaration header count')
+    for header in headers:
+        validate_file(header, flavor)
+    require([h['path'] for h in headers] == paths and sum(h['bytes'] for h in headers) <= MAX_HEADER_BYTES,
+            'declaration header closure')
+    by_path = {path_type(h['path']): h for h in headers}
+    require(by_path.get(path_type(input_path)) == probe['input'], 'declaration source absent from closure')
+    bindings = {}
+    for record in [value['library'], probe['input'], *headers,
+                   *[tool['file'] for tool in native['tools'].values()],
+                   *[h for p in native['probes'].values() for h in p['headers']]]:
+        path, resolved = path_type(record['path']), path_type(record['resolved_path'])
+        require('..' not in resolved.parts, 'noncanonical declaration identity')
+        entry = (resolved, record['bytes'], record['sha256'])
+        for name in (path, resolved):
+            require(name not in bindings or bindings[name] == entry, 'declaration identity disagreement')
+            bindings[name] = entry
+    syntax = probe['syntax']
+    fields(syntax, 'argv exit_code stdout stderr', 'declaration syntax command')
+    require(syntax['argv'] == declaration_command(compiler, system, metadata, input_path)
+            and type(syntax['exit_code']) is int and syntax['exit_code'] in (0, 1), 'declaration syntax identity')
+    for stream in ('stdout', 'stderr'):
+        item = syntax[stream]
+        fields(item, 'bytes sha256', 'declaration stream')
+        require(type(item['bytes']) is int and 0 <= item['bytes'] <= MAX_OUTPUT and digest(item['sha256'])
+                and (item['bytes'] != 0 or item['sha256'] == hashlib.sha256(b'').hexdigest()),
+                'declaration stream identity')
+    require(syntax['stdout']['bytes'] == 0, 'syntax-only declaration stdout')
+    observed = probe['cindex']
+    failure = probe['backend_failure']
+    if failure is not None:
+        fields(failure, 'kind exit_code stdout stderr', 'declaration backend failure')
+        require(observed is None and failure['kind'] in ('TIMEOUT', 'START_FAILED', 'PROCESS_FAILED', 'OUTPUT_LIMIT', 'INVALID_RESULT')
+                and (failure['exit_code'] is None or type(failure['exit_code']) is int), 'declaration backend outcome')
+        require((failure['exit_code'] is None) == (failure['kind'] in ('TIMEOUT', 'START_FAILED'))
+                and (failure['kind'] != 'PROCESS_FAILED' or failure['exit_code'] != 0), 'declaration backend exit')
+        for key in ('stdout', 'stderr'):
+            fields(failure[key], 'bytes sha256', 'declaration backend stream')
+            require(type(failure[key]['bytes']) is int and failure[key]['bytes'] >= 0
+                    and digest(failure[key]['sha256']), 'declaration backend stream values')
+        issues = ['BACKEND_FAILED'] + (['SYNTAX_FAILED'] if syntax['exit_code'] else [])
+        return {'metadata_only': True, 'syntax_pass': False, 'requests': [
+                    {'id': row['id'], 'issues': issues, 'state': 'INCOMPLETE'} for row in declaration_requests(model, system)],
+                'coverage': declaration_coverage(model), 'local_native_bytes_verified': False,
+                'native_qualified': False, 'task_ready': False, 'product_qualified': False}
+    fields(observed, 'parse_status library_version diagnostics requests inclusions entry', 'CIndex observation')
+    require(type(observed['parse_status']) is int and observed['parse_status'] == 0
+            and nonempty(observed['library_version']) and len(observed['library_version']) <= 8192,
+            'CIndex parser observation')
+    require(type(observed['inclusions']) is list and observed['inclusions'] == sorted(set(observed['inclusions']))
+            and {path_type(path) for path in observed['inclusions']} == set(by_path), 'CIndex include closure')
+    diagnostics = observed['diagnostics']
+    require(type(diagnostics) is list and len(diagnostics) <= 128, 'CIndex diagnostic count')
+    for diagnostic in diagnostics:
+        fields(diagnostic, 'severity bytes sha256', 'CIndex diagnostic')
+        require(type(diagnostic['severity']) is int and 0 <= diagnostic['severity'] <= 4
+                and type(diagnostic['bytes']) is int and 0 <= diagnostic['bytes'] <= 8192
+                and digest(diagnostic['sha256']), 'CIndex diagnostic values')
+
+    nodes = [0]
+    def text(value, empty=False):
+        require(type(value) is str and '\x00' not in value and len(value.encode('utf-8')) <= 8192
+                and (empty or bool(value)), 'CIndex text')
+
+    def location(value):
+        fields(value, 'spelling expansion', 'CIndex location')
+        for position in value.values():
+            fields(position, 'file line column offset', 'CIndex physical position')
+            require(all(type(position[k]) is int and position[k] >= 0 for k in ('line', 'column', 'offset')),
+                    'CIndex position values')
+            if position['file'] is None:
+                require(all(position[k] == 0 for k in ('line', 'column', 'offset')), 'CIndex absent file position')
+            else:
+                text(position['file'])
+                header = by_path.get(path_type(position['file']))
+                require(header is not None and position['line'] > 0 and position['column'] > 0
+                        and position['offset'] <= header['bytes'], 'CIndex location outside hashed closure')
+
+    def qualifiers(value):
+        fields(value, 'const volatile restrict', 'CIndex qualifiers')
+        require(all(type(item) is bool for item in value.values()), 'CIndex qualifier flags')
+
+    def cursor(value, depth=0):
+        if value is None:
+            return
+        require(depth < 12, 'CIndex declaration depth')
+        fields(value, 'name kind usr location linkage_kind language_kind mangling is_definition parameters', 'CIndex cursor')
+        for key in ('name', 'kind', 'usr', 'mangling'):
+            text(value[key], empty=key != 'kind')
+        location(value['location'])
+        require(type(value['is_definition']) is bool and type(value['linkage_kind']) is int
+                and 0 <= value['linkage_kind'] <= 4 and type(value['language_kind']) is int
+                and 0 <= value['language_kind'] <= 3, 'CIndex cursor flags')
+        if value['kind'] == 'FunctionDecl':
+            require(type(value['parameters']) is list and len(value['parameters']) <= 32, 'CIndex declared parameters')
+            for parameter in value['parameters']:
+                fields(parameter, 'name location type', 'CIndex parameter')
+                text(parameter['name'], empty=True)
+                location(parameter['location'])
+                type_record(parameter['type'], depth + 1)
+        else:
+            require(value['parameters'] is None, 'non-function CIndex parameters')
+
+    def type_record(value, depth=0):
+        nodes[0] += 1
+        require(depth < 12 and nodes[0] <= 16384, 'CIndex type metadata budget')
+        fields(value, 'kind spelling canonical_spelling qualifiers canonical_qualifiers size alignment detail', 'CIndex type')
+        for key in ('kind', 'spelling', 'canonical_spelling'):
+            text(value[key], empty=key != 'kind')
+        qualifiers(value['qualifiers'])
+        qualifiers(value['canonical_qualifiers'])
+        kind, detail = value['kind'], value['detail']
+        if kind in ('Void', 'FunctionProto'):
+            require(value['size'] is None and value['alignment'] is None, 'unsized CIndex type')
+        else:
+            require(all(type(value[k]) is int and -10 <= value[k] <= MAX_FILE for k in ('size', 'alignment')),
+                    'CIndex type layout bounds')
+        if kind == 'Pointer':
+            fields(detail, 'pointee', 'CIndex pointer')
+            type_record(detail['pointee'], depth + 1)
+        elif kind == 'FunctionProto':
+            fields(detail, 'result parameters variadic calling_convention', 'CIndex function type')
+            require(type(detail['parameters']) is list and len(detail['parameters']) <= 32
+                    and type(detail['variadic']) is bool and type(detail['calling_convention']) is int
+                    and 0 <= detail['calling_convention'] <= 200, 'CIndex function type values')
+            type_record(detail['result'], depth + 1)
+            for parameter in detail['parameters']:
+                type_record(parameter, depth + 1)
+        elif kind in ('Record', 'Enum'):
+            fields(detail, 'declaration', 'CIndex named type')
+            cursor(detail['declaration'], depth + 1)
+        elif kind in DECLARATION_TYPES:
+            require(detail is None, 'CIndex primitive detail')
+        else:
+            require(detail == {'unsupported': True}, 'unknown CIndex type must remain unsupported')
+
+    requests = declaration_requests(model, system)
+    require(type(observed['requests']) is list and len(observed['requests']) == len(requests), 'CIndex request inventory')
+    syntax_pass = syntax['exit_code'] == 0 and not any(d['severity'] >= 3 for d in diagnostics)
+    driver_version = re.search(r'clang version (\d+\.\d+\.\d+)', compiler['version']['stdout'])
+    parser_version = re.search(r'clang version (\d+\.\d+\.\d+)', observed['library_version'])
+    versions_match = (driver_version is not None and parser_version is not None
+                      and driver_version.group(1) == parser_version.group(1))
+    results = []
+    for actual, expected in zip(observed['requests'], requests):
+        fields(actual, 'id symbol expected_type variable_location targets', 'CIndex request')
+        require((actual['id'], actual['symbol']) == (expected['id'], expected['symbol']), 'CIndex request identity')
+        issues = [] if syntax_pass else ['SYNTAX_FAILED']
+        if not versions_match:
+            issues.append('PARSER_DRIVER_VERSION_MISMATCH')
+        if actual['variable_location'] is not None:
+            location(actual['variable_location'])
+            require(all(p['file'] == input_path for p in actual['variable_location'].values()), 'CIndex fixed variable location')
+        if actual['expected_type'] is not None:
+            type_record(actual['expected_type'])
+        require(type(actual['targets']) is list and len(actual['targets']) <= 8, 'CIndex reference count')
+        if not actual['targets'] or actual['variable_location'] is None:
+            issues.append('MISSING_REFERENCE')
+        if actual['expected_type'] is None or actual['expected_type']['kind'] != 'Pointer':
+            issues.append('MISSING_EXPECTED_TYPE')
+        for target in actual['targets']:
+            fields(target, 'reference canonical definition type', 'CIndex reference target')
+            for key in ('reference', 'canonical', 'definition'):
+                cursor(target[key])
+            type_record(target['type'])
+            reference, canonical_cursor = target['reference'], target['canonical']
+            if any(item is None or item['kind'] != 'FunctionDecl' or item['name'] != expected['symbol']
+                   for item in (reference, canonical_cursor)):
+                issues.append('REQUEST_TARGET_MISMATCH')
+            if reference and canonical_cursor and reference['usr'] != canonical_cursor['usr']:
+                issues.append('CANONICAL_IDENTITY_MISMATCH')
+            if any(item and (not item['usr'] or item['language_kind'] != 1 or item['linkage_kind'] != 4)
+                   for item in (reference, canonical_cursor)):
+                issues.append('LINKAGE_NOT_ADJUDICATED')
+            if target['definition'] is not None or any(item and item['is_definition'] for item in (reference, canonical_cursor)):
+                issues.append('DEFINITION_PRESENT')
+            if canonical_cursor:
+                positions = canonical_cursor['location']
+                if any(p['file'] in (None, input_path) for p in positions.values()):
+                    issues.append('MISSING_NATIVE_HEADER')
+                if positions['spelling'] != positions['expansion']:
+                    issues.append('REDIRECTION_NOT_ADJUDICATED')
+            expected_type = actual['expected_type']
+            if expected_type and expected_type['kind'] == 'Pointer' and declaration_type_key(
+                    expected_type['detail']['pointee']) != declaration_type_key(target['type']):
+                issues.append('SIGNATURE_MISMATCH')
+            if target['type']['kind'] != 'FunctionProto':
+                issues.append('UNSUPPORTED_FUNCTION_TYPE')
+            else:
+                parameters = target['type']['detail']['parameters']
+                for declaration in (reference, canonical_cursor, target['definition']):
+                    if declaration and declaration['kind'] == 'FunctionDecl' and (
+                            len(declaration['parameters']) != len(parameters) or any(
+                                declaration_parameter_key(actual['type']) != declaration_parameter_key(expected)
+                                for actual, expected in zip(declaration['parameters'], parameters))):
+                        issues.append('DECLARED_PARAMETER_MISMATCH')
+            if declaration_type_incomplete(target) or declaration_type_incomplete(expected_type):
+                issues.append('UNSUPPORTED_TYPE')
+        results.append({'id': expected['id'], 'issues': sorted(set(issues)),
+                        'state': 'INCOMPLETE' if issues else 'OBSERVED_UNADJUDICATED'})
+    require(type(observed['entry']) is list and len(observed['entry']) <= 1, 'CIndex entry count')
+    for entry in observed['entry']:
+        cursor(entry)
+        require(entry is not None and entry['kind'] == 'FunctionDecl' and entry['name'] == 'main'
+                and entry['is_definition'] and all(p['file'] == input_path for p in entry['location'].values()),
+                'CIndex actual entry identity')
+    return {'metadata_only': True, 'syntax_pass': syntax_pass, 'requests': results,
+            'coverage': declaration_coverage(model), 'local_native_bytes_verified': False,
+            'native_qualified': False, 'task_ready': False, 'product_qualified': False}
+
+
+def declaration_worker(config):
+    """Private child input is fixed-source metadata, never arbitrary source/flags."""
+    fields(config, 'native_identity environment library input', 'declaration worker')
+    native, environment = config['native_identity'], config['environment']
+    validate_case_selection(native, environment)
+    require(environment == case_environment(os.environ, platform.system())
+            and native['platform']['system'] == platform.system(), 'declaration worker environment')
+    root = Path(__file__).resolve().parents[1]
+    require(source_identity(root, native['source']['head']) == native['source'], 'declaration worker source')
+    model, sha = declaration_model(root)
+    require(sha == native['source']['api_models_sha256'], 'declaration worker model')
+    source = declaration_source(model, platform.system()).encode('utf-8')
+    input_, library = config['input'], config['library']
+    require(file_identity(Path(input_['path'])) == input_ and input_['bytes'] == len(source)
+            and input_['sha256'] == hashlib.sha256(source).hexdigest(), 'declaration worker fixed input')
+    require(file_identity(Path(library['path'])) == library, 'declaration worker library changed')
+    argv = declaration_command(native['tools']['clang'], platform.system(), native['platform']['metadata'], input_['path'])
+    result = declaration_backend(library['resolved_path']).observe(argv, declaration_requests(model, platform.system()))
+    require(file_identity(Path(library['path'])) == library and file_identity(Path(input_['path'])) == input_,
+            'declaration worker bytes changed')
+    return result
+
+
+def run_declaration_worker(config):
+    """Retain a later extraction failure without discarding earlier syntax RED."""
+    from product_profiles import parse_json
+    command = [sys.executable, '-B', str(Path(__file__).resolve()), '_declaration-worker']
+    failure = None
+    try:
+        run_ = subprocess.run(command, input=canonical(config).encode('utf-8'),
+                              env=checked_environment(os.environ), capture_output=True, timeout=30, check=False)
+        stdout, stderr, code = run_.stdout, run_.stderr, run_.returncode
+        if len(stdout) > MAX_OUTPUT or len(stderr) > MAX_OUTPUT:
+            failure = 'OUTPUT_LIMIT'
+        elif code != 0:
+            failure = 'PROCESS_FAILED'
+        elif stderr:
+            failure = 'INVALID_RESULT'
+        else:
+            try:
+                return parse_json(stdout.decode('utf-8')), None
+            except (ValueError, UnicodeError):
+                failure = 'INVALID_RESULT'
+    except subprocess.TimeoutExpired as error:
+        failure, stdout, stderr, code = 'TIMEOUT', error.stdout or b'', error.stderr or b'', None
+    except OSError:
+        failure, stdout, stderr, code = 'START_FAILED', b'', b'', None
+    return None, {'kind': failure, 'exit_code': code,
+                  'stdout': {'bytes': len(stdout), 'sha256': hashlib.sha256(stdout).hexdigest()},
+                  'stderr': {'bytes': len(stderr), 'sha256': hashlib.sha256(stderr).hexdigest()}}
+
+
+def capture_declarations(args):
+    root = args.root.resolve(strict=True)
+    environment = case_environment(os.environ, platform.system())
+    with selected_case_environment(environment):
+        native = capture(args)
+        resolve_case_resources(native)
+        validate_case_selection(native, environment)
+        model, model_sha = declaration_model(root)
+        library = file_identity(args.libclang)
+        require(library['path'] == library['resolved_path'], 'select physical libclang explicitly')
+        producers = {}
+        for relative in DECLARATION_PRODUCERS:
+            actual = file_identity(root / relative)
+            committed = run(['git', 'cat-file', 'blob', args.source_sha + ':' + relative], cwd=root)['stdout']
+            require(actual['sha256'] == hashlib.sha256(committed.encode('utf-8')).hexdigest(), 'declaration producer differs from commit')
+            producers[relative] = actual['sha256']
+        system, compiler = platform.system(), native['tools']['clang']
+        with tempfile.TemporaryDirectory(prefix='codeskeptic-declarations-', dir=args.output.parent) as directory:
+            path = Path(directory).resolve(strict=True) / 'declarations.c'
+            with path.open('x', encoding='utf-8', newline='\n') as stream:
+                stream.write(declaration_source(model, system))
+            input_ = file_identity(path)
+            dependency = run(declaration_command(compiler, system, native['platform']['metadata'], str(path), True))
+            headers, total = [], 0
+            for filename in dependency_paths(dependency['stdout'], 'windows' if system == 'Windows' else 'posix'):
+                item = file_identity(Path(filename), maximum=MAX_HEADER_BYTES - total)
+                total += item['bytes']
+                headers.append(item)
+            syntax = declaration_streams(run(declaration_command(compiler, system, native['platform']['metadata'], str(path)), allowed=(0, 1)))
+            config = {'native_identity': native, 'environment': environment, 'library': library, 'input': input_}
+            observed, failure = run_declaration_worker(config)
+            value = {'schema': 'codeskeptic-native-declarations/v1', 'native_identity': native,
+                     'environment': environment, 'producer_files': producers, 'library': library,
+                     'probe': {'input': input_, 'dependency': dependency, 'headers': headers, 'syntax': syntax,
+                               'cindex': observed, 'backend_failure': failure},
+                     'metadata_only': True, 'native_qualified': False, 'task_ready': False, 'product_qualified': False}
+            validate_declaration_document(value, model, model_sha)
+            for record in [library, *headers, *[tool['file'] for tool in native['tools'].values()],
+                           *[item for probe in native['probes'].values() for item in probe['headers']]]:
+                require(file_identity(Path(record['path'])) == record, 'declaration capture bytes changed')
+            require(source_identity(root, args.source_sha) == native['source'] and declaration_model(root)[1] == model_sha
+                    and native_metadata(system) == native['platform']['metadata']
+                    and all(file_identity(root / name)['sha256'] == sha for name, sha in producers.items()),
+                    'declaration capture source/platform changed')
+        return value
+
+
 def main(argv=None):
+    arguments = sys.argv[1:] if argv is None else argv
+    if arguments == ['_declaration-worker']:
+        try:
+            from product_profiles import parse_json
+            raw = sys.stdin.buffer.read(MAX_OUTPUT + 1)
+            require(len(raw) <= MAX_OUTPUT, 'declaration worker input bound')
+            output = canonical(declaration_worker(parse_json(raw.decode('utf-8'))))
+            require(len(output.encode('utf-8')) <= MAX_OUTPUT, 'declaration worker output bound')
+            print(output, end='')
+            return 0
+        except (ValueError, OSError, KeyError, TypeError, RuntimeError, AttributeError) as error:
+            print('DECLARATION_WORKER_INVALID ' + case_observation_failure(error), file=sys.stderr)
+            return 2
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     check = commands.add_parser('check', help='structural metadata check, not native byte verification')
     check.add_argument('input', type=Path)
     case_check = commands.add_parser('check-case', help='structural case metadata check, not remote attestation')
     case_check.add_argument('input', type=Path)
+    declarations_check = commands.add_parser('check-declarations', help='pure declaration metadata check; never executes retained commands')
+    declarations_check.add_argument('input', type=Path)
+    declarations_check.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
     collect = commands.add_parser('capture', help='installed-tool metadata only; writes one new external JSON')
     collect.add_argument('--root', type=Path, required=True)
     collect.add_argument('--source-sha', required=True)
@@ -1273,6 +1935,13 @@ def main(argv=None):
     case_collect.add_argument('--output', type=Path, required=True)
     for role in TOOL_ROLES:
         case_collect.add_argument('--' + role, type=Path, required=True)
+    declarations = commands.add_parser('capture-declarations', help='opt-in fixed declaration/signature observation; errors remain unqualified')
+    declarations.add_argument('--root', type=Path, required=True)
+    declarations.add_argument('--source-sha', required=True)
+    declarations.add_argument('--libclang', type=Path, required=True)
+    declarations.add_argument('--output', type=Path, required=True)
+    for role in TOOL_ROLES:
+        declarations.add_argument('--' + role, type=Path, required=True)
     diagnostic = commands.add_parser('diagnose-windows', help='post-attempt startup/module/query observations, not a retry')
     diagnostic.add_argument('--root', type=Path, required=True)
     diagnostic.add_argument('--source-sha', required=True)
@@ -1300,11 +1969,13 @@ def main(argv=None):
             validator = validate_windows_stages
         if args.command in ('diagnose-windows-context', 'check-windows-context'):
             validator = validate_windows_context
-        if args.command in ('check', 'check-case', 'check-windows-diagnostic', 'check-windows-stages', 'check-windows-context'):
+        if args.command in ('capture-declarations', 'check-declarations'):
+            validator = lambda value: validate_declaration_document(value, *declaration_model(args.root))
+        if args.command in ('check', 'check-case', 'check-windows-diagnostic', 'check-windows-stages', 'check-windows-context', 'check-declarations'):
             require(not args.input.is_symlink() and args.input.resolve() == args.input
                     and args.input.is_file() and args.input.stat().st_size <= 16 * MAX_OUTPUT,
                     'metadata input must be a bounded absolute regular file')
-            if args.command in ('check-case', 'check-windows-diagnostic', 'check-windows-stages', 'check-windows-context'):
+            if args.command in ('check-case', 'check-windows-diagnostic', 'check-windows-stages', 'check-windows-context', 'check-declarations'):
                 from product_profiles import parse_json
                 result = validator(parse_json(args.input.read_text(encoding='utf-8')))
             else:
@@ -1315,6 +1986,7 @@ def main(argv=None):
                     and not args.output.exists() and not args.output.is_symlink()
                     and not args.output.is_relative_to(root), 'output must be new and outside the checkout')
             collector = {'capture-case': capture_case, 'capture': capture,
+                         'capture-declarations': capture_declarations,
                          'diagnose-windows': capture_windows_diagnostic,
                          'diagnose-windows-stages': capture_windows_stages,
                          'diagnose-windows-context': capture_windows_context}[args.command]
@@ -1323,11 +1995,12 @@ def main(argv=None):
                 stream.write(canonical(value))
             result = {**validator(value), 'output_sha256': file_identity(args.output)['sha256']}
         print(canonical(result), end='')
-        return 0
+        return 2 if args.command == 'capture-declarations' and not result['syntax_pass'] else 0
     except (IdentityError, OSError, ValueError, KeyError, TypeError, RuntimeError) as error:
         private = args.command in ('check-case', 'capture-case', 'diagnose-windows', 'check-windows-diagnostic',
                                    'diagnose-windows-stages', 'check-windows-stages',
-                                   'diagnose-windows-context', 'check-windows-context')
+                                   'diagnose-windows-context', 'check-windows-context',
+                                   'capture-declarations', 'check-declarations')
         print('IDENTITY_INVALID ' + (case_observation_failure(error) if private else str(error)), file=sys.stderr)
         if args.command == 'capture-case':
             print('CASE_FAILURE_KIND ' + case_failure_kind(error), file=sys.stderr)

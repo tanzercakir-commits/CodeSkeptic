@@ -2151,3 +2151,33 @@ diğer bütün akışlarda boş kalmasını doğrular. 36 focused GREEN capture
 `c43cf386a4a4722b1d560819f5476c5cbef156cfa73b7dc50087664b02b1f25a`.
 Bu sonraki satırlar 2e incelemesinin PASS kapsamına girmez; yeni temiz exact-head
 denetimi ve gerçek hosted gözlem gerekir. Native/ürün/U003 yeterliliği değişmez.
+
+### CIndex bildirim yakalaması — yerel uygulama adayı
+
+`44788dc` identity run `34710516744` üç platformda başarılı tamamlandı; yedi
+artifact/log paketinin bağımsız review SHA-256'sı
+`95bdba51a2bc1a6ecac09e466f215ca8aeb12f654688647d8e692ef17e7be61f`.
+Dört workflow'un daha sonraki completed/success API snapshot'ı ayrıca denetlendi;
+bu, bütün workflow loglarının bağımsız semantik doğrulaması değildir. Önceki
+başarısız koşular başarısız kalır; GCC case LLVM kabulü veya U003 bitişi olmaz.
+
+Yerel Fedora/Clang22.1.8 syntax/AST deneyi, görünmeyen popen/openat ve hatalı
+openat→open recovery nedeniyle RED kaldı. Ayrı CIndex provasının dört sabit
+çıktısı bağımsız olarak byte-byte tekrarlandı; gerçek header/definition ayrımı
+ve recursive türler gözlendi. Review SHA-256
+`93c0ff0756e040c728dd884e2edd7c28c3d176e81cbf0cf233cec0ccc2b92238`,
+`OBSERVATIONS_VERIFIED_NOT_QUALIFIED`. Canonical function type'ın kaybettiği
+parameter-level restrict, ayrıca gerçek parameter-declaration yakalamasını
+gerektirdi. Bu deney üç hosted platform veya üretim adapter PASS'i değildir.
+
+Eklemeli üretim adayı bu ayrımı mevcut dört Python uygulama/test dosyasında
+uygular; eski şemalar/collector'lar/workflow/model/ledger/corpus pinleri değişmez.
+Yeni semantic negatifler ilk adayda iki gerçek failure verdi: declared parameter
+uyuşmazlığı ve nested unsupported tür issue-free kalabiliyordu. RED capture SHA
+`1e0debb984840262b8db523e31c3099febca207b5f8b4145e95b1daec98f21eb`.
+Düzeltme sonrası bu 14 test geçti; capture SHA
+`fa7c93fcab9259df4a1e01b0953153766afc0888f13463fb9c1f8955db08a9fa`.
+Backend failure retention, çapraz fiziksel identity uyuşmazlığı, pure reader ve
+selector kontrolleri de eklendi. Temiz exact-head gerçek capture ve bağımsız
+uygulama denetimi bu aday kaydının ardından yapılmalıdır; bu paragraf onları
+önceden olmuş saymaz. Selection 2/1020 ve LLVM HOLD korunur; POP yapılmaz.

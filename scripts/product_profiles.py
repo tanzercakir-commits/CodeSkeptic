@@ -3298,9 +3298,27 @@ def verify_cohort_ground_truth(repo, record_path, *, review=None, _input_guard=N
         raise ValueError('source cohort all-rule labels rejected') from None
 
 
+def verify_native_declarations(root, packet, expected_sha):
+    """Read a source-bound observation; native paths/argv are never executed."""
+    import product_identity as identity
+    root = Path(root).resolve(strict=True)
+    external_digest(expected_sha)
+    path = regular_file(packet, maximum=16 * 1024 * 1024)
+    raw = path.read_bytes()
+    require(hashlib.sha256(raw).hexdigest() == expected_sha, 'native declaration packet digest mismatch')
+    value = parse_json(raw.decode('utf-8'))
+    result = identity.validate_declaration_document(value, *identity.declaration_model(root))
+    source = value['native_identity']['source']
+    links = [{'path': relative, 'sha256': source[key]} for key, relative in identity.SOURCE_FILES.items()]
+    links += [{'path': relative, 'sha256': sha} for relative, sha in value['producer_files'].items()]
+    verify_reviewed_files(root, source['head'], links, expected_tree=source['tree'])
+    require(path.read_bytes() == raw, 'native declaration packet changed during read')
+    return {**result, 'packet_sha256': expected_sha, 'producer_bytes_verified': True}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check", "ground-truth-candidate-check", "ground-truth-check", "retained-ground-truth-check", "source-cohort-check", "cohort-native-check", "cohort-ground-truth-check", "platform-recipes-check", "platform-source-labels-check"))
+    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check", "ground-truth-candidate-check", "ground-truth-check", "retained-ground-truth-check", "source-cohort-check", "cohort-native-check", "cohort-ground-truth-check", "platform-recipes-check", "platform-source-labels-check", "native-declarations-check"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--historical-sources", type=Path, default=Path(
         "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S04-U001/corpus-diagnostic-comparison"))
@@ -3314,8 +3332,13 @@ def main():
     parser.add_argument('--cohort-review-sha256', help='required digest with --cohort-review')
     parser.add_argument("--external-root", type=Path, help="explicit external snapshot root (absolute canonical path)")
     parser.add_argument("--evidence-root", type=Path, help="explicit external license-reference directory")
+    parser.add_argument('--declarations', type=Path, help='absolute declaration observation; native-declarations-check only')
+    parser.add_argument('--declarations-sha256', help='exact digest of the declaration observation')
     args = parser.parse_args()
     try:
+        require(args.command == 'native-declarations-check' or
+                args.declarations is None and args.declarations_sha256 is None,
+                'declaration selectors are only valid for native-declarations-check')
         require(args.command == 'source-candidate-check' or args.candidate is None,
                 'candidate selector is only valid for source-candidate-check')
         require(args.command == 'ground-truth-candidate-check' or args.ground_truth is None,
@@ -3330,7 +3353,13 @@ def main():
         if args.command == "selection-check":
             require(args.binding is None and args.evidence_root is None and args.external_root is None,
                     "reviewed selection uses its explicit tracked roots")
-        if args.command == 'cohort-ground-truth-check':
+        if args.command == 'native-declarations-check':
+            require(args.declarations is not None and args.declarations_sha256 is not None
+                    and args.binding is None and args.evidence_root is None and args.external_root is None
+                    and args.historical_sources == parser.get_default('historical_sources'),
+                    'declaration observation uses its explicit packet and digest')
+            result = verify_native_declarations(args.root, args.declarations, args.declarations_sha256)
+        elif args.command == 'cohort-ground-truth-check':
             require(args.cohort_labels is not None and args.binding is None and args.evidence_root is None
                     and args.external_root is None and args.historical_sources == parser.get_default('historical_sources')
                     and (args.cohort_review is None) == (args.cohort_review_sha256 is None),

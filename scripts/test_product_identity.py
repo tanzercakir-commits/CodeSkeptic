@@ -1438,6 +1438,269 @@ class WindowsContextDiagnosticTests(unittest.TestCase):
         execute.assert_not_called()
 
 
+class DeclarationTests(unittest.TestCase):
+    def setUp(self):
+        self.model = json.loads((Path(__file__).resolve().parents[1] /
+                                'tests/product_corpus/native-api-models.json').read_text())
+
+    def packet(self):
+        old = CaseCaptureTests().case_document('Linux')
+        native = old['native_identity']
+        model_sha = identity.declaration_model(Path(identity.__file__).resolve().parents[1])[1]
+        native['source']['api_models_sha256'] = model_sha
+        source = identity.declaration_source(self.model, 'Linux').encode()
+        input_ = {'path': '/probe/declarations.c', 'resolved_path': '/probe/declarations.c',
+                  'bytes': len(source), 'sha256': hashlib.sha256(source).hexdigest()}
+        header = {'path': '/sdk/stdlib.h', 'resolved_path': '/sdk/stdlib.h', 'bytes': 100000, 'sha256': 'b' * 64}
+        compiler = native['tools']['clang']
+        empty = {'bytes': 0, 'sha256': hashlib.sha256(b'').hexdigest()}
+        requests = [{'id': r['id'], 'symbol': r['symbol'], 'expected_type': None,
+                     'variable_location': None, 'targets': []} for r in identity.declaration_requests(self.model, 'Linux')]
+        value = {'schema': 'codeskeptic-native-declarations/v1', 'native_identity': native,
+                 'environment': old['environment'], 'producer_files': {'scripts/product_profiles.py': 'c' * 64},
+                 'library': {'path': '/lib/libclang.so', 'resolved_path': '/lib/libclang.so', 'bytes': 100, 'sha256': 'd' * 64},
+                 'probe': {'input': input_, 'headers': [input_, header],
+                     'dependency': {'argv': identity.declaration_command(compiler, 'Linux', {}, input_['path'], True),
+                                    'exit_code': 0, 'stdout': 'identity-probe: /probe/declarations.c /sdk/stdlib.h\n', 'stderr': ''},
+                     'syntax': {'argv': identity.declaration_command(compiler, 'Linux', {}, input_['path']),
+                                'exit_code': 0, 'stdout': empty, 'stderr': copy.deepcopy(empty)},
+                     'backend_failure': None,
+                     'cindex': {'parse_status': 0, 'library_version': 'clang version 22.1.0', 'diagnostics': [],
+                                'requests': requests, 'inclusions': ['/probe/declarations.c', '/sdk/stdlib.h'], 'entry': []}},
+                 'metadata_only': True, 'native_qualified': False, 'task_ready': False, 'product_qualified': False}
+        return value, model_sha
+
+    def position(self, file='/sdk/stdlib.h'):
+        return {key: {'file': file, 'line': 1, 'column': 1, 'offset': 0} for key in ('spelling', 'expansion')}
+
+    def type_node(self, kind, detail=None, const=False):
+        qualifiers = {'const': const, 'volatile': False, 'restrict': False}
+        return {'kind': kind, 'spelling': kind, 'canonical_spelling': kind,
+                'qualifiers': qualifiers, 'canonical_qualifiers': copy.deepcopy(qualifiers),
+                'size': None if kind in ('Void', 'FunctionProto') else 8,
+                'alignment': None if kind in ('Void', 'FunctionProto') else 8, 'detail': detail}
+
+    def populated(self):
+        value, sha = self.packet()
+        return_pointer = self.type_node('Pointer', {'pointee': self.type_node('Char_S')})
+        parameter = self.type_node('Pointer', {'pointee': self.type_node('Char_S', const=True)})
+        function = self.type_node('FunctionProto', {'result': return_pointer, 'parameters': [parameter],
+                                                  'variadic': False, 'calling_convention': 1})
+        declaration = {'name': 'getenv', 'kind': 'FunctionDecl', 'usr': 'c:@F@getenv',
+                       'location': self.position(), 'linkage_kind': 4, 'language_kind': 1,
+                       'mangling': 'getenv', 'is_definition': False,
+                       'parameters': [{'name': 'name', 'location': self.position(), 'type': copy.deepcopy(parameter)}]}
+        row = next(r for r in value['probe']['cindex']['requests'] if r['symbol'] == 'getenv')
+        row.update(expected_type=self.type_node('Pointer', {'pointee': copy.deepcopy(function)}),
+                   variable_location=self.position('/probe/declarations.c'),
+                   targets=[{'reference': declaration, 'canonical': copy.deepcopy(declaration),
+                             'definition': None, 'type': function}])
+        return value, sha, row
+
+    def summary(self, value, sha):
+        return identity.validate_declaration_document(value, self.model, sha)
+
+    def issues(self, value, sha):
+        return next(r['issues'] for r in self.summary(value, sha)['requests'] if r['id'] == 'c.getenv')
+
+    def test_positive_metadata_never_counts_as_native_qualification(self):
+        value, sha, row = self.populated()
+        self.assertEqual(self.issues(value, sha), [])
+        result = self.summary(value, sha)
+        self.assertFalse(result['native_qualified'])
+        self.assertEqual(result['coverage']['qualified_library_pairs'], 0)
+
+    def test_whole_tu_error_blocks_a_plausible_reference(self):
+        value, sha, row = self.populated()
+        value['probe']['cindex']['diagnostics'] = [{'severity': 3, 'bytes': 5, 'sha256': 'a' * 64}]
+        self.assertFalse(self.summary(value, sha)['syntax_pass'])
+        self.assertIn('SYNTAX_FAILED', self.issues(value, sha))
+        value['probe']['cindex']['diagnostics'] = []
+        value['probe']['syntax']['exit_code'] = 1
+        self.assertIn('SYNTAX_FAILED', self.issues(value, sha))
+
+    def test_wrong_target_and_same_name_user_body_remain_explicit_gaps(self):
+        value, sha, row = self.populated()
+        row['targets'][0]['reference']['name'] = 'open'
+        self.assertIn('REQUEST_TARGET_MISMATCH', self.issues(value, sha))
+        value, sha, row = self.populated()
+        definition = copy.deepcopy(row['targets'][0]['reference'])
+        definition.update(is_definition=True, location=self.position('/probe/declarations.c'))
+        row['targets'][0]['definition'] = definition
+        self.assertIn('DEFINITION_PRESENT', self.issues(value, sha))
+
+    def test_variadic_calling_convention_and_nested_type_drift(self):
+        for mutation in ('variadic', 'calling_convention', 'const'):
+            value, sha, row = self.populated()
+            detail = row['targets'][0]['type']['detail']
+            if mutation == 'const':
+                detail['parameters'][0]['detail']['pointee']['canonical_qualifiers']['const'] = False
+            else:
+                detail[mutation] = True if mutation == 'variadic' else 2
+            self.assertIn('SIGNATURE_MISMATCH', self.issues(value, sha))
+
+    def test_declared_parameter_is_bound_without_erasing_its_restrict(self):
+        value, sha, row = self.populated()
+        parameter = row['targets'][0]['reference']['parameters'][0]['type']
+        parameter['qualifiers']['restrict'] = parameter['canonical_qualifiers']['restrict'] = True
+        self.assertEqual(self.issues(value, sha), [])
+        parameter['detail']['pointee']['canonical_qualifiers']['const'] = False
+        self.assertIn('DECLARED_PARAMETER_MISMATCH', self.issues(value, sha))
+        row['targets'][0]['canonical']['parameters'] = []
+        self.assertIn('DECLARED_PARAMETER_MISMATCH', self.issues(value, sha))
+
+    def test_nested_unsupported_types_and_parser_version_drift_are_gaps(self):
+        value, sha, row = self.populated()
+        for function in (row['expected_type']['detail']['pointee'], row['targets'][0]['type']):
+            function['detail']['result'] = self.type_node('UnknownThing', {'unsupported': True})
+        self.assertIn('UNSUPPORTED_TYPE', self.issues(value, sha))
+        value['probe']['cindex']['library_version'] = 'clang version 19.0.0'
+        self.assertIn('PARSER_DRIVER_VERSION_MISMATCH', self.issues(value, sha))
+
+    def test_header_closure_source_model_and_inventory_forgery_are_rejected(self):
+        for mutation in ('header', 'source', 'model', 'missing', 'duplicate', 'macro', 'qualify'):
+            value, sha, row = self.populated()
+            if mutation == 'header':
+                row['targets'][0]['canonical']['location'] = self.position('/elsewhere/stdlib.h')
+            elif mutation == 'source':
+                value['probe']['input']['sha256'] = 'f' * 64
+            elif mutation == 'model':
+                sha = 'f' * 64
+            elif mutation == 'missing':
+                value['probe']['cindex']['requests'].pop()
+            elif mutation == 'duplicate':
+                value['probe']['cindex']['requests'][1] = copy.deepcopy(row)
+            elif mutation == 'macro':
+                value['probe']['syntax']['argv'].insert(1, '-D_POSIX_C_SOURCE=200809L')
+            else:
+                value['native_qualified'] = True
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                self.summary(value, sha)
+
+    def test_duplicate_reference_occurrences_do_not_inflate_coverage(self):
+        value, sha, row = self.populated()
+        row['targets'].append(copy.deepcopy(row['targets'][0]))
+        result = self.summary(value, sha)
+        self.assertEqual(len(result['requests']), 14)
+        self.assertEqual(result['coverage']['required_library_pairs'], 50)
+
+    def test_metadata_reader_never_loads_libraries_or_runs_native_commands(self):
+        value, sha, row = self.populated()
+        with (mock.patch.object(identity, 'declaration_backend', side_effect=AssertionError('library load')),
+              mock.patch.object(identity.subprocess, 'run', side_effect=AssertionError('execution'))):
+            self.assertEqual(self.issues(value, sha), [])
+
+    def test_shared_physical_identity_cannot_have_conflicting_bytes(self):
+        value, sha, row = self.populated()
+        old_header = value['native_identity']['probes']['c']['headers'][0]
+        value['library'].update(path=old_header['resolved_path'], resolved_path=old_header['resolved_path'])
+        with self.assertRaisesRegex(ValueError, 'identity disagreement'):
+            self.summary(value, sha)
+
+    def test_empty_usr_and_unsupported_linkage_cannot_be_issue_free(self):
+        for field, replacement in (('usr', ''), ('language_kind', 0), ('linkage_kind', 0)):
+            value, sha, row = self.populated()
+            for target in ('reference', 'canonical'):
+                row['targets'][0][target][field] = replacement
+            self.assertIn('LINKAGE_NOT_ADJUDICATED', self.issues(value, sha))
+
+    def test_backend_failure_retains_the_earlier_syntax_failure(self):
+        value, sha, row = self.populated()
+        value['probe']['syntax']['exit_code'] = 1
+        value['probe']['cindex'] = None
+        empty = {'bytes': 0, 'sha256': hashlib.sha256(b'').hexdigest()}
+        value['probe']['backend_failure'] = {'kind': 'TIMEOUT', 'exit_code': None, 'stdout': empty, 'stderr': empty}
+        self.assertEqual(self.issues(value, sha), ['BACKEND_FAILED', 'SYNTAX_FAILED'])
+        self.assertFalse(self.summary(value, sha)['syntax_pass'])
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory).resolve() / 'failed.json'
+            argv = ['capture-declarations', '--root', str(Path(identity.__file__).resolve().parents[1]),
+                    '--source-sha', 'a' * 40, '--libclang', '/not-loaded', '--output', str(output)]
+            for role in identity.TOOL_ROLES:
+                argv += ['--' + role, '/not-executed']
+            with (mock.patch.object(identity, 'capture_declarations', return_value=value),
+                  mock.patch('sys.stdout', new_callable=io.StringIO)):
+                self.assertEqual(identity.main(argv), 2)
+            self.assertEqual(json.loads(output.read_text()), value)
+
+    def test_worker_timeout_crash_bad_json_and_oversize_are_explicit(self):
+        cases = [(subprocess.TimeoutExpired(['fixed'], 30, output=b'partial'), 'TIMEOUT'),
+                 (OSError('unavailable'), 'START_FAILED'),
+                 (SimpleNamespace(returncode=-11, stdout=b'', stderr=b''), 'PROCESS_FAILED'),
+                 (SimpleNamespace(returncode=0, stdout=b'not-json', stderr=b''), 'INVALID_RESULT'),
+                 (SimpleNamespace(returncode=0, stdout=b'x' * (identity.MAX_OUTPUT + 1), stderr=b''), 'OUTPUT_LIMIT')]
+        for result, kind in cases:
+            option = {'side_effect': result} if isinstance(result, Exception) else {'return_value': result}
+            with self.subTest(kind=kind), mock.patch.object(identity.subprocess, 'run', **option) as command:
+                observed, failure = identity.run_declaration_worker({})
+            self.assertIsNone(observed)
+            self.assertEqual(failure['kind'], kind)
+            self.assertEqual(command.call_args.kwargs['timeout'], 30)
+
+    def test_capture_rejects_existing_output_before_collection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory).resolve() / 'preserved.json'
+            output.write_bytes(b'preserved')
+            argv = ['capture-declarations', '--root', str(Path(directory).resolve()), '--source-sha', 'a' * 40,
+                    '--libclang', '/not-loaded', '--output', str(output)]
+            for role in identity.TOOL_ROLES:
+                argv += ['--' + role, '/not-executed']
+            with (mock.patch.object(identity, 'capture_declarations', side_effect=AssertionError('collection')),
+                  mock.patch('sys.stderr', new_callable=io.StringIO)):
+                self.assertEqual(identity.main(argv), 2)
+            self.assertEqual(output.read_bytes(), b'preserved')
+
+    def test_fixed_requests_cover_each_applicable_non_sqlite_model(self):
+        for system, count in (('Linux', 14), ('Darwin', 14), ('Windows', 13)):
+            with self.subTest(system=system):
+                rows = identity.declaration_requests(self.model, system)
+                self.assertEqual(len(rows), count)
+                self.assertEqual(len({r['id'] for r in rows}), count)
+                self.assertNotIn('sqlite3.h', {r['header'] for r in rows})
+        self.assertEqual(identity.declaration_coverage(self.model),
+                         {'required_library_pairs': 50, 'required_entry_pairs': 3,
+                          'qualified_library_pairs': 0, 'qualified_entry_pairs': 0})
+
+    def test_source_has_independent_signature_checks_and_no_visibility_macros(self):
+        source = identity.declaration_source(self.model, 'Linux')
+        self.assertIn('typedef char* (*cs_expected_getenv)(const char*);', source)
+        self.assertIn('_Generic(&getenv, cs_expected_getenv: 1, default: 0)', source)
+        self.assertIn('__typeof__(&openat) cs_native_openat = &openat;', source)
+        self.assertNotIn('#define', source)
+        self.assertNotIn('sqlite3.h', source)
+        self.assertEqual(source.count('int main('), 1)
+
+    def test_model_drift_and_unknown_platform_are_rejected(self):
+        self.model['sources'][1]['symbol'] = 'invented'
+        with self.assertRaises(ValueError):
+            identity.declaration_requests(self.model, 'Linux')
+        with self.assertRaises(ValueError):
+            identity.declaration_source(self.model, 'Other')
+
+    def test_command_preserves_observed_target_and_explicit_resource(self):
+        compiler = {'file': {'resolved_path': '/usr/bin/clang-22'},
+                    'resource_dir': '/usr/lib/clang/22', 'target': 'x86_64-redhat-linux-gnu'}
+        command = identity.declaration_command(compiler, 'Linux', {}, '/probe/declarations.c')
+        self.assertEqual(command, ['/usr/bin/clang-22', '--no-default-config', '-fno-modules',
+            '-resource-dir', '/usr/lib/clang/22', '-x', 'c', '-std=c17',
+            '--target=x86_64-redhat-linux-gnu', '-fsyntax-only', '/probe/declarations.c'])
+        self.assertEqual(identity.declaration_command(compiler, 'Linux', {}, '/probe/declarations.c', True),
+                         command[:-2] + ['-M', '-MT', 'identity-probe', command[-1]])
+
+    def test_type_identity_compares_nested_qualifiers_not_typedef_spelling(self):
+        left = {'kind': 'Pointer', 'spelling': 'alias', 'canonical_spelling': 'const char *',
+                'qualifiers': {'const': False, 'volatile': False, 'restrict': False},
+                'canonical_qualifiers': {'const': False, 'volatile': False, 'restrict': False},
+                'detail': {'pointee': {'kind': 'Char_S', 'spelling': 'char',
+                    'canonical_spelling': 'const char', 'qualifiers': {'const': True},
+                    'canonical_qualifiers': {'const': True}, 'detail': None}}}
+        right = copy.deepcopy(left)
+        right['spelling'] = 'another_alias'
+        self.assertEqual(identity.declaration_type_key(left), identity.declaration_type_key(right))
+        right['detail']['pointee']['canonical_qualifiers']['const'] = False
+        self.assertNotEqual(identity.declaration_type_key(left), identity.declaration_type_key(right))
+
+
 class WorkflowTests(unittest.TestCase):
     def test_every_native_lane_runs_external_input_staging_ground_truth_and_recipe_tests(self):
         workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/product-identity.yml').read_text()

@@ -1496,6 +1496,54 @@ class SourceProfileTests(unittest.TestCase):
                 profiles.draft_readiness(manifest)
 
 
+class NativeDeclarationReaderTests(unittest.TestCase):
+    def fixture(self):
+        import test_product_identity
+        helper = test_product_identity.DeclarationTests()
+        helper.setUp()
+        return helper.populated()[0]
+
+    def test_source_bound_metadata_reader_never_replays_native_commands(self):
+        import product_identity
+        value = self.fixture()
+        root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            packet = Path(directory).resolve() / 'observed.json'
+            raw = (json.dumps(value) + '\n').encode()
+            packet.write_bytes(raw)
+            with (mock.patch.object(profiles, 'verify_reviewed_files') as reviewed,
+                  mock.patch.object(product_identity, 'declaration_backend', side_effect=AssertionError('library load')),
+                  mock.patch.object(product_identity.subprocess, 'run', side_effect=AssertionError('native execution'))):
+                result = profiles.verify_native_declarations(root, packet, hashlib.sha256(raw).hexdigest())
+            self.assertFalse(result['native_qualified'])
+            self.assertTrue(result['producer_bytes_verified'])
+            self.assertEqual(result['coverage']['required_library_pairs'], 50)
+            self.assertEqual(reviewed.call_args.args[:2], (root, 'a' * 40))
+            self.assertEqual(reviewed.call_args.kwargs, {'expected_tree': 'b' * 40})
+            self.assertEqual({link['path'] for link in reviewed.call_args.args[2]},
+                             set(product_identity.SOURCE_FILES.values()) | set(product_identity.DECLARATION_PRODUCERS))
+
+    def test_packet_hash_and_source_binding_fail_closed(self):
+        value = self.fixture()
+        with tempfile.TemporaryDirectory() as directory:
+            packet = Path(directory).resolve() / 'observed.json'
+            raw = json.dumps(value).encode()
+            packet.write_bytes(raw)
+            root = Path(__file__).resolve().parents[1]
+            with self.assertRaisesRegex(ValueError, 'digest mismatch'):
+                profiles.verify_native_declarations(root, packet, 'a' * 64)
+            with mock.patch.object(profiles, 'verify_reviewed_files', side_effect=ValueError('source mismatch')):
+                with self.assertRaisesRegex(ValueError, 'source mismatch'):
+                    profiles.verify_native_declarations(root, packet, hashlib.sha256(raw).hexdigest())
+
+    def test_selectors_cannot_leak_into_other_commands(self):
+        command = [sys.executable, '-B', str(Path(profiles.__file__)), 'limits',
+                   '--declarations', '/not-read', '--declarations-sha256', 'a' * 64]
+        result = subprocess.run(command, capture_output=True, timeout=15)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn(b'declaration selectors', result.stderr)
+
+
 class NativeApiProfileTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

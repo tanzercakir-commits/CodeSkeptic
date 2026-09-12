@@ -623,3 +623,32 @@ mkdir EILSEQ dalı, aynı skip'ten önce sabit `REVIEWED_BYTE_ROOT_SKIP` işaret
 mevcut gerekçesini stderr'e yazar. Bu kayıt path, Git çıktısı veya değişken özel
 veri taşımaz; başka hata/başarı yolu aynı işareti üretmez. Sentetik testlerin
 işareti ayrı StringIO'da tutulur ve gerçek hosted syscall gözlemi diye sunulmaz.
+
+### Eklemeli native bildirim gözlemi
+
+`product_identity.py capture-declarations` ayrı v1 packet üretir; önceki identity,
+case ve diagnostic şemaları değişmez. Açık seçilmiş fiziksel libclang kendi
+path/hash/version kimliğine bağlıdır ve yalnız zaman sınırlı alt süreçte yüklenir.
+Modelden üretilen sabit C17 kaynakta gerçek header'lar, bağımsız `_Generic` imza
+beklentileri ve adres referansları vardır; kullanıcı kaynak/flag/makro girdisi
+kabul edilmez. SQLite seçilmez; 50 library/platform ve üç entry/platform toplamı
+korunur. Hiçbir korpus örneği, analyzer davranışı veya native yeterlilik kazanılmaz.
+
+Derleyici syntax sonucu, CIndex parse dönüşü ve error/fatal diagnostic durumu
+ayrıdır. CIndex'in TU döndürmesi başarı demek değildir. Bildirim, canonical cursor,
+USR/linkage/mangling, definition ilişkisi, spelling/expansion konumu, hashli include
+closure, recursive canonical tür ve gerçek parameter-declaration tür/qualifier
+değerleri kaydedilir. Kanonik fonksiyon türünün sildiği top-level parameter
+`restrict` gerçek bildirimden ayrı korunur; basılı tür metninden geri uydurulmaz.
+Parametre sayısı/türü, canonical hedef, kullanıcı definition'ı, nested unsupported
+tür/layout ve farklı parser/driver sürümü açık eksik kalır. Aynı sürümün eşleşmesi
+iki parser arayüzünün eşdeğerliğini veya tam ABI/runtime closure'ı kanıtlamaz.
+
+Geçerli başarısız syntax kaydı output dosyasına yazılır, capture exit 2 döner.
+Sonraki backend timeout/crash/çıktı hatası önceki syntax RED'i silmez: ayrı backend
+failure taşır. Timeout ve çıktı sayımı hard RSS/streaming/descendant bütçesi değildir.
+`check-declarations` saf metadata denetimidir; `native-declarations-check` ayrıca
+packet digest'ini, seçili model byte'larını ve gerçek producer Git bloblarını
+doğrular. Hiçbiri kayıt içindeki native yolları açmaz, library yüklemez veya argv'yi
+çalıştırmaz. `OBSERVED_UNADJUDICATED` adı native model kabulü değildir; bütün
+native/task/product qualification bayrakları false, qualified coverage sıfır kalır.
