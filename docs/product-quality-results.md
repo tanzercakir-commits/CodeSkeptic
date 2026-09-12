@@ -2205,3 +2205,17 @@ iddiası değildir; hosted declaration ve U003 kapıları açık kalır.
 Üç sentetik Linux capture/writer regresyonu yalnız POSIX filesystem üzerinde
 çalışır; Windows'ta açık gerekçeli skip'tir. Ayrı saf worker/result-shape testi
 platformdan bağımsız kalır; bu ayrım gerçek Windows native capture kanıtı sayılmaz.
+
+`588a4b4c8c460a48bbd8d4005e20d0af56cb3649` review'u R1'i çözülmüş buldu;
+425 testi bağımsız çalıştırdı, fakat R2 nedeniyle **BLOCKED** kaldı. Worker'ın
+library_version alanındaki JSON-escaped lone surrogate UTF-8 yazımını bozuyor,
+syntax RED yerine sıfır-byte output bırakıyordu. Gerçek capture/writer yolundaki
+iki surrogate negatifi ve saf worker negatifi bunu yeniden üretti; RED capture
+SHA-256 `1bc638d61595747989b5a1a4058981f51c34abfd6e8aba1c07d912fef9ca056b`.
+Dar düzeltme sürüm için UTF-8 byte sınırı ve bütün çocuk sonucu için serialization
+preflight ekler. Geçerli non-ASCII sürüm kontrolü geçerken lone surrogate ve byte
+sınırını aşan sürüm reddedilir; altı focused testin GREEN capture SHA-256'sı
+`099e1ce78acbc0c5b2044ae18c0d7aef38ec7e5cc1110ccbe3e7ca022e17054e`.
+Yeni Unicode writer testiyle sentetik POSIX orchestration testleri dört oldu;
+Windows native capture yapılmış sayılmaz. R2 sonrası temiz exact-head review
+ayrıca gereklidir; önceki iki BLOCKED kaydı değişmez, U003/POP hâlâ açık kalır.

@@ -1645,7 +1645,7 @@ def validate_declaration_observation(observed, model, native, probe):
     input_path, syntax, compiler = probe['input']['path'], probe['syntax'], native['tools']['clang']
     fields(observed, 'parse_status library_version diagnostics requests inclusions entry', 'CIndex observation')
     require(type(observed['parse_status']) is int and observed['parse_status'] == 0
-            and nonempty(observed['library_version']) and len(observed['library_version']) <= 8192,
+            and nonempty(observed['library_version']) and len(observed['library_version'].encode('utf-8')) <= 8192,
             'CIndex parser observation')
     require(type(observed['inclusions']) is list and observed['inclusions'] == sorted(set(observed['inclusions']))
             and {path_type(path) for path in observed['inclusions']} == set(by_path), 'CIndex include closure')
@@ -1851,6 +1851,7 @@ def run_declaration_worker(config, validate_result):
             try:
                 observed = parse_json(stdout.decode('utf-8'))
                 validate_result(observed)
+                require(len(canonical(observed).encode('utf-8')) <= MAX_OUTPUT, 'declaration result serialization bound')
                 return observed, None
             except (ValueError, TypeError, KeyError, RecursionError):
                 failure = 'INVALID_RESULT'

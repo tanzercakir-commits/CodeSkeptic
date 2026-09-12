@@ -648,7 +648,9 @@ Geçerli başarısız syntax kaydı output dosyasına yazılır, capture exit 2 
 Sonraki backend timeout/crash/çıktı hatası önceki syntax RED'i silmez: ayrı backend
 failure taşır. Geçerli JSON'un yanlış üst/alt yapısı da yalnız çocuk sonucuna ait
 denetimde `INVALID_RESULT` olur; bounded byte sayısı/hash'i ve önceki syntax
-sonucu korunur. Bağımsız capture envelope, kaynak ve header identity denetimleri
+sonucu korunur. Sürüm alanı UTF-8 byte sınırına, bütün çocuk sonucu da kabulden
+önce bounded UTF-8 serialization kontrolüne tabidir; JSON-escaped lone surrogate
+yazıcıya ulaşmaz. Bağımsız capture envelope, kaynak ve header identity denetimleri
 bu yakalama sınırının dışındadır; onların başarısızlığı fatal kalır ve packet yazılmaz.
 Timeout ve çıktı sayımı hard RSS/streaming/descendant bütçesi değildir.
 `check-declarations` saf metadata denetimidir; `native-declarations-check` ayrıca

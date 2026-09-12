@@ -1645,9 +1645,15 @@ class DeclarationTests(unittest.TestCase):
         nested['requests'][0]['targets'] = [None]
         bad_inclusion = copy.deepcopy(observation)
         bad_inclusion['inclusions'] = [{}]
-        for result in ({}, None, [], nested, bad_inclusion, observation):
-            raw = identity.canonical(result).encode()
-            valid = result is observation
+        bad_unicode = copy.deepcopy(observation)
+        bad_unicode['library_version'] = '\udcff'
+        oversized_unicode = copy.deepcopy(observation)
+        oversized_unicode['library_version'] = 'é' * 5000
+        valid_unicode = copy.deepcopy(observation)
+        valid_unicode['library_version'] += ' — native'
+        for result in ({}, None, [], nested, bad_inclusion, bad_unicode, oversized_unicode, observation, valid_unicode):
+            raw = json.dumps(result, ensure_ascii=True).encode()
+            valid = result is observation or result is valid_unicode
             with (self.subTest(valid=valid, shape=type(result).__name__),
                   mock.patch.object(identity.subprocess, 'run', return_value=SimpleNamespace(
                       returncode=0, stdout=raw, stderr=b'')),
@@ -1664,7 +1670,7 @@ class DeclarationTests(unittest.TestCase):
                 self.assertEqual(failure['stdout'], {'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
 
     @contextmanager
-    def mocked_declaration_capture(self, output, worker_stdout, changed=None):
+    def mocked_declaration_capture(self, output, worker_stdout, changed=None, after_serialization=None):
         """Real capture/writer orchestration; synthetic native I/O, never native execution."""
         value, sha = self.packet()
         native = value['native_identity']
@@ -1707,6 +1713,8 @@ class DeclarationTests(unittest.TestCase):
                     and all(type(item) is str for item in observed['inclusions'])):
                 observed['inclusions'].sort()
                 emitted['stdout'] = identity.canonical(observed).encode()
+            if after_serialization is not None:
+                emitted['stdout'] = after_serialization(emitted['stdout'])
             return SimpleNamespace(returncode=0, stdout=emitted['stdout'], stderr=b'')
 
         source = copy.deepcopy(native['source'])
@@ -1746,6 +1754,28 @@ class DeclarationTests(unittest.TestCase):
             self.assertIsNone(retained['probe']['backend_failure'])
             self.assertEqual(retained['probe']['cindex'], json.loads(emitted['stdout']))
             self.assertFalse(self.summary(retained, sha)['syntax_pass'])
+
+    @unittest.skipIf(sys.platform == 'win32', 'Synthetic Linux capture/writer fixture requires POSIX paths; Windows native capture is not exercised.')
+    def test_worker_escaped_unicode_error_cannot_leave_empty_red_output(self):
+        value, sha, row = self.populated()
+        raw = identity.canonical(value['probe']['cindex']).encode()
+        for encoded in (b'\\udcff', b'\\ud800'):
+            with self.subTest(encoded=encoded), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory).resolve() / 'failed.json'
+                def inject(stdout):
+                    marker = b'"library_version":"clang version 22.1.0"'
+                    self.assertEqual(stdout.count(marker), 1)
+                    return stdout.replace(marker, b'"library_version":"' + encoded + b'"')
+                with self.mocked_declaration_capture(output, raw, after_serialization=inject) as (argv, stderr, emitted):
+                    self.assertEqual(identity.main(argv), 2)
+                    self.assertEqual(stderr.getvalue(), '')
+                retained = json.loads(output.read_text())
+                self.assertIsNone(retained['probe']['cindex'])
+                self.assertEqual(retained['probe']['backend_failure']['kind'], 'INVALID_RESULT')
+                self.assertEqual(retained['probe']['backend_failure']['stdout'],
+                                 {'bytes': len(emitted['stdout']), 'sha256': hashlib.sha256(emitted['stdout']).hexdigest()})
+                self.assertEqual(retained['probe']['syntax']['exit_code'], 1)
+                self.assertFalse(self.summary(retained, sha)['syntax_pass'])
 
     @unittest.skipIf(sys.platform == 'win32', 'Synthetic Linux capture/writer fixture requires POSIX paths; Windows native capture is not exercised.')
     def test_malformed_worker_shape_preserves_red_through_actual_capture_writer(self):
