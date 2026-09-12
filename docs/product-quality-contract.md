@@ -731,3 +731,10 @@ gözlenen exact-head sonuçtur; job varlığı veya yerel statik test yeterli de
 Yeni Darwin job'unda SDK seçimi önce ayrı assignment ile yapılır, ardından başarılı
 değer export edilir. Makul stdout üretse bile nonzero selector sonucu capture'a
 geçmeden durur; export built-in'inin exit durumu selector failure'ını örtemez.
+
+Declaration yakalamasının exception yolu, mevcut bounded cause-chain okuyucuyla
+yalnız `DECLARATION_FAILURE_KIND TIMEOUT|OS_ERROR|INVALID` sınıfını ayrıca yazar.
+`IDENTITY_INVALID`, exit2 ve başarısız pre-envelope durumda dosya oluşturmama
+davranışı korunur; özel exception/komut/stream metni dışarı verilmez. Başarı veya
+geçerli kaydedilmiş syntax RED bu exception marker'ını üretmez. Bu sınıfın
+görünürlüğü query/timeout/ortam değişikliği, retry veya kök neden teşhisi değildir.

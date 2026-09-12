@@ -2382,3 +2382,68 @@ sonra export uygulanınca beş focused test GREEN verdi. Capture SHA
 Pozitif exit0 SDK'yı geçirir; negatif exit7 continuation/capture'a ulaşmaz. Eski
 job byte'ları ve bütün önceki failure kayıtları korunur. Gerçek xcrun/SDK çalışması,
 yeni exact-head PASS veya hosted başarı bu dar yerel deneyin iddiası değildir.
+
+### 8953056 gerçek hosted CIndex gözlemleri ve Windows pre-envelope failure
+
+Exact `89530563ec912385b38bd4c06bea60cc38c84146`, bağımsız453 test ile
+PASS_IMPLEMENTATION_ONLY aldı; receipt SHA
+`65cd252d348697e83a3d9bea043beed983c4719e58d424b64eb4925455205f19`.
+Normal feature fast-forward sonrasında identity run34722436917 attempt1 failure
+oldu: altı işten beşi success, yalnız Declare Windows failure. Aynı head'in
+FIFO34722436904, CI34722436910 ve Windows34722436938 run'ları terminal/success.
+Eski başarısız run'lar bu yeni sonuçlarla yeniden etiketlenmez.
+
+Yeni altı-job/dokuz-mevcut-artifact paketi gerçek logları, ZIP'leri, JSON'ları ve
+ilk/son API kimliklerini tutar; summary SHA
+`476f6593aeb0a4767af86f9ad0443c675c87ace10f7b9fb95c8dc71faa3cb293`.
+Retainer'ın tanımsız job sonucu ve bool/float kimlik açıkları önce bağımsız
+BLOCKED aldı,15 RED alt durumuyla yeniden üretildi ve dar guard düzeltmesiyle
+14 test/20 ek bağımsız kontrol sonrası PASS_HELPER_ONLY aldı. Bu helper onayı,
+indirilen gerçek paketlerin bağımsız denetimi veya native yeterlilik değildir.
+
+Primary'nin saf/source-bound okuyucuları gerçek Linux ve Darwin v2 paketlerinde
+syntax_pass/visibility_pass=true,14'er issue-free OBSERVED_UNADJUDICATED kaydetti.
+Paket SHA'ları sırasıyla
+`db310c6a273bec6356a96df7e347ca6e59ee93525e95b8b6d6e0932bfc015a59` ve
+`0a33ab29d7983f31af533fccab959fc9770ce76d07740878b4d0c785cf72a426`.
+Linux Ubuntu Clang18.1.3 ve67 declaration closure girdisi; Darwin standalone
+CLT Apple Clang16.0.0 ve108 closure girdisi gözlendi (üretilen kaynak dahil).
+İkisinde CIndex diagnostic
+listesi boş; bu tam ABI/runtime closure, sanitizer veya model davranış onayı
+değildir. Hosted native dosyalar bağımsız olarak yeniden açılmadı.
+
+Declare Windows138 identity testi (yedi skip) ve dört declaration reader testi
+geçti; ardından ilk native identity yakalamasındaki özgün powershell.exe OS
+sorgusu OSError veya TimeoutExpired ortak handler'ına ulaştı. Log SHA
+`61cc64704a34c914eb91eaf4c2bdc9ce01db62e4c6c5555753c7c56a7fb605f8`.
+Bu kayıt hangi sınıf olduğunu ayırmaz; aradaki40.6s özgün sorgunun ölçülmüş süresi
+değildir. DLL pathname seçimi tamamlandı, fakat collector library hash/load,
+compiler/header/syntax/CIndex adımlarına ulaşmadı; declaration JSON/artifact yok.
+Bu, geçerli retained syntax RED değil, pre-envelope capture failure'dır.
+
+Ayrı Observe Windows job'u identity/case/diagnostic artifact'larını başarıyla
+üretti. Sonraki staged query17375ms OK ve policy188ms OK gözlendi; bu başka job'un
+sonucu Declare failure'ını onarmaz veya onun iç nedenini kanıtlamaz. Yeni dar
+regresyon, declaration exception yolunun TIMEOUT/OS_ERROR/INVALID sınıflarını
+sabit ve özel metin içermeyen marker ile ayırmasını ister; mevcut kodda üç RED
+alt durum verdi: SHA
+`9e87958972ed0ad0bdcb00a2310656749f796eb969c3d4ff76b17c8b5da9b622`.
+Sorgu/timeout/policy değişikliği, retry veya önceki failure'ın temizlenmesi bu
+gözlem ihtiyacının kapsamı değildir. Gerçek paketlerin bağımsız audit'i ve yeni
+uygulama incelemesi ayrıca gerekir; selection2/1020, native0/50+3 ve U003 açık.
+
+Gerçek paketin bağımsız denetimi tamamlandı:
+HOSTED_OBSERVATIONS_VERIFIED_NOT_QUALIFIED receipt SHA
+`be8b847c51c0556e99c5f2d533ceb4c73480c4d6a4ffe44869e7fbe9ef6579da`.
+52 manifest girdisi+summary, dokuz ZIP/payload ve altı gerçek job logu incelendi;
+iki yeni v2 paketindeki10 ek saf negatif, syntax/makro/hedef/imza eksiklerini
+INCOMPLETE tuttu ve sahte qualification'ı reddetti. Windows yokluğu ve bütün
+native/task/productfalse sınırları korundu; hosted header/library yeniden açılmadı.
+
+Dar uygulama yalnız declaration exception yoluna mevcut sabit classifier'ın
+marker'ını ekler. Timeout/OSError/generic validation regresyonları ve mevcut
+gerçek writer-orchestration success/retained-RED stderr kontrolleri GREEN verdi:
+`4ad8aeb8e0950c705562a2a5370adca14d264f83d07667abf50e156ac03fc8a2`.
+Özgün OS query argv/30s bütçesi, ortam, tek invocation, syntax/JSON şekilleri ve
+eski case marker'ı değişmedi. Yeni exact-head uygulama PASS'i ve marker'ın taze
+hosted gözlemi ayrıca gereklidir; bu eski8953056 failure sınıfını tamamlamaz.

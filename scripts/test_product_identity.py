@@ -1833,6 +1833,34 @@ class DeclarationTests(unittest.TestCase):
                     self.assertTrue(stderr.getvalue().startswith('IDENTITY_INVALID '))
                 self.assertFalse(output.exists())
 
+    def test_capture_exception_keeps_fixed_failure_kind_without_private_text(self):
+        causes = [(subprocess.TimeoutExpired('PRIVATE_SENTINEL', 30), 'TIMEOUT'),
+                  (OSError('PRIVATE_SENTINEL'), 'OS_ERROR'),
+                  (ValueError('PRIVATE_SENTINEL'), 'INVALID')]
+        for cause, expected in causes:
+            with self.subTest(expected=expected), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory).resolve() / 'repo'
+                root.mkdir()
+                output = root.parent / 'declaration.json'
+                error = identity.IdentityError('PRIVATE_SENTINEL')
+                error.__context__ = cause
+                argv = ['capture-declarations', '--root', str(root), '--source-sha', 'a' * 40,
+                        '--libclang', '/not-loaded', '--output', str(output)]
+                for role in identity.TOOL_ROLES:
+                    argv += ['--' + role, '/not-executed']
+                stdout, stderr = io.StringIO(), io.StringIO()
+                with mock.patch.object(identity, 'capture_declarations', side_effect=error), \
+                        mock.patch.object(identity.sys, 'stdout', stdout), \
+                        mock.patch.object(identity.sys, 'stderr', stderr), \
+                        mock.patch.object(identity.subprocess, 'run') as execute:
+                    self.assertEqual(identity.main(argv), 2)
+                execute.assert_not_called()
+                self.assertFalse(output.exists())
+                self.assertEqual(stdout.getvalue(), '')
+                self.assertNotIn('PRIVATE_SENTINEL', stderr.getvalue())
+                self.assertTrue(stderr.getvalue().startswith('IDENTITY_INVALID '))
+                self.assertIn('DECLARATION_FAILURE_KIND ' + expected + '\n', stderr.getvalue())
+
     def test_capture_rejects_existing_output_before_collection(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory).resolve() / 'preserved.json'

@@ -2161,6 +2161,8 @@ def main(argv=None):
         print('IDENTITY_INVALID ' + (case_observation_failure(error) if private else str(error)), file=sys.stderr)
         if args.command == 'capture-case':
             print('CASE_FAILURE_KIND ' + case_failure_kind(error), file=sys.stderr)
+        elif args.command == 'capture-declarations':
+            print('DECLARATION_FAILURE_KIND ' + case_failure_kind(error), file=sys.stderr)
         return 2
 
 
