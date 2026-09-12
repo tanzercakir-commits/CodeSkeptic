@@ -1,0 +1,54 @@
+{
+  "schema": "codeskeptic-product-retained-github-inputs/v1",
+  "state": "SOURCE_BINDING_ONLY_NOT_FROZEN",
+  "id": "gcc-parent-free-loses-child",
+  "genetic_history": "UNKNOWN_NOT_ASSERTED",
+  "adjudication": {
+    "path": "tests/product_corpus/candidates/gcc-parent-child-selection.json",
+    "sha256": "7a98b131546ac4ea49eb4ac9b0e1486cbce3cf85fcf8c8e05e7141610dc0679b"
+  },
+  "inputs": [
+    {
+      "role": "notice",
+      "path": "COPYING3",
+      "size_bytes": 35147,
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+    },
+    {
+      "role": "notice",
+      "path": "README",
+      "size_bytes": 1026,
+      "sha256": "49306c701a64d02dc25de7c89eac5643a3e73c159b4aa9438b47f6b9d86ba0df"
+    },
+    {
+      "role": "candidate",
+      "path": "case.c",
+      "size_bytes": 193,
+      "sha256": "7e0b0494e9572d46eecce6049b968917044a677608f1f934f6c9ad6bbe85651c"
+    },
+    {
+      "role": "semantic-comparison",
+      "path": "comparison.c",
+      "size_bytes": 47828,
+      "sha256": "f6472fecd8b96331595bf990ffebb1fe01df9b49684027e81b731a287f1817fc"
+    },
+    {
+      "role": "extraction",
+      "path": "extraction.json",
+      "size_bytes": 575,
+      "sha256": "1da023b51c164a21fa795c68d467811d8fe175270f18dd52efc2e032b8602b0e"
+    },
+    {
+      "role": "provenance",
+      "path": "metadata.json",
+      "size_bytes": 5733,
+      "sha256": "fac0370eb53206fbbfbd4bb43a1587a95b4f6177bba1d4ed0dd49b98b2b15fda"
+    },
+    {
+      "role": "origin",
+      "path": "origin.c",
+      "size_bytes": 3329,
+      "sha256": "64f7fa32ecac51cea4da7c85dd994f9bdb2147e1c29772b51ccb7cc4891efb81"
+    }
+  ]
+}

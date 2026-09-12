@@ -1176,3 +1176,35 @@ bağlama/admission entegrasyonu, nihai analiz tarifleri, matching/bütçe bağla
 platform ve all-rule etiketleri ile köken/hak sınırları hâlâ eksiktir. Bu aday
 **FULL_ADMISSION_HELD**, ek kota 0'dır; kabul edilmiş seçim hâlâ **1/1020**.
 Yeni kayıt eski GCC kaynağının lisans/admission veya native CI kararını devralmaz.
+
+### İkinci aday — retained kaynak bayt bağlama protokolü
+
+`gcc-parent-child-binding.json`, eski `external-inputs/v1` biçimini değiştirmeyen
+ayrı `codeskeptic-product-retained-github-inputs/v1` protokolünü kullanır. Bu dar
+biçim bir candidate, bir origin, bir retained GitHub metadata belgesi, bir
+extraction açıklaması, bir semantic-comparison ve en az bir notice ister.
+Genetic history açıkça `UNKNOWN_NOT_ASSERTED` kalır; karşılaştırma `lineage`
+yerine geçirilemez. Eski GCC lisans okuyucusu yalnız eski protokol sonucunu kabul
+eder; mevcut GCC pinleri, kabul kaydı ve seçim manifesti değişmez.
+
+Okuyucu gerçek dosyaların hash/boyutlarını ve son dosya kimliklerini kontrol
+eder. Retained metadata'nın sabit repository/revision/path, Git blob, içerik
+ve boyut alanları gerçek origin baytlarıyla eşleşir; extraction kaynak hashleri,
+artan/ayrık/geçerli satır aralıkları ve açıklaması mevcut adjudication'a bağlıdır.
+LLVM karşılaştırmasının hash'i aynı eski kaynak kararına bağlanır. Yerel portable
+dosya yolu sınırları genişlemez; upstream `c++` yolu yalnız metadata/URL'de işlenir.
+Bu tutarlılık denetimi upstream kimlik doğrulaması, otomatik extraction eşdeğerlik
+ispatı, semantik bağımsızlık, lisans izni veya source ADMIT değildir.
+
+U003 `gcc-parent-child-binding-v1/inputs` dış paketinin yedi dosyası / 93.831
+baytı doğrulandı; kaynak `7e0b0494…51c` aynı kalır. Değiştirilmiş gerçek kaynak
+kopyası exit2 ile reddedildi. Yeni protokolün başlangıç RED'i, legacy-dispatch
+negatifi ve ilk uygulamadaki upstream `c++` yolu ayrım hatası ayrı başarısız
+kanıtlardır; sonraki GREEN bunları yeniden etiketlemez. 148 profile ve 88 identity
+testi yerelde geçti; source CLI ve mutation kontrolleri dış kanıt paketinde tutulur.
+
+Bu checkpoint yalnız kaynak bayt bağlamasını ekler. Generic candidate/admission
+dispatch, nihai native tarifler, matching/bütçeler, all-rule/platform kararları
+ve hak sınırları tamamlanmadı. Analyzer çalıştırılmadı; ikinci aday hâlâ
+**FULL_ADMISSION_HELD**, ek kota 0 ve toplam kabul edilmiş seçim **1/1020**.
+Yeni kodun hosted sonucu ayrıca doğrulanmalıdır; eski CI bu checkpoint'e taşınmaz.

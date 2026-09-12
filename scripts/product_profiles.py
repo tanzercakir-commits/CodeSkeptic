@@ -8,6 +8,7 @@ stage-gcc-inputs command downloads four pinned ordinary GCC inputs into a new
 external directory. No execution, rebaseline or pin refresh is performed here.
 """
 import argparse
+import base64
 from collections import Counter
 import hashlib
 import json
@@ -19,6 +20,7 @@ import stat
 import subprocess
 import sys
 import urllib.request
+from urllib.parse import quote
 
 from product_quality import FAMILIES, fields, nonempty, require
 
@@ -326,6 +328,68 @@ def external_tree(root, expected):
     return identities
 
 
+RETAINED_GITHUB_INPUTS = 'codeskeptic-product-retained-github-inputs/v1'
+
+
+def retained_github_evidence(review, rows, captured):
+    """Check retained metadata consistency, not upstream authentication or labels.
+
+    Extraction descriptions are linked to the reviewed bytes, not executed or
+    mechanically certified equivalent. Semantic comparison is never lineage.
+    """
+    origin = review['origin']
+    repository = origin['repository']
+    require(type(repository) is str and re.fullmatch(
+        r'https://github\.com/[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}',
+        repository) and not repository.endswith('.git'), 'retained repository identity')
+    revision = origin['revision']
+    require(type(revision) is str and re.fullmatch(r'[0-9a-f]{40}', revision)
+            and revision != '0' * 40
+            and origin['source_specific_genetic_lineage_established'] is False
+            and origin['tag_signature_authenticated'] is False, 'retained history boundary')
+    # This is an upstream Git path used only in metadata/URL comparison, never
+    # opened locally. Preserve the stricter portable external_relative policy.
+    upstream_path = origin['path']
+    require(type(upstream_path) is str and 0 < len(upstream_path) <= 512
+            and len(upstream_path.split('/')) <= 16
+            and all(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._+-]{0,127}', part)
+                    and not part.endswith('.') for part in upstream_path.split('/')),
+            'retained upstream path')
+    original = captured['origin']
+    blob = hashlib.sha1(b'blob ' + str(len(original)).encode() + b'\0' + original).hexdigest()
+    require(origin['git_blob'] == blob, 'retained origin blob')
+    api = parse_json(captured['provenance'].decode('utf-8'))
+    url = ('https://api.github.com/repos/' + repository.removeprefix('https://github.com/')
+           + '/contents/' + quote(upstream_path, safe='/') + '?ref=' + revision)
+    require(type(api) is dict and api['type'] == 'file' and api['encoding'] == 'base64'
+            and api['path'] == upstream_path and api['sha'] == blob
+            and type(api['size']) is int and api['size'] == len(original)
+            and api['url'] == url and type(api['content']) is str, 'retained metadata identity')
+    require(base64.b64decode(''.join(api['content'].split()), validate=True) == original,
+            'retained metadata content')
+    extraction = parse_json(captured['extraction'].decode('utf-8'))
+    fields(extraction, 'schema source_sha256 origin_sha256 lines adaptation equivalence', 'retained extraction')
+    require(extraction['schema'] == 'codeskeptic-reviewed-extraction-description/v1'
+            and extraction['source_sha256'] == review['source']['sha256']
+            and extraction['origin_sha256'] == origin['sha256']
+            and extraction['adaptation'] == review['source']['adaptation']
+            and nonempty(extraction['adaptation']) and len(extraction['adaptation']) <= 8192
+            and extraction['equivalence'] == 'INDEPENDENT_REVIEW_REQUIRED_NOT_EXECUTED',
+            'retained extraction linkage')
+    ranges = extraction['lines']
+    require(type(ranges) is list and 1 <= len(ranges) <= 64
+            and canonical(ranges) == canonical(origin['lines']),
+            'retained selected ranges')
+    last, line_count = 0, len(original.decode('utf-8').splitlines())
+    for pair in ranges:
+        require(type(pair) is list and len(pair) == 2 and all(type(n) is int for n in pair)
+                and last < pair[0] <= pair[1] <= line_count, 'retained range bounds/order')
+        last = pair[1]
+    comparison = next(row for row in rows if row['role'] == 'semantic-comparison')
+    require(review['independence']['same_cluster_comparison']['sha256'] == comparison['sha256'],
+            'retained reviewed comparison bytes')
+
+
 def verify_external_inputs(binding_path, repo, source_root):
     """Verify reviewed source bytes only; never execute, download or admit a case.
 
@@ -343,11 +407,15 @@ def verify_external_inputs(binding_path, repo, source_root):
         require(repo in binding_path.parents, "external manifest outside checkout")
         binding_hash, binding_info, raw = external_read(binding_path, capture=True)
         manifest = parse_json(raw.decode("utf-8"))
-        fields(manifest, "schema state id adjudication inputs", "external binding")
-        require(manifest["schema"] == "codeskeptic-product-external-inputs/v1"
+        retained = type(manifest) is dict and manifest.get('schema') == RETAINED_GITHUB_INPUTS
+        fields(manifest, "schema state id adjudication inputs" + (' genetic_history' if retained else ''),
+               "external binding")
+        require(manifest["schema"] in ("codeskeptic-product-external-inputs/v1", RETAINED_GITHUB_INPUTS)
                 and manifest["state"] == "SOURCE_BINDING_ONLY_NOT_FROZEN"
                 and type(manifest["id"]) is str and re.fullmatch(r"[a-z][a-z0-9-]{0,95}", manifest["id"]),
                 "external binding identity/state")
+        if retained:
+            require(manifest['genetic_history'] == 'UNKNOWN_NOT_ASSERTED', 'retained history claim')
         link = manifest["adjudication"]
         fields(link, "path sha256", "external adjudication")
         review_path = repo / external_relative(link["path"])
@@ -356,11 +424,13 @@ def verify_external_inputs(binding_path, repo, source_root):
         require(review_hash["sha256"] == link["sha256"], "external adjudication changed")
         review = parse_json(raw.decode("utf-8"))
         rows = manifest["inputs"]
-        require(type(rows) is list and 4 <= len(rows) <= 64, "external input inventory size")
+        require(type(rows) is list and (6 if retained else 4) <= len(rows) <= 64, "external input inventory size")
         expected, roles, names, total = {}, Counter(), [], 0
+        allowed_roles = (('candidate', 'origin', 'provenance', 'extraction', 'semantic-comparison', 'notice')
+                         if retained else ('candidate', 'origin', 'lineage', 'notice'))
         for row in rows:
             fields(row, "role path size_bytes sha256", "external input")
-            require(type(row["role"]) is str and row["role"] in ("candidate", "origin", "lineage", "notice"),
+            require(type(row["role"]) is str and row["role"] in allowed_roles,
                     "external role")
             relative = external_relative(row["path"])
             external_digest(row["sha256"])
@@ -372,7 +442,9 @@ def verify_external_inputs(binding_path, repo, source_root):
             roles[row["role"]] += 1
         require(names == sorted(names) and len(set(name.casefold() for name in names)) == len(names)
                 and total <= 64 * 1024 * 1024 and roles["candidate"] == roles["origin"] == 1
-                and roles["lineage"] >= 1 and roles["notice"] >= 1, "external inventory ordering/roles/budget")
+                and roles["notice"] >= 1, "external inventory ordering/roles/budget")
+        require((roles['provenance'] == roles['extraction'] == roles['semantic-comparison'] == 1)
+                if retained else roles['lineage'] >= 1, 'external evidence roles')
         for path in expected:
             require(not any(parent in expected for parent in path.parents), "external file/directory collision")
         require(type(review) is dict and review["id"] == manifest["id"], "external review case identity")
@@ -380,23 +452,33 @@ def verify_external_inputs(binding_path, repo, source_root):
             require(type(review[field]) is dict and review[field]["sha256"] ==
                     next(row["sha256"] for row in rows if row["role"] == role), "external reviewed bytes mismatch")
         before_tree = external_tree(root, expected)
-        files, inodes = {binding_path: binding_info, review_path: review_info}, set()
+        files, inodes, captured = {binding_path: binding_info, review_path: review_info}, set(), {}
         for path, row in expected.items():
-            actual, info, _ = external_read(path)
+            capture = retained and row['role'] in ('origin', 'provenance', 'extraction')
+            actual, info, raw = external_read(path, capture=capture)
             require(actual == {key: row[key] for key in ("size_bytes", "sha256")}, "external source changed")
             require((info.st_dev, info.st_ino) not in inodes, "external duplicate inode")
             inodes.add((info.st_dev, info.st_ino))
             files[path] = info
+            if capture:
+                captured[row['role']] = raw
+        if retained:
+            retained_github_evidence(review, rows, captured)
         require(external_tree(root, expected) == before_tree, "external tree changed")
         for path, before in files.items():
             require(path.resolve(strict=True) == path and external_identity(path.lstat()) == external_identity(before),
                     "external final identity changed")
-        return {"schema": "codeskeptic-product-external-input-check/v1", "id": manifest["id"],
+        result = {"schema": "codeskeptic-product-external-input-check/v1", "id": manifest["id"],
                 "binding_sha256": binding_hash["sha256"], "adjudication_sha256": review_hash["sha256"],
                 "source_bytes_verified": True, "verified_inputs": len(rows), "verified_bytes": total,
                 "independent_quota_examples": 0, "task_ready": False, "product_qualified": False,
                 "native_commands_bound": False, "license_qualified": False,
                 "state": "SOURCE_BINDING_ONLY_NOT_FROZEN"}
+        if retained:
+            result.update(schema='codeskeptic-product-retained-github-input-check/v1',
+                          genetic_lineage_established=False, upstream_authenticated=False,
+                          extraction_equivalence_verified=False, semantic_independence_verified=False)
+        return result
     except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError):
         # Parser/OS exception text can contain private paths or input fragments.
         raise ValueError("external input binding rejected") from None
@@ -477,7 +559,8 @@ def verify_gcc_license_basis(repo, evidence_root, source_root):
         value = parse_json(raw.decode("utf-8"))
         result = gcc_license_metadata(value)
         binding = verify_external_inputs(repo / GCC_BINDING, repo, source_root)
-        require(binding["binding_sha256"] == value["source_binding"]["sha256"], "GCC license binding drift")
+        require(binding['schema'] == 'codeskeptic-product-external-input-check/v1'
+                and binding["binding_sha256"] == value["source_binding"]["sha256"], "GCC license binding drift")
         manifest = read_json(repo / GCC_BINDING)
         require(next(row["sha256"] for row in manifest["inputs"] if row["role"] == "candidate")
                 == value["source_sha256"], "GCC license source drift")

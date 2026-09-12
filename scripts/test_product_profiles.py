@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Synthetic manifest accounting checks; no sample or product quality claim."""
 import copy
+import base64
 import hashlib
 import io
 import json
@@ -1102,6 +1103,14 @@ class LicenseBasisTests(unittest.TestCase):
             with self.subTest(target=target), self.assertRaisesRegex(ValueError, "^GCC license reference binding rejected$"):
                 profiles.verify_gcc_license_basis(repo, evidence, source)
 
+    def test_legacy_license_reader_rejects_retained_protocol_result(self):
+        repo, source, evidence = self.fixture()
+        observed = profiles.verify_external_inputs(repo / profiles.GCC_BINDING, repo, source)
+        observed['schema'] = 'codeskeptic-product-retained-github-input-check/v1'
+        with mock.patch.object(profiles, 'verify_external_inputs', return_value=observed):
+            with self.assertRaisesRegex(ValueError, '^GCC license reference binding rejected$'):
+                profiles.verify_gcc_license_basis(repo, evidence, source)
+
     def test_reference_symlink_and_checkout_overlap_rejected(self):
         repo, source, evidence = self.fixture()
         path = evidence / "root-README"
@@ -1978,6 +1987,157 @@ class ExternalInputTests(unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertEqual(result.stderr, "PRODUCT_PROFILE_FAIL: external input binding rejected\n")
         self.assertNotIn("SOURCE_SENTINEL", result.stdout + result.stderr)
+
+
+class RetainedExternalInputTests(ExternalInputTests):
+    """New byte-binding protocol; synthetic evidence is never source admission."""
+    def setUp(self):
+        super().setUp()
+        self.manifest['schema'] = 'codeskeptic-product-retained-github-inputs/v1'
+        self.manifest['genetic_history'] = 'UNKNOWN_NOT_ASSERTED'
+        comparison = next(row for row in self.rows if row['role'] == 'lineage')
+        comparison['role'] = 'semantic-comparison'
+        original = (self.source / 'origin.c').read_bytes()
+        self.review['source']['adaptation'] = 'Synthetic retained extraction description.'
+        self.review['origin'].update(
+            repository='https://github.com/example/project', revision='a' * 40,
+            path='tests/c++/original.c', lines=[[1, 1]],
+            git_blob=hashlib.sha1(b'blob ' + str(len(original)).encode() + b'\0' + original).hexdigest(),
+            source_specific_genetic_lineage_established=False, tag_signature_authenticated=False)
+        self.review['independence'] = {'same_cluster_comparison': {'sha256': comparison['sha256']}}
+        self.api = {'type': 'file', 'encoding': 'base64', 'path': self.review['origin']['path'],
+                    'sha': self.review['origin']['git_blob'], 'size': len(original),
+                    'url': 'https://api.github.com/repos/example/project/contents/tests/c%2B%2B/original.c?ref=' + 'a' * 40,
+                    'content': base64.b64encode(original).decode()}
+        self.extraction = {'schema': 'codeskeptic-reviewed-extraction-description/v1',
+                           'source_sha256': self.review['source']['sha256'],
+                           'origin_sha256': self.review['origin']['sha256'],
+                           'lines': self.review['origin']['lines'],
+                           'adaptation': self.review['source']['adaptation'],
+                           'equivalence': 'INDEPENDENT_REVIEW_REQUIRED_NOT_EXECUTED'}
+        for role, name, value in (('provenance', 'metadata.json', self.api),
+                                  ('extraction', 'extraction.json', self.extraction)):
+            self.rows.append({'role': role, 'path': name})
+            self.save_evidence(role, value)
+        self.rows.sort(key=lambda row: row['path'])
+        self.save_review()
+
+    def save_evidence(self, role, value):
+        row = next(row for row in self.manifest['inputs'] if row['role'] == role)
+        raw = profiles.canonical(value).encode()
+        (self.source / row['path']).write_bytes(raw)
+        row.update(size_bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest())
+        self.save()
+
+    def save_review(self):
+        raw = profiles.canonical(self.review).encode()
+        (self.repo / 'review.json').write_bytes(raw)
+        self.manifest['adjudication']['sha256'] = hashlib.sha256(raw).hexdigest()
+        self.save()
+
+    def test_actual_bytes_bound_without_execution_or_admission(self):
+        with mock.patch.object(subprocess, 'run', side_effect=AssertionError('must not execute')):
+            result = self.check()
+        self.assertEqual(result['schema'], 'codeskeptic-product-retained-github-input-check/v1')
+        self.assertEqual(result['verified_inputs'], 6)
+        self.assertTrue(result['source_bytes_verified'])
+        self.assertEqual(result['independent_quota_examples'], 0)
+        for key in ('task_ready', 'product_qualified', 'native_commands_bound', 'license_qualified',
+                    'genetic_lineage_established', 'upstream_authenticated',
+                    'extraction_equivalence_verified', 'semantic_independence_verified'):
+            self.assertIs(result[key], False)
+        self.assertNotIn('SOURCE_SENTINEL', profiles.canonical(result))
+
+    def test_old_schema_still_requires_lineage_and_rejects_new_claims(self):
+        self.manifest['schema'] = 'codeskeptic-product-external-inputs/v1'
+        self.save()
+        with self.assertRaises(ValueError):
+            self.check()
+        del self.manifest['genetic_history']
+        self.save()
+        with self.assertRaises(ValueError):
+            self.check()
+
+    def test_history_claim_and_evidence_roles_are_not_interchangeable(self):
+        original = copy.deepcopy(self.manifest)
+        for value in ('ESTABLISHED', None, True, 0):
+            self.manifest = copy.deepcopy(original)
+            self.manifest['genetic_history'] = value
+            self.save()
+            with self.subTest(history=value), self.assertRaises(ValueError):
+                self.check()
+        for role in ('provenance', 'extraction', 'semantic-comparison', 'notice'):
+            for replacement in ('lineage', 'origin', 'candidate'):
+                self.manifest = copy.deepcopy(original)
+                next(row for row in self.manifest['inputs'] if row['role'] == role)['role'] = replacement
+                self.save()
+                with self.subTest(role=role, replacement=replacement), self.assertRaises(ValueError):
+                    self.check()
+
+    def test_unknown_schema_and_missing_or_duplicate_evidence_rejected(self):
+        original = copy.deepcopy(self.manifest)
+        for schema in ('codeskeptic-product-retained-github-inputs/v2', None, 1):
+            self.manifest = copy.deepcopy(original)
+            self.manifest['schema'] = schema
+            self.save()
+            with self.subTest(schema=schema), self.assertRaises(ValueError):
+                self.check()
+        for role in ('provenance', 'extraction', 'semantic-comparison'):
+            for operation in ('missing', 'duplicate'):
+                self.manifest = copy.deepcopy(original)
+                rows = self.manifest['inputs']
+                row = next(row for row in rows if row['role'] == role)
+                if operation == 'missing':
+                    rows.remove(row)
+                else:
+                    rows.append(copy.deepcopy(row))
+                    rows.sort(key=lambda row: row['path'])
+                self.save()
+                with self.subTest(role=role, operation=operation), self.assertRaises(ValueError):
+                    self.check()
+
+    def test_provenance_bytes_cannot_disagree_even_with_updated_inventory_hash(self):
+        for key, value in (('type', 'dir'), ('encoding', 'utf-8'), ('path', 'other.c'),
+                           ('sha', 'b' * 40), ('size', True), ('size', 1),
+                           ('url', self.api['url'].replace('a' * 40, 'main')),
+                           ('url', self.api['url'].replace('example/project', 'other/project')),
+                           ('content', 'not-base64'), ('content', base64.b64encode(b'other').decode())):
+            changed = {**self.api, key: value}
+            self.save_evidence('provenance', changed)
+            with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                self.check()
+
+    def test_extraction_range_and_source_links_must_match_review(self):
+        for key, value in (('source_sha256', 'c' * 64), ('origin_sha256', 'd' * 64),
+                           ('lines', [[2, 2]]), ('lines', [[True, 1]]), ('lines', []),
+                           ('adaptation', 'other'), ('equivalence', 'VERIFIED'), ('extra', True)):
+            self.save_evidence('extraction', {**self.extraction, key: value})
+            with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                self.check()
+
+    def test_reviewed_origin_and_comparison_identity_checked(self):
+        original = copy.deepcopy(self.review)
+        mutations = [('origin', 'revision', 'main'), ('origin', 'revision', 'b' * 40),
+                     ('origin', 'repository', 'https://github.com/example/project.git'),
+                     ('origin', 'git_blob', 'b' * 40), ('origin', 'path', '../escape.c'),
+                     ('origin', 'lines', [[True, 1]]), ('origin', 'lines', [[1.0, 1]]),
+                     ('origin', 'source_specific_genetic_lineage_established', True),
+                     ('origin', 'tag_signature_authenticated', True),
+                     ('independence', 'same_cluster_comparison', {'sha256': 'e' * 64})]
+        for section, key, value in mutations:
+            self.review = copy.deepcopy(original)
+            self.review[section][key] = value
+            self.save_review()
+            with self.subTest(section=section, key=key), self.assertRaises(ValueError):
+                self.check()
+
+    def test_self_consistent_but_impossible_ranges_are_rejected(self):
+        for ranges in ([], [[0, 1]], [[1, 2]], [[True, 1]], [[1, 1], [1, 1]], [[2, 1]]):
+            self.review['origin']['lines'] = ranges
+            self.save_review()
+            self.save_evidence('extraction', {**self.extraction, 'lines': ranges})
+            with self.subTest(ranges=ranges), self.assertRaises(ValueError):
+                self.check()
 
 
 class GccStagingTests(unittest.TestCase):
