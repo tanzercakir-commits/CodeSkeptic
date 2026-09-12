@@ -646,7 +646,11 @@ iki parser arayüzünün eşdeğerliğini veya tam ABI/runtime closure'ı kanıt
 
 Geçerli başarısız syntax kaydı output dosyasına yazılır, capture exit 2 döner.
 Sonraki backend timeout/crash/çıktı hatası önceki syntax RED'i silmez: ayrı backend
-failure taşır. Timeout ve çıktı sayımı hard RSS/streaming/descendant bütçesi değildir.
+failure taşır. Geçerli JSON'un yanlış üst/alt yapısı da yalnız çocuk sonucuna ait
+denetimde `INVALID_RESULT` olur; bounded byte sayısı/hash'i ve önceki syntax
+sonucu korunur. Bağımsız capture envelope, kaynak ve header identity denetimleri
+bu yakalama sınırının dışındadır; onların başarısızlığı fatal kalır ve packet yazılmaz.
+Timeout ve çıktı sayımı hard RSS/streaming/descendant bütçesi değildir.
 `check-declarations` saf metadata denetimidir; `native-declarations-check` ayrıca
 packet digest'ini, seçili model byte'larını ve gerçek producer Git bloblarını
 doğrular. Hiçbiri kayıt içindeki native yolları açmaz, library yüklemez veya argv'yi

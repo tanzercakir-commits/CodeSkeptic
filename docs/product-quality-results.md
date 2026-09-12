@@ -2181,3 +2181,27 @@ Backend failure retention, çapraz fiziksel identity uyuşmazlığı, pure reade
 selector kontrolleri de eklendi. Temiz exact-head gerçek capture ve bağımsız
 uygulama denetimi bu aday kaydının ardından yapılmalıdır; bu paragraf onları
 önceden olmuş saymaz. Selection 2/1020 ve LLVM HOLD korunur; POP yapılmaz.
+
+Temiz `de2a68094b5a0fb8c7dc7b58f65071b1b30945d1` üzerinde gerçek capture
+exit 2 ile syntax RED packet'ini yazdı; SHA-256
+`0ab49b3e450be4f60a03c7265ae312414ce702438bb7c2209ade5e4218545fb9`.
+Altı CIndex error, popen/openat eksikleri ve 14 isteğin unqualified durumu korunur.
+Bağımsız denetçi 407 testi ve üç gerçek sınırlı native kontrolü yeniden çalıştırdı;
+çıktılar byte-byte eşleşti. Buna rağmen uygulama review'u **BLOCKED** verdi:
+geçerli ama yanlış yapıda worker JSON'u önceki syntax RED packet'ini kaybettiriyordu.
+Bu bulgu eski PASS diye yeniden etiketlenmez.
+
+R1 için exact de2a680 producer byte'ları belleğe yüklenerek current regresyonlar
+ayrıca çalıştırıldı; üst/alt JSON yapıları RED'i yeniden üretti, geçerli-shape
+kontrolü geçti. Capture SHA-256
+`04dc41244796a8d4c14346e920a815f093071f8539142421f9c29de7d1a526c7`.
+Dar düzeltme çocuk-result doğrulamasını bağımsız envelope/identity denetimlerinden
+ayırır; INVALID_RESULT stdout/stderr byte/hash kaydı, önceki syntax sonucu ve
+sonraki fatal kaynak/header kontrolleri birlikte test edilir. Dört focused GREEN
+capture SHA-256 `fa334d081284b7619b07a0619f08bbf30c5d38a32dbb972badc4c5d6e636bfd7`.
+Önceki test taslaklarının fixture-path/sanitized-message hataları ayrıca korunur;
+bunlar ek ürün hatası sayılmaz. Yeni temiz exact-head review henüz bu paragrafın
+iddiası değildir; hosted declaration ve U003 kapıları açık kalır.
+Üç sentetik Linux capture/writer regresyonu yalnız POSIX filesystem üzerinde
+çalışır; Windows'ta açık gerekçeli skip'tir. Ayrı saf worker/result-shape testi
+platformdan bağımsız kalır; bu ayrım gerçek Windows native capture kanıtı sayılmaz.

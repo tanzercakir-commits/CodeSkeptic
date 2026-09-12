@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Focused metadata tests; no analyzer or native qualification is performed."""
 import copy
+from contextlib import contextmanager, ExitStack
 import hashlib
 import io
 import json
@@ -1632,10 +1633,163 @@ class DeclarationTests(unittest.TestCase):
         for result, kind in cases:
             option = {'side_effect': result} if isinstance(result, Exception) else {'return_value': result}
             with self.subTest(kind=kind), mock.patch.object(identity.subprocess, 'run', **option) as command:
-                observed, failure = identity.run_declaration_worker({})
+                observed, failure = identity.run_declaration_worker({}, lambda observed: self.fail('invalid output accepted'))
             self.assertIsNone(observed)
             self.assertEqual(failure['kind'], kind)
             self.assertEqual(command.call_args.kwargs['timeout'], 30)
+
+    def test_worker_result_shape_validation_is_pure_and_platform_independent(self):
+        value, sha, row = self.populated()
+        observation = value['probe']['cindex']
+        nested = copy.deepcopy(observation)
+        nested['requests'][0]['targets'] = [None]
+        bad_inclusion = copy.deepcopy(observation)
+        bad_inclusion['inclusions'] = [{}]
+        for result in ({}, None, [], nested, bad_inclusion, observation):
+            raw = identity.canonical(result).encode()
+            valid = result is observation
+            with (self.subTest(valid=valid, shape=type(result).__name__),
+                  mock.patch.object(identity.subprocess, 'run', return_value=SimpleNamespace(
+                      returncode=0, stdout=raw, stderr=b'')),
+                  mock.patch.object(identity, 'file_identity', side_effect=AssertionError('native file read')),
+                  mock.patch.object(identity, 'declaration_backend', side_effect=AssertionError('native load'))):
+                observed, failure = identity.run_declaration_worker({}, lambda observed:
+                    identity.validate_declaration_observation(observed, self.model, value['native_identity'], value['probe']))
+            if valid:
+                self.assertIsNone(failure)
+                self.assertEqual(observed, result)
+            else:
+                self.assertIsNone(observed)
+                self.assertEqual(failure['kind'], 'INVALID_RESULT')
+                self.assertEqual(failure['stdout'], {'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
+
+    @contextmanager
+    def mocked_declaration_capture(self, output, worker_stdout, changed=None):
+        """Real capture/writer orchestration; synthetic native I/O, never native execution."""
+        value, sha = self.packet()
+        native = value['native_identity']
+        root = Path(identity.__file__).resolve().parents[1]
+        real_file_identity = identity.file_identity
+        records = {record['path']: record for record in [value['library'], value['probe']['headers'][1],
+                   *[tool['file'] for tool in native['tools'].values()],
+                   *[header for probe in native['probes'].values() for header in probe['headers']]]}
+        producer = root / 'scripts/product_profiles.py'
+        records[str(producer)] = {'path': str(producer), 'resolved_path': str(producer), 'bytes': 8,
+                                 'sha256': hashlib.sha256(b'producer').hexdigest()}
+        worker_finished = False
+        emitted = {}
+
+        def file_identity(path, **kwargs):
+            if str(path) not in records:
+                return real_file_identity(path, **kwargs)
+            result = copy.deepcopy(records[str(path)])
+            if worker_finished and changed == str(path):
+                result['sha256'] = 'f' * 64
+            return result
+
+        def run(argv, **kwargs):
+            if argv[:3] == ['git', 'cat-file', 'blob']:
+                return {'stdout': 'producer'}
+            if '-M' in argv:
+                escaped = identity.re.sub(r'(\\*) ', lambda match: match[1] * 2 + '\\ ', argv[-1])
+                escaped = escaped.replace('#', '\\#').replace('$', '$$')
+                return {'argv': argv, 'exit_code': 0,
+                        'stdout': 'identity-probe: ' + escaped + ' /sdk/stdlib.h\n', 'stderr': ''}
+            return {'argv': argv, 'exit_code': 1, 'stdout': '', 'stderr': 'earlier syntax RED'}
+
+        def worker(*args, **kwargs):
+            nonlocal worker_finished
+            worker_finished = True
+            path = json.loads(kwargs['input'])['input']['path']
+            emitted['stdout'] = worker_stdout.replace(json.dumps('/probe/declarations.c').encode(), json.dumps(path).encode())
+            observed = json.loads(emitted['stdout'])
+            if (type(observed) is dict and type(observed.get('inclusions')) is list
+                    and all(type(item) is str for item in observed['inclusions'])):
+                observed['inclusions'].sort()
+                emitted['stdout'] = identity.canonical(observed).encode()
+            return SimpleNamespace(returncode=0, stdout=emitted['stdout'], stderr=b'')
+
+        source = copy.deepcopy(native['source'])
+        if changed == 'source':
+            source['head'] = 'f' * 40
+        with ExitStack() as stack:
+            for name, options in (
+                    ('capture', {'return_value': native}),
+                    ('resolve_case_resources', {'return_value': None}),
+                    ('case_environment', {'return_value': value['environment']}),
+                    ('file_identity', {'side_effect': file_identity}),
+                    ('run', {'side_effect': run}),
+                    ('source_identity', {'return_value': source}),
+                    ('native_metadata', {'return_value': native['platform']['metadata']})):
+                stack.enter_context(mock.patch.object(identity, name, **options))
+            stack.enter_context(mock.patch.object(identity.platform, 'system', return_value='Linux'))
+            stack.enter_context(mock.patch.object(identity.subprocess, 'run', side_effect=worker))
+            stack.enter_context(mock.patch.object(identity, 'declaration_backend', side_effect=AssertionError('native load')))
+            stack.enter_context(mock.patch('sys.stdout', new_callable=io.StringIO))
+            stderr = stack.enter_context(mock.patch('sys.stderr', new_callable=io.StringIO))
+            argv = ['capture-declarations', '--root', str(root), '--source-sha', native['source']['head'],
+                    '--libclang', value['library']['path'], '--output', str(output)]
+            for role in identity.TOOL_ROLES:
+                argv += ['--' + role, '/not-executed']
+            yield argv, stderr, emitted
+
+    @unittest.skipIf(sys.platform == 'win32', 'Synthetic Linux capture/writer fixture requires POSIX paths; Windows native capture is not exercised.')
+    def test_valid_worker_shape_remains_observed_even_after_syntax_red(self):
+        value, sha, row = self.populated()
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory).resolve() / 'observed.json'
+            with self.mocked_declaration_capture(output, identity.canonical(value['probe']['cindex']).encode()) as (
+                    argv, stderr, emitted):
+                self.assertEqual(identity.main(argv), 2)
+                self.assertEqual(stderr.getvalue(), '')
+            retained = json.loads(output.read_text())
+            self.assertIsNone(retained['probe']['backend_failure'])
+            self.assertEqual(retained['probe']['cindex'], json.loads(emitted['stdout']))
+            self.assertFalse(self.summary(retained, sha)['syntax_pass'])
+
+    @unittest.skipIf(sys.platform == 'win32', 'Synthetic Linux capture/writer fixture requires POSIX paths; Windows native capture is not exercised.')
+    def test_malformed_worker_shape_preserves_red_through_actual_capture_writer(self):
+        value, sha, row = self.populated()
+        nested = copy.deepcopy(value['probe']['cindex'])
+        nested['requests'][0]['targets'] = [None]
+        bad_inclusion = copy.deepcopy(value['probe']['cindex'])
+        bad_inclusion['inclusions'] = [{}]
+        for raw in (b'{}', b'null', b'[]', identity.canonical(nested).encode(),
+                    identity.canonical(bad_inclusion).encode()):
+            with self.subTest(raw=raw[:40]), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory).resolve() / 'failed.json'
+                with self.mocked_declaration_capture(output, raw) as (argv, stderr, emitted):
+                    self.assertEqual(identity.main(argv), 2)
+                    self.assertEqual(stderr.getvalue(), '')
+                retained = json.loads(output.read_text())
+                failure = retained['probe']['backend_failure']
+                self.assertEqual(failure['kind'], 'INVALID_RESULT')
+                self.assertEqual(failure['exit_code'], 0)
+                self.assertEqual(failure['stdout'], {'bytes': len(emitted['stdout']),
+                                                    'sha256': hashlib.sha256(emitted['stdout']).hexdigest()})
+                self.assertIsNone(retained['probe']['cindex'])
+                self.assertEqual(retained['probe']['syntax']['exit_code'], 1)
+                self.assertEqual(retained['probe']['syntax']['stderr']['sha256'],
+                                 hashlib.sha256(b'earlier syntax RED').hexdigest())
+                summary = self.summary(retained, sha)
+                self.assertFalse(summary['syntax_pass'])
+                self.assertTrue(all(r['issues'] == ['BACKEND_FAILED', 'SYNTAX_FAILED'] for r in summary['requests']))
+
+    @unittest.skipIf(sys.platform == 'win32', 'Synthetic Linux capture/writer fixture requires POSIX paths; Windows native capture is not exercised.')
+    def test_invalid_worker_result_cannot_mask_independent_identity_drift(self):
+        for changed in ('/sdk/stdlib.h', 'source'):
+            with self.subTest(changed=changed), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory).resolve() / 'must-not-exist.json'
+                with self.mocked_declaration_capture(output, b'{}', changed) as (argv, stderr, emitted):
+                    args = SimpleNamespace(root=Path(argv[2]), source_sha=argv[4], libclang=Path(argv[6]), output=output)
+                    with self.assertRaisesRegex(ValueError, 'declaration capture ' + (
+                            'source/platform' if changed == 'source' else 'bytes') + ' changed'):
+                        identity.capture_declarations(args)
+                self.assertFalse(output.exists())
+                with self.mocked_declaration_capture(output, b'{}', changed) as (argv, stderr, emitted):
+                    self.assertEqual(identity.main(argv), 2)
+                    self.assertTrue(stderr.getvalue().startswith('IDENTITY_INVALID '))
+                self.assertFalse(output.exists())
 
     def test_capture_rejects_existing_output_before_collection(self):
         with tempfile.TemporaryDirectory() as directory:

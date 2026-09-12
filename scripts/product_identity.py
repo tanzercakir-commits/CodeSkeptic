@@ -1634,6 +1634,15 @@ def validate_declaration_document(value, model, model_sha256):
                     {'id': row['id'], 'issues': issues, 'state': 'INCOMPLETE'} for row in declaration_requests(model, system)],
                 'coverage': declaration_coverage(model), 'local_native_bytes_verified': False,
                 'native_qualified': False, 'task_ready': False, 'product_qualified': False}
+    return validate_declaration_observation(observed, model, native, probe)
+
+
+def validate_declaration_observation(observed, model, native, probe):
+    """Validate only child-owned output against the separately checked capture inputs."""
+    system = native['platform']['system']
+    path_type = PureWindowsPath if system == 'Windows' else PurePosixPath
+    by_path = {path_type(h['path']): h for h in probe['headers']}
+    input_path, syntax, compiler = probe['input']['path'], probe['syntax'], native['tools']['clang']
     fields(observed, 'parse_status library_version diagnostics requests inclusions entry', 'CIndex observation')
     require(type(observed['parse_status']) is int and observed['parse_status'] == 0
             and nonempty(observed['library_version']) and len(observed['library_version']) <= 8192,
@@ -1823,7 +1832,7 @@ def declaration_worker(config):
     return result
 
 
-def run_declaration_worker(config):
+def run_declaration_worker(config, validate_result):
     """Retain a later extraction failure without discarding earlier syntax RED."""
     from product_profiles import parse_json
     command = [sys.executable, '-B', str(Path(__file__).resolve()), '_declaration-worker']
@@ -1840,8 +1849,10 @@ def run_declaration_worker(config):
             failure = 'INVALID_RESULT'
         else:
             try:
-                return parse_json(stdout.decode('utf-8')), None
-            except (ValueError, UnicodeError):
+                observed = parse_json(stdout.decode('utf-8'))
+                validate_result(observed)
+                return observed, None
+            except (ValueError, TypeError, KeyError, RecursionError):
                 failure = 'INVALID_RESULT'
     except subprocess.TimeoutExpired as error:
         failure, stdout, stderr, code = 'TIMEOUT', error.stdout or b'', error.stderr or b'', None
@@ -1882,12 +1893,14 @@ def capture_declarations(args):
                 headers.append(item)
             syntax = declaration_streams(run(declaration_command(compiler, system, native['platform']['metadata'], str(path)), allowed=(0, 1)))
             config = {'native_identity': native, 'environment': environment, 'library': library, 'input': input_}
-            observed, failure = run_declaration_worker(config)
             value = {'schema': 'codeskeptic-native-declarations/v1', 'native_identity': native,
                      'environment': environment, 'producer_files': producers, 'library': library,
                      'probe': {'input': input_, 'dependency': dependency, 'headers': headers, 'syntax': syntax,
-                               'cindex': observed, 'backend_failure': failure},
+                               'cindex': None, 'backend_failure': None},
                      'metadata_only': True, 'native_qualified': False, 'task_ready': False, 'product_qualified': False}
+            observed, failure = run_declaration_worker(config, lambda observed:
+                validate_declaration_observation(observed, model, native, value['probe']))
+            value['probe'].update(cindex=observed, backend_failure=failure)
             validate_declaration_document(value, model, model_sha)
             for record in [library, *headers, *[tool['file'] for tool in native['tools'].values()],
                            *[item for probe in native['probes'].values() for item in probe['headers']]]:
