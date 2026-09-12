@@ -1143,3 +1143,36 @@ dokuz qualification bayrağı false kalır. Güncel native byte reopening,
 adjusted header closure ve embedded frontend eşdeğerliği doğrulanmış değildir.
 Korpus 1/1020, ek kota 0; readiness exit 2, evaluation freeze yok, U003/ürün
 hedefi açık ve `main` değişmemiştir. Bu kayıt bir POP değildir.
+
+### İkinci kaynak adayı — heap parent serbest, child sahipliği kayıp
+
+Mevcut GCC 15.2.0 havuzundaki `leak-4.c:5–23`, native `stdlib.h`, tek pointer
+alanlı yapı ve `test_1` korunarak 15 satırlık ayrı kaynak önerisine bağlandı.
+Kaynak SHA-256 `7e0b0494e9572d46eecce6049b968917044a677608f1f934f6c9ad6bbe85651c`;
+[kaynak/hakem kaydı](../tests/product_corpus/candidates/gcc-parent-child-selection.json)
+özgün revision/blob/hash, çıkarım ve dış kanıtları taşır. Kaynak byte'ları repo'ya
+eklenmedi. GCC/Clang ile toplam 14 yerel version/dependency/syntax/ABI/negatif
+kontrol beklenen sonuçları verdi; aday çalıştırılmadı ve analyzer kullanılmadı.
+
+Bağımsız kaynak hakemi iki tahsis de başarılıyken yalnız child için bir CWE-401
+sızıntısını kabul etti. Parent doğru serbest bırakılır; başarısız tahsis ek leak
+yaratmaz. İncelenen stack-aggregate eğitim örneği ayrı local owner taşır ve farklı
+yapıdadır. Bununla birlikte LLVM `testMallocIntoMalloc` aynı core cluster'dır;
+ikinci kaynak/köken sayılmaz ve bu benzerlik genetik türetim kanıtı değildir.
+
+İlk hakem kararı addressability için HOLD'dur ve özgün byte'ları korunur.
+Mevcut motor direct `a->ptr = malloc(...)` için field-owner kaydı tutmaz;
+closing-brace emitter'ın bu child'ı raporladığı ileri sürülmez. Ayrı, hashli
+ölçüm-öncesi öneri ve bağımsız ek inceleme bu sınırlı örneğin hedef değerlendirme
+seçimini kabul etti: istenen occurrence `test_1:15:1`, memory-leak/CWE-401,
+multiplicity 1. Bu mevcut çıktı değil, önceden tanımlanan hedef convention'dır.
+Sonradan normal raporda eksik child FN olarak kalacak; sonuç görüldükten sonra
+unsupported etiketi veya konum değişikliği yapılmayacak. U003'te detector
+değişikliği, genel field/heap-graph destek iddiası veya eşik gevşetmesi yoktur.
+
+İlk review, ek karar, öneri ve 14 kontrolün özgün kanıtları checkout dışındaki
+U003 `gcc-parent-child-source-review-v1` paketinde korunur. Generic kaynak
+bağlama/admission entegrasyonu, nihai analiz tarifleri, matching/bütçe bağları,
+platform ve all-rule etiketleri ile köken/hak sınırları hâlâ eksiktir. Bu aday
+**FULL_ADMISSION_HELD**, ek kota 0'dır; kabul edilmiş seçim hâlâ **1/1020**.
+Yeni kayıt eski GCC kaynağının lisans/admission veya native CI kararını devralmaz.

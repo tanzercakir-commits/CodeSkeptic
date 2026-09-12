@@ -1,0 +1,107 @@
+{
+  "schema": "codeskeptic-product-external-source-adjudication/v1",
+  "state": "SOURCE_AND_TARGET_REVIEWED_FULL_ADMISSION_HELD",
+  "id": "gcc-parent-free-loses-child",
+  "source": {
+    "storage": "EXTERNAL_CANDIDATE_NOT_VENDORED",
+    "local_evidence": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/gcc-parent-child-source-review-v1/candidate.c",
+    "sha256": "7e0b0494e9572d46eecce6049b968917044a677608f1f934f6c9ad6bbe85651c",
+    "language": "C17",
+    "line_count": 15,
+    "adaptation": "Retained the native stdlib.h include, struct s1 and test_1 from upstream lines 5-23. Removed comments, test directives and blank lines; no executable statement changed. Other upstream cases are not selected."
+  },
+  "origin": {
+    "id": "gcc-analyzer-testsuite",
+    "repository": "https://github.com/gcc-mirror/gcc",
+    "revision": "5115c7e447fc07457443df874bf57840e8316d5f",
+    "tag": "releases/gcc-15.2.0",
+    "path": "gcc/testsuite/c-c++-common/analyzer/leak-4.c",
+    "lines": [[5, 23]],
+    "git_blob": "5ee3c310d5b679ae3e10a4334d4432bd53470c6a",
+    "sha256": "64f7fa32ecac51cea4da7c85dd994f9bdb2147e1c29772b51ccb7cc4891efb81",
+    "local_evidence": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/upstream-candidates/gcc-15.2.0/retained/leak-4.c",
+    "tag_signature_authenticated": false,
+    "source_specific_genetic_lineage_established": false
+  },
+  "source_label": {
+    "family": "memory-leak",
+    "cwe": 401,
+    "label": "BUGGY_ON_SUCCESSFUL_PARENT_AND_CHILD_ALLOCATION",
+    "function": "test_1",
+    "multiplicity": 1,
+    "rationale": "The separate child allocation stored at line 13 becomes unreachable when free(a) releases its sole containing parent at line 14. The parent is correctly released. Either allocation failing creates no child leak. No child dereference or repeated release is selected.",
+    "boundary": "Ordinary C17 native malloc/free semantics with compatible declarations and no allocator replacement or interposition. Source-level ownership label, not an observed analyzer result or measured runtime allocation."
+  },
+  "independence": {
+    "verdict": "DISTINCT_FROM_INSPECTED_TRAINING_BUT_SHARED_LLVM_CLUSTER",
+    "cluster": "heap-parent-release-loses-separately-allocated-child",
+    "rationale": "The inspected local-aggregate training retains a separate allocation-owning local variable; here a heap parent is explicitly freed while its field alone holds the child. Member-address tests concern one allocation and mem_pool.c explicitly releases its child through caller-owned storage. These differ from the selected two-allocation parent-release/child-loss mechanism.",
+    "same_cluster_comparison": {
+      "local_evidence": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/upstream-candidates/llvm-20.1.8/malloc.c",
+      "sha256": "f6472fecd8b96331595bf990ffebb1fe01df9b49684027e81b731a287f1817fc",
+      "function": "testMallocIntoMalloc",
+      "lines": [1947, 1951],
+      "boundary": "Same core ownership mechanism; no second sample or origin credit. Similarity is not proof of genetic derivation or an authenticated LLVM revision."
+    },
+    "global_originality_claim": false,
+    "generator_blindness_claim": false,
+    "independent_origin_count_established": false
+  },
+  "selection": {
+    "decision": "FULL_ADMISSION_HELD",
+    "quota": false,
+    "accepted_independent_quota_examples": 0,
+    "gaps": [
+      "generic actual-source binding and independently reviewed admission integration",
+      "final prospective source/path, analyzer recipe, matching policy and fixed-limit binding",
+      "required platform and all-rule source-label evidence",
+      "remaining origin/lineage and source-specific rights boundaries"
+    ],
+    "rights_boundary": "Existing project-default GCC license references were checked, not a source-specific license clearance. This record does not reuse the old mixed-storage candidate's license/admission decision for this new source. No GCC source or license bytes are vendored here; redistribution approval remains false."
+  },
+  "prospective_mapping": {
+    "state": "REVIEWED_DESIRED_TARGET_NOT_IMPLEMENTED_NOT_MEASURED_NOT_ADMITTED",
+    "addressability_decision": "ACCEPT_PRE_RESULT_TARGET_SELECTION",
+    "rule": "memory-leak",
+    "function": "test_1",
+    "line": 15,
+    "column": 1,
+    "cwes": [401],
+    "multiplicity": 1,
+    "scope": "One function, two malloc calls, one non-recursive single-pointer struct, one direct field store and one explicit parent free. No arbitrary heap graph, unknown callee, external-TU effect or general field-support claim.",
+    "basis": "The accepted source proposal uses the function closing brace as the desired scoring convention, not GCC's upstream free-site warning. Current collectTrackedVars has no field-only child allocation slot; the existing exit emitter covers tracked variable owners and does not establish an implemented child emission.",
+    "scoring_boundary": "After actual admission and recipe binding, a normal report missing the expected child occurrence is FN; the released parent contributes no expected leak. No result-driven unsupported relabel or location adjustment. Crash/timeout/OOM/malformed or missing reports remain separate infrastructure RED.",
+    "implemented_emission_verified": false,
+    "analyzer_run": false
+  },
+  "review": {
+    "reviewer": "/root/platform_recipe_exact_verifier",
+    "role": "independent read-only source semantics and supplemental pre-result target selection",
+    "repository_head": "d3f193773c263b3b3dbc5fae33aa7a5101a412ff",
+    "source_sha256": "7e0b0494e9572d46eecce6049b968917044a677608f1f934f6c9ad6bbe85651c",
+    "proof_evidence": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/gcc-parent-child-source-review-v1/proof/summary.json",
+    "proof_evidence_sha256": "746e3581c2c04bb53a67816a0439632729c0c46417f0a0daa2d693322468e43a",
+    "initial_review": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/gcc-parent-child-source-review-v1/source-review-initial.json",
+    "initial_review_sha256": "e4ac6b9ea65d1ccdb344ae0c91bd39e946e1eb24b7a4a4aa88e29d04c6c3e69d",
+    "initial_verdict": "HOLD",
+    "addressability_proposal": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/gcc-parent-child-source-review-v1/addressability-proposal.md",
+    "addressability_proposal_sha256": "d91dcd9bd49e058ad887763dc75b0421a3092d578b2aa8c4a12f4f1b5482db39",
+    "supplement": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/gcc-parent-child-source-review-v1/source-review-addressability.json",
+    "supplement_sha256": "1c9e243987ebaf4e312bd03e8c9d098d0a67d953faf6c9bd7d2f0c067ce445b6",
+    "supplement_verdict": "ACCEPT_PROPOSAL_ONLY",
+    "boundary": "The original HOLD remains unchanged. The supplement resolves only prospective target/scoring selection; other admission gaps remain. Neither review is an implementation or U003 PASS."
+  },
+  "qualification": {
+    "admission_ready": false,
+    "analyzer_run": false,
+    "evaluation_frozen": false,
+    "license_qualified": false,
+    "native_product_qualified": false,
+    "pop_authorized": false,
+    "product_qualified": false,
+    "quota_credit": false,
+    "redistribution_approved": false,
+    "task_ready": false
+  },
+  "boundary": "Reviewed source/target proposal only. Local syntax and ABI observations are not a final native profile, frozen evaluation, current detector coverage or quota admission. The existing one-source selection and original GCC records are unchanged."
+}
