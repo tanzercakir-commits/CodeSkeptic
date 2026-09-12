@@ -475,6 +475,10 @@
       "sha256": "f52cf61a6aae2f48e8dd427733a879bcb9b88b200027ff57ab22840a4c181ea8"
     },
     {
+      "path": "tests/product_corpus/cohort_evidence/llvm-caller-slot-v1.json",
+      "sha256": "0e8aebb79d802c9353f329ba8b5971744aa486fe8e546b8549481069c7d68275"
+    },
+    {
       "path": "tests/product_corpus/cohorts/llvm-caller-slot-v1.json",
       "sha256": "65f26a88ef90326a05db8de927f175d70097c5abf765625e45b389171d93b9be"
     },

@@ -2,7 +2,7 @@
   "schema": "codeskeptic-cwe-catalog/v2",
   "selection_base": "005b1264618dcf84aa20a5685efd9c03a26bd67f",
   "profile": "linux-x86_64-clang20-cxx17-isolated-rule",
-  "inventory_sha256": "4ac2a1c318b1c44e8168d7aa7b44aec96baaa36926e1ac0044d59c0adec873d2",
+  "inventory_sha256": "5bbffcaa2510892e2989606ff0708ce0307bbc7b2abc6e28d5694d0c61c59c9c",
   "rules": {
     "alloc-size-overflow": {
       "tier_at_selection": "experimental",
@@ -1021,10 +1021,10 @@
   ],
   "evidence_version": {
     "schema": "codeskeptic-cwe-evidence-version/v1",
-    "sequence": 4,
-    "previous_catalog_sha256": "31384b65ee813ca82d6825fd222b4f8986afe1b56218d55150c5c6b943801dc2",
-    "previous_inventory_sha256": "40dfedb3ebe09f3b7575fe8e8e3b5063719fab184467504283c4ba98237713c9",
-    "previous_version_id": "fc3e0986568a0574ac42035ed8f6f708dcb070d69ed72b2c0ece71c5058499ef",
+    "sequence": 5,
+    "previous_catalog_sha256": "56a99a03102a1988f8e1dfb896184b3a52a95cbd186c721346390ff208ca055f",
+    "previous_inventory_sha256": "4ac2a1c318b1c44e8168d7aa7b44aec96baaa36926e1ac0044d59c0adec873d2",
+    "previous_version_id": "3f52bde44ce897bec6ee999f4cb2e3c15e545c4e52b67efe3daa03ec4e97f8c9",
     "registry_sha256": "17bd1d76e01534b6afd98ad04c105c656c8ed45a2778be8f4ed842716afcaadc",
     "capabilities": {
       "uninit-ptr": {
@@ -1318,6 +1318,7 @@
       "tests/product_corpus/candidates/llvm-value-return-loses-owner.cpp",
       "tests/product_corpus/candidates/llvm-value-return-selection.json",
       "tests/product_corpus/candidates/selection-record.json",
+      "tests/product_corpus/cohort_evidence/llvm-caller-slot-v1.json",
       "tests/product_corpus/cohorts/llvm-caller-slot-v1.json",
       "tests/product_corpus/ground_truth.json",
       "tests/product_corpus/historical/measurement-index.json",
@@ -1413,17 +1414,17 @@
       "alloc-size-overflow-unknown-addend",
       "int-overflow-unknown-operands"
     ],
-    "id": "3f52bde44ce897bec6ee999f4cb2e3c15e545c4e52b67efe3daa03ec4e97f8c9",
+    "id": "06b371221edd01a87b22acba2960fd399bede89c6e7573b25256011872312698",
     "review": {
       "schema": "codeskeptic-cwe-successor-review/v1",
-      "source_base": "ef039c68cd2d059d4afa2e42b83e725597c6f813",
-      "source_head": "5fc09da642bd45f4555cfd343cfcd983a5089b4e",
+      "source_base": "67e131fa3fa358f50bc8433ec8378aaa6d0b1db5",
+      "source_head": "244a994411e5174b553e10304f5bdc4f559af9e0",
       "implementer": "/root",
-      "verifier": "/root/parent_child_native_verifier",
+      "verifier": "/root/retained_binding_exact_verifier",
       "verdict": "PASS",
       "findings": [],
-      "reason": "Prospective protection of one new U003 source-preparation shard containing two attributed LLVM C17 adaptations (one candidate and one same-cluster nonquota control). All 157 prior input rows, 52 fixtures, 15 capabilities, historical snapshots and stricter floors are preserved; no admission, label acceptance, rights, native, frozen-corpus or product qualification is granted.",
-      "payload_sha256": "3f52bde44ce897bec6ee999f4cb2e3c15e545c4e52b67efe3daa03ec4e97f8c9"
+      "reason": "Prospective protection of one source-bound U003 compiler-evidence sidecar linking the unchanged LLVM caller-slot candidate and same-cluster nonquota control to the retained compiler-only packet. Complete source-base-to-head closure adds exactly this input; all 158 prior inputs, 52 fixture contracts, 15 capabilities, selection base, historical snapshots and quality floors remain unchanged. No source admission, label acceptance, rights, native-product, frozen-corpus or U003 qualification is granted.",
+      "payload_sha256": "06b371221edd01a87b22acba2960fd399bede89c6e7573b25256011872312698"
     }
   }
 }

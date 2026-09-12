@@ -1679,3 +1679,46 @@ packet CLI okuması geçti. Yeni compiler/analyzer çalıştırılmadı; eski na
 baytlar, source shard, seçim 2/1020, sıfır ek kota ve qualification false
 korundu. Bu düzeltme için yeni exact-head bağımsız inceleme gerekir; eski
 inceleme PASS'e çevrilmez ve pending inventory önerisi uygulanmış sayılmaz.
+
+### İncelenmiş compiler-evidence envanter ardılı
+
+Temiz `244a994411e5174b553e10304f5bdc4f559af9e0` üzerinde bağımsız
+`/root/retained_binding_exact_verifier` okuyucu checkpoint'ine ve ayrı
+prospective input sınıflandırmasına PASS verdi; önceki `ea5c1ac` bulguları
+tarihsel başarısız inceleme olarak korunur. Gerçek karar
+`cohort-native-bridge-v1/checkpoint-review-244a994.json`, SHA-256
+`f4de8f6ef838900caf177fe543a1f527c0eeef08d02b0eb2379ab98dede28851`.
+214 profile, 88 identity ve 24 quality testi bağımsız çalıştırıldı. Temiz
+head'de workflow'un 140 seçili profile testi ve gerçek native okuyucu da geçti.
+
+Yalnız önceden incelenen `cohort_evidence/llvm-caller-slot-v1.json` eklenerek
+korumalı input sayısı 158'den 159'a, evidence sequence 4'ten 5'e çıkarıldı.
+Önceki 158 girdi, 52 fixture sözleşmesi, 15 capability, selection, snapshots,
+eşikler ve bütün BOOK/PLAN/TODO/PROGRESS baytları değişmez. Source base
+`67e131fa3fa358f50bc8433ec8378aaa6d0b1db5`, source head `244a994` kalır.
+Onaylı tam katalog SHA-256
+`10d6031382098dc12649af86ef968c35a2da24931534341b998d65960104cfb5`,
+inventory `5bbffcaa2510892e2989606ff0708ce0307bbc7b2abc6e28d5694d0c61c59c9c`,
+payload `06b371221edd01a87b22acba2960fd399bede89c6e7573b25256011872312698`.
+Gerçek integrity kontrolü ve ayrı exact-old/new harness'in 12 in-memory
+negatifi geçti; bu harness'in ek iddiaları production validator'a mal edilmez.
+
+Kanıt düzeltmesi: `cohort-native-fixed-exact-successor-required-red.json`
+yanlış `integrity` altkomutunun argparse reddidir, eksik-input kanıtı değildir.
+Silinmedi veya yeniden etiketlenmedi. Doğru `cwe_quality.py check` denemesi
+`cohort-native-fixed-exact-missing-input-red.json`, SHA-256
+`13390eac9a8c8447c470fa652a63a712ab13cbf3e002722b1a4aaf8320ae3d90`,
+temiz aynı head'de gerçek protected-input RED'ini gösterir; uygulama sonrası
+aynı kontrol GREEN oldu. Bağımsız denetçi bu ayrımı da doğruladı.
+
+Bu uygulama için yeni temiz exact-head bağımsız denetim gerekir; prospective
+PASS uygulama PASS'i olarak taşınmaz. U003 POP yoktur. Seçim 2/1020, LLVM
+aday/kontrol non-admitted, ek kota sıfır ve qualification false kalır.
+Sıradaki ayrı etiket hazırlığında `--assumptions` açıkken iki kaynağın birer
+`assumption` Info hedefi temsil edilmelidir; eski yalnız no-trigger kabul eden
+retained etiket şeması bu girdilere zorlanmaz. Henüz all-rule etiket PASS'i yoktur.
+
+Önceki exact `67e131f` [Windows 34699316708](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34699316708)
+koşusunun tamamlanmış başarı durumu API'den ayrıca okundu. Bu durum kontrolü
+yeni reader'ın hosted başarısı veya ham Windows suite denetimi değildir;
+önceden kaydedilen genel CI deadline RED'i değişmez.
