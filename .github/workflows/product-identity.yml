@@ -68,7 +68,7 @@ jobs:
           "$identity_python" -B scripts/product_profiles.py stage-gcc-inputs \
             --root "$GITHUB_WORKSPACE" --external-root "$RUNNER_TEMP/codeskeptic-gcc-case"
           "$identity_python" -B -m unittest discover -s scripts -p test_product_profiles.py \
-            -k GccStaging -k ExternalInput -k AllRuleGroundTruthTests -k NativeRecipeTests -k RetainedCandidateTests -k RetainedGroundTruthTests -k SourceCohortTests -q
+            -k GccStaging -k ExternalInput -k AllRuleGroundTruthTests -k NativeRecipeTests -k RetainedCandidateTests -k RetainedGroundTruthTests -k SourceCohortTests -k SourceCohortNativeTests -q
           if [[ "$RUNNER_OS" == macOS ]]; then
             export DEVELOPER_DIR=/Library/Developer/CommandLineTools
             unset SDKROOT MACOSX_DEPLOYMENT_TARGET
@@ -125,7 +125,7 @@ jobs:
             --root "$env:GITHUB_WORKSPACE" --external-root "$env:RUNNER_TEMP/codeskeptic-gcc-case"
           if ($LASTEXITCODE -ne 0) { throw 'Pinned GCC source staging failed' }
           & $identityPython -B -m unittest discover -s scripts -p test_product_profiles.py `
-            -k GccStaging -k ExternalInput -k AllRuleGroundTruthTests -k NativeRecipeTests -k RetainedCandidateTests -k RetainedGroundTruthTests -k SourceCohortTests -q
+            -k GccStaging -k ExternalInput -k AllRuleGroundTruthTests -k NativeRecipeTests -k RetainedCandidateTests -k RetainedGroundTruthTests -k SourceCohortTests -k SourceCohortNativeTests -q
           if ($LASTEXITCODE -ne 0) { throw 'External input safety tests failed' }
           # Select a separate case-only standard-library include profile from the
           # observed VC/SDK roots. Do not relabel the original full vcvars record.

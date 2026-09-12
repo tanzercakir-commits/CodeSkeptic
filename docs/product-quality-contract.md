@@ -439,3 +439,48 @@ source/cluster/admission kararları tamamlanmadan bu kayıtlar mevcut selection'
 katılamaz. Yapısal byte check bunların yerine geçmez; admitted_sources ve ek
 kota sıfır, bağımsız review ve yedi qualification alanı false kalır. Eski iki
 kaynak, platform/etiket kayıtları, quality floors ve readiness kapısı değişmez.
+
+### Paket kaydı ile gerçek derleyici kanıtının bağlantısı
+
+`verify_source_cohort_entry` tam paket/hash, kayıt ID/canonical hash ve ayrı
+kaynak hashini bağlar. Kaynak/API verileri yeniden açılır; dış okuyucunun private
+kimlik kontrolü aynı okuma zincirine taşınabilir. Dönüş yalnız metadata'dır,
+kaynak metni veya private kanıt yollarını içermez ve kota/kabul vermez.
+
+`cohort-native-check --cohort-evidence tests/product_corpus/cohort_evidence/<name>.json`
+ayrı `codeskeptic-product-cohort-native-evidence/v1` sidecar'ını doğrular.
+İlk açık profil `caller-slot-publication-c17-v1`, mevcut LLVM overwrite adayı
+ve aynı mekanizmalı kontrolü içindir; eski parent/child v1 protokolüne yönlendirme
+veya uydurma tarihsel HOLD/supplement kayıtları yoktur. Kaynak paketi değiştirilmez.
+All-rule etiketleri, source/cluster admission ve hak/yayın clearance'ı ayrı
+kayıt/inceleme ister; kontrol bu bağlantıyla bağımsız safe kotaya dönüşmez.
+
+Okuyucu gerçek wrapper, observation, bağımsız sınırlı compiler-review, image
+inspection, kaynaklar, producer dosyaları ve bütün çıktı baytlarını yeniden
+açar. 26 komutun argv/cwd/environment/exit/marker alanları iki kaynak, ortak
+probe, iki komut biçimi ve üç negatif kontrolden türetilir. 53 stream/CDB dosyası
+tam ve benzersiz olmalıdır; sıfır baytlık observation ve container hata çıktıları
+da güvenli descriptor okuması ve ortak son kimlik kontrolüne girer. Native root,
+inputs ve observation dizinlerine eklenen yabancı dosya/boş dizin de ret alır.
+Her stream mevcut 2 MiB sınırına tabidir; bir deneme tekrar çalıştırılmaz.
+
+Dependency bilgisi ham Clang Make çıktısından yeniden ayrıştırılır. Her kaynak
+native stdlib header'ını, birleşik probe iki kaynağı da içermelidir. Önce/sonra
+ve iki komut biçimi arasındaki yollar ile tüm input-identity sözlükleri eşleşir;
+birleşim tamdır ve örtüşen başlangıç kimlikleriyle de eşittir. Compiler/OS
+metadata'sı raw stdout/userspace baytlarına, materialized kaynak/probe/helper
+kimlikleri kaydedilen producer içeriğine bağlanır.
+
+Tarihsel producer head'i sonraki uygulama veya etiket head'ine çevrilmez.
+Repository yardımcıları gerçek ancestor Git blob SHA-256 ve boyutuyla okunur;
+bugünkü checkout dosyasının eski inode veya eski içerikle aynı olması gerekmez.
+Canlı kaynak/paket/API/review/stream dosyalarının bütün okuma boyunca değişmemesi
+ise zorunludur. Bu kontrol hostile-root snapshot veya kriptografik hakem imzası
+değildir. Native compiler/header kimlikleri retained kayıtlardır; image yeniden
+açılmış, imzası doğrulanmış veya kernel sınırları yeniden denenmiş sayılmaz.
+
+PASS yalnız mevcut bağımsız compiler preflight packet'inin doğrulanmış bağını
+ifade eder. Function/analyzer yürütümü, calling ABI/allocator runtime davranışı,
+compiler runtime closure, tüm native platformlar, all-rule etiket kabulü,
+haklar, tam cohort veya ürün yeterliliği çıkarılamaz. Her iki kaynak için
+admitted_sources ve ek kota sıfır, yedi qualification false kalır.

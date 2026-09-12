@@ -3606,5 +3606,688 @@ class SourceCohortTests(unittest.TestCase):
         self.assertNotIn(str(self.fixture.base), result.stderr)
 
 
+class SourceCohortNativeFixture(SourceCohortFixture):
+    """Invented compiler packet bytes: no compiler, container or source execution.
+
+    Commands, streams and projections are constructed here from the documented
+    protocol, without any production command-matrix generator or real packet.
+    Only a small temporary Git repository supplies actual historical blobs.
+    """
+
+    names = ('llvm-caller-slot-overwrite', 'llvm-caller-slot-retained-control')
+    forms = ('cdb', 'frontend-adjusted')
+    controls = ('wrong-width', 'wrong-malloc', 'wrong-slot')
+    compiler = '/usr/bin/clang-20'
+    resource = '/usr/lib/llvm-20/lib/clang/20'
+    branch = 'agent/cs3-ch08-s01-u003-frozen-product-profiles'
+    definitions = ('src/source_manager/SourceManager.cpp', 'src/main.cpp', 'src/core/RuleCapabilities.def')
+    helpers = ('scripts/product_profiles.py', 'scripts/product_identity.py', 'scripts/product_quality.py')
+
+    def __init__(self, owner):
+        super().__init__(owner)
+        for row, name in zip(self.value['records'], self.names):
+            row['value']['id'] = name
+        self.value['records'][1]['value']['related_to'] = self.names[0]
+        self.value['id'] = 'llvm-caller-slot-v1'
+        self.save()
+        for relative in (*self.definitions, *self.helpers):
+            target = self.repo / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text('Synthetic historical producer bytes: ' + relative + '\n', encoding='utf-8')
+        self.git('init', '--initial-branch=' + self.branch, '--quiet')
+        self.git('add', '--', *self.definitions, *self.helpers, self.path)
+        self.git('commit', '--no-gpg-sign', '-qm', 'Synthetic source cohort producer')
+        self.head = self.git('rev-parse', 'HEAD')
+        self.native_root = self.base / 'native'
+        self.inputs = self.native_root / 'inputs'
+        self.output = self.native_root / 'observation'
+        self.inputs.mkdir(parents=True)
+        self.output.mkdir()
+        for row in self.value['records']:
+            record = row['value']
+            (self.inputs / (record['id'] + '.c')).write_bytes(record['source']['text'].encode('utf-8'))
+        for name in ('run.py', 'observe.py', 'probe.c', *(item + '.c' for item in self.controls)):
+            payload = ('/* Synthetic producer fixture ' + name + '; never executed. */\n').encode()
+            if name == 'probe.c':
+                payload += ''.join('#include "/input/' + item + '.c"\n' for item in self.names).encode()
+            (self.native_root / name).write_bytes(payload)
+        self.cases = {name: {'path': '/input/' + name + '.c',
+                            'sha256': row['value']['source']['sha256']}
+                      for name, row in zip(self.names, self.value['records'])}
+        self.roles = {name: row['path'] for name, row in self.cases.items()} | {'abi': '/runner/probe.c'}
+        self.environment = {'PATH': '/usr/bin:/bin', 'LANG': 'C', 'LC_ALL': 'C', 'TMPDIR': '/tmp'}
+        selected = [self.compiler, '--no-default-config', '-fno-modules', '--target=x86_64-pc-linux-gnu',
+                    '-resource-dir', self.resource, '-x', 'c', '-std=c17', '-fsyntax-only']
+        adjusted = [self.compiler, '-resource-dir', self.resource, '-fparse-all-comments', *selected[1:]]
+        self.cdb = [{'directory': '/input', 'file': row['path'], 'arguments': [*selected, row['path']]}
+                    for row in self.cases.values()]
+        self.version = 'Ubuntu clang version 20.1.2 (synthetic, never executed)\nTarget: x86_64-pc-linux-gnu\n'
+        self.userspace = 'NAME="Synthetic Packet OS"\nID=synthetic\n'
+        self.commands, self.stream_names = [], []
+        self.dependencies = {name: [path, '/usr/include/stdlib.h'] for name, path in self.roles.items()}
+        self.dependencies['abi'] = ['/runner/probe.c', *[row['path'] for row in self.cases.values()],
+                                    '/usr/include/stdlib.h']
+
+        def command(name, argv, stdout=b'', stderr=b'', negative=False, marker=None):
+            self.commands.append({'name': name, 'argv': argv, 'cwd': '/input',
+                                  'environment': copy.deepcopy(self.environment), 'exit_code': int(negative),
+                                  'expected_exit': int(negative),
+                                  'stderr_marker': marker})
+            for suffix, payload in (('stdout', stdout), ('stderr', stderr)):
+                filename = name + '.' + suffix
+                (self.output / filename).write_bytes(payload)
+                self.stream_names.append(filename)
+
+        command('resource-directory', [self.compiler, '--no-default-config', '-print-resource-dir'],
+                (self.resource + '\n').encode())
+        command('compiler-version', [self.compiler, '--no-default-config', '--version'], self.version.encode())
+        self.environment['CODESKEPTIC_RESOURCE_DIR'] = self.resource
+        self.write(self.output / 'compile_commands.json', self.cdb)
+        self.stream_names.append('compile_commands.json')
+        for form, prefix in (('cdb', selected), ('frontend-adjusted', adjusted)):
+            for role, path in self.roles.items():
+                argv = [item for item in prefix if item != '-fsyntax-only'] + ['-M', '-MT', 'identity-probe', path]
+                command(form + '-' + role + '-dependencies-before', argv,
+                        ('identity-probe: ' + ' '.join(self.dependencies[role]) + '\n').encode())
+            for role, path in self.roles.items():
+                command(form + '-' + role + '-syntax', [*prefix, path])
+            for control in self.controls:
+                name = form + '-' + control
+                marker = 'slot-' + control + '-control'
+                command(name, [*prefix, '/runner/' + control + '.c'], negative=True, marker=marker,
+                        stderr=('probe.c:1:1: error: static assertion failed: ' + marker + '\n').encode())
+            for role, path in self.roles.items():
+                argv = [item for item in prefix if item != '-fsyntax-only'] + ['-M', '-MT', 'identity-probe', path]
+                command(form + '-' + role + '-dependencies-after', argv,
+                        ('identity-probe: ' + ' '.join(self.dependencies[role]) + '\n').encode())
+
+        initial = {
+            self.compiler: self.identity(self.compiler, b'Synthetic compiler object\n', '/usr/lib/llvm-20/bin/clang'),
+            '/etc/os-release': self.identity('/etc/os-release', self.userspace.encode(), '/usr/lib/os-release')}
+        mapped = {'/runner/' + name: self.native_root / name for name in
+                  ('observe.py', 'probe.c', *(item + '.c' for item in self.controls))}
+        mapped['/helpers/product_identity.py'] = self.repo / 'scripts/product_identity.py'
+        mapped.update({row['path']: self.inputs / (name + '.c') for name, row in self.cases.items()})
+        initial.update({path: self.identity(path, host.read_bytes()) for path, host in mapped.items()})
+        native_identities = {path: copy.deepcopy(initial[path]) for paths in self.dependencies.values()
+                             for path in paths if path in initial}
+        native_identities['/usr/include/stdlib.h'] = self.identity('/usr/include/stdlib.h', b'Synthetic stdlib header\n')
+        self.observation = {
+            'schema': 'codeskeptic-source-cohort-native-preflight/v1', 'profile': 'caller-slot-publication-c17-v1',
+            'cases': copy.deepcopy(self.cases), 'initial_identities': initial, 'compiler_version': self.version,
+            'resource_directory': self.resource, 'userspace': self.userspace, 'observed_kernel': 'synthetic-kernel',
+            'compilation_database': self.cdb, 'compilation_database_sha256': profiles.file_sha(self.output / 'compile_commands.json'),
+            'frontend_adjusted_arguments': {name: [*adjusted, row['path']] for name, row in self.cases.items()},
+            'child_environment': copy.deepcopy(self.environment), 'commands': self.commands, 'files': [],
+            'native_inputs': {form: {'dependency_paths': copy.deepcopy(self.dependencies),
+                                      'input_identities': copy.deepcopy(native_identities)} for form in self.forms},
+            'matrix': {'source_roles': list(self.roles), 'command_forms': list(self.forms),
+                       'negative_controls': list(self.controls), 'expected_commands': 26},
+            'candidate_and_abi_syntax_verified': True, 'same_header_closure_verified': True,
+            'before_after_input_identity_verified': True, 'additional_quota_examples': 0,
+            'boundary': 'Synthetic retained bytes only; no actual compiler, source admission or qualification.'}
+        self.observation.update({key: False for key in (
+            'analyzer_run candidate_executed native_product_qualified embedded_frontend_verified calling_abi_executed '
+            'runtime_allocator_semantics_verified source_admitted task_ready product_qualified').split()})
+        self.refresh_streams()
+        self.image = '1' * 64
+        self.image_digest = 'sha256:' + '2' * 64
+        self.inspection = [{'Id': self.image, 'Digest': self.image_digest}]
+        self.write(self.native_root / 'image-inspect.json', self.inspection)
+        (self.native_root / 'container.stderr').write_bytes(b'')
+        self.projections = [self.project(row) for row in self.value['records']]
+        self.cohort_projection = {'records': self.projections, 'total_sources': 2, 'preparation_candidates': 1,
+                                  'control_sources': 1, 'source_bytes_verified': True, 'independently_reviewed': False,
+                                  'admitted_sources': 0, 'additional_quota_examples': 0,
+                                  'cohort_sha256': profiles.file_sha(self.cohort_path),
+                                  **copy.deepcopy(self.value['qualification'])}
+        argv = ['podman', 'run', '--rm', '--pull=never', '--network=none', '--read-only', '--timeout=150',
+                '--cap-drop=ALL', '--security-opt=no-new-privileges', '--security-opt=label=disable',
+                '--cpus=2', '--memory=6144m', '--memory-swap=12288m', '--pids-limit=256',
+                '--tmpfs=/tmp:rw,nosuid,nodev,noexec,size=1024m']
+        for source, destination, mode in ((self.repo / 'scripts', '/helpers', 'ro'),
+                                           (self.inputs, '/input', 'ro'), (self.native_root, '/runner', 'ro'),
+                                           (self.output, '/output', 'rw')):
+            argv.extend(['--mount', 'type=bind,src=' + str(source) + ',dst=' + destination + ',' + mode + '=true'])
+        argv.extend(['--entrypoint=/usr/bin/python3', self.image, '-B', '/runner/observe.py'])
+        for name, case in self.cases.items():
+            argv.extend(['--case', name + '=' + case['sha256']])
+        producer_paths = [self.repo / relative for relative in self.helpers] + [self.cohort_path]
+        producer_paths += [self.inputs / (name + '.c') for name in self.names]
+        producer_paths += [self.native_root / name for name in
+                           ('run.py', 'observe.py', 'probe.c', *(item + '.c' for item in self.controls))]
+        producer_paths += [self.source_path, self.capture_path]
+        self.wrapper = {'schema': 'codeskeptic-source-cohort-native-preflight-driver/v1', 'head': self.head,
+                        'image': self.image, 'image_manifest_digest': self.image_digest, 'argv': argv, 'exit_code': 0,
+                        'source_cohort': copy.deepcopy(self.cohort_projection),
+                        'producer_inputs': {str(path): {'content': self.content(path),
+                                            'identity': [17, 29, 33188, 1, path.stat().st_size, 101, 102]}
+                                            for path in producer_paths},
+                        'image_inspection_sha256': profiles.file_sha(self.native_root / 'image-inspect.json'),
+                        'additional_quota_examples': 0,
+                        **{key: False for key in 'analyzer_run candidate_executed source_admitted product_qualified task_ready'.split()}}
+        self.review_path = self.base / 'PRIVATE_NATIVE_REVIEW.json'
+        self.review = {'schema': 'codeskeptic-source-cohort-native-preflight-review/v1',
+                       'implementer': '/root', 'verifier': '/root/synthetic_native_verifier', 'head': self.head,
+                       'branch': self.branch, 'verdict': 'PASS_BOUNDED_COMPILER_ONLY_PREFLIGHT', 'findings': [],
+                       'evidence': {'root': str(self.native_root), 'cohort_sha256': profiles.file_sha(self.cohort_path),
+                                    'candidate_sha256': self.cases[self.names[0]]['sha256'],
+                                    'control_sha256': self.cases[self.names[1]]['sha256']},
+                       'checks': ['Synthetic command and raw-stream binding check, never real native evidence.'],
+                       'source_assessment': 'Synthetic metadata; no independent semantic source assessment.',
+                       'limitations': ['No real provenance, source admission, compiler execution or product qualification.'],
+                       'boundary': 'This synthetic fixture grants no credit.'}
+        self.evidence_path = 'tests/product_corpus/cohort_evidence/synthetic-caller-slot-native.json'
+        self.packet_path = self.repo / self.evidence_path
+        self.packet = {'schema': 'codeskeptic-product-cohort-native-evidence/v1',
+                       'state': 'PRE_RESULT_REVIEWED_COMPILER_PACKET_NOT_ADMITTED', 'id': 'synthetic-caller-slot-native',
+                       'profile': 'caller-slot-publication-c17-v1',
+                       'cohort': {'path': self.path, 'sha256': profiles.file_sha(self.cohort_path)},
+                       'records': [{key: row[key] for key in ('id', 'record_sha256', 'source_sha256')}
+                                   for row in self.projections],
+                       'native': {'head': self.head, 'root': str(self.native_root),
+                                  'review': {'path': str(self.review_path), 'sha256': '0' * 64}},
+                       'definition_reference': {'head': self.head, 'files': [
+                           {'path': relative, 'sha256': profiles.file_sha(self.repo / relative)}
+                           for relative in self.definitions]},
+                       'limits': copy.deepcopy(profiles.LIMITS), 'additional_quota_examples': 0,
+                       'qualification': copy.deepcopy(self.value['qualification']),
+                       'boundary': 'Synthetic preparation packet; zero source admission, control credit or qualification.'}
+        self.sync()
+
+    @staticmethod
+    def project(row):
+        value = row['value']
+        return {key: value[key] for key in ('id', 'origin', 'cluster', 'selection', 'role', 'family', 'related_to')} | {
+            'record_sha256': row['sha256'], 'source_sha256': value['source']['sha256']}
+
+    def entry_link(self, offset=0):
+        return {'path': self.path, 'sha256': profiles.file_sha(self.cohort_path),
+                **{key: self.projections[offset][key] for key in ('id', 'record_sha256', 'source_sha256')}}
+
+    @classmethod
+    def identity(cls, path, data, resolved=None):
+        return {'path': path, 'resolved_path': resolved or path, 'sha256': cls.digest(data), 'bytes': len(data)}
+
+    @classmethod
+    def content(cls, path):
+        return {key: value for key, value in cls.link(path).items() if key != 'path'}
+
+    @staticmethod
+    def write(path, value):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(profiles.canonical(value), encoding='utf-8')
+        return profiles.file_sha(path)
+
+    def git(self, *args):
+        return subprocess.run(['git', '-C', str(self.repo), '-c', 'user.name=Synthetic Test',
+            '-c', 'user.email=test@example.invalid', '-c', 'commit.gpgsign=false',
+            '-c', 'core.hooksPath=' + str(self.base / 'disabled-hooks'), *args],
+            capture_output=True, text=True, check=True, timeout=10).stdout.strip()
+
+    def refresh_streams(self):
+        self.observation['files'] = [{'file': name, **self.content(self.output / name)} for name in self.stream_names]
+
+    def sync(self, *, refresh_container=True):
+        """Rehash enclosing records without repairing deliberately forged inner facts."""
+        observation_sha = self.write(self.output / 'summary.json', self.observation)
+        if refresh_container:
+            self.write(self.native_root / 'container.stdout', {'commands': 26, 'negative_controls': 6, 'sources': 2,
+                       'summary_sha256': observation_sha, 'analyzer_run': False})
+        self.wrapper.update(observation_sha256=observation_sha,
+                            stdout_sha256=profiles.file_sha(self.native_root / 'container.stdout'),
+                            stderr_sha256=profiles.file_sha(self.native_root / 'container.stderr'))
+        wrapper_sha = self.write(self.native_root / 'summary.json', self.wrapper)
+        self.review['evidence'].update(driver_sha256=wrapper_sha, observation_sha256=observation_sha)
+        review_sha = self.write(self.review_path, self.review)
+        self.packet['native'].update(wrapper_sha256=wrapper_sha, observation_sha256=observation_sha)
+        self.packet['native']['review']['sha256'] = review_sha
+        self.write(self.packet_path, self.packet)
+
+
+class SourceCohortNativeTests(unittest.TestCase):
+    """Synthetic raw-packet binding only; never admission or native qualification."""
+
+    def setUp(self):
+        self.fixture = SourceCohortNativeFixture(self)
+
+    def assert_uncredited(self, result):
+        self.assertIs(result['source_bytes_verified'], True)
+        self.assertEqual(result['admitted_sources'], 0)
+        self.assertEqual(result['additional_quota_examples'], 0)
+        for key in profiles.SOURCE_QUALIFICATION.split():
+            self.assertIs(result[key], False)
+        public = profiles.canonical(result)
+        for private in ('PRIVATE_', '#include', str(self.fixture.base), 'assumptions', 'source_assessment'):
+            self.assertNotIn(private, public)
+
+    def assert_rejected(self, reader, fixture):
+        output = io.StringIO()
+        with mock.patch.object(sys, 'stdout', output), self.assertRaises(ValueError) as caught:
+            reader(fixture.repo, fixture.evidence_path)
+        self.assertEqual(output.getvalue(), '')
+        self.assertNotIn('PRIVATE_', str(caught.exception))
+        self.assertNotIn(str(fixture.base), str(caught.exception))
+
+    def cli(self, *arguments):
+        script = Path(__file__).resolve().with_name('product_profiles.py')
+        return subprocess.run([sys.executable, '-B', str(script), *arguments],
+                              capture_output=True, text=True, check=False, timeout=10)
+
+    def test_entry_resolver_reopens_each_exact_record_without_exporting_private_source(self):
+        read = profiles.verify_source_cohort_entry
+        guard = {}
+        with mock.patch.object(profiles.subprocess, 'run', side_effect=AssertionError('no execution')), \
+                mock.patch.object(profiles.urllib.request, 'urlopen', side_effect=AssertionError('no network')):
+            for number in range(2):
+                result = read(self.fixture.repo, self.fixture.entry_link(number), _input_guard=guard)
+                self.assert_uncredited(result)
+                self.assertIs(result['independently_reviewed'], False)
+                self.assertEqual({key: result[key] for key in self.fixture.projections[number]},
+                                 self.fixture.projections[number])
+                self.assertEqual(result['cohort_sha256'], profiles.file_sha(self.fixture.cohort_path))
+        self.assertTrue({self.fixture.cohort_path, self.fixture.source_path, self.fixture.capture_path} <= set(guard))
+        self.fixture.capture_path.write_bytes(b'PRIVATE_LATER_CAPTURE_SENTINEL\n')
+        with self.assertRaises(ValueError):
+            profiles.verify_input_identities(guard)
+
+    def test_existing_cohort_reader_accepts_shared_guard_and_registers_all_inputs(self):
+        guard = {}
+        result = profiles.verify_source_cohort(self.fixture.repo, self.fixture.path, _input_guard=guard)
+        self.assert_uncredited(result)
+        self.assertTrue({self.fixture.cohort_path, self.fixture.source_path, self.fixture.capture_path} <= set(guard))
+
+    def test_entry_link_shape_hash_id_and_path_are_all_bound(self):
+        read = profiles.verify_source_cohort_entry
+        for key, replacement in (('path', '../PRIVATE_LINK_SENTINEL'), ('path', str(self.fixture.cohort_path)),
+                                  ('sha256', 'e' * 64), ('id', 'missing-entry'), ('id', True),
+                                  ('record_sha256', 'e' * 64), ('source_sha256', 'e' * 64),
+                                  ('schema', 'borrowed-source-candidate/v1')):
+            link = self.fixture.entry_link()
+            link[key] = replacement
+            with self.subTest(key=key), self.assertRaises(ValueError) as caught:
+                read(self.fixture.repo, link)
+            self.assertNotIn('PRIVATE_', str(caught.exception))
+        link = self.fixture.entry_link()
+        del link['source_sha256']
+        with self.assertRaises(ValueError):
+            read(self.fixture.repo, link)
+
+    def test_entry_resolver_rechecks_unselected_peer_and_redacts_input_exceptions(self):
+        read = profiles.verify_source_cohort_entry
+        peer = self.fixture.value['records'][1]['value']
+        peer['source'] = self.fixture.source(peer['source']['text'].replace('free(p);', 'p = 0;'))
+        self.fixture.save()
+        link = self.fixture.entry_link()
+        with self.assertRaises(ValueError):
+            read(self.fixture.repo, link)
+        with mock.patch.object(profiles, 'external_read', side_effect=ValueError('PRIVATE_INPUT_SENTINEL')):
+            with self.assertRaises(ValueError) as caught:
+                read(self.fixture.repo, link)
+        self.assertNotIn('PRIVATE_', str(caught.exception))
+
+    def test_synthetic_packet_has_real_git_bindings_but_no_native_execution_or_credit(self):
+        read = profiles.verify_cohort_native
+        execute = subprocess.run
+        calls = []
+        def git_reads_only(argv, *args, **kwargs):
+            self.assertEqual(argv[0], 'git', 'reader cannot execute a compiler, container or source')
+            for forbidden in ('commit', 'update-ref', 'checkout', 'fetch', 'push'):
+                self.assertNotIn(forbidden, argv)
+            calls.append(argv)
+            return execute(argv, *args, **kwargs)
+        with mock.patch.object(profiles.subprocess, 'run', side_effect=git_reads_only), \
+                mock.patch.object(profiles.urllib.request, 'urlopen', side_effect=AssertionError('no network')), \
+                mock.patch.object(profiles.urllib.request, 'build_opener', side_effect=AssertionError('no network')), \
+                mock.patch.object(Path, 'write_bytes', side_effect=AssertionError('reader is read-only')), \
+                mock.patch.object(Path, 'write_text', side_effect=AssertionError('reader is read-only')):
+            result = read(self.fixture.repo, self.fixture.evidence_path)
+        self.assertTrue(calls)
+        self.assert_uncredited(result)
+        self.assertIs(result['compiler_preflight_independently_reviewed'], True)
+        self.assertEqual(result['recorded_commands'], 26)
+        self.assertEqual(result['recorded_stream_files'], 53)
+        self.assertEqual(result['producer_head'], self.fixture.head)
+        self.assertEqual(result['packet_sha256'], profiles.file_sha(self.fixture.packet_path))
+        self.assertEqual(result['cohort_sha256'], profiles.file_sha(self.fixture.cohort_path))
+        self.assertEqual(len(result['records']), 2)
+        for actual, expected in zip(result['records'], self.fixture.projections):
+            self.assertEqual({key: actual[key] for key in expected}, expected)
+        self.assertEqual(len(self.fixture.wrapper['producer_inputs']), 14)
+        self.assertEqual([row['exit_code'] for row in self.fixture.commands].count(0), 20)
+        self.assertEqual([row['exit_code'] for row in self.fixture.commands].count(1), 6)
+
+    def test_packet_exact_shape_refs_candidate_control_order_and_old_protocol_are_rejected(self):
+        read = profiles.verify_cohort_native
+        variants = [(('schema',), 'codeskeptic-retained-linux-native-preflight/v1'),
+                    (('state',), 'ADMITTED'), (('id',), True), (('profile',), 'gcc-parent-child'),
+                    (('extra',), 'PRIVATE_PACKET_SENTINEL'), (('cohort', 'sha256'), 'e' * 64),
+                    (('records', 0, 'record_sha256'), 'e' * 64), (('records', 1, 'source_sha256'), 'e' * 64),
+                    (('records', 0, 'id'), 'missing-candidate'), (('records',), []),
+                    (('records',), list(reversed(self.fixture.packet['records']))),
+                    (('records',), self.fixture.packet['records'][:1]),
+                    (('additional_quota_examples',), True), (('additional_quota_examples',), 1),
+                    (('limits', 'repetitions'), 1)]
+        variants += [(('qualification', key), True) for key in profiles.SOURCE_QUALIFICATION.split()]
+        for keys, replacement in variants:
+            fixture = SourceCohortNativeFixture(self)
+            SourceCohortTests.replace(fixture.packet, keys, replacement)
+            fixture.sync()
+            with self.subTest(path=keys):
+                self.assert_rejected(read, fixture)
+
+    def test_driver_requires_exact_podman_request_image_identity_and_no_false_credit(self):
+        read = profiles.verify_cohort_native
+        for mutation in ('network', 'mount', 'image', 'timeout', 'env', 'exit', 'extra-producer', 'missing-producer',
+                         'borrowed-schema', 'source-credit', 'control-credit', 'inspection'):
+            fixture = SourceCohortNativeFixture(self)
+            if mutation == 'network': fixture.wrapper['argv'].remove('--network=none')
+            elif mutation == 'mount':
+                offset = fixture.wrapper['argv'].index('--mount') + 1
+                fixture.wrapper['argv'][offset] = 'type=bind,src=/PRIVATE_MOUNT_SENTINEL,dst=/helpers,ro=true'
+            elif mutation == 'image': fixture.wrapper['image'] = '3' * 64
+            elif mutation == 'timeout': fixture.wrapper['argv'][6] = '--timeout=999'
+            elif mutation == 'env': fixture.wrapper['argv'].insert(2, '--env=LD_PRELOAD=PRIVATE_SENTINEL')
+            elif mutation == 'exit': fixture.wrapper['exit_code'] = False
+            elif mutation == 'extra-producer': fixture.wrapper['producer_inputs']['/PRIVATE_EXTRA_SENTINEL'] = {}
+            elif mutation == 'missing-producer': fixture.wrapper['producer_inputs'].pop(str(fixture.native_root / 'run.py'))
+            elif mutation == 'borrowed-schema': fixture.wrapper['schema'] = 'codeskeptic-retained-linux-native-preflight-driver/v1'
+            elif mutation == 'source-credit': fixture.wrapper['source_cohort']['admitted_sources'] = 1
+            elif mutation == 'control-credit': fixture.wrapper['additional_quota_examples'] = 1
+            else:
+                fixture.inspection[0]['Digest'] = 'sha256:' + '3' * 64
+                fixture.wrapper['image_inspection_sha256'] = fixture.write(fixture.native_root / 'image-inspect.json', fixture.inspection)
+            fixture.sync()
+            with self.subTest(mutation=mutation):
+                self.assert_rejected(read, fixture)
+
+    def test_command_argv_environment_order_count_exit_and_matrix_cannot_be_rehashed_away(self):
+        read = profiles.verify_cohort_native
+        for mutation in ('argv', 'environment', 'metadata-env', 'reorder', 'missing', 'duplicate', 'exit',
+                         'expected-exit', 'marker', 'cdb', 'adjusted-resource', 'matrix', 'false-pass', 'qualification'):
+            fixture = SourceCohortNativeFixture(self)
+            commands = fixture.observation['commands']
+            if mutation == 'argv': commands[2]['argv'].remove('-fno-modules')
+            elif mutation == 'environment': commands[2]['environment']['LD_PRELOAD'] = 'PRIVATE_ENV_SENTINEL'
+            elif mutation == 'metadata-env': commands[0]['environment']['CODESKEPTIC_RESOURCE_DIR'] = fixture.resource
+            elif mutation == 'reorder': commands[2], commands[3] = commands[3], commands[2]
+            elif mutation == 'missing': commands.pop()
+            elif mutation == 'duplicate': commands.append(copy.deepcopy(commands[-1]))
+            elif mutation == 'exit': commands[8]['exit_code'] = 0
+            elif mutation == 'expected-exit': commands[8]['expected_exit'] = True
+            elif mutation == 'marker': commands[8]['stderr_marker'] = 'borrowed-parent-child-control'
+            elif mutation == 'cdb':
+                fixture.cdb[0]['arguments'].remove('--no-default-config')
+                fixture.observation['compilation_database_sha256'] = fixture.write(fixture.output / 'compile_commands.json', fixture.cdb)
+                fixture.refresh_streams()
+            elif mutation == 'adjusted-resource':
+                argv = fixture.observation['frontend_adjusted_arguments'][fixture.names[0]]
+                del argv[1:3]
+            elif mutation == 'matrix': fixture.observation['matrix']['expected_commands'] = 25
+            elif mutation == 'false-pass': fixture.observation['candidate_and_abi_syntax_verified'] = 1
+            else: fixture.observation['native_product_qualified'] = True
+            fixture.sync()
+            with self.subTest(mutation=mutation):
+                self.assert_rejected(read, fixture)
+
+    def test_rehashed_raw_streams_must_show_intended_failure_and_actual_dependency_closure(self):
+        read = profiles.verify_cohort_native
+        negative = 'cdb-wrong-slot.stderr'
+        dep = 'cdb-' + self.fixture.names[0] + '-dependencies-before.stdout'
+        variants = [(negative, b'PRIVATE_FAILURE_SENTINEL\n'),
+                    (negative, b'slot-wrong-slot-control unrelated diagnostic\n'),
+                    (negative, b'error: static assertion failed: unrelated-control\n'),
+                    ('cdb-wrong-slot.stdout', b'PRIVATE_NEGATIVE_STDOUT_SENTINEL\n'),
+                    ('cdb-' + self.fixture.names[0] + '-syntax.stderr', b'PRIVATE_SYNTAX_SENTINEL\n'),
+                    ('resource-directory.stderr', b'PRIVATE_METADATA_SENTINEL\n'),
+                    ('compiler-version.stdout', b'PRIVATE_FOREIGN_COMPILER_SENTINEL\n'),
+                    (dep, ('identity-probe: /input/' + self.fixture.names[0] + '.c\n').encode()),
+                    (dep, b'identity-probe: /usr/include/stdlib.h\n'),
+                    (dep, b'PRIVATE_INVALID_MAKE_SENTINEL\n'),
+                    ('cdb-abi-dependencies-before.stdout',
+                     b'identity-probe: /runner/probe.c /usr/include/stdlib.h\n')]
+        for filename, data in variants:
+            fixture = SourceCohortNativeFixture(self)
+            (fixture.output / filename).write_bytes(data)
+            fixture.refresh_streams()
+            fixture.sync()
+            with self.subTest(filename=filename, data=data[:50]):
+                self.assert_rejected(read, fixture)
+
+    def test_dependency_forms_and_initial_identities_must_agree_on_complete_union(self):
+        read = profiles.verify_cohort_native
+        for mutation in ('missing-header', 'extra-header', 'foreign-form', 'initial-source', 'userspace',
+                         'identity-path', 'identity-resolved', 'identity-size', 'initial-extra', 'initial-missing',
+                         'overlap-source'):
+            fixture = SourceCohortNativeFixture(self)
+            native = fixture.observation['native_inputs']['cdb']
+            initial = fixture.observation['initial_identities']
+            source = fixture.cases[fixture.names[0]]['path']
+            if mutation == 'missing-header': native['input_identities'].pop('/usr/include/stdlib.h')
+            elif mutation == 'extra-header':
+                native['input_identities']['/PRIVATE_HEADER_SENTINEL'] = fixture.identity('/PRIVATE_HEADER_SENTINEL', b'header')
+            elif mutation == 'foreign-form':
+                fixture.observation['native_inputs']['frontend-adjusted']['input_identities']['/usr/include/stdlib.h']['sha256'] = 'e' * 64
+            elif mutation == 'initial-source': initial[source]['sha256'] = 'e' * 64
+            elif mutation == 'userspace': fixture.observation['userspace'] += 'PRIVATE_OS_SENTINEL\n'
+            elif mutation == 'identity-path': native['input_identities'][source]['path'] = '/PRIVATE_PATH_SENTINEL'
+            elif mutation == 'identity-resolved': native['input_identities'][source]['resolved_path'] = 'relative/PRIVATE_SENTINEL'
+            elif mutation == 'identity-size': native['input_identities'][source]['bytes'] = True
+            elif mutation == 'initial-extra': initial['/PRIVATE_EXTRA_SENTINEL'] = fixture.identity('/PRIVATE_EXTRA_SENTINEL', b'x')
+            elif mutation == 'overlap-source': native['input_identities'][source]['sha256'] = 'e' * 64
+            else: initial.pop('/runner/observe.py')
+            if mutation in ('missing-header', 'extra-header', 'identity-path', 'identity-resolved', 'identity-size', 'overlap-source'):
+                fixture.observation['native_inputs']['frontend-adjusted'] = copy.deepcopy(native)
+            fixture.sync()
+            with self.subTest(mutation=mutation):
+                self.assert_rejected(read, fixture)
+
+    def test_consistently_rehashed_dependencies_cannot_omit_native_stdlib_or_probe_peer(self):
+        read = profiles.verify_cohort_native
+        for mutation in ('native-header', 'probe-peer'):
+            fixture = SourceCohortNativeFixture(self)
+            paths = copy.deepcopy(fixture.dependencies)
+            if mutation == 'native-header':
+                paths = {role: [path for path in entries if path != '/usr/include/stdlib.h']
+                         for role, entries in paths.items()}
+            else:
+                peer = fixture.cases[fixture.names[1]]['path']
+                paths['abi'].remove(peer)
+            union = {path for entries in paths.values() for path in entries}
+            for form in fixture.forms:
+                fixture.observation['native_inputs'][form]['dependency_paths'] = copy.deepcopy(paths)
+                fixture.observation['native_inputs'][form]['input_identities'] = {
+                    path: row for path, row in fixture.observation['native_inputs'][form]['input_identities'].items()
+                    if path in union}
+                for role, entries in paths.items():
+                    for phase in ('before', 'after'):
+                        name = form + '-' + role + '-dependencies-' + phase + '.stdout'
+                        (fixture.output / name).write_bytes(('identity-probe: ' + ' '.join(entries) + '\n').encode())
+            fixture.refresh_streams()
+            fixture.sync()
+            with self.subTest(mutation=mutation):
+                self.assert_rejected(read, fixture)
+
+    def test_review_binds_distinct_agents_exact_producer_and_non_admission_verdict(self):
+        read = profiles.verify_cohort_native
+        variants = [(('schema',), 'codeskeptic-native-preflight-review/v1'), (('verdict',), 'PASS'),
+                    (('verifier',), '/root'), (('verifier',), 'unbounded identity'),
+                    (('findings',), ['PRIVATE_UNRESOLVED_SENTINEL']), (('head',), 'e' * 40),
+                    (('branch',), 'main'), (('evidence', 'root'), '/PRIVATE_ROOT_SENTINEL'),
+                    (('evidence', 'cohort_sha256'), 'e' * 64), (('evidence', 'candidate_sha256'), 'e' * 64),
+                    (('evidence', 'control_sha256'), 'e' * 64), (('checks',), []), (('extra',), True)]
+        for keys, replacement in variants:
+            fixture = SourceCohortNativeFixture(self)
+            SourceCohortTests.replace(fixture.review, keys, replacement)
+            fixture.sync()
+            with self.subTest(path=keys):
+                self.assert_rejected(read, fixture)
+
+    def test_producer_blob_hash_size_and_ancestor_are_actual_git_gates(self):
+        read = profiles.verify_cohort_native
+        for mutation in ('helper-sha', 'helper-size', 'definition-sha', 'cohort-sha', 'nonancestor'):
+            fixture = SourceCohortNativeFixture(self)
+            link = fixture.wrapper['producer_inputs'][str(fixture.repo / 'scripts/product_identity.py')]['content']
+            if mutation == 'helper-sha': link['sha256'] = 'e' * 64
+            elif mutation == 'helper-size':
+                # Forge all repeated size claims, so only the actual historical
+                # Git blob size (not an internal summary disagreement) rejects it.
+                link['size_bytes'] += 1
+                fixture.wrapper['producer_inputs'][str(fixture.repo / 'scripts/product_identity.py')]['identity'][4] += 1
+                fixture.observation['initial_identities']['/helpers/product_identity.py']['bytes'] += 1
+            elif mutation == 'definition-sha': fixture.packet['definition_reference']['files'][0]['sha256'] = 'e' * 64
+            elif mutation == 'cohort-sha':
+                fixture.wrapper['producer_inputs'][str(fixture.cohort_path)]['content']['sha256'] = 'e' * 64
+            else:
+                tree = fixture.git('rev-parse', 'HEAD^{tree}')
+                orphan = fixture.git('commit-tree', tree, '-m', 'Synthetic nonancestor without a parent')
+                self.assertNotEqual(orphan, fixture.head)
+                fixture.wrapper['head'] = fixture.review['head'] = orphan
+                fixture.packet['native']['head'] = fixture.packet['definition_reference']['head'] = orphan
+            fixture.sync()
+            with self.subTest(mutation=mutation):
+                self.assert_rejected(read, fixture)
+
+    def test_later_unrelated_checkout_commit_preserves_historical_producer_hashes_and_sizes(self):
+        read = profiles.verify_cohort_native
+        self.assert_uncredited(read(self.fixture.repo, self.fixture.evidence_path))
+        helper = self.fixture.repo / 'scripts/product_identity.py'
+        helper.write_text('Later helper implementation differs from the recorded producer.\n', encoding='utf-8')
+        note = self.fixture.repo / 'later-note.txt'
+        note.write_text('Unrelated integration after native preparation.\n', encoding='utf-8')
+        self.fixture.git('add', '--', 'scripts/product_identity.py', 'later-note.txt')
+        self.fixture.git('commit', '--no-gpg-sign', '-qm', 'Synthetic later integration')
+        self.assertNotEqual(self.fixture.git('rev-parse', 'HEAD'), self.fixture.head)
+        result = read(self.fixture.repo, self.fixture.evidence_path)
+        self.assert_uncredited(result)
+        self.assertEqual(result['producer_head'], self.fixture.head)
+
+    def test_early_source_and_api_drift_cannot_be_overwritten_by_later_packet_reads(self):
+        read = profiles.verify_cohort_native
+        original = profiles.external_read
+        for target_name in ('source_path', 'capture_path'):
+            fixture = SourceCohortNativeFixture(self)
+            seen, changed = set(), []
+            def mutate(path, capture=False):
+                result = original(path, capture)
+                seen.add(Path(path))
+                if {fixture.source_path, fixture.capture_path} <= seen and fixture.native_root in Path(path).parents and not changed:
+                    target = getattr(fixture, target_name)
+                    target.write_bytes(target.read_bytes() + b'\nPRIVATE_EARLY_DRIFT_SENTINEL\n')
+                    changed.append(target)
+                return result
+            with mock.patch.object(profiles, 'external_read', side_effect=mutate), self.subTest(target=target_name):
+                self.assert_rejected(read, fixture)
+            self.assertTrue(changed, 'must mutate a bound origin while later native inputs are read')
+
+    def test_empty_streams_container_stderr_and_directories_join_the_final_guard(self):
+        read = profiles.verify_cohort_native
+        original = profiles.verify_input_identities
+        for mutation in ('empty-stream', 'container-stderr', 'directory'):
+            fixture = SourceCohortNativeFixture(self)
+            target = (fixture.native_root / 'container.stderr' if mutation == 'container-stderr'
+                      else fixture.output / ('cdb-' + fixture.names[0] + '-syntax.stderr'))
+            changed = []
+            def mutate(guard):
+                if target in guard and fixture.output in guard and not changed:
+                    if mutation == 'directory': (fixture.output / 'PRIVATE_LATE_DIRECTORY_SENTINEL').mkdir()
+                    else: target.write_bytes(b'PRIVATE_LATE_EMPTY_STREAM_SENTINEL\n')
+                    changed.append(target)
+                return original(guard)
+            with mock.patch.object(profiles, 'verify_input_identities', side_effect=mutate), self.subTest(mutation=mutation):
+                self.assert_rejected(read, fixture)
+            self.assertTrue(changed, 'empty stream and directory identities must be registered before final audit')
+
+    def test_packet_tree_missing_duplicate_and_unexpected_members_are_rejected(self):
+        read = profiles.verify_cohort_native
+        for mutation in ('root-extra', 'input-extra', 'output-extra', 'output-directory', 'missing-stream',
+                         'missing-source', 'duplicate-file', 'undeclared-file', 'container-output'):
+            fixture = SourceCohortNativeFixture(self)
+            if mutation == 'root-extra': (fixture.native_root / 'PRIVATE_EXTRA_SENTINEL').write_bytes(b'extra')
+            elif mutation == 'input-extra': (fixture.inputs / 'PRIVATE_EXTRA_SENTINEL').write_bytes(b'extra')
+            elif mutation == 'output-extra': (fixture.output / 'PRIVATE_EXTRA_SENTINEL').write_bytes(b'extra')
+            elif mutation == 'output-directory': (fixture.output / 'PRIVATE_DIRECTORY_SENTINEL').mkdir()
+            elif mutation == 'missing-stream': (fixture.output / fixture.stream_names[0]).unlink()
+            elif mutation == 'missing-source': (fixture.inputs / (fixture.names[1] + '.c')).unlink()
+            elif mutation == 'duplicate-file': fixture.observation['files'].append(copy.deepcopy(fixture.observation['files'][0]))
+            elif mutation == 'undeclared-file': fixture.observation['files'].pop()
+            else:
+                (fixture.native_root / 'container.stdout').write_bytes(b'PRIVATE_CONTAINER_SENTINEL\n')
+            fixture.sync(refresh_container=mutation != 'container-output')
+            with self.subTest(mutation=mutation):
+                self.assert_rejected(read, fixture)
+
+    def test_symlink_hardlink_and_host_path_aliases_never_count_as_bound_native_inputs(self):
+        read = profiles.verify_cohort_native
+        def unavailable_windows_link(fixture, target, error):
+            if os.name != 'nt':
+                raise error
+            # Without Windows link-creation privileges, exercise a real reader
+            # rejection of an injected canonical-path alias. Do not silently
+            # skip or claim that a physical NTFS symlink was tested.
+            resolve, reached = Path.resolve, []
+            def alias(path, *args, **kwargs):
+                if path == target:
+                    reached.append(path)
+                    return fixture.base / 'PRIVATE_RESOLVED_ALIAS_SENTINEL'
+                return resolve(path, *args, **kwargs)
+            fixture.sync()
+            with mock.patch.object(Path, 'resolve', autospec=True, side_effect=alias):
+                self.assert_rejected(read, fixture)
+            self.assertTrue(reached, 'reader must inspect and reject the observed alias')
+        for mutation in ('hardlink', 'symlink', 'relative-root', 'in-repo-root', 'relative-review'):
+            fixture = SourceCohortNativeFixture(self)
+            target = fixture.output / 'cdb-wrong-slot.stderr'
+            if mutation == 'hardlink':
+                alias = fixture.base / 'PRIVATE_HARDLINK_SENTINEL'
+                try: os.link(target, alias)
+                except OSError as error:
+                    unavailable_windows_link(fixture, target, error)
+                    continue
+            elif mutation == 'symlink':
+                saved = fixture.base / 'PRIVATE_SYMLINK_SENTINEL'
+                target.rename(saved)
+                try: target.symlink_to(saved)
+                except OSError as error:
+                    saved.rename(target)
+                    unavailable_windows_link(fixture, target, error)
+                    continue
+            elif mutation == 'relative-root': fixture.packet['native']['root'] = 'relative/PRIVATE_ROOT_SENTINEL'
+            elif mutation == 'in-repo-root': fixture.packet['native']['root'] = str(fixture.repo)
+            else: fixture.packet['native']['review']['path'] = 'relative/PRIVATE_REVIEW_SENTINEL'
+            fixture.sync()
+            with self.subTest(mutation=mutation):
+                self.assert_rejected(read, fixture)
+
+    def test_real_native_cli_dispatch_returns_unqualified_metadata_only(self):
+        result = self.cli('cohort-native-check', '--root', str(self.fixture.repo),
+                          '--cohort-evidence', self.fixture.evidence_path)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stderr, '')
+        value = json.loads(result.stdout)
+        self.assert_uncredited(value)
+        self.assertEqual(value['recorded_commands'], 26)
+        self.assertEqual(value['recorded_stream_files'], 53)
+
+    def test_real_native_cli_rejects_missing_cross_command_selectors_and_private_failures(self):
+        base = ['cohort-native-check', '--root', str(self.fixture.repo), '--cohort-evidence', self.fixture.evidence_path]
+        variants = [['cohort-native-check', '--root', str(self.fixture.repo)],
+                    ['limits', '--cohort-evidence', self.fixture.evidence_path]]
+        for option in ('--cohort', '--binding', '--candidate', '--ground-truth', '--external-root', '--evidence-root'):
+            variants.append([*base, option, 'PRIVATE_OPTION_SENTINEL'])
+        for arguments in variants:
+            result = self.cli(*arguments)
+            with self.subTest(arguments=arguments):
+                self.assertEqual(result.returncode, 2)
+                self.assertEqual(result.stdout, '')
+                self.assertNotIn('PRIVATE_', result.stderr)
+        self.fixture.capture_path.write_bytes(b'PRIVATE_CLI_PAYLOAD_SENTINEL\n')
+        result = self.cli(*base)
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, '')
+        self.assertNotIn('PRIVATE_', result.stderr)
+        self.assertNotIn(str(self.fixture.base), result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,84 @@
+{
+  "schema": "codeskeptic-product-cohort-native-evidence/v1",
+  "state": "PRE_RESULT_REVIEWED_COMPILER_PACKET_NOT_ADMITTED",
+  "id": "llvm-caller-slot-native-v1",
+  "profile": "caller-slot-publication-c17-v1",
+  "cohort": {
+    "path": "tests/product_corpus/cohorts/llvm-caller-slot-v1.json",
+    "sha256": "65f26a88ef90326a05db8de927f175d70097c5abf765625e45b389171d93b9be"
+  },
+  "records": [
+    {
+      "id": "llvm-caller-slot-overwrite",
+      "record_sha256": "f5254e063a97a81e06197a6c1bbcb85889ffe7ff4c91f1159131861b3bd56203",
+      "source_sha256": "a118c66873a197c3b55534f86500828492724ebd2e347df4414e2a71d322617a"
+    },
+    {
+      "id": "llvm-caller-slot-retained-control",
+      "record_sha256": "b2010e8886f09eb7323c299ef6b5fd30511581e85f48035b4032c2150abbfc57",
+      "source_sha256": "a99952fd6198cb713db7d260925467f68181fcba3f9d6acc571eb2c87386381a"
+    }
+  ],
+  "native": {
+    "head": "5fc09da642bd45f4555cfd343cfcd983a5089b4e",
+    "root": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/source-cohort-v1/native",
+    "wrapper_sha256": "a5bb4cf7e5e4aeb9ebcfbd698e98ed7e09f4ab4db8b777f469fdd94114288869",
+    "observation_sha256": "5443995ea09a455e2d481581062379be69a4ff9791e9aa41c52243941e6d5bd3",
+    "review": {
+      "path": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/source-cohort-v1/native-review-5fc09da.json",
+      "sha256": "ba3f01d88086ffb94032d413a1feba3284caba2b100d620b6b59a3a99bd735ef"
+    }
+  },
+  "definition_reference": {
+    "head": "5fc09da642bd45f4555cfd343cfcd983a5089b4e",
+    "files": [
+      {
+        "path": "src/source_manager/SourceManager.cpp",
+        "sha256": "2b62d346ca8a26ad018f2371e4134d7c013775b79c56f00d7e50687000034f31"
+      },
+      {
+        "path": "src/main.cpp",
+        "sha256": "b314df2bf76d5c36a2738291d77cf2e30b3625a86011cfec68cfc87d78b1b823"
+      },
+      {
+        "path": "src/core/RuleCapabilities.def",
+        "sha256": "17bd1d76e01534b6afd98ad04c105c656c8ed45a2778be8f4ed842716afcaadc"
+      }
+    ]
+  },
+  "limits": {
+    "addressable_recall_min": "0.70",
+    "buggy_min_per_bucket": 30,
+    "campaign_timeout_seconds": 43200,
+    "capture_bytes_per_stream": 2097152,
+    "case_timeout_seconds": 30,
+    "family_precision_min": "0.90",
+    "linux_harness_cpu_quota": 2,
+    "linux_harness_memory_mib": 6144,
+    "linux_harness_memory_plus_swap_mib": 12288,
+    "linux_harness_pids_max": 256,
+    "linux_harness_tmpfs_mib": 1024,
+    "origins_min_per_bucket": 3,
+    "project_timeout_seconds": 1200,
+    "repetitions": 3,
+    "safe_fp_max": 0,
+    "safe_min_per_bucket": 30,
+    "string_flow_call_depth_max": 4,
+    "string_flow_states_per_function_max": 256,
+    "string_flow_transfer_steps_per_function_max": 65536,
+    "unique_quota_sources_min": 1020,
+    "worker_memory_mib": 2048,
+    "worker_timeout_ms": 120000
+  },
+  "additional_quota_examples": 0,
+  "qualification": {
+    "analyzer_run": false,
+    "evaluation_frozen": false,
+    "license_qualified": false,
+    "native_product_qualified": false,
+    "product_qualified": false,
+    "redistribution_approved": false,
+    "task_ready": false
+  },
+  "boundary": "Source-specific recorded compiler syntax, conditional width/type assertions and retained dependency identities only. No source or analyzer execution, actual calling ABI or allocator runtime behavior, compiler runtime closure, authenticated image, kernel-limit enforcement, all-rule label acceptance, source/cluster admission, independent safe quota, source-specific rights or redistribution clearance, hosted/native product qualification or U003 completion. The paired control remains supplemental and nonquota."
+}

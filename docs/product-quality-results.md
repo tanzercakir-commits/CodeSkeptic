@@ -1593,3 +1593,65 @@ mekanizmalı nonquota kontrol olarak kalır; beklenen satır 5/sütun 3 henüz
 gözlenmiş rapor değildir. Sonraki normal eksik rapor FN kalır. Seçim **2/1020**,
 ek kota sıfır, yedi qualification false ve readiness exit 2 değişmez.
 Yeni head için hosted başarı veya tüm genel CI yeşil iddiası yoktur.
+
+### LLVM source-entry ve gerçek compiler packet okuyucusu
+
+Yeni `cohort-native-check` yolu iki LLVM kaydını ayrı 3681 baytlık
+`tests/product_corpus/cohort_evidence/llvm-caller-slot-v1.json` sidecar'ıyla
+kaydedilmiş gerçek compiler packet'ine bağlar. Source shard, iki TU, eski GCC
+seçim/etiket/platform kayıtları ve 158 korunan input baytı değiştirilmedi.
+Sidecar SHA-256 `0e8aebb79d802c9353f329ba8b5971744aa486fe8e546b8549481069c7d68275`.
+
+Gerçek çiftin CLI okuyucusu 26 komut/53 stream-CDB dosyasını, altı amaçlanan
+static-assert reddini, tam raw dependency birleşimini, image/producer/source
+bağlarını ve geçmiş `5fc09da` Git nesnelerini doğruladı. Yeni bir compiler veya
+analyzer çalıştırılmadı. Producer helper'ının bugünkü sürümü değişebilir; eski
+hash ve boyut gerçek ancestor blob'una bağlı kalır. Bütün canlı dış dosyalar,
+boş container/observation stderr'leri ve üç native dizin ortak son kimlik
+kontrolündedir. Hakem yalnız bu compiler ön kontrolünün bağını onaylamıştı;
+bu okuyucu yeni all-rule veya source-admission kararı üretmez.
+
+20 yeni bağımsız kurulmuş sentetik packet testi, eski temiz `67e131f` kodunda
+RED verdi; CLI'nin bilinmeyen komut reddi ve eksik API/private-guard hataları
+korundu. Geliştirilen kodda 211 profile, 88 identity ve 24 quality testi;
+workflow'un 137 seçili profile testi ve gerçek packet CLI kontrolü geçti.
+Tutarlı yeniden hashlenmiş eksik stdlib/peer dependency, her yerde aynı sahte
+historical helper boyutu ve iki formda aynı değiştirilmiş source identity de
+ret alır. Native fixture'lar gerçek upstream/derleme/kota kanıtı sayılmaz.
+Windows link oluşturma yetkisi yoksa test bir gözlenen canonical-path alias
+reddini ayrıca zorlar; fiziksel NTFS symlink kapsamı varmış gibi sunulmaz.
+
+Yeni sidecar için integrity'nin eksik protected-input RED'i beklenendir;
+ayrı bağımsız source-derived prospective successor ve exact-head uygulama
+denetimi tamamlanmadan katalog güncellenmiş veya U003 bitmiş sayılmaz.
+Seçim hâlâ 2/1020, kontrol nonquota, ek kota sıfır ve qualification false.
+All-rule etiketleri, source/cluster/origin kabulü, haklar ve tam quota kapıları
+ayrı açık işlerdir; yeni native okuyucu bunların yerine geçmez.
+
+### 67e131f gerçek hosted identity başarısı ve ayrı genel CI RED'i
+
+[Identity 34699316728](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34699316728)
+attempt 1 üç platformda başarılıdır. Her lane'de 88 identity ve 117 seçili
+profile testi geçti; bu koşu yeni cohort-native okuyucusundan ÖNCEDİR.
+Eski 636 baytlık mixed-storage native case, yeni LLVM/parent-child yeterliliği
+değildir. Yedi API/ZIP/member/source bağı ve 34 kayıtlı dosya hash'i bağımsız
+denetlendi. Windows post-case diagnostic 23297 ms, CIM_LOADED 22946 ms,
+query aralığı 44 ms ve ayrı policy probe 531 ms idi; kalıcı CIM onarımı iddiası yoktur.
+Ham kanıt U003 `cohort-native-bridge-v1/hosted-34699316728` altında,
+summary SHA-256 `4073daf7b6d26d567a5efc9bd9ef652392d18f5bc4bc21bda4d5f1e5f1e30d83`.
+
+Ayrı [genel CI 34699316742](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34699316742)
+yine aynı ilk reusable-response assertion'ında 1/1583 RED verdi.
+`runtime_before:deadline`, module_read, 8 modül, 234233048 byte read/hash,
+5014776 us wall ve 1014945 us thread CPU kaydedildi. Runtime digest/input
+witness boş kalıp reuse doğru reddedildi; sonraki ürün kapıları skipped.
+İlgili runtime/coordinator/worker/test/workflow baytları EF ve 05a5 ile aynı;
+bu, bütün olası nedenlerden bağımsızlık veya kesin I/O/host-contention teşhisi
+değildir. Cache fix, warmup, süre artırma veya kör rerun yapılmadı; U004 RED
+kaydı ve ilgili CH12 dayanıklılık sahipliği korunur.
+
+Her iki gerçek bağımsız karar `cohort-native-bridge-v1/hosted-review-67e131f.json`,
+SHA-256 `e3cbf66d09b444cca0a0fc6fa7b9f8fdfdeb2bbbe16ea82198eae0bc5841e14f`.
+Ham GH capture wrapper'ları o sırada düzenlenen primary checkout'u bildirir;
+hosted head ve kaynak bağları ayrıca temiz exact `67e131f` klonuyla doğrulandı.
+Identity başarısı genel CI veya U003/ürün başarı iddiasına dönüştürülmez.

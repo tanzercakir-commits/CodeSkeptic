@@ -1154,7 +1154,7 @@ def verify_reviewed_files(repo, head, links, *, expected_tree=None):
                 and git("rev-parse", head + "^{tree}").decode("ascii").strip() == expected_tree,
                 "observed producer tree changed")
     require(type(links) is list and 1 <= len(links) <= 64, "reviewed file links")
-    names = set()
+    names, contents = set(), {}
     for link in links:
         fields(link, "path sha256", "reviewed file")
         # One actual producer input lives under a dot-directory. Keep the
@@ -1176,6 +1176,8 @@ def verify_reviewed_files(repo, head, links, *, expected_tree=None):
         raw = git("cat-file", "blob", blob_name)
         require(len(raw) == size and hashlib.sha256(raw).hexdigest() == link["sha256"],
                 "reviewed commit bytes changed")
+        contents[relative] = {'sha256': link['sha256'], 'size_bytes': size}
+    return contents
 
 
 SOURCE_SELECTION = "tests/product_corpus/selection.json"
@@ -2425,7 +2427,7 @@ def source_cohort_metadata(value):
             **value['qualification']}
 
 
-def verify_source_cohort(repo, cohort_path):
+def verify_source_cohort(repo, cohort_path, *, _input_guard=None):
     """Read one bounded preparation shard and all linked provenance atomically
     with respect to ordinary observed drift, not as a hostile-root snapshot.
 
@@ -2438,7 +2440,7 @@ def verify_source_cohort(repo, cohort_path):
         require(repo.is_absolute() and repo.resolve(strict=True) == repo, 'source cohort checkout')
         relative = external_relative(cohort_path).as_posix()
         require(relative.startswith('tests/product_corpus/cohorts/'), 'source cohort scope')
-        guard = {}
+        guard = {} if _input_guard is None else _input_guard
         info, value = _ground_truth_input(repo / relative, guard, maximum=16 * 1024 * 1024)
         result = source_cohort_metadata(value)
 
@@ -2490,6 +2492,378 @@ def verify_source_cohort(repo, cohort_path):
         return {**result, 'source_bytes_verified': True, 'cohort_sha256': info['sha256']}
     except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError, subprocess.SubprocessError):
         raise ValueError('source cohort preparation rejected') from None
+
+
+def _cohort_entry_projection(value, link, cohort_sha):
+    fields(link, 'path sha256 id record_sha256 source_sha256', 'cohort entry reference')
+    require(external_relative(link['path']).as_posix().startswith('tests/product_corpus/cohorts/'),
+            'cohort entry scope')
+    for key in ('sha256', 'record_sha256', 'source_sha256'):
+        external_digest(link[key])
+    require(link['sha256'] == cohort_sha and type(link['id']) is str
+            and re.fullmatch(r'[a-z][a-z0-9-]{0,95}', link['id']), 'cohort entry reference identity')
+    entries = [entry for entry in value['records'] if entry['value']['id'] == link['id']]
+    require(len(entries) == 1 and entries[0]['sha256'] == link['record_sha256']
+            and entries[0]['value']['source']['sha256'] == link['source_sha256'], 'cohort entry binding')
+    record = entries[0]['value']
+    return {key: record[key] for key in ('id', 'origin', 'cluster', 'selection', 'role', 'family', 'related_to')} | {
+        'record_sha256': link['record_sha256'], 'source_sha256': link['source_sha256'],
+        'cohort_sha256': cohort_sha, 'source_bytes_verified': True, 'independently_reviewed': False,
+        'admitted_sources': 0, 'additional_quota_examples': 0, **value['qualification']}
+
+
+def verify_source_cohort_entry(repo, link, *, _input_guard=None):
+    """Resolve one actual preparation entry, not an admission or label decision."""
+    try:
+        guard = {} if _input_guard is None else _input_guard
+        fields(link, 'path sha256 id record_sha256 source_sha256', 'cohort entry reference')
+        result = verify_source_cohort(repo, link['path'], _input_guard=guard)
+        _, value = _ground_truth_input(Path(repo) / external_relative(link['path']), guard,
+                                      link['sha256'], maximum=16 * 1024 * 1024)
+        projection = _cohort_entry_projection(value, link, result['cohort_sha256'])
+        verify_input_identities(guard)
+        return projection
+    except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError, subprocess.SubprocessError):
+        raise ValueError('source cohort entry rejected') from None
+
+
+def _cohort_native_commands(records, resource):
+    """Recorded compiler-only matrix for the explicit caller-slot pair profile."""
+    compiler = '/usr/bin/clang-20'
+    require(resource == '/usr/lib/llvm-20/lib/clang/20', 'cohort native resource directory')
+    sources = {row['id']: '/input/' + row['id'] + '.c' for row in records}
+    roles = {**sources, 'abi': '/runner/probe.c'}
+    controls = ['wrong-width', 'wrong-malloc', 'wrong-slot']
+    prefix = [compiler, '--no-default-config', '-fno-modules', '--target=x86_64-pc-linux-gnu',
+              '-resource-dir', resource, '-x', 'c', '-std=c17', '-fsyntax-only']
+    adjusted = [compiler, '-resource-dir', resource, '-fparse-all-comments', *prefix[1:]]
+    base_env = {'PATH': '/usr/bin:/bin', 'LANG': 'C', 'LC_ALL': 'C', 'TMPDIR': '/tmp'}
+    selected_env = {**base_env, 'CODESKEPTIC_RESOURCE_DIR': resource}
+    commands = []
+
+    def append(name, argv, environment, bad=False, marker=None):
+        commands.append({'name': name, 'argv': argv, 'cwd': '/input', 'environment': environment,
+                         'exit_code': int(bad), 'expected_exit': int(bad), 'stderr_marker': marker})
+
+    for name, flag in (('resource-directory', '-print-resource-dir'), ('compiler-version', '--version')):
+        append(name, [compiler, '--no-default-config', flag], base_env)
+    for form, argv in (('cdb', prefix), ('frontend-adjusted', adjusted)):
+        def dependencies(phase):
+            for role, path in roles.items():
+                append(form + '-' + role + '-dependencies-' + phase,
+                       [arg for arg in argv if arg != '-fsyntax-only'] + ['-M', '-MT', 'identity-probe', path],
+                       selected_env)
+        dependencies('before')
+        for role, path in roles.items():
+            append(form + '-' + role + '-syntax', [*argv, path], selected_env)
+        for control in controls:
+            append(form + '-' + control, [*argv, '/runner/' + control + '.c'], selected_env,
+                   bad=True, marker='slot-' + control + '-control')
+        dependencies('after')
+    return {
+        'commands': commands, 'roles': roles, 'controls': controls, 'environment': selected_env,
+        'cdb': [{'directory': '/input', 'file': path, 'arguments': [*prefix, path]} for path in sources.values()],
+        'adjusted': {name: [*adjusted, path] for name, path in sources.items()},
+        'matrix': {'source_roles': list(roles), 'command_forms': ['cdb', 'frontend-adjusted'],
+                   'negative_controls': controls, 'expected_commands': 2 + 2 * (3 * len(roles) + len(controls))}}
+
+
+def _cohort_native_identity(path, value):
+    fields(value, 'path resolved_path sha256 bytes', 'cohort native recorded file identity')
+    external_digest(value['sha256'])
+    require(value['path'] == path and type(value['bytes']) is int and 0 < value['bytes'] <= 2 ** 32,
+            'cohort native recorded file content')
+    for name in (path, value['resolved_path']):
+        require(type(name) is str and 0 < len(name) <= 4096 and not any(ord(char) < 32 for char in name)
+                and PurePosixPath(name).is_absolute() and not name.startswith('//')
+                and '..' not in PurePosixPath(name).parts and str(PurePosixPath(name)) == name,
+                'cohort native recorded file path')
+
+
+def verify_cohort_native(repo, evidence_path, *, _input_guard=None):
+    """Reopen the reviewed caller-slot compiler packet, never execute or admit.
+
+Recorded native header identities are not fresh image extraction or signed
+attestation. One guard covers live sidecar/source/API/review/producer/stream
+bytes; historical checkout helpers instead bind actual producer-head blobs.
+    """
+    try:
+        import product_identity as identity
+        guard = {} if _input_guard is None else _input_guard
+        repo = Path(repo)
+        require(repo.is_absolute() and repo.resolve(strict=True) == repo, 'cohort native checkout')
+        relative = external_relative(evidence_path).as_posix()
+        require(relative.startswith('tests/product_corpus/cohort_evidence/'), 'cohort native packet scope')
+        info, value = _ground_truth_input(repo / relative, guard)
+        fields(value, 'schema state id profile cohort records native definition_reference limits '
+               'additional_quota_examples qualification boundary', 'cohort native packet')
+        require(value['schema'] == 'codeskeptic-product-cohort-native-evidence/v1'
+                and value['state'] == 'PRE_RESULT_REVIEWED_COMPILER_PACKET_NOT_ADMITTED'
+                and value['profile'] == 'caller-slot-publication-c17-v1'
+                and type(value['id']) is str and re.fullmatch(r'[a-z][a-z0-9-]{0,95}', value['id'])
+                and nonempty(value['boundary']) and len(value['boundary']) <= 8192, 'cohort native identity')
+        validate_limits(value['limits'])
+        fields(value['qualification'], SOURCE_QUALIFICATION, 'cohort native qualification')
+        require(all(item is False for item in value['qualification'].values())
+                and type(value['additional_quota_examples']) is int and value['additional_quota_examples'] == 0,
+                'cohort native cannot grant quota or qualify')
+        fields(value['cohort'], 'path sha256', 'cohort native source link')
+        external_digest(value['cohort']['sha256'])
+        source = verify_source_cohort(repo, value['cohort']['path'], _input_guard=guard)
+        _, cohort = _ground_truth_input(repo / external_relative(value['cohort']['path']), guard,
+                                       value['cohort']['sha256'], maximum=16 * 1024 * 1024)
+        require(source['cohort_sha256'] == value['cohort']['sha256'], 'cohort native source changed')
+        records = value['records']
+        require(type(records) is list and len(records) == source['total_sources'] == 2
+                and cohort['id'] == 'llvm-caller-slot-v1', 'cohort native pair size and profile')
+        projections = []
+        for record in records:
+            fields(record, 'id record_sha256 source_sha256', 'cohort native entry')
+            projections.append(_cohort_entry_projection(cohort, {**value['cohort'], **record}, source['cohort_sha256']))
+        candidate, control = projections
+        require([row['id'] for row in records] == ['llvm-caller-slot-overwrite', 'llvm-caller-slot-retained-control']
+                and candidate['selection'] == 'independent-evaluation-candidate' and candidate['role'] == 'buggy'
+                and control['selection'] == 'supplemental-control' and control['role'] == 'safe'
+                and candidate['family'] == control['family'] == 'memory-leak'
+                and control['related_to'] == candidate['id']
+                and all(candidate[key] == control[key] for key in ('origin', 'cluster')),
+                'cohort native source/control mechanism')
+        native_link = value['native']
+        fields(native_link, 'head root wrapper_sha256 observation_sha256 review', 'cohort native link')
+        for key in ('wrapper_sha256', 'observation_sha256'):
+            external_digest(native_link[key])
+        root = Path(native_link['root'])
+        require(root.is_absolute() and root.resolve(strict=True) == root and repo != root and repo not in root.parents,
+                'cohort native external root')
+        fields(native_link['review'], 'path sha256', 'cohort native review link')
+        external_digest(native_link['review']['sha256'])
+        review_path = Path(native_link['review']['path'])
+        require(review_path.is_absolute() and repo not in review_path.parents and root not in review_path.parents,
+                'cohort native external review')
+        parts = _cohort_native_commands(records, '/usr/lib/llvm-20/lib/clang/20')
+        command_names = [row['name'] for row in parts['commands']]
+        stream_names = {'compile_commands.json'} | {name + '.' + suffix for name in command_names
+                                                     for suffix in ('stdout', 'stderr')}
+        runner_names = ('run.py', 'observe.py', 'probe.c', 'wrong-width.c', 'wrong-malloc.c', 'wrong-slot.c')
+        expected_tree = {root / name for name in (*runner_names, 'summary.json', 'image-inspect.json',
+                                                  'container.stdout', 'container.stderr')}
+        expected_tree.update(root / 'inputs' / (row['id'] + '.c') for row in records)
+        expected_tree.update(root / 'observation' / name for name in stream_names | {'summary.json'})
+        remember_input_identities(guard, {}, external_tree(root, expected_tree))
+        _, wrapper = _ground_truth_input(root / 'summary.json', guard, native_link['wrapper_sha256'],
+                                         maximum=16 * 1024 * 1024)
+        _, native = _ground_truth_input(root / 'observation/summary.json', guard, native_link['observation_sha256'],
+                                        maximum=16 * 1024 * 1024)
+        _, review = _ground_truth_input(review_path, guard, native_link['review']['sha256'])
+        fields(wrapper, 'schema head image image_manifest_digest argv exit_code source_cohort producer_inputs '
+               'image_inspection_sha256 stdout_sha256 stderr_sha256 analyzer_run candidate_executed '
+               'source_admitted additional_quota_examples product_qualified task_ready observation_sha256',
+               'cohort native driver')
+        require(wrapper['schema'] == 'codeskeptic-source-cohort-native-preflight-driver/v1'
+                and type(wrapper['exit_code']) is int and wrapper['exit_code'] == 0
+                and wrapper['head'] == native_link['head']
+                and wrapper['observation_sha256'] == native_link['observation_sha256']
+                and canonical(wrapper['source_cohort']) == canonical(source), 'cohort native driver binding')
+        require(all(wrapper[key] is False for key in ('analyzer_run', 'candidate_executed', 'source_admitted',
+                                                     'product_qualified', 'task_ready'))
+                and type(wrapper['additional_quota_examples']) is int and wrapper['additional_quota_examples'] == 0,
+                'cohort native driver qualification')
+        fields(review, 'schema implementer verifier head branch verdict findings evidence checks source_assessment '
+               'limitations boundary', 'cohort native independent review')
+        for key in ('implementer', 'verifier'):
+            require(type(review[key]) is str and len(review[key]) <= 128
+                    and re.fullmatch(r'/[a-z0-9_]+(?:/[a-z0-9_]+)*', review[key]), 'cohort native reviewer identity')
+        require(review['schema'] == 'codeskeptic-source-cohort-native-preflight-review/v1'
+                and review['verdict'] == 'PASS_BOUNDED_COMPILER_ONLY_PREFLIGHT' and review['findings'] == []
+                and review['implementer'] != review['verifier'] and review['head'] == native_link['head']
+                and review['branch'] == 'agent/cs3-ch08-s01-u003-frozen-product-profiles'
+                and review['evidence'] == {'root': str(root), 'driver_sha256': native_link['wrapper_sha256'],
+                    'observation_sha256': native_link['observation_sha256'], 'cohort_sha256': source['cohort_sha256'],
+                    'candidate_sha256': candidate['source_sha256'], 'control_sha256': control['source_sha256']},
+                'cohort native review binding')
+        for key in ('checks', 'limitations'):
+            require(type(review[key]) is list and 1 <= len(review[key]) <= 64
+                    and all(nonempty(item) and len(item) <= 8192 for item in review[key]), 'cohort native review coverage')
+        require(all(nonempty(review[key]) and len(review[key]) <= 8192 for key in ('source_assessment', 'boundary')),
+                'cohort native review boundary')
+        definition = value['definition_reference']
+        fields(definition, 'head files', 'cohort native definitions')
+        require(definition['head'] == native_link['head'] and type(definition['files']) is list
+                and [row['path'] for row in definition['files']] == [
+                    'src/source_manager/SourceManager.cpp', 'src/main.cpp', 'src/core/RuleCapabilities.def'],
+                'cohort native definition closure')
+        verify_reviewed_files(repo, definition['head'], definition['files'])
+
+        expected_producers = {repo / 'scripts' / name for name in
+                              ('product_profiles.py', 'product_identity.py', 'product_quality.py')}
+        expected_producers.add(repo / value['cohort']['path'])
+        expected_producers.update(root / name for name in runner_names)
+        expected_producers.update(root / 'inputs' / (row['id'] + '.c') for row in records)
+        expected_producers.update(Path(origin[key]['path']) for origin in cohort['origins']
+                                  for key in ('source', 'api_capture'))
+        require(type(wrapper['producer_inputs']) is dict
+                and set(wrapper['producer_inputs']) == {str(path) for path in expected_producers},
+                'cohort native producer closure')
+        producer_contents, repo_links = {}, []
+        for name, row in wrapper['producer_inputs'].items():
+            fields(row, 'content identity', 'cohort native producer')
+            fields(row['content'], 'sha256 size_bytes', 'cohort native producer content')
+            external_digest(row['content']['sha256'])
+            require(type(row['content']['size_bytes']) is int and 0 < row['content']['size_bytes'] <= 16 * 1024 * 1024
+                    and type(row['identity']) is list and len(row['identity']) == 7
+                    and all(type(number) is int and number >= 0 for number in row['identity'])
+                    and stat.S_ISREG(row['identity'][2]) and row['identity'][3] == 1
+                    and row['identity'][4] == row['content']['size_bytes'], 'cohort native historical identity')
+            path = Path(name)
+            if repo in path.parents:
+                repo_links.append({'path': path.relative_to(repo).as_posix(), 'sha256': row['content']['sha256']})
+            else:
+                actual, _ = _ground_truth_input(path, guard, row['content']['sha256'], json_value=False,
+                                                maximum=16 * 1024 * 1024)
+                require(actual == row['content'], 'cohort native producer bytes')
+            producer_contents[path] = row['content']
+        historical = verify_reviewed_files(repo, native_link['head'], repo_links)
+        require(all(historical[row['path']] == producer_contents[repo / row['path']] for row in repo_links),
+                'cohort native historical producer size')
+        for row in records:
+            content = producer_contents[root / 'inputs' / (row['id'] + '.c')]
+            require(content['sha256'] == row['source_sha256'], 'cohort native materialized source')
+        external_digest(wrapper['image'])
+        require(type(wrapper['image_manifest_digest']) is str
+                and re.fullmatch(r'sha256:[0-9a-f]{64}', wrapper['image_manifest_digest']), 'cohort native image digest')
+        external_digest(wrapper['image_inspection_sha256'])
+        _, inspection = _ground_truth_input(root / 'image-inspect.json', guard, wrapper['image_inspection_sha256'],
+                                            maximum=16 * 1024 * 1024)
+        require(type(inspection) is list and len(inspection) == 1 and type(inspection[0]) is dict
+                and inspection[0]['Id'] == wrapper['image'] and inspection[0]['Digest'] == wrapper['image_manifest_digest'],
+                'cohort native recorded image inspection')
+        argv = ['podman', 'run', '--rm', '--pull=never', '--network=none', '--read-only', '--timeout=150',
+                '--cap-drop=ALL', '--security-opt=no-new-privileges', '--security-opt=label=disable',
+                '--cpus=2', '--memory=6144m', '--memory-swap=12288m', '--pids-limit=256',
+                '--tmpfs=/tmp:rw,nosuid,nodev,noexec,size=1024m',
+                '--mount', 'type=bind,src=' + str(repo / 'scripts') + ',dst=/helpers,ro=true',
+                '--mount', 'type=bind,src=' + str(root / 'inputs') + ',dst=/input,ro=true',
+                '--mount', 'type=bind,src=' + str(root) + ',dst=/runner,ro=true',
+                '--mount', 'type=bind,src=' + str(root / 'observation') + ',dst=/output,rw=true',
+                '--entrypoint=/usr/bin/python3', wrapper['image'], '-B', '/runner/observe.py']
+        for row in records:
+            argv.extend(['--case', row['id'] + '=' + row['source_sha256']])
+        require(wrapper['argv'] == argv, 'cohort native recorded container command')
+
+        def read_stream(path, digest, size=None):
+            external_digest(digest)
+            if size is None:
+                size = path.lstat().st_size
+            require(type(size) is int and 0 <= size <= LIMITS['capture_bytes_per_stream'], 'cohort native stream size')
+            if size == 0:
+                require(digest == hashlib.sha256(b'').hexdigest(), 'cohort native empty stream digest')
+                remember_input_identities(guard, {path: empty_native_stream(path)})
+                return b''
+            actual, raw = _ground_truth_input(path, guard, digest, json_value=False,
+                                              maximum=LIMITS['capture_bytes_per_stream'])
+            require(actual['size_bytes'] == size, 'cohort native stream byte count')
+            return raw
+
+        container_stdout = read_stream(root / 'container.stdout', wrapper['stdout_sha256'])
+        require(read_stream(root / 'container.stderr', wrapper['stderr_sha256']) == b'', 'cohort native container failure')
+        require(parse_json(container_stdout.decode('utf-8')) == {
+            'commands': len(parts['commands']), 'negative_controls': 2 * len(parts['controls']), 'sources': len(records),
+            'summary_sha256': native_link['observation_sha256'], 'analyzer_run': False}, 'cohort native container result')
+        fields(native, 'schema profile cases initial_identities compiler_version resource_directory userspace observed_kernel '
+               'compilation_database compilation_database_sha256 frontend_adjusted_arguments child_environment commands files '
+               'native_inputs matrix candidate_and_abi_syntax_verified same_header_closure_verified '
+               'before_after_input_identity_verified analyzer_run candidate_executed native_product_qualified '
+               'embedded_frontend_verified calling_abi_executed runtime_allocator_semantics_verified source_admitted '
+               'additional_quota_examples task_ready product_qualified boundary', 'cohort native observation')
+        require(native['schema'] == 'codeskeptic-source-cohort-native-preflight/v1' and native['profile'] == value['profile']
+                and native['resource_directory'] == '/usr/lib/llvm-20/lib/clang/20'
+                and native['cases'] == {row['id']: {'path': '/input/' + row['id'] + '.c', 'sha256': row['source_sha256']}
+                                        for row in records}
+                and canonical(native['commands']) == canonical(parts['commands'])
+                and canonical(native['matrix']) == canonical(parts['matrix'])
+                and native['compilation_database'] == parts['cdb']
+                and native['frontend_adjusted_arguments'] == parts['adjusted']
+                and native['child_environment'] == parts['environment'], 'cohort native observed command matrix')
+        require(all(native[key] is True for key in ('candidate_and_abi_syntax_verified', 'same_header_closure_verified',
+                                                   'before_after_input_identity_verified'))
+                and all(native[key] is False for key in ('analyzer_run', 'candidate_executed', 'native_product_qualified',
+                    'embedded_frontend_verified', 'calling_abi_executed', 'runtime_allocator_semantics_verified',
+                    'source_admitted', 'task_ready', 'product_qualified'))
+                and type(native['additional_quota_examples']) is int and native['additional_quota_examples'] == 0
+                and nonempty(native['boundary']) and len(native['boundary']) <= 8192
+                and nonempty(native['observed_kernel']) and len(native['observed_kernel']) <= 512,
+                'cohort native observed boundaries')
+        require(type(native['files']) is list and len(native['files']) == len(stream_names)
+                and {row['file'] for row in native['files']} == stream_names, 'cohort native raw file closure')
+        streams = {}
+        for row in native['files']:
+            fields(row, 'file sha256 size_bytes', 'cohort native raw file')
+            streams[row['file']] = read_stream(root / 'observation' / row['file'], row['sha256'], row['size_bytes'])
+        require(hashlib.sha256(streams['compile_commands.json']).hexdigest() == native['compilation_database_sha256']
+                and parse_json(streams['compile_commands.json'].decode('utf-8')) == parts['cdb'], 'cohort native actual CDB')
+        require(streams['resource-directory.stdout'].decode('utf-8').strip() == native['resource_directory']
+                and streams['compiler-version.stdout'].decode('utf-8') == native['compiler_version']
+                and nonempty(native['compiler_version']), 'cohort native raw compiler metadata')
+        for command in parts['commands']:
+            stdout, stderr = (streams[command['name'] + '.' + suffix] for suffix in ('stdout', 'stderr'))
+            if command['stderr_marker'] is not None:
+                require(stdout == b'' and command['stderr_marker'].encode() in stderr
+                        and b'static assertion failed' in stderr, 'cohort native intended assertion failure')
+            else:
+                require(stderr == b'' and (not command['name'].endswith('-syntax') or stdout == b''),
+                        'cohort native positive compiler failure')
+        fields(native['native_inputs'], 'cdb frontend-adjusted', 'cohort native input forms')
+        require(canonical(native['native_inputs']['cdb']) == canonical(native['native_inputs']['frontend-adjusted']),
+                'cohort native cross-form identity drift')
+        inputs = native['native_inputs']['cdb']
+        fields(inputs, 'dependency_paths input_identities', 'cohort native inputs')
+        require(type(inputs['dependency_paths']) is dict and set(inputs['dependency_paths']) == set(parts['roles'])
+                and type(inputs['input_identities']) is dict, 'cohort native dependency roles')
+        union = set()
+        for role, source_path in parts['roles'].items():
+            actual_paths = None
+            for form in ('cdb', 'frontend-adjusted'):
+                for phase in ('before', 'after'):
+                    raw = streams[form + '-' + role + '-dependencies-' + phase + '.stdout']
+                    paths = identity.dependency_paths(raw.decode('utf-8'), 'posix')
+                    require(actual_paths is None or paths == actual_paths, 'cohort native raw dependency drift')
+                    actual_paths = paths
+            require(actual_paths == inputs['dependency_paths'][role] and source_path in actual_paths
+                    and '/usr/include/stdlib.h' in actual_paths
+                    and (role != 'abi' or all(row['path'] in actual_paths for row in native['cases'].values())),
+                    'cohort native source/header dependency closure')
+            union.update(actual_paths)
+        require(set(inputs['input_identities']) == union, 'cohort native complete header identity set')
+        for path, row in inputs['input_identities'].items():
+            _cohort_native_identity(path, row)
+            require(path in parts['roles'].values() or path.startswith('/usr/include/')
+                    or path.startswith(native['resource_directory'] + '/include/'), 'cohort native dependency scope')
+        mapped = {'/runner/' + name: root / name for name in runner_names if name != 'run.py'}
+        mapped.update({'/helpers/product_identity.py': repo / 'scripts/product_identity.py'})
+        mapped.update({row['path']: root / 'inputs' / Path(row['path']).name for row in native['cases'].values()})
+        require(type(native['initial_identities']) is dict
+                and set(native['initial_identities']) == set(mapped) | {'/usr/bin/clang-20', '/etc/os-release'},
+                'cohort native initial identity closure')
+        for path, row in native['initial_identities'].items():
+            _cohort_native_identity(path, row)
+            if path in mapped:
+                require({'sha256': row['sha256'], 'size_bytes': row['bytes']} == producer_contents[mapped[path]],
+                        'cohort native logical-to-producer identity')
+            if path in inputs['input_identities']:
+                require(row == inputs['input_identities'][path], 'cohort native overlapping identity drift')
+        require(type(native['userspace']) is str
+                and {'sha256': hashlib.sha256(native['userspace'].encode('utf-8')).hexdigest(),
+                     'bytes': len(native['userspace'].encode('utf-8'))} == {
+                        key: native['initial_identities']['/etc/os-release'][key] for key in ('sha256', 'bytes')},
+                'cohort native recorded userspace identity')
+        verify_input_identities(guard)
+        return {'packet_sha256': info['sha256'], 'cohort_sha256': source['cohort_sha256'], 'profile': value['profile'],
+                'producer_head': native_link['head'], 'records': projections, 'source_bytes_verified': True,
+                'compiler_preflight_independently_reviewed': True, 'recorded_commands': len(parts['commands']),
+                'recorded_stream_files': len(stream_names), 'admitted_sources': 0, 'additional_quota_examples': 0,
+                **value['qualification']}
+    except (ValueError, OSError, TypeError, KeyError, IndexError, RecursionError, RuntimeError, subprocess.SubprocessError):
+        raise ValueError('source cohort native packet rejected') from None
 
 
 def source_metadata(manifest):
@@ -2638,7 +3012,7 @@ def draft_readiness(manifest, root=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check", "ground-truth-candidate-check", "ground-truth-check", "retained-ground-truth-check", "source-cohort-check", "platform-recipes-check", "platform-source-labels-check"))
+    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check", "ground-truth-candidate-check", "ground-truth-check", "retained-ground-truth-check", "source-cohort-check", "cohort-native-check", "platform-recipes-check", "platform-source-labels-check"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--historical-sources", type=Path, default=Path(
         "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S04-U001/corpus-diagnostic-comparison"))
@@ -2646,6 +3020,7 @@ def main():
     parser.add_argument('--candidate', help='explicit repository-relative source-candidate record; source-candidate-check only')
     parser.add_argument('--ground-truth', help='explicit retained label record; ground-truth-candidate-check only')
     parser.add_argument('--cohort', help='explicit repository-relative source preparation shard; source-cohort-check only')
+    parser.add_argument('--cohort-evidence', help='explicit repository-relative compiler packet; cohort-native-check only')
     parser.add_argument("--external-root", type=Path, help="explicit external snapshot root (absolute canonical path)")
     parser.add_argument("--evidence-root", type=Path, help="explicit external license-reference directory")
     args = parser.parse_args()
@@ -2656,10 +3031,17 @@ def main():
                 'ground-truth selector is only valid for ground-truth-candidate-check')
         require(args.command == 'source-cohort-check' or args.cohort is None,
                 'cohort selector is only valid for source-cohort-check')
+        require(args.command == 'cohort-native-check' or args.cohort_evidence is None,
+                'cohort evidence selector is only valid for cohort-native-check')
         if args.command == "selection-check":
             require(args.binding is None and args.evidence_root is None and args.external_root is None,
                     "reviewed selection uses its explicit tracked roots")
-        if args.command == 'source-cohort-check':
+        if args.command == 'cohort-native-check':
+            require(args.cohort_evidence is not None and args.binding is None and args.evidence_root is None
+                    and args.external_root is None and args.historical_sources == parser.get_default('historical_sources'),
+                    'cohort native packet uses its explicit linked inputs')
+            result = verify_cohort_native(args.root, args.cohort_evidence)
+        elif args.command == 'source-cohort-check':
             require(args.cohort is not None and args.binding is None and args.evidence_root is None
                     and args.external_root is None, 'source cohort uses its explicit linked inputs')
             result = verify_source_cohort(args.root, args.cohort)
