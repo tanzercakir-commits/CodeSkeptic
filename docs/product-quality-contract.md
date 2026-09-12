@@ -658,3 +658,38 @@ packet digest'ini, seçili model byte'larını ve gerçek producer Git blobları
 doğrular. Hiçbiri kayıt içindeki native yolları açmaz, library yüklemez veya argv'yi
 çalıştırmaz. `OBSERVED_UNADJUDICATED` adı native model kabulü değildir; bütün
 native/task/product qualification bayrakları false, qualified coverage sıfır kalır.
+
+### Açık seçilen POSIX görünürlük gözlemi — ayrı v2
+
+`capture-declarations --declaration-profile c17-posix2008/v1` yalnız Linux/Darwin
+için ayrı `codeskeptic-native-declarations/v2` packet üretir. Bayrak verilmezse
+eski v1 şeması, makrosuz kaynak ve komut davranışı korunur. Windows veya bilinmeyen
+profil native yakalamadan önce reddedilir. Darwin seçilebilir olması o SDK'da
+gerçek çalışma/başarı kanıtı değildir; her platformun taze native gözlemi gerekir.
+
+Bu önceden tanımlı profil sabit C17 kaynağın başına, bütün header'lardan önce yalnız
+`#define _POSIX_C_SOURCE 200809L` ekler. Açık descriptor'ın id/language/feature_macros
+alanları, üretilmiş kaynak byte/hash'i ve child yapılandırması birbirine bağlanır.
+Ek kullanıcı makrosu, flag, kaynak veya GNU dil modu kabul edilmez. Descriptor
+modelin source/sink davranışına kabul değildir; model pinleri ve 50+3 yükümlülük
+değişmez. v2 kayıt v1 diye yeniden etiketlenemez; alanları silmek de prefixed
+kaynağın eski kaynak hash denetimini geçirmesini sağlamaz.
+
+Aynı seçili driver/target/resource/SDK ile sabit `-dM -E` komutu çalışır; başarılı
+önişlemenin tam bounded stdout/stderr/argv/exit kaydı packet'te tutulur. Saf okuyucu
+dokuz seçili makroyu bu metinden yeniden çıkarır; eksik makro null, boş replacement
+boş string'dir. Function-like/boş/ilgisiz makroların replacement'ları yürütülmez.
+Tekrarlı veya function-like seçili tanım, yanlış projection/komut, bozuk UTF-8 ve
+boyut sınırı ihlalleri kabul edilmez. Driver'ın makro çıktısı bağımsız CIndex
+parser'ının built-in/preprocessing eşdeğerliği kanıtı değildir; gerçek bildirim,
+header closure ve syntax/CIndex hata denetimleri ayrıca korunur.
+
+Başarısız sonraki önişleme önceki syntax RED'i silmez: ayrı failure türü, exit ve
+gerçekte gözlenen stream byte/hash'leri kalır; bu hash'ler tutulmayan tam failure
+metninin elde olduğu iddiası değildir. Başarıda tam metin, başarısızlıkta failure
+kaydı birbirini dışlar. PREPROCESSOR_FAILED veya gerekli POSIX/C17 makroları
+gözlenmediyse VISIBILITY_NOT_OBSERVED bütün istekleri INCOMPLETE tutar. Birleşik
+backend/önişleme hatası aynı issue'yu her isteğe yalnız bir kez ekler. Bağımsız
+source/header/library identity hataları fatal kalır. Timeout/çıktı sayımı yine
+hard RSS/streaming-memory/descendant bütçesi değildir. Saf ve source-bound
+okuyucular native yol/komut çalıştırmaz; bütün yeterlilik bayrakları false kalır.

@@ -2219,3 +2219,47 @@ sınırını aşan sürüm reddedilir; altı focused testin GREEN capture SHA-25
 Yeni Unicode writer testiyle sentetik POSIX orchestration testleri dört oldu;
 Windows native capture yapılmış sayılmaz. R2 sonrası temiz exact-head review
 ayrıca gereklidir; önceki iki BLOCKED kaydı değişmez, U003/POP hâlâ açık kalır.
+
+### Açık POSIX görünürlük profili — ayrı üretim adayı
+
+`1168a717d5116b1fcab3ef732ccf67e8237c82b1` önceki R1/R2 düzeltmeleri için gerçek
+PASS_IMPLEMENTATION_ONLY aldı; 426 yerel testin bağımsız inceleme receipt SHA'sı
+`487894db181f4b10327fa052785845500b25ef38fa145465cbf5943161ace9b2`.
+Bu, yeni POSIX profilinin önceden verilmiş onayı değildir. Aynı head'in FIFO/CI/
+Windows workflow'ları completed/success, identity run34715529749 completed/failure
+oldu. Ham identity paketinin bağımsız review SHA'sı
+`1fa98657fe4c9080b4747716db8bf0970e519a1f8affcf5988fcbf98ea434152`.
+Windows'un özgün OS metadata sorgusu30s timeout verdi; native-case artifact eksik.
+Sonraki başarılı staged diagnostic eski failure'ı düzeltmez veya iç kök nedenini
+kanıtlamaz. Bu workflow yeni declaration/CIndex komutunu çalıştırmıyordu.
+
+Ayrı önceden dondurulmuş Linux deneyinde özgün C17, açık POSIX2008 prefix'i ve
+yanlış getenv imzası karşılaştırıldı. İlk yardımcı incelemesinin stream/hash ve
+cross-case header tutarlılığı bulguları uygulamadan önce ayrı sürümde düzeltildi;
+eski taslak/inceleme korunur. Reviewed PLAN SHA
+`94fba29fea5c89a14ead5a952336cf4aa537ba4144f914fa3350c2db180b3c6b`, gerçek observation
+SHA `16fdf5c9197130be512d0e47ed5e35ab3add27a1b527205e190f1be1b25d115f`.
+Özgün C17 syntax RED ve popen/openat eksiklerini korudu; POSIX varyantı14 isteği
+issue-free OBSERVED_UNADJUDICATED gözledi; yanlış imza bir driver/CIndex error ve
+getenv SIGNATURE_MISMATCH/SYNTAX_FAILED verdi. Bağımsız post-observation review
+SHA `d9177beb560d1cc397302b74d56537560cb43a679e29d99762beea3cf958cb82`, verdict
+OBSERVATIONS_VERIFIED_NOT_QUALIFIED. Denetçi native deneyi yeniden çalıştırmadı;
+ham komut/stream, güncel byte kimlikleri, gerçek header konumları ve saf sonuç
+kontrollerini inceledi. Bu packet üretim v1/v2 veya Darwin/Windows kanıtı değildir.
+
+Yeni eklemeli aday açık `c17-posix2008/v1` seçimini, ayrı v2 descriptor/source/
+child bağlarını, bounded tam başarılı makro çıktısını ve başarısızlık retention'ını
+uygular. Eski default v1 kaynak byte'ları üç platform için bağımsız exact1168
+hash'leriyle korunur. Yeni kabul testleri eski implementation'da beklenen şekilde
+başarısızdı: capture SHA
+`cf44f95da08e65f6aafa58490b1560442e6be0d92248736dbef69c6841eda274`.
+Bu yeni profilin henüz bulunmamasıdır, eski v1 davranışını sonradan bug saymak değildir.
+
+Uygulama adayında birleşik backend/önişleme failure'ı ortak issue listesini tekrar
+ekleyebiliyordu. Dar regresyon bunu RED gösterdi (capture SHA
+`765cc58e9d5a172e4b2a088533635e4e6284ab4085da4a8a6a497bc3439da208`); her istek için
+ayrı sonuç listesi düzeltmesi GREEN verdi (SHA
+`bc0e58db913b4be9a7f8cf5dfe46cb52ec1152fcdeb1555d4014fa4d55c82bbf`).
+Temiz exact-head native CLI yakalaması ve bağımsız uygulama review'u ayrıca
+gereklidir; bu aday paragrafı onları olmuş saymaz. U003, selection2/1020, LLVM HOLD,
+model/rights/admission ve Windows failure kapıları değişmez; POP yapılmaz.

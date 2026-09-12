@@ -1255,6 +1255,9 @@ def capture_windows_context(args):
 
 DECLARATION_PLATFORM = {'Linux': 'linux-x86_64', 'Windows': 'windows-x64', 'Darwin': 'macos-arm64'}
 DECLARATION_PRODUCERS = ('scripts/product_profiles.py',)
+POSIX_DECLARATION_PROFILE = 'c17-posix2008/v1'
+DECLARATION_MACROS = ('__STRICT_ANSI__', '_POSIX_C_SOURCE', '_POSIX_SOURCE', '_ATFILE_SOURCE',
+                      '__USE_POSIX', '__USE_POSIX2', '__USE_ATFILE', '__USE_MISC', '__USE_XOPEN2K8')
 DECLARATION_TYPES = {'Void', 'Bool', 'Char_S', 'Char_U', 'SChar', 'UChar', 'Short', 'UShort',
                      'Int', 'UInt', 'Long', 'ULong', 'LongLong', 'ULongLong', 'Float', 'Double', 'LongDouble'}
 
@@ -1276,11 +1279,23 @@ def declaration_coverage(model):
             'qualified_library_pairs': 0, 'qualified_entry_pairs': 0}
 
 
-def declaration_source(model, system):
+def declaration_profile(profile, system):
+    require(system in DECLARATION_PLATFORM, 'declaration profile platform')
+    if profile is None:
+        return None
+    require(profile == POSIX_DECLARATION_PROFILE and system in ('Linux', 'Darwin'),
+            'unsupported declaration visibility profile/platform')
+    return {'id': POSIX_DECLARATION_PROFILE, 'language': 'c17',
+            'feature_macros': {'_POSIX_C_SOURCE': '200809L'}}
+
+
+def declaration_source(model, system, profile=None):
+    selected = declaration_profile(profile, system)
     rows = declaration_requests(model, system)
     headers = (['winsock2.h', 'io.h', 'fcntl.h'] if system == 'Windows'
                else ['sys/types.h', 'sys/socket.h', 'unistd.h', 'fcntl.h']) + ['stdio.h', 'stdlib.h']
-    lines = ['#include <' + header + '>' for header in headers]
+    lines = (['#define _POSIX_C_SOURCE 200809L'] if selected is not None else [])
+    lines += ['#include <' + header + '>' for header in headers]
     for row in rows:
         symbol, signature = row['symbol'], row['signature']
         parameters = signature['parameters'] + (['...'] if signature['variadic'] else [])
@@ -1557,11 +1572,100 @@ def declaration_streams(command):
                for key in ('stdout', 'stderr')}}
 
 
+def declaration_preprocessor_command(compiler, system, metadata, source):
+    argv = declaration_command(compiler, system, metadata, source)
+    return argv[:-2] + ['-dM', '-E', source]
+
+
+def declaration_macro_projection(stdout):
+    require(type(stdout) is str and len(stdout.encode('utf-8')) <= MAX_OUTPUT and '\x00' not in stdout,
+            'declaration macro output')
+    selected, seen = dict.fromkeys(DECLARATION_MACROS), set()
+    for line in stdout.splitlines():
+        if not line.strip():
+            continue
+        match = re.fullmatch(r'#define ([A-Za-z_][A-Za-z_0-9]*)(.*)', line)
+        require(match is not None, 'declaration macro definition')
+        name, suffix = match.groups()
+        require(not suffix or suffix[0].isspace() or suffix[0] == '(', 'declaration macro separator')
+        if name in selected:
+            require(name not in seen and not suffix.startswith('('), 'ambiguous selected declaration macro')
+            seen.add(name)
+            selected[name] = suffix.strip()
+    return selected
+
+
+def capture_declaration_preprocessor(argv):
+    """Later preprocessing failure is retained separately from earlier syntax RED."""
+    failure = None
+    try:
+        result = subprocess.run(argv, env=checked_environment(os.environ), capture_output=True, timeout=30, check=False)
+        stdout, stderr, code = result.stdout, result.stderr, result.returncode
+        if len(stdout) > MAX_OUTPUT or len(stderr) > MAX_OUTPUT:
+            failure = 'OUTPUT_LIMIT'
+        elif code != 0:
+            failure = 'PROCESS_FAILED'
+        else:
+            try:
+                command = {'argv': list(argv), 'exit_code': code,
+                           'stdout': stdout.decode('utf-8'), 'stderr': stderr.decode('utf-8')}
+                validate_command(command)
+                require(not command['stderr'], 'declaration macro diagnostics')
+                selected = declaration_macro_projection(command['stdout'])
+                return {'argv': list(argv), 'command': command, 'failure': None, 'selected_macros': selected}
+            except (ValueError, TypeError, KeyError):
+                failure = 'INVALID_RESULT'
+    except subprocess.TimeoutExpired as error:
+        failure, stdout, stderr, code = 'TIMEOUT', error.stdout or b'', error.stderr or b'', None
+    except OSError:
+        failure, stdout, stderr, code = 'START_FAILED', b'', b'', None
+    return {'argv': list(argv), 'command': None, 'selected_macros': None,
+            'failure': {'kind': failure, 'exit_code': code,
+                        **{key: {'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}
+                           for key, raw in (('stdout', stdout), ('stderr', stderr))}}}
+
+
+def validate_declaration_preprocessor(value, argv):
+    fields(value, 'argv command failure selected_macros', 'declaration preprocessor')
+    require(value['argv'] == argv, 'declaration preprocessor command identity')
+    failure = value['failure']
+    if failure is not None:
+        require(value['command'] is None and value['selected_macros'] is None, 'failed declaration preprocessing')
+        fields(failure, 'kind exit_code stdout stderr', 'declaration preprocessor failure')
+        kind, code = failure['kind'], failure['exit_code']
+        require(kind in ('TIMEOUT', 'START_FAILED', 'PROCESS_FAILED', 'OUTPUT_LIMIT', 'INVALID_RESULT')
+                and (code is None or type(code) is int)
+                and (code is None) == (kind in ('TIMEOUT', 'START_FAILED'))
+                and (kind != 'PROCESS_FAILED' or code != 0)
+                and (kind != 'INVALID_RESULT' or code == 0), 'declaration preprocessor failure outcome')
+        for key in ('stdout', 'stderr'):
+            item = failure[key]
+            fields(item, 'bytes sha256', 'declaration preprocessor stream')
+            require(type(item['bytes']) is int and item['bytes'] >= 0 and digest(item['sha256'])
+                    and (item['bytes'] != 0 or item['sha256'] == hashlib.sha256(b'').hexdigest()),
+                    'declaration preprocessor stream identity')
+        require(kind != 'START_FAILED' or all(failure[key]['bytes'] == 0 for key in ('stdout', 'stderr')),
+                'declaration preprocessor startup streams')
+        require(kind != 'OUTPUT_LIMIT' or any(failure[key]['bytes'] > MAX_OUTPUT for key in ('stdout', 'stderr')),
+                'declaration preprocessor output limit')
+        return ['PREPROCESSOR_FAILED']
+    command = value['command']
+    validate_command(command)
+    require(command['argv'] == argv and command['stderr'] == '', 'declaration preprocessor observed command')
+    selected = declaration_macro_projection(command['stdout'])
+    require(value['selected_macros'] == selected, 'declaration macro projection mismatch')
+    return ([] if selected['_POSIX_C_SOURCE'] == '200809L' and selected['__STRICT_ANSI__'] == '1'
+            else ['VISIBILITY_NOT_OBSERVED'])
+
+
 def validate_declaration_document(value, model, model_sha256):
     """Pure consistency checking. Never opens native paths, loads a library or runs argv."""
+    require(type(value) is dict, 'declaration observation object')
+    version2 = value.get('schema') == 'codeskeptic-native-declarations/v2'
     fields(value, 'schema native_identity environment producer_files library probe metadata_only '
-           'native_qualified task_ready product_qualified', 'declaration observation')
-    require(value['schema'] == 'codeskeptic-native-declarations/v1' and value['metadata_only'] is True
+           'native_qualified task_ready product_qualified' + (' profile' if version2 else ''), 'declaration observation')
+    require(value['schema'] in ('codeskeptic-native-declarations/v1', 'codeskeptic-native-declarations/v2')
+            and value['metadata_only'] is True
             and all(value[key] is False for key in ('native_qualified', 'task_ready', 'product_qualified')),
             'declaration observation cannot claim qualification')
     native = value['native_identity']
@@ -1571,14 +1675,21 @@ def validate_declaration_document(value, model, model_sha256):
     fields(value['producer_files'], ' '.join(DECLARATION_PRODUCERS), 'declaration producers')
     require(all(digest(sha) for sha in value['producer_files'].values()), 'declaration producer digest')
     system = native['platform']['system']
+    profile = None
+    if version2:
+        fields(value['profile'], 'id language feature_macros', 'declaration profile')
+        profile = value['profile']['id']
+        require(profile is not None and value['profile'] == declaration_profile(profile, system),
+                'declaration profile descriptor')
     flavor = 'windows' if system == 'Windows' else 'posix'
     path_type = PureWindowsPath if flavor == 'windows' else PurePosixPath
     validate_file(value['library'], flavor)
     require(value['library']['path'] == value['library']['resolved_path'], 'physical declaration library')
     probe = value['probe']
-    fields(probe, 'input dependency headers syntax cindex backend_failure', 'declaration probe')
+    fields(probe, 'input dependency headers syntax cindex backend_failure' + (' preprocessor' if version2 else ''),
+           'declaration probe')
     validate_file(probe['input'], flavor)
-    source = declaration_source(model, system).encode('utf-8')
+    source = declaration_source(model, system, profile).encode('utf-8')
     require(probe['input']['sha256'] == hashlib.sha256(source).hexdigest()
             and probe['input']['bytes'] == len(source), 'declaration fixed source mismatch')
     input_path = probe['input']['path']
@@ -1617,6 +1728,8 @@ def validate_declaration_document(value, model, model_sha256):
                 and (item['bytes'] != 0 or item['sha256'] == hashlib.sha256(b'').hexdigest()),
                 'declaration stream identity')
     require(syntax['stdout']['bytes'] == 0, 'syntax-only declaration stdout')
+    visibility_issues = (validate_declaration_preprocessor(probe['preprocessor'],
+                         declaration_preprocessor_command(compiler, system, metadata, input_path)) if version2 else [])
     observed = probe['cindex']
     failure = probe['backend_failure']
     if failure is not None:
@@ -1630,11 +1743,20 @@ def validate_declaration_document(value, model, model_sha256):
             require(type(failure[key]['bytes']) is int and failure[key]['bytes'] >= 0
                     and digest(failure[key]['sha256']), 'declaration backend stream values')
         issues = ['BACKEND_FAILED'] + (['SYNTAX_FAILED'] if syntax['exit_code'] else [])
-        return {'metadata_only': True, 'syntax_pass': False, 'requests': [
+        result = {'metadata_only': True, 'syntax_pass': False, 'requests': [
                     {'id': row['id'], 'issues': issues, 'state': 'INCOMPLETE'} for row in declaration_requests(model, system)],
                 'coverage': declaration_coverage(model), 'local_native_bytes_verified': False,
                 'native_qualified': False, 'task_ready': False, 'product_qualified': False}
-    return validate_declaration_observation(observed, model, native, probe)
+    else:
+        result = validate_declaration_observation(observed, model, native, probe)
+    if version2:
+        result.update(profile_id=profile, visibility_pass=not visibility_issues)
+        if visibility_issues:
+            result['syntax_pass'] = False
+            for row in result['requests']:
+                row['issues'] = row['issues'] + visibility_issues
+                row['state'] = 'INCOMPLETE'
+    return result
 
 
 def validate_declaration_observation(observed, model, native, probe):
@@ -1811,7 +1933,15 @@ def validate_declaration_observation(observed, model, native, probe):
 
 def declaration_worker(config):
     """Private child input is fixed-source metadata, never arbitrary source/flags."""
-    fields(config, 'native_identity environment library input', 'declaration worker')
+    require(type(config) is dict, 'declaration worker object')
+    selected = 'profile' in config
+    fields(config, 'native_identity environment library input' + (' profile' if selected else ''), 'declaration worker')
+    profile = None
+    if selected:
+        fields(config['profile'], 'id language feature_macros', 'declaration worker profile')
+        profile = config['profile']['id']
+        require(profile is not None and config['profile'] == declaration_profile(profile, platform.system()),
+                'declaration worker profile descriptor')
     native, environment = config['native_identity'], config['environment']
     validate_case_selection(native, environment)
     require(environment == case_environment(os.environ, platform.system())
@@ -1820,7 +1950,7 @@ def declaration_worker(config):
     require(source_identity(root, native['source']['head']) == native['source'], 'declaration worker source')
     model, sha = declaration_model(root)
     require(sha == native['source']['api_models_sha256'], 'declaration worker model')
-    source = declaration_source(model, platform.system()).encode('utf-8')
+    source = declaration_source(model, platform.system(), profile).encode('utf-8')
     input_, library = config['input'], config['library']
     require(file_identity(Path(input_['path'])) == input_ and input_['bytes'] == len(source)
             and input_['sha256'] == hashlib.sha256(source).hexdigest(), 'declaration worker fixed input')
@@ -1865,6 +1995,7 @@ def run_declaration_worker(config, validate_result):
 
 
 def capture_declarations(args):
+    profile = declaration_profile(getattr(args, 'declaration_profile', None), platform.system())
     root = args.root.resolve(strict=True)
     environment = case_environment(os.environ, platform.system())
     with selected_case_environment(environment):
@@ -1884,7 +2015,7 @@ def capture_declarations(args):
         with tempfile.TemporaryDirectory(prefix='codeskeptic-declarations-', dir=args.output.parent) as directory:
             path = Path(directory).resolve(strict=True) / 'declarations.c'
             with path.open('x', encoding='utf-8', newline='\n') as stream:
-                stream.write(declaration_source(model, system))
+                stream.write(declaration_source(model, system, None if profile is None else profile['id']))
             input_ = file_identity(path)
             dependency = run(declaration_command(compiler, system, native['platform']['metadata'], str(path), True))
             headers, total = [], 0
@@ -1899,6 +2030,11 @@ def capture_declarations(args):
                      'probe': {'input': input_, 'dependency': dependency, 'headers': headers, 'syntax': syntax,
                                'cindex': None, 'backend_failure': None},
                      'metadata_only': True, 'native_qualified': False, 'task_ready': False, 'product_qualified': False}
+            if profile is not None:
+                config['profile'] = profile
+                value.update(schema='codeskeptic-native-declarations/v2', profile=profile)
+                value['probe']['preprocessor'] = capture_declaration_preprocessor(
+                    declaration_preprocessor_command(compiler, system, native['platform']['metadata'], str(path)))
             observed, failure = run_declaration_worker(config, lambda observed:
                 validate_declaration_observation(observed, model, native, value['probe']))
             value['probe'].update(cindex=observed, backend_failure=failure)
@@ -1953,6 +2089,8 @@ def main(argv=None):
     declarations.add_argument('--root', type=Path, required=True)
     declarations.add_argument('--source-sha', required=True)
     declarations.add_argument('--libclang', type=Path, required=True)
+    declarations.add_argument('--declaration-profile', choices=(POSIX_DECLARATION_PROFILE,),
+                              help='explicit separate POSIX visibility v2 observation; default preserves legacy v1')
     declarations.add_argument('--output', type=Path, required=True)
     for role in TOOL_ROLES:
         declarations.add_argument('--' + role, type=Path, required=True)

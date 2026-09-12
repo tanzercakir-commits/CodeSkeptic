@@ -1670,7 +1670,8 @@ class DeclarationTests(unittest.TestCase):
                 self.assertEqual(failure['stdout'], {'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
 
     @contextmanager
-    def mocked_declaration_capture(self, output, worker_stdout, changed=None, after_serialization=None):
+    def mocked_declaration_capture(self, output, worker_stdout, changed=None, after_serialization=None,
+                                   syntax_exit=1, preprocessor_response=None):
         """Real capture/writer orchestration; synthetic native I/O, never native execution."""
         value, sha = self.packet()
         native = value['native_identity']
@@ -1701,12 +1702,22 @@ class DeclarationTests(unittest.TestCase):
                 escaped = escaped.replace('#', '\\#').replace('$', '$$')
                 return {'argv': argv, 'exit_code': 0,
                         'stdout': 'identity-probe: ' + escaped + ' /sdk/stdlib.h\n', 'stderr': ''}
-            return {'argv': argv, 'exit_code': 1, 'stdout': '', 'stderr': 'earlier syntax RED'}
+            return {'argv': argv, 'exit_code': syntax_exit, 'stdout': '',
+                    'stderr': 'earlier syntax RED' if syntax_exit else ''}
 
         def worker(*args, **kwargs):
             nonlocal worker_finished
+            if '-dM' in args[0]:
+                self.assertEqual(args[0], identity.declaration_preprocessor_command(
+                    native['tools']['clang'], 'Linux', native['platform']['metadata'], args[0][-1]))
+                emitted['preprocessor_argv'] = args[0]
+                if isinstance(preprocessor_response, BaseException):
+                    raise preprocessor_response
+                return (preprocessor_response if preprocessor_response is not None else SimpleNamespace(
+                    returncode=0, stdout=b'#define _POSIX_C_SOURCE 200809L\n#define __STRICT_ANSI__ 1\n', stderr=b''))
             worker_finished = True
-            path = json.loads(kwargs['input'])['input']['path']
+            emitted['config'] = json.loads(kwargs['input'])
+            path = emitted['config']['input']['path']
             emitted['stdout'] = worker_stdout.replace(json.dumps('/probe/declarations.c').encode(), json.dumps(path).encode())
             observed = json.loads(emitted['stdout'])
             if (type(observed) is dict and type(observed.get('inclusions')) is list
@@ -1883,6 +1894,298 @@ class DeclarationTests(unittest.TestCase):
         self.assertEqual(identity.declaration_type_key(left), identity.declaration_type_key(right))
         right['detail']['pointee']['canonical_qualifiers']['const'] = False
         self.assertNotEqual(identity.declaration_type_key(left), identity.declaration_type_key(right))
+
+
+class PosixDeclarationProfileTests(unittest.TestCase):
+    PROFILE = 'c17-posix2008/v1'
+    PREFIX = '#define _POSIX_C_SOURCE 200809L\n'
+    MACROS = ('__STRICT_ANSI__', '_POSIX_C_SOURCE', '_POSIX_SOURCE', '_ATFILE_SOURCE',
+              '__USE_POSIX', '__USE_POSIX2', '__USE_ATFILE', '__USE_MISC', '__USE_XOPEN2K8')
+
+    def setUp(self):
+        self.legacy = DeclarationTests()
+        self.legacy.setUp()
+        self.model = self.legacy.model
+
+    def packet(self):
+        value, sha, row = self.legacy.populated()
+        value['schema'] = 'codeskeptic-native-declarations/v2'
+        value['profile'] = {'id': self.PROFILE, 'language': 'c17',
+                            'feature_macros': {'_POSIX_C_SOURCE': '200809L'}}
+        source = (self.PREFIX + identity.declaration_source(self.model, 'Linux')).encode()
+        value['probe']['input'].update(bytes=len(source), sha256=hashlib.sha256(source).hexdigest())
+        argv = value['probe']['syntax']['argv'][:-2] + ['-dM', '-E', value['probe']['input']['path']]
+        selected = dict.fromkeys(self.MACROS)
+        selected.update(__STRICT_ANSI__='1', _POSIX_C_SOURCE='200809L')
+        value['probe']['preprocessor'] = {
+            'argv': argv, 'failure': None, 'selected_macros': selected,
+            'command': {'argv': argv, 'exit_code': 0, 'stderr': '',
+                        'stdout': '#define __STRICT_ANSI__ 1\n#define _POSIX_C_SOURCE 200809L\n'}}
+        return value, sha
+
+    def check(self, value, sha):
+        return identity.validate_declaration_document(value, self.model, sha)
+
+    def test_explicit_profile_source_and_platform_contract(self):
+        for system in ('Linux', 'Darwin'):
+            old = identity.declaration_source(self.model, system)
+            self.assertEqual(identity.declaration_source(self.model, system, self.PROFILE), self.PREFIX + old)
+            self.assertNotIn('#define', old)
+        for system, profile in (('Windows', self.PROFILE), ('Linux', 'unknown'), ('Linux', ''), ('Other', self.PROFILE)):
+            with self.subTest(system=system, profile=profile), self.assertRaises(ValueError):
+                identity.declaration_source(self.model, system, profile)
+
+    def test_legacy_source_bytes_match_independent_exact_1168_snapshots(self):
+        for system, count, sha in (
+                ('Linux', 3013, '12b406293cf60e286a05925676d2f67a00343a324ff1818a39cf6718913801f0'),
+                ('Darwin', 3013, '12b406293cf60e286a05925676d2f67a00343a324ff1818a39cf6718913801f0'),
+                ('Windows', 2795, 'e9ea1cc82cebc69878c5e8fb4a44b46c459647b58af755e3dd2f982bf5bf378e')):
+            raw = identity.declaration_source(self.model, system).encode()
+            self.assertEqual((len(raw), hashlib.sha256(raw).hexdigest()), (count, sha))
+        value, sha = self.legacy.packet()
+        self.assertEqual(value['schema'], 'codeskeptic-native-declarations/v1')
+        self.assertNotIn('profile', value)
+        self.assertNotIn('preprocessor', value['probe'])
+        self.assertNotIn('visibility_pass', self.check(value, sha))
+
+    def test_darwin_preprocessing_preserves_selected_sdk_and_c17_command(self):
+        compiler = {'file': {'resolved_path': '/usr/bin/clang'}, 'resource_dir': '/clt/lib/clang/20',
+                    'target': 'arm64-apple-darwin24.0.0'}
+        self.assertEqual(identity.declaration_preprocessor_command(compiler, 'Darwin',
+                         {'sdk_root': '/clt/SDKs/MacOSX.sdk'}, '/probe/declarations.c'),
+                         ['/usr/bin/clang', '--no-default-config', '-fno-modules', '-resource-dir',
+                          '/clt/lib/clang/20', '-x', 'c', '-std=c17', '--target=arm64-apple-darwin24.0.0',
+                          '-isysroot', '/clt/SDKs/MacOSX.sdk', '-dM', '-E', '/probe/declarations.c'])
+
+    def test_v2_pure_reader_preserves_missing_references_and_zero_qualification(self):
+        value, sha = self.packet()
+        with (mock.patch.object(identity.subprocess, 'run', side_effect=AssertionError('execution')),
+              mock.patch.object(identity, 'file_identity', side_effect=AssertionError('native read')),
+              mock.patch.object(identity, 'declaration_backend', side_effect=AssertionError('native load'))):
+            result = self.check(value, sha)
+        self.assertTrue(result['visibility_pass'])
+        self.assertEqual(result['profile_id'], self.PROFILE)
+        self.assertEqual(result['requests'][0]['issues'], [])
+        self.assertIn('MISSING_REFERENCE', next(r['issues'] for r in result['requests'] if r['id'] == 'posix.popen'))
+        self.assertEqual(result['coverage'], {'required_library_pairs': 50, 'required_entry_pairs': 3,
+                                            'qualified_library_pairs': 0, 'qualified_entry_pairs': 0})
+        self.assertFalse(result['native_qualified'] or result['task_ready'] or result['product_qualified'])
+
+    def test_schema_profile_and_source_cross_bindings_reject_downgrades(self):
+        for mutation in ('schema', 'strip', 'profile', 'language', 'macro', 'source', 'projection', 'argv', 'extra'):
+            value, sha = self.packet()
+            if mutation == 'schema': value['schema'] = 'codeskeptic-native-declarations/v1'
+            elif mutation == 'strip':
+                value['schema'] = 'codeskeptic-native-declarations/v1'
+                del value['profile'], value['probe']['preprocessor']
+            elif mutation == 'profile': value['profile']['id'] = 'unknown'
+            elif mutation == 'language': value['profile']['language'] = 'gnu17'
+            elif mutation == 'macro': value['profile']['feature_macros']['_GNU_SOURCE'] = '1'
+            elif mutation == 'source': value['probe']['input']['sha256'] = 'a' * 64
+            elif mutation == 'projection': value['probe']['preprocessor']['selected_macros']['__USE_MISC'] = '1'
+            elif mutation == 'argv': value['probe']['preprocessor']['argv'].insert(1, '-D_GNU_SOURCE')
+            else: value['probe']['preprocessor']['extra'] = True
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                self.check(value, sha)
+
+    def test_projection_is_recomputed_and_missing_visibility_is_a_gap(self):
+        value, sha = self.packet()
+        probe = value['probe']['preprocessor']
+        probe['command']['stdout'] = '#define EMPTY\n#define FN(x) ((x) + 1)\n#define __STRICT_ANSI__ 1\n'
+        probe['selected_macros']['_POSIX_C_SOURCE'] = None
+        result = self.check(value, sha)
+        self.assertFalse(result['visibility_pass'])
+        self.assertFalse(result['syntax_pass'])
+        self.assertTrue(all('VISIBILITY_NOT_OBSERVED' in r['issues'] and r['state'] == 'INCOMPLETE'
+                            for r in result['requests']))
+
+    def test_projection_rejects_ambiguous_selected_definitions_and_invalid_utf8(self):
+        for suffix in ('#define _POSIX_C_SOURCE 1\n', '#define __STRICT_ANSI__(x) x\n', '\udcff', 'not a macro\n'):
+            value, sha = self.packet()
+            value['probe']['preprocessor']['command']['stdout'] += suffix
+            with self.subTest(suffix=repr(suffix)), self.assertRaises(ValueError):
+                self.check(value, sha)
+
+    def test_later_preprocessor_timeout_retains_prior_syntax_red(self):
+        value, sha = self.packet()
+        probe = value['probe']['preprocessor']
+        empty = {'bytes': 0, 'sha256': hashlib.sha256(b'').hexdigest()}
+        probe.update(command=None, selected_macros=None,
+                     failure={'kind': 'TIMEOUT', 'exit_code': None, 'stdout': empty, 'stderr': copy.deepcopy(empty)})
+        value['probe']['syntax']['exit_code'] = 1
+        result = self.check(value, sha)
+        self.assertFalse(result['visibility_pass'])
+        self.assertTrue(all('PREPROCESSOR_FAILED' in r['issues'] and 'SYNTAX_FAILED' in r['issues']
+                            for r in result['requests']))
+
+    def test_unsupported_platform_rejected_before_native_capture(self):
+        args = SimpleNamespace(declaration_profile=self.PROFILE)
+        with (mock.patch.object(identity.platform, 'system', return_value='Windows'),
+              mock.patch.object(identity, 'capture', side_effect=AssertionError('native capture')),
+              mock.patch.object(identity, 'file_identity', side_effect=AssertionError('native read')),
+              self.assertRaises(ValueError)):
+            identity.capture_declarations(args)
+
+    def test_preprocessor_capture_has_fixed_failure_and_projection_outcomes(self):
+        argv = ['/clang', '-dM', '-E', '/input.c']
+        valid = b'#define _POSIX_C_SOURCE 200809L\n#define __STRICT_ANSI__ 1\n'
+        cases = [(SimpleNamespace(returncode=0, stdout=valid, stderr=b''), None),
+                 (SimpleNamespace(returncode=0, stdout=b'\xff', stderr=b''), 'INVALID_RESULT'),
+                 (SimpleNamespace(returncode=0, stdout=valid, stderr=b'warning'), 'INVALID_RESULT'),
+                 (SimpleNamespace(returncode=0, stdout=b'#define _POSIX_C_SOURCE(x) x\n', stderr=b''), 'INVALID_RESULT'),
+                 (SimpleNamespace(returncode=1, stdout=b'partial', stderr=b'error'), 'PROCESS_FAILED'),
+                 (SimpleNamespace(returncode=0, stdout=b'x' * (identity.MAX_OUTPUT + 1), stderr=b''), 'OUTPUT_LIMIT'),
+                 (subprocess.TimeoutExpired(argv, 30, output=b'partial'), 'TIMEOUT'),
+                 (OSError('not started'), 'START_FAILED')]
+        for returned, expected in cases:
+            options = {'side_effect': returned} if isinstance(returned, BaseException) else {'return_value': returned}
+            with self.subTest(expected=expected), mock.patch.object(identity.subprocess, 'run', **options) as run:
+                result = identity.capture_declaration_preprocessor(argv)
+            self.assertEqual(run.call_args.args[0], argv)
+            self.assertEqual(run.call_args.kwargs['timeout'], 30)
+            self.assertEqual(identity.validate_declaration_preprocessor(result, argv),
+                             [] if expected is None else ['PREPROCESSOR_FAILED'])
+            if expected is None:
+                self.assertEqual(result['command']['stdout'].encode(), valid)
+            else:
+                self.assertIsNone(result['command'])
+                self.assertEqual(result['failure']['kind'], expected)
+
+    def test_preprocessor_forged_failure_shapes_are_rejected(self):
+        for mutation in ('exit', 'streams', 'missing', 'output', 'kind', 'projection'):
+            value, sha = self.packet()
+            preprocessor = value['probe']['preprocessor']
+            empty = {'bytes': 0, 'sha256': hashlib.sha256(b'').hexdigest()}
+            preprocessor.update(command=None, selected_macros=None, failure={
+                'kind': 'TIMEOUT', 'exit_code': None, 'stdout': empty, 'stderr': copy.deepcopy(empty)})
+            failure = preprocessor['failure']
+            if mutation == 'exit': failure['exit_code'] = 0
+            elif mutation == 'streams': failure['stdout']['sha256'] = 'a' * 64
+            elif mutation == 'missing': del failure['stderr']
+            elif mutation == 'output': failure.update(kind='OUTPUT_LIMIT', exit_code=0)
+            elif mutation == 'kind': failure['kind'] = 'SUCCESS'
+            else: preprocessor['selected_macros'] = {}
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                self.check(value, sha)
+
+    def test_combined_failures_add_each_visibility_issue_only_once_per_request(self):
+        value, sha = self.packet()
+        empty = {'bytes': 0, 'sha256': hashlib.sha256(b'').hexdigest()}
+        failure = {'kind': 'TIMEOUT', 'exit_code': None, 'stdout': empty, 'stderr': copy.deepcopy(empty)}
+        value['probe']['preprocessor'].update(command=None, selected_macros=None, failure=failure)
+        value['probe'].update(cindex=None, backend_failure=copy.deepcopy(failure))
+        value['probe']['syntax']['exit_code'] = 1
+        before = copy.deepcopy(value)
+        result = self.check(value, sha)
+        self.assertEqual(value, before)
+        self.assertEqual(len(result['requests']), 14)
+        for row in result['requests']:
+            self.assertEqual(row['issues'], ['BACKEND_FAILED', 'SYNTAX_FAILED', 'PREPROCESSOR_FAILED'])
+
+    def test_child_reconstructs_explicit_profile_before_backend_loading(self):
+        value, sha = self.packet()
+        config = {key: value[key] for key in ('native_identity', 'environment', 'library', 'profile')}
+        config['input'] = value['probe']['input']
+        native = config['native_identity']
+        files = {row['path']: row for row in (config['input'], config['library'])}
+        for mutation in (None, 'missing', 'unknown', 'extra', 'prefix', 'windows'):
+            candidate = copy.deepcopy(config)
+            if mutation == 'missing': del candidate['profile']
+            elif mutation == 'unknown': candidate['profile']['id'] = 'unknown'
+            elif mutation == 'extra': candidate['profile']['flags'] = []
+            elif mutation == 'prefix': candidate['input']['sha256'] = 'f' * 64
+            with (self.subTest(mutation=mutation),
+                  mock.patch.object(identity.platform, 'system', return_value='Windows' if mutation == 'windows' else 'Linux'),
+                  mock.patch.object(identity, 'case_environment', return_value=value['environment']),
+                  mock.patch.object(identity, 'source_identity', return_value=native['source']),
+                  mock.patch.object(identity, 'file_identity', side_effect=lambda path: files[str(path)]),
+                  mock.patch.object(identity, 'declaration_backend') as backend):
+                backend.return_value.observe.return_value = {'child': 'observed'}
+                if mutation is None:
+                    self.assertEqual(identity.declaration_worker(candidate), {'child': 'observed'})
+                    self.assertEqual(backend.return_value.observe.call_args.args[0], value['probe']['syntax']['argv'])
+                    self.assertEqual(len(backend.return_value.observe.call_args.args[1]), 14)
+                else:
+                    with self.assertRaises(ValueError):
+                        identity.declaration_worker(candidate)
+                    backend.assert_not_called()
+
+    @unittest.skipIf(sys.platform == 'win32', 'Synthetic Linux v2 writer requires POSIX paths; no Windows native claim.')
+    def test_explicit_v2_writer_propagates_profile_and_preserves_both_failures(self):
+        value, sha = self.packet()
+        raw = identity.canonical(value['probe']['cindex']).encode()
+        for syntax_exit, worker_raw, preprocess_failure in ((0, raw, None), (1, b'{}', None),
+                (1, raw, subprocess.TimeoutExpired(['/clang'], 30, output=b'partial'))):
+            with self.subTest(syntax_exit=syntax_exit, worker_valid=worker_raw == raw), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory).resolve() / 'observed.json'
+                with self.legacy.mocked_declaration_capture(output, worker_raw, syntax_exit=syntax_exit,
+                        preprocessor_response=preprocess_failure) as (argv, stderr, emitted):
+                    self.assertEqual(identity.main(argv + ['--declaration-profile', self.PROFILE]), 2 if syntax_exit else 0)
+                    self.assertEqual(stderr.getvalue(), '')
+                retained = json.loads(output.read_text())
+                self.assertEqual(retained['schema'], 'codeskeptic-native-declarations/v2')
+                self.assertEqual(emitted['config']['profile'], retained['profile'])
+                self.assertEqual(retained['probe']['preprocessor']['argv'], emitted['preprocessor_argv'])
+                self.assertEqual(retained['probe']['syntax']['exit_code'], syntax_exit)
+                self.assertEqual(self.check(retained, sha)['visibility_pass'], preprocess_failure is None)
+                if worker_raw == b'{}':
+                    self.assertEqual(retained['probe']['backend_failure']['kind'], 'INVALID_RESULT')
+
+    def test_public_cli_rejects_windows_and_unknown_profile_before_execution(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory).resolve() / 'not-written.json'
+            argv = ['capture-declarations', '--root', str(Path(directory).resolve()), '--source-sha', 'a' * 40,
+                    '--libclang', '/not-loaded', '--output', str(output)]
+            for role in identity.TOOL_ROLES:
+                argv += ['--' + role, '/not-executed']
+            with (mock.patch.object(identity.platform, 'system', return_value='Windows'),
+                  mock.patch.object(identity, 'capture', side_effect=AssertionError('capture')),
+                  mock.patch.object(identity.subprocess, 'run', side_effect=AssertionError('execution')),
+                  mock.patch('sys.stderr', new_callable=io.StringIO)):
+                self.assertEqual(identity.main(argv + ['--declaration-profile', self.PROFILE]), 2)
+                with self.assertRaises(SystemExit) as error:
+                    identity.main(argv + ['--declaration-profile', 'unknown'])
+                self.assertEqual(error.exception.code, 2)
+            self.assertFalse(output.exists())
+
+    def test_public_pure_reader_accepts_each_explicit_schema_and_rejects_cross_binding(self):
+        root = Path(identity.__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            packet = Path(directory).resolve() / 'metadata.json'
+            for value, _ in (self.legacy.packet(), self.packet()):
+                packet.write_text(identity.canonical(value), encoding='utf-8')
+                result = subprocess.run([sys.executable, '-B', identity.__file__, 'check-declarations', str(packet),
+                                         '--root', str(root)], capture_output=True, timeout=15)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertFalse(json.loads(result.stdout)['native_qualified'])
+            value['profile']['language'] = 'gnu17'
+            packet.write_text(identity.canonical(value), encoding='utf-8')
+            result = subprocess.run([sys.executable, '-B', identity.__file__, 'check-declarations', str(packet),
+                                     '--root', str(root)], capture_output=True, timeout=15)
+            self.assertEqual(result.returncode, 2)
+
+    @unittest.skipIf(sys.platform == 'win32', 'Synthetic Linux v2 writer requires POSIX paths; no Windows native claim.')
+    def test_v2_unicode_child_failure_and_independent_drift_keep_existing_boundaries(self):
+        value, sha = self.packet()
+        raw = identity.canonical(value['probe']['cindex']).encode()
+        for changed in (None, '/sdk/stdlib.h', 'source'):
+            with self.subTest(changed=changed), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory).resolve() / 'metadata.json'
+                def inject(stdout):
+                    marker = b'"library_version":"clang version 22.1.0"'
+                    self.assertEqual(stdout.count(marker), 1)
+                    return stdout.replace(marker, b'"library_version":"\\udcff"')
+                with self.legacy.mocked_declaration_capture(output, raw, changed=changed,
+                        after_serialization=inject) as (argv, stderr, emitted):
+                    self.assertEqual(identity.main(argv + ['--declaration-profile', self.PROFILE]), 2)
+                    self.assertEqual(bool(stderr.getvalue()), changed is not None)
+                if changed is not None:
+                    self.assertFalse(output.exists())
+                else:
+                    retained = json.loads(output.read_text())
+                    self.assertEqual(retained['probe']['backend_failure']['kind'], 'INVALID_RESULT')
+                    self.assertEqual(retained['probe']['syntax']['exit_code'], 1)
+                    self.assertFalse(self.check(retained, sha)['syntax_pass'])
 
 
 class WorkflowTests(unittest.TestCase):

@@ -1543,6 +1543,31 @@ class NativeDeclarationReaderTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn(b'declaration selectors', result.stderr)
 
+    def test_v2_source_bound_reader_checks_the_same_producer_links_without_native_replay(self):
+        import product_identity
+        from test_product_identity import PosixDeclarationProfileTests
+        fixture = PosixDeclarationProfileTests()
+        fixture.setUp()
+        value, _ = fixture.packet()
+        root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            packet = Path(directory).resolve() / 'observed-v2.json'
+            raw = json.dumps(value).encode()
+            packet.write_bytes(raw)
+            with (mock.patch.object(profiles, 'verify_reviewed_files') as reviewed,
+                  mock.patch.object(product_identity, 'declaration_backend', side_effect=AssertionError('load')),
+                  mock.patch.object(product_identity.subprocess, 'run', side_effect=AssertionError('execute'))):
+                result = profiles.verify_native_declarations(root, packet, hashlib.sha256(raw).hexdigest())
+            self.assertTrue(result['producer_bytes_verified'])
+            self.assertTrue(result['visibility_pass'])
+            self.assertEqual(result['profile_id'], 'c17-posix2008/v1')
+            self.assertFalse(result['native_qualified'])
+            self.assertEqual({link['path'] for link in reviewed.call_args.args[2]},
+                             set(product_identity.SOURCE_FILES.values()) | set(product_identity.DECLARATION_PRODUCERS))
+            with mock.patch.object(profiles, 'verify_reviewed_files', side_effect=ValueError('source mismatch')):
+                with self.assertRaisesRegex(ValueError, 'source mismatch'):
+                    profiles.verify_native_declarations(root, packet, hashlib.sha256(raw).hexdigest())
+
 
 class NativeApiProfileTests(unittest.TestCase):
     @classmethod
