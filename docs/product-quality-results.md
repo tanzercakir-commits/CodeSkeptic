@@ -1841,3 +1841,110 @@ başarısız. Bunlar status yenilemesidir, genel CI kök neden denetimi değildi
 Capture SHA-256 `1af56d4c875f0a0777ddb123688ba80496bb3569a26f028e92032dc9aa2c47b1`.
 Bu sonuçlar yeni checkpoint'in hosted başarısına taşınmaz. U003 POP yok;
 selection 2/1020, LLVM non-admitted, haklar ve ürün/native qualification bekler.
+
+### Pinned LLVM yol/notice gözlemi ve bağımsızlık HOLD'u
+
+Temiz `9900bbffecaa2d8cba110b1dacb7bed3d3efb811` üzerinde aynı LLVM revision
+`87f0227cb60147a26a1eeb4fb06e3b505e9c7261` için root → clang → test → Analysis
+Git ağacı zinciri ve özgün `malloc.c` blob'u yeniden bağlandı. Dört complete
+nonrecursive ağaçtaki 38/21/80/816 entry'nin Git tree OID'leri hesaplandı.
+Yedi actual API yanıtı ve source-parent LICENSE/COPYING/NOTICE ad eşleşmeleri
+iki notice verdi: root `LICENSE.TXT` (15141 byte, SHA-256
+`8d85c1057d742e597985c7d4e6320b015a9139385cff4cbae06ffc0ebe89afee`) ve
+`clang/LICENSE.TXT` (15140 byte,
+`ebcd9bbf783a73d05c53ba4d586b8d5813dcdf3bbec50265860ccc885e606f47`).
+Legacy copyright aralıkları ve son boş satır farklıdır; tek belgeymiş gibi
+birleştirilmez. Byte/Git-nesnesi doğrulaması kaynak özelinde hukuki uygulanabilirlik,
+tam attribution veya dağıtım onayı değildir. Commit API'de unsigned görünür;
+commit→root tree bağı API gözlemidir, imza/kimliği doğrulanmış lineage değildir.
+
+`/root/parent_child_native_verifier` 18 ham dosya, yedi empty stderr, iki
+notice ve source/API bağını bağımsız doğruladı. Paket
+`cohort-provenance-v1/llvm-pinned-path-notices/summary.json`, SHA-256
+`73b172264c23085dbac67b281b617e209597461482ee69c6466479bfae2a698c`;
+gerçek `notice-observation-review-9900bbf.json`
+`76bd24ab24d1c679adb2d1b9aaf5e20d8e345d14e78094d520a974de4fd7e203`.
+Yalnız gözlem PASS'i; lisans/redistribution/admission/ek kota false/sıfır.
+
+Ayrı comparison packet 14 karşılaştırma, 25 repository referansı ve 25
+repository/external span'i; gerçek iki GCC source byte'ını ve üç tam saklanan
+arama çıktısını bağladı. Paket SHA-256
+`ceefb642839e36850f87c8cd2699fca0b094b33c5c74ce7e41a0477b2a05cfcb`.
+Sınırlı spelling araması global özgünlük veya bütün eşdeğerlerin yokluğu kanıtı
+değildir. Yeni maddi yakınlıklar: `InterproceduralTest.cpp` 1884–1936 aynı
+caller slot'una static pointer yazıp alias ile siler; `FdResourceRuleTest.cpp`
+306–347 acquired FD/DIR handle slot'larını alias/helper üzerinden siler;
+`MemoryLeakRuleExTest.cpp` 1662–1677 storage reassignment ile eski allocation
+sorumluluğunu ayırır. Ayrı API/family veya doğrudan malloc RHS farkı bu
+bileşimin eğitimden bağımsızlığını tek başına kanıtlamaz.
+
+Gerçek `/root/retained_binding_exact_verifier` kararı
+`cohort-provenance-v1/source-cluster-review-9900bbf.json`, SHA-256
+`d8e96ea89143c044689337b0e13e5c9f8cf56e71a045bbf875d7512f885d12d5`:
+candidate **HELD_NONQUOTA**, control **SUPPLEMENTAL_NONQUOTA**. Önceki
+`ACCEPT_SOURCE_LABELS` ve preparation-only kararları değiştirilmez; etiket
+kabulü cluster yeniliği değildir. Selection 2/1020 ve source/label/native
+baytları korunur. Bu aday için admission entegrasyonuna geçilmez; yeni somut
+bağımsızlık kanıtı olmadan aynı öneri başka isimle tekrar sayılmaz.
+
+### 9900bbf Windows identity iptali ve dar Git-okuma düzeltmesi
+
+[Identity 34704593020](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34704593020)
+attempt 1 **cancelled** kaldı. Linux/macOS 88 identity +163 profile testini
+tamamladı; profile süreleri 48.284/167.866 saniye. Windows 88 identity testi
+geçti, ancak profile suite tamamlanmadı. Üç identity ve eski 636-byte GCC
+mixed-storage kaynağına ait iki native-case artifact'ı vardır; Windows
+native-case ve post-case diagnostic yoktur. LLVM native ürün kanıtı değildir.
+
+Exact Windows check annotation, 10m0s job sınırının aşıldığını açıkça bildirir;
+capture SHA-256 `77d7f900129c60af89030f1446bef3b0535c85ac8876326eac12c3f2b4387414`.
+Kesilme, yeni source-target negatifinde `verify_cohort_ground_truth` → native
+reader → `verify_reviewed_files` → `git cat-file -e` sırasında KeyboardInterrupt
+olarak görünür. Bu stack o tek Git çağrısının tüm süreyi tükettiğini veya bütün
+profile süresinin dökümünü kanıtlamaz. Önceki 37e99c7 PowerShell query TIMEOUT'u
+ile aynı olay diye adlandırılmaz. Workflow timeout 10 dakika ve cancel-in-progress
+false kalır; iptal olmuş işlem yeniden başlatılmadı.
+
+Ham paket özeti SHA-256
+`a1db519e5e4639168e03fd10ed013cb835fde5834bb692d804d9049ff88537cf`.
+`/root/parent_child_native_verifier` temiz detached 9900 audit clone'unda 29
+dosya, 11 empty stderr, beş ZIP/member, source/helper/parser ve annotation bağını
+doğruladı. Gerçek `cohort-provenance-v1/hosted-review-9900bbf.json`
+SHA-256 `302d5afcf73b42f4ddc9529d59c0e666eb4d6f300047cea9463d97ca48f318a4`.
+Windows suite/native kapısı başarısız kalır; hiçbir eski failure temizlenmez.
+
+Tekrarlanabilir yerel process-count RED'i, gerçek 22 Git referansının eski
+okuyucuda 68 süreç açtığını gösterdi; capture SHA-256
+`d135baeef0ac3a5799a33a7325a8cc5b300f95da816a7b2daee7953a9dcde3a6`.
+Önbelleksiz sınırlı ls-tree/cat-file batch düzeltmesi aynı gerçek hashleri dört
+süreçle doğruladı; ilk GREEN
+`db77b7ce0dfc61c79e81542627c4601739f61e77a3fb131716b52a452902fbdb`.
+Mevcut 237 profile testi geçti. Bu yapısal süreç azalması observed Windows
+deadline düzeldi iddiası değildir; yeni exact-head bağımsız kod denetimi ve
+fresh hosted sonuç gerekir. Saklanan native packet/producer baytları, eski review head'leri,
+dosya/aggregate kabul sınırları, all-rule/kota semantiği ve sabit süreler korunur.
+
+Bağımsız test üreticisinin yalnız test dosyası değişen isolated 9900 checkout'unda
+22 yeni test eski production'a karşı 53 beklenen failure, sıfır error/skip verdi;
+primary tekrarının capture SHA-256'sı
+`ed20b200925bedbe31c5a8d66f2b0ec41f58aab5f1dfeea7c13aee7ec91e67f9`.
+Yeni production'da aynı 22 test GREEN; capture
+`30c57dc7061f1fea7de88468f909b0b09a73d86e8b73056766abefe0278fbdba`.
+Gerçek Git fixture'ları historical ancestor/dirty checkout ayrımını, executable,
+symlink/gitlink modlarını, aynı OID'nin ayrı yollarını, Unicode UTF-16 argv
+sınırını, tam 16 MiB ve daha büyük toplamların bölünmesini sınar. Kırk tree/batch
+protocol bozumu, sonraki chunk hatası ve tekrar okumada cache olmaması ret
+sınırlarını kontrol eder; synthetic test nesneleri gerçek source/native kanıtı
+diye sunulmaz. Fiziksel 8 KiB checkout yolu değil, tek-yol soft sınırı için
+yalnız serialization ölçümü yapay büyütülür.
+
+Tam profile suite 259 test (23.455 saniye), capture SHA-256
+`3a1d3c7b37775f07d3db0761ad666015c45a5a36af2b3472d6aec55367fb7286`;
+workflow'un korunan seçimine eklenen yeni sınıfla 185 test (22.549 saniye),
+`294ca10a3050060c98ff3d3a976d429480f1a0ad98ecce253fe5dd758588a295`.
+Ayrıca 88 identity, 24 quality ve 65 catalog testi geçti. İki workflow satırının
+selector assertion'ı ayrı RED/GREEN ile bağlandı; eski seçili testler çıkarılmadı.
+Gerçek reviewed-label, legacy-label ve native-packet CLI okumaları ile inventory
+kontrolü GREEN; readiness beklenen exit 2 ve selection 2/1020 olarak kaldı.
+Bunlar commit öncesi yerel sonuçlardır; temiz exact-head guard/bağımsız denetim
+ve yeni hosted Windows başarısının yerine geçmez. Yeni quota veya U003 POP yoktur.

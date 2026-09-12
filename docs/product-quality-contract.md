@@ -545,3 +545,40 @@ ifade eder. Function/analyzer yürütümü, calling ABI/allocator runtime davran
 compiler runtime closure, tüm native platformlar, all-rule etiket kabulü,
 haklar, tam cohort veya ürün yeterliliği çıkarılamaz. Her iki kaynak için
 admitted_sources ve ek kota sıfır, yedi qualification false kalır.
+
+### Kaynak bağımsızlığı kararı etiket kabulünden ayrıdır
+
+Caller-slot çiftinin koşullu all-rule etiket kabulü bir bağımsız kota kararı
+değildir. `9900bbf` kaynak karşılaştırması, önceki hazırlık incelemesine ek
+olarak static-storage caller-slot publication/revocation, FD/DIR handle'ının
+alias üzerinden silinmesi ve memory-owner reassignment eğitim örneklerini
+bağlar. Gerçek yeni bağımsız karar adayı `HELD_NONQUOTA`, komşu kontrolü
+`SUPPLEMENTAL_NONQUOTA` bırakır. Bu durum byte duplicate veya kanıtlanmış
+genetik türetme iddiası değil, ayrı mekanizma bağımsızlığının kanıtlanamamasıdır.
+Kaynak/etiket/native hazırlık baytları ve eski kararlar yeniden yazılmaz.
+Yeniden değerlendirme aynı gerekçeyi tekrar sunmakla değil, bu karşılaştırmaları
+adresleyen yeni somut bağımsızlık kanıtıyla mümkündür. Başka LLVM dosyası veya
+başka kural ailesi kendiliğinden yeni kaynak kökeni ya da quota örneği değildir.
+
+### Sınırlı ve önbelleksiz historical Git okumaları
+
+`verify_reviewed_files` gerçek ancestor, isteğe bağlı exact tree, literal yol,
+unique path, regular blob mode, actual size ve SHA-256 kontrollerini korur.
+1–64 referans ve dosya başına pozitif en fazla 16 MiB sınırı değişmez; toplamı
+16 MiB'ı aşan geçerli girdiler reddedilmez, ayrı içerik gruplarına bölünür.
+`ls-tree -l -z` tam komutun Windows-quoted UTF-16 uzunluğuna göre muhafazakâr
+8192-unit gruplarla çağrılır; bu soft gruplama tek geçerli yol için yeni ret
+sınırı değildir. Listelenen yollar tam eşleşmeli ve unique olmalıdır; symlink,
+gitlink, dizin, eksik/ek/bozuk kayıt normal blob gibi kabul edilmez.
+
+`cat-file --batch` girdisi yalnız doğrulanmış blob OID'leridir. Her çağrıda
+en fazla 16 MiB ham içerik ve sınırlı header/terminator payı vardır; binary
+içerik newline'a göre bölünmez. Her OID/type/size header'ı, tam gövde, LF ve
+SHA-256 ayrı doğrulanır; trailing/eksik/bozuk yanıtta kısmi başarı dönmez.
+Aynı blob'un iki farklı geçerli yolda bulunması kabul edilir. Kalıcı süreç,
+cache, lazy fetch, replacement object veya başka head'e fallback yoktur.
+Her yeni doğrulama Git'i yeniden okur; sanitize edilmiş environment ve mevcut
+30 saniye/komut sınırı korunur. Byte sınırları subprocess çıktı alımı sonrası
+doğrulanır; hostile Git executable'a karşı hard streaming memory sınırı değildir.
+Süre/kota/eşik gevşetilmez. Süreç sayısının azalması tek başına gerçek Windows
+hosted başarısı ya da native ürün yeterliliği kanıtı değildir.

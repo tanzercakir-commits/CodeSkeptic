@@ -1443,7 +1443,8 @@ class WorkflowTests(unittest.TestCase):
         workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/product-identity.yml').read_text()
         self.assertEqual(workflow.count('-k GccStaging -k ExternalInput -k AllRuleGroundTruthTests '
                                        '-k NativeRecipeTests -k RetainedCandidateTests -k RetainedGroundTruthTests '
-                                       '-k SourceCohortTests -k SourceCohortNativeTests -k SourceCohortGroundTruthTests -q'), 2)
+                                       '-k SourceCohortTests -k SourceCohortNativeTests -k SourceCohortGroundTruthTests '
+                                       '-k ReviewedFilesTests -q'), 2)
         self.assertIn("throw 'External input safety tests failed'", workflow)
 
     def test_each_lane_uses_one_explicit_python_for_tests_and_capture(self):

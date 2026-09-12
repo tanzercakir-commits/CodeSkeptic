@@ -1133,7 +1133,7 @@ def admission_review_metadata(review, candidate, candidate_sha, candidate_path=G
 
 
 def verify_reviewed_files(repo, head, links, *, expected_tree=None):
-    """Bind reviewed bytes to a real ancestor commit, permitting later integration."""
+    """Bind actual ancestor blobs with bounded, per-call Git batches, never a cache."""
     repo = Path(repo)
     require(repo.is_absolute() and repo.resolve(strict=True) == repo, "reviewed checkout root")
     require(type(head) is str and re.fullmatch(r"[0-9a-f]{40}", head) and head != "0" * 40,
@@ -1141,8 +1141,10 @@ def verify_reviewed_files(repo, head, links, *, expected_tree=None):
     environment = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
     environment.update(GIT_NO_LAZY_FETCH="1", GIT_NO_REPLACE_OBJECTS="1", GIT_TERMINAL_PROMPT="0")
 
-    def git(*args):
-        result = subprocess.run(["git", "--no-pager", "--literal-pathspecs", "-C", str(repo), *args],
+    command_prefix = ["git", "--no-pager", "--literal-pathspecs", "-C", str(repo)]
+
+    def git(*args, payload=None):
+        result = subprocess.run([*command_prefix, *args], input=payload,
                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=30, env=environment)
         require(result.returncode == 0, "reviewed Git object unavailable")
         return result.stdout
@@ -1154,7 +1156,7 @@ def verify_reviewed_files(repo, head, links, *, expected_tree=None):
                 and git("rev-parse", head + "^{tree}").decode("ascii").strip() == expected_tree,
                 "observed producer tree changed")
     require(type(links) is list and 1 <= len(links) <= 64, "reviewed file links")
-    names, contents = set(), {}
+    requested = {}
     for link in links:
         fields(link, "path sha256", "reviewed file")
         # One actual producer input lives under a dot-directory. Keep the
@@ -1162,21 +1164,78 @@ def verify_reviewed_files(repo, head, links, *, expected_tree=None):
         relative = (link["path"] if link["path"] == ".github/workflows/product-identity.yml"
                     else external_relative(link["path"]).as_posix())
         external_digest(link["sha256"])
-        require(relative not in names, "duplicate reviewed file")
-        names.add(relative)
-        entry = git("ls-tree", "-z", head, "--", relative)
-        require(entry.endswith(b"\0") and entry.count(b"\0") == 1, "reviewed tree entry")
-        info, name = entry[:-1].split(b"\t", 1)
-        mode, kind, blob = info.split(b" ")
-        require(mode in (b"100644", b"100755") and kind == b"blob" and name.decode("utf-8") == relative,
-                "reviewed file is not a regular blob")
-        blob_name = blob.decode("ascii")
-        size = int(git("cat-file", "-s", blob_name))
-        require(0 < size <= 16 * 1024 * 1024, "reviewed blob size")
-        raw = git("cat-file", "blob", blob_name)
-        require(len(raw) == size and hashlib.sha256(raw).hexdigest() == link["sha256"],
-                "reviewed commit bytes changed")
-        contents[relative] = {'sha256': link['sha256'], 'size_bytes': size}
+        require(relative not in requested, "duplicate reviewed file")
+        requested[relative] = link['sha256']
+
+    # Sixty-four valid 512-character paths need not fit a Windows command
+    # line. Count the whole quoted command in UTF-16 units, not just names.
+    # This soft grouping limit does not introduce a new singleton-path limit.
+    listing_prefix = ['ls-tree', '-l', '-z', head, '--']
+    groups, group = [], []
+    for relative in requested:
+        command = [*command_prefix, *listing_prefix, *group, relative]
+        units = len(subprocess.list2cmdline(command).encode('utf-16-le')) // 2
+        if group and units > 8192:
+            groups.append(group)
+            group = []
+        group.append(relative)
+    groups.append(group)
+
+    maximum = 16 * 1024 * 1024
+    objects = {}
+    for group in groups:
+        entries = git(*listing_prefix, *group)
+        require(entries.endswith(b'\0'), 'reviewed tree entry framing')
+        observed = set()
+        for entry in entries[:-1].split(b'\0'):
+            require(entry.count(b'\t') == 1, 'reviewed tree entry')
+            info, name = entry.split(b'\t', 1)
+            parts = info.split()
+            require(len(parts) == 4, 'reviewed tree metadata')
+            mode, kind, blob, raw_size = parts
+            relative = name.decode('utf-8')
+            require(relative in group and relative not in observed
+                    and mode in (b'100644', b'100755') and kind == b'blob',
+                    'reviewed file is not a unique regular blob')
+            require(re.fullmatch(b'[0-9a-f]{40}', blob) and blob != b'0' * 40
+                    and re.fullmatch(b'[1-9][0-9]{0,7}', raw_size), 'reviewed blob identity/size')
+            size = int(raw_size)
+            require(size <= maximum, 'reviewed blob size')
+            observed.add(relative)
+            objects[relative] = (blob, size)
+        require(observed == set(group), 'reviewed tree entry missing')
+
+    # Preserve the per-blob limit without imposing a stricter aggregate limit.
+    # Every invocation reopens the objects; no persistent process or cached
+    # bytes can hide later deletion/drift. Binary bodies are never split on LF.
+    chunks, chunk, total = [], [], 0
+    for relative in requested:
+        size = objects[relative][1]
+        if chunk and total + size > maximum:
+            chunks.append(chunk)
+            chunk, total = [], 0
+        chunk.append(relative)
+        total += size
+    chunks.append(chunk)
+    contents = {}
+    for chunk in chunks:
+        payload = b''.join(objects[name][0] + b'\n' for name in chunk)
+        data = git('cat-file', '--batch', payload=payload)
+        require(len(data) <= sum(objects[name][1] for name in chunk) + 64 * len(chunk),
+                'reviewed batch response size')
+        offset = 0
+        for relative in chunk:
+            blob, size = objects[relative]
+            header = blob + b' blob ' + str(size).encode('ascii') + b'\n'
+            require(data[offset:offset + len(header)] == header, 'reviewed batch header')
+            offset += len(header)
+            end = offset + size
+            require(end < len(data) and data[end:end + 1] == b'\n', 'reviewed batch body framing')
+            require(hashlib.sha256(memoryview(data)[offset:end]).hexdigest() == requested[relative],
+                    'reviewed commit bytes changed')
+            contents[relative] = {'sha256': requested[relative], 'size_bytes': size}
+            offset = end + 1
+        require(offset == len(data), 'reviewed batch trailing bytes')
     return contents
 
 

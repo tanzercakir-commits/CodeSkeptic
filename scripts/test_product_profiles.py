@@ -4916,5 +4916,527 @@ class SourceCohortGroundTruthTests(unittest.TestCase):
         self.assertNotIn(str(self.fixture.base), result.stderr)
 
 
+class _ReviewedFilesGitFixture:
+    """Tiny real Git history; no source receipt, native run or admission claim.
+
+    Index-only entries exercise historical modes and long paths on Windows
+    without requiring symlink privileges or physical long-path checkout.
+    """
+    maximum = 16 * 1024 * 1024
+
+    def __init__(self, base):
+        self.repo = (Path(base) / 'reviewed checkout \u03bb \U0001f9ea').resolve()
+        self.repo.mkdir()
+        self.empty_hooks = (Path(base) / 'empty-fixture-hooks').resolve()
+        self.empty_hooks.mkdir()
+        self.environment = {key: value for key, value in os.environ.items()
+                            if not key.upper().startswith('GIT_')}
+        self.entries = {}
+        self.git('init', '--quiet')
+        empty_tree = self.git('mktree', input=b'').decode().strip()
+        self.unrelated = self.git('commit-tree', empty_tree, input=b'Unrelated synthetic commit\n').decode().strip()
+        small = [b'first\x00binary\nsource\xff\n', b'second reviewed source\n', b'shared reviewed bytes\n']
+        objects = [self.blob(raw) for raw in small]
+        self.small_paths = ['src/nested/f%02d.c' % number for number in range(64)]
+        for number, path in enumerate(self.small_paths):
+            self.add(path, *objects[number % 3], mode='100755' if number == 1 else '100644')
+        self.add('.github/workflows/product-identity.yml', *objects[1])
+        self.add('mode/symlink.c', *objects[0], mode='120000')
+        self.entries['mode/gitlink.c'] = {'oid': self.unrelated, 'mode': '160000',
+                                        'sha256': hashlib.sha256(b'not blob content').hexdigest(),
+                                        'size_bytes': 16}
+        self.add('sizes/empty.c', *self.blob(b''))
+        self.add('sizes/inclusive.c', *self.blob(b'I' * self.maximum))
+        self.add('sizes/oversized.c', *self.blob(b'O' * (self.maximum + 1)))
+        self.add('sizes/half-a.c', *self.blob(b'A' * (self.maximum // 2)))
+        self.add('sizes/half-b.c', *self.blob(b'B' * (self.maximum // 2)))
+        self.add('sizes/one.c', *self.blob(b'Z'))
+        self.long_paths = []
+        for number in range(64):
+            path = '/'.join(['long%02d' % number, 'a' * 127, 'b' * 127, 'c' * 127, 'd' * 116 + '.c'])
+            assert len(path) <= 512
+            self.long_paths.append(path)
+            self.add(path, *objects[2])
+        self.utf16_paths = []
+        prefix = ['git', '--no-pager', '--literal-pathspecs', '-C', str(self.repo),
+                  'ls-tree', '-l', '-z', 'a' * 40, '--']
+        # Fifteen paths leave room for one final valid path such that character
+        # count is exactly 8192, but the non-BMP checkout name needs one more
+        # UTF-16 unit. This catches len(serialized) as well as name-only sums.
+        for number in range(16):
+            length = 509 if number < 15 else 8192 - len(subprocess.list2cmdline(prefix + self.utf16_paths)) - 1
+            assert 20 <= length <= 512
+            parts = ['boundary%02d' % number]
+            while len('/'.join(parts)) < length:
+                remaining = length - len('/'.join(parts)) - 1
+                size = min(127, remaining)
+                if remaining - size == 1:
+                    size -= 1
+                parts.append('x' * size)
+            path = '/'.join(parts)
+            assert len(path) == length and all(parts)
+            self.utf16_paths.append(path)
+            self.add(path, *objects[2])
+        rows = b''.join(('%s %s\t%s\0' % (value['mode'], value['oid'], path)).encode('utf-8')
+                        for path, value in sorted(self.entries.items()))
+        self.git('update-index', '-z', '--index-info', input=rows)
+        self.tree = self.git('write-tree').decode().strip()
+        self.head = self.git('commit-tree', self.tree, input=b'Reviewed synthetic object history\n').decode().strip()
+        self.git('update-ref', 'HEAD', self.head)
+        # HEAD moves forward, and its tree plus the worktree differ from the
+        # reviewed ancestor. Reads must still select that ancestor's blobs.
+        changed = self.blob(b'new unreviewed tree bytes\n')
+        path = self.small_paths[0]
+        self.git('update-index', '--cacheinfo', '100644,%s,%s' % (changed[0], path))
+        next_tree = self.git('write-tree').decode().strip()
+        self.current = self.git('commit-tree', next_tree, '-p', self.head,
+                                input=b'Later synthetic integration\n').decode().strip()
+        self.git('update-ref', 'HEAD', self.current)
+        dirty = self.repo / path
+        dirty.parent.mkdir(parents=True)
+        dirty.write_bytes(b'DIRTY_WORKTREE_SENTINEL\n')
+
+    def git(self, *args, input=None):
+        result = subprocess.run(['git', '-C', str(self.repo), '-c', 'user.name=Synthetic Object Test',
+                                 '-c', 'user.email=synthetic@example.invalid',
+                                 '-c', 'core.hooksPath=' + str(self.empty_hooks),
+                                 '-c', 'commit.gpgsign=false', '-c', 'tag.gpgsign=false', *args], input=input,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30,
+                                env=self.environment, check=True)
+        return result.stdout
+
+    def blob(self, raw):
+        return (self.git('hash-object', '-w', '--stdin', input=raw).decode().strip(),
+                hashlib.sha256(raw).hexdigest(), len(raw))
+
+    def add(self, path, oid, digest, size, mode='100644'):
+        self.entries[path] = {'oid': oid, 'mode': mode, 'sha256': digest, 'size_bytes': size}
+
+    def links(self, paths):
+        return [{'path': path, 'sha256': self.entries[path]['sha256']} for path in paths]
+
+    def expected(self, paths):
+        return {path: {key: self.entries[path][key] for key in ('sha256', 'size_bytes')} for path in paths}
+
+
+class ReviewedFilesTests(unittest.TestCase):
+    """Real object identity and bounded Git transport, not semantic approval."""
+
+    @classmethod
+    def setUpClass(cls):
+        temporary = tempfile.TemporaryDirectory(prefix='codeskeptic-reviewed-files-')
+        cls.addClassCleanup(temporary.cleanup)
+        cls.fixture = _ReviewedFilesGitFixture(temporary.name)
+
+    def setUp(self):
+        self.git_calls = []
+
+    def check(self, paths=None, *, links=None, head=None, expected_tree=None, transform=None):
+        fixture = self.fixture
+        requested = fixture.small_paths[:2] if paths is None else paths
+        original_run = subprocess.run
+
+        def observed(argv, **kwargs):
+            self.assertEqual(argv[0], 'git', 'The object reader must not launch native tools')
+            self.git_calls.append((list(argv), dict(kwargs)))
+            result = original_run(argv, **kwargs)
+            return transform(argv, kwargs, result) if transform else result
+
+        with mock.patch.object(profiles.subprocess, 'run', side_effect=observed), \
+             mock.patch.object(profiles.urllib.request, 'urlopen', side_effect=AssertionError('No network')):
+            return profiles.verify_reviewed_files(
+                fixture.repo, head or fixture.head, fixture.links(requested) if links is None else links,
+                expected_tree=expected_tree)
+
+    def batch_calls(self):
+        return [(argv, kwargs) for argv, kwargs in self.git_calls if '--batch' in argv]
+
+    def tree_calls(self):
+        return [(argv, kwargs) for argv, kwargs in self.git_calls if 'ls-tree' in argv]
+
+    def require_batch(self):
+        self.assertTrue(self.batch_calls(), 'Required real cat-file --batch path was not exercised')
+
+    @staticmethod
+    def tree_records(raw):
+        assert raw.endswith(b'\0')
+        rows = []
+        for row in raw[:-1].split(b'\0'):
+            fields, name = row.split(b'\t', 1)
+            mode, kind, oid, size = fields.split()
+            rows.append([mode, kind, oid, size, name])
+        return rows
+
+    @staticmethod
+    def tree_bytes(rows):
+        return b''.join(b' '.join(row[:4]) + b'\t' + row[4] + b'\0' for row in rows)
+
+    @staticmethod
+    def batch_records(raw):
+        rows, offset = [], 0
+        while offset < len(raw):
+            end = raw.index(b'\n', offset)
+            oid, kind, size = raw[offset:end].split(b' ')
+            length = int(size)
+            start = end + 1
+            content = raw[start:start + length]
+            assert len(content) == length and raw[start + length:start + length + 1] == b'\n'
+            rows.append([oid, kind, size, content])
+            offset = start + length + 1
+        return rows
+
+    @staticmethod
+    def batch_bytes(rows):
+        return b''.join(b' '.join(row[:3]) + b'\n' + row[3] + b'\n' for row in rows)
+
+    def test_small_twenty_two_file_call_budget_and_actual_historical_bytes(self):
+        paths = list(reversed(self.fixture.small_paths[:22]))
+        actual = self.check(paths)
+        self.assertEqual(actual, self.fixture.expected(paths))
+        self.assertLessEqual(len(self.git_calls), 5, '22 reviewed links require at most five Git processes')
+        self.require_batch()
+
+    def test_expected_tree_adds_at_most_one_process_and_dot_workflow_is_bound(self):
+        paths = self.fixture.small_paths[:21] + ['.github/workflows/product-identity.yml']
+        self.assertEqual(self.check(paths, expected_tree=self.fixture.tree), self.fixture.expected(paths))
+        self.assertLessEqual(len(self.git_calls), 6)
+        self.require_batch()
+        with self.assertRaises(ValueError):
+            self.check(paths, expected_tree='f' * 40)
+
+    def test_nested_out_of_order_executable_and_same_oid_distinct_paths(self):
+        paths = [self.fixture.small_paths[number] for number in (4, 0, 1, 3)]
+        self.assertEqual(self.fixture.entries[paths[1]]['oid'], self.fixture.entries[paths[3]]['oid'])
+        self.assertEqual(self.fixture.entries[paths[2]]['mode'], '100755')
+        self.assertEqual(self.check(paths), self.fixture.expected(paths))
+        self.require_batch()
+
+    def test_one_and_sixty_four_links_are_accepted_but_sixty_five_are_rejected(self):
+        for paths in (self.fixture.small_paths[:1], self.fixture.small_paths):
+            with self.subTest(count=len(paths)):
+                self.assertEqual(self.check(paths), self.fixture.expected(paths))
+        links = self.fixture.links(self.fixture.small_paths + ['sizes/one.c'])
+        with self.assertRaises(ValueError):
+            self.check(links=links)
+
+    def test_repeat_invocation_reopens_objects_without_persistent_cache(self):
+        paths = self.fixture.small_paths[:22]
+        self.assertEqual(self.check(paths), self.fixture.expected(paths))
+        first = [(argv, kwargs.get('input')) for argv, kwargs in self.git_calls]
+        self.git_calls = []
+        self.assertEqual(self.check(paths), self.fixture.expected(paths))
+        second = [(argv, kwargs.get('input')) for argv, kwargs in self.git_calls]
+        self.assertEqual(first, second)
+        self.assertTrue(second)
+        self.require_batch()
+        corrupted = []
+
+        def corrupt_later_read(argv, kwargs, result):
+            if '--batch' in argv:
+                corrupted.append(True)
+                result.stdout = b''
+            return result
+
+        with self.assertRaises(ValueError):
+            self.check(paths, transform=corrupt_later_read)
+        self.assertTrue(corrupted, 'Second object read must not be served by a cache')
+
+    def test_git_environment_timeout_literal_paths_and_oid_only_binary_batch_input(self):
+        hostile = {'GIT_DIR': '/PRIVATE_WRONG_REPOSITORY', 'GIT_WORK_TREE': '/PRIVATE_WORKTREE',
+                   'GIT_OBJECT_DIRECTORY': '/PRIVATE_OBJECTS', 'GIT_CONFIG_COUNT': '1',
+                   'GIT_CONFIG_KEY_0': 'core.hooksPath', 'GIT_CONFIG_VALUE_0': '/PRIVATE_HOOKS',
+                   'git_private_lowercase': 'must disappear', 'GiT_Private_Mixed': 'must disappear',
+                   'GIT_NO_LAZY_FETCH': '0', 'GIT_NO_REPLACE_OBJECTS': '0', 'GIT_TERMINAL_PROMPT': '1',
+                   'REVIEWED_FILES_NON_GIT_SENTINEL': 'preserved'}
+        with mock.patch.dict(os.environ, hostile):
+            self.assertEqual(self.check(), self.fixture.expected(self.fixture.small_paths[:2]))
+        self.require_batch()
+        approved = {'GIT_NO_LAZY_FETCH': '1', 'GIT_NO_REPLACE_OBJECTS': '1', 'GIT_TERMINAL_PROMPT': '0'}
+        for argv, kwargs in self.git_calls:
+            with self.subTest(argv=argv):
+                self.assertIn('--literal-pathspecs', argv)
+                self.assertEqual(kwargs['timeout'], 30)
+                self.assertEqual(kwargs['stdout'], subprocess.PIPE)
+                self.assertEqual(kwargs['stderr'], subprocess.DEVNULL)
+                self.assertFalse(kwargs.get('shell', False))
+                self.assertFalse(kwargs.get('text', False))
+                self.assertFalse(kwargs.get('universal_newlines', False))
+                command = argv[argv.index('-C') + 2:]
+                self.assertIn(command[0], ('cat-file', 'merge-base', 'rev-parse', 'ls-tree'))
+                if command[0] == 'cat-file':
+                    self.assertIn(command[1], ('-e', '--batch'))
+                self.assertEqual({key: value for key, value in kwargs['env'].items()
+                                  if key.upper().startswith('GIT_')}, approved)
+                self.assertEqual(kwargs['env']['REVIEWED_FILES_NON_GIT_SENTINEL'], 'preserved')
+                if 'ls-tree' in argv:
+                    self.assertIn('-z', argv)
+                    self.assertIn('-l', argv)
+                if '--batch' in argv:
+                    self.assertIs(type(kwargs.get('input')), bytes)
+                    self.assertTrue(kwargs['input'].endswith(b'\n'))
+                    for oid in kwargs['input'].splitlines():
+                        self.assertRegex(oid, rb'^[0-9a-f]{40}$')
+                        self.assertIn(oid.decode(), {row['oid'] for row in self.fixture.entries.values()})
+
+    def test_unicode_checkout_and_long_valid_paths_split_full_serialized_argv_budget(self):
+        paths = list(reversed(self.fixture.long_paths))
+        self.assertEqual(self.check(paths), self.fixture.expected(paths))
+        self.assertGreater(len(self.tree_calls()), 1, '64 valid long paths must use bounded groups')
+        observed = []
+        for argv, kwargs in self.tree_calls():
+            self.assertIn('-l', argv)
+            names = argv[argv.index('--') + 1:]
+            self.assertTrue(names)
+            observed.extend(names)
+            # Include executable/options/commit/checkout, quoting and non-BMP
+            # UTF-16 units, not merely the sum of path character lengths.
+            units = len(subprocess.list2cmdline(argv).encode('utf-16-le')) // 2
+            self.assertLessEqual(units, 8192)
+        self.assertCountEqual(observed, paths)
+        self.assertEqual(len(observed), len(set(observed)))
+        self.require_batch()
+
+    def test_utf16_units_not_unicode_character_count_determine_group_boundary(self):
+        paths = self.fixture.utf16_paths
+        prefix = ['git', '--no-pager', '--literal-pathspecs', '-C', str(self.fixture.repo),
+                  'ls-tree', '-l', '-z', self.fixture.head, '--']
+        serialized = subprocess.list2cmdline(prefix + paths)
+        self.assertEqual(len(serialized), 8192)
+        self.assertGreater(len(serialized.encode('utf-16-le')) // 2, 8192)
+        self.assertEqual(self.check(paths), self.fixture.expected(paths))
+        self.assertGreater(len(self.tree_calls()), 1)
+        for argv, kwargs in self.tree_calls():
+            self.assertLessEqual(len(subprocess.list2cmdline(argv).encode('utf-16-le')) // 2, 8192)
+        self.require_batch()
+
+    def test_singleton_path_survives_soft_budget_even_when_serialized_root_is_large(self):
+        # A physical >8K checkout path is not portable. Inflate only the
+        # independent serialization measurement; actual Git still reads the
+        # real Unicode checkout and its accepted long object path.
+        serializer = subprocess.list2cmdline
+        calls = []
+
+        def long_serialization(argv):
+            calls.append(list(argv))
+            return 'X' * 8192 + serializer(argv)
+
+        paths = self.fixture.long_paths[:1]
+        # Do not patch subprocess.list2cmdline globally: actual Windows Popen
+        # also uses it. Only the reader's budget view is enlarged here.
+        transport = SimpleNamespace(run=subprocess.run, PIPE=subprocess.PIPE, DEVNULL=subprocess.DEVNULL,
+                                    list2cmdline=long_serialization)
+        with mock.patch.object(profiles, 'subprocess', transport):
+            self.assertEqual(self.check(paths), self.fixture.expected(paths))
+        self.assertTrue(calls, 'Full Windows serialization budget must actually be consulted')
+        self.assertEqual(len(self.tree_calls()), 1)
+        self.require_batch()
+
+    def test_sixteen_mib_blob_is_inclusive_and_binary_payload_is_not_line_parsed(self):
+        paths = ['sizes/inclusive.c', self.fixture.small_paths[0]]
+        self.assertEqual(self.check(paths), self.fixture.expected(paths))
+        self.assertGreaterEqual(len(self.batch_calls()), 2)
+        self.require_batch()
+        self.assert_batch_payload_bounds()
+
+    def assert_batch_payload_bounds(self):
+        sizes = {row['oid']: row['size_bytes'] for row in self.fixture.entries.values()}
+        for argv, kwargs in self.batch_calls():
+            identifiers = kwargs['input'].decode('ascii').splitlines()
+            with self.subTest(identifiers=identifiers):
+                self.assertGreater(sum(sizes[oid] for oid in identifiers), 0)
+                self.assertLessEqual(sum(sizes[oid] for oid in identifiers), self.fixture.maximum)
+                self.assertLessEqual(len(identifiers), 64)
+
+    def test_aggregate_over_sixteen_mib_is_chunked_not_rejected(self):
+        paths = ['sizes/half-a.c', 'sizes/half-b.c', 'sizes/one.c']
+        self.assertEqual(self.check(paths), self.fixture.expected(paths))
+        self.assertGreaterEqual(len(self.batch_calls()), 2)
+        self.assert_batch_payload_bounds()
+
+    def test_exact_aggregate_boundary_fits_one_batch(self):
+        paths = ['sizes/half-a.c', 'sizes/half-b.c']
+        self.assertEqual(self.check(paths), self.fixture.expected(paths))
+        self.assertEqual(len(self.batch_calls()), 1)
+        self.assert_batch_payload_bounds()
+
+    def test_zero_and_oversized_historical_blobs_are_rejected_before_content_read(self):
+        for path in ('sizes/empty.c', 'sizes/oversized.c'):
+            self.git_calls = []
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                self.check([path])
+            self.assertFalse(self.batch_calls())
+            self.assertFalse(any('blob' in argv for argv, kwargs in self.git_calls))
+
+    def test_git_index_symlink_gitlink_and_tree_modes_are_rejected_on_every_platform(self):
+        for path in ('mode/symlink.c', 'mode/gitlink.c'):
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                self.check([path])
+        with self.assertRaises(ValueError):
+            self.check(links=[{'path': 'src/nested', 'sha256': 'a' * 64}])
+
+    def test_malformed_links_paths_hashes_and_duplicate_paths_reject(self):
+        good = self.fixture.links(self.fixture.small_paths[:1])[0]
+        # Keep generated cases separate so each malformed input is visible in
+        # subTest output, while sharing the one tiny real repository fixture.
+        variants = [[], {}, [good] * 2, [dict(good, extra=True)], [{'path': good['path']}]]
+        variants += [[dict(good, path=bad)] for bad in
+                     ('../escape.c', '/absolute.c', 'src//file.c', 'src/./file.c', 'src/file.c/',
+                      'src\\file.c', ':magic', '.git/config', '.github/other.yml', 'src/NUL.c',
+                      'src/name.', 'src/na\u00efve.c', 'a' * 513, '', True)]
+        variants += [[dict(good, sha256=bad)] for bad in ('0' * 64, 'A' * 64, 'f' * 63, True, None)]
+        for links in variants:
+            with self.subTest(links=links), self.assertRaises(ValueError):
+                self.check(links=links)
+
+    def test_missing_path_wrong_digest_and_nonancestor_are_rejected(self):
+        good = self.fixture.links(self.fixture.small_paths[:1])[0]
+        for links in ([dict(good, path='src/missing.c')], [dict(good, sha256='e' * 64)]):
+            with self.subTest(links=links), self.assertRaises(ValueError):
+                self.check(links=links)
+        with self.assertRaises(ValueError):
+            self.check(head=self.fixture.unrelated)
+        for head in ('HEAD', '0' * 40, 'A' * 40, 'f' * 39, True):
+            with self.subTest(head=head), self.assertRaises(ValueError):
+                self.check(head=head)
+        for tree in ('HEAD', '0' * 40, 'A' * 40, True):
+            with self.subTest(tree=tree), self.assertRaises(ValueError):
+                self.check(expected_tree=tree)
+
+    def test_relative_and_noncanonical_checkout_roots_are_rejected(self):
+        for root in (Path('.'), self.fixture.repo / '..' / self.fixture.repo.name):
+            with self.subTest(root=root), self.assertRaises(ValueError):
+                profiles.verify_reviewed_files(root, self.fixture.head,
+                                               self.fixture.links(self.fixture.small_paths[:1]))
+
+    def test_tree_records_reject_missing_extra_duplicate_and_malformed_framing(self):
+        mutations = ('empty', 'missing', 'extra', 'duplicate', 'unterminated', 'empty-record',
+                     'extra-field', 'missing-tab', 'invalid-utf8-name', 'wrong-name',
+                     'wrong-mode', 'wrong-type', 'wrong-oid', 'nonhex-oid', 'long-oid',
+                     'zero-size', 'oversize', 'negative-size', 'not-decimal-size', 'wrong-size')
+        for mutation in mutations:
+            touched = []
+
+            def corrupt(argv, kwargs, result):
+                if 'ls-tree' not in argv:
+                    return result
+                self.assertIn('-l', argv, 'Missing sized NUL tree protocol on the old baseline')
+                touched.append(True)
+                rows = self.tree_records(result.stdout)
+                raw = None
+                if mutation == 'empty': raw = b''
+                elif mutation == 'missing': rows.pop()
+                elif mutation == 'extra': rows.append([*rows[0][:4], b'unrequested.c'])
+                elif mutation == 'duplicate': rows.append(list(rows[0]))
+                elif mutation == 'unterminated': raw = result.stdout[:-1]
+                elif mutation == 'empty-record': raw = result.stdout + b'\0'
+                elif mutation == 'extra-field': raw = b'extra ' + result.stdout
+                elif mutation == 'missing-tab': raw = result.stdout.replace(b'\t', b' ', 1)
+                elif mutation == 'invalid-utf8-name': rows[0][4] = b'\xff.c'
+                elif mutation == 'wrong-name': rows[0][4] = b'src/unrequested.c'
+                elif mutation == 'wrong-mode': rows[0][0] = b'100664'
+                elif mutation == 'wrong-type': rows[0][1] = b'commit'
+                elif mutation == 'wrong-oid': rows[0][2] = b'0' * 40
+                elif mutation == 'nonhex-oid': rows[0][2] = b'g' * 40
+                elif mutation == 'long-oid': rows[0][2] += b'0'
+                elif mutation == 'zero-size': rows[0][3] = b'0'
+                elif mutation == 'oversize': rows[0][3] = str(self.fixture.maximum + 1).encode()
+                elif mutation == 'negative-size': rows[0][3] = b'-1'
+                elif mutation == 'not-decimal-size': rows[0][3] = b'NaN'
+                else: rows[0][3] = str(int(rows[0][3]) + 1).encode()
+                result.stdout = raw if raw is not None else self.tree_bytes(rows)
+                return result
+
+            with self.subTest(mutation=mutation):
+                with self.assertRaises(ValueError):
+                    self.check(transform=corrupt)
+                self.assertTrue(touched)
+
+    def test_binary_batch_records_reject_all_header_body_and_termination_faults(self):
+        mutations = ('empty', 'missing-last', 'extra', 'truncated-header', 'truncated-body',
+                     'missing-lf', 'wrong-lf', 'trailing-data', 'wrong-oid', 'nonhex-oid',
+                     'uppercase-oid', 'wrong-type', 'wrong-size', 'negative-size',
+                     'not-decimal-size', 'huge-size', 'extra-header-field', 'corrupt-body',
+                     'wrong-second-oid', 'corrupt-second-body')
+        for mutation in mutations:
+            touched = []
+
+            def corrupt(argv, kwargs, result):
+                if '--batch' not in argv:
+                    return result
+                touched.append(True)
+                rows = self.batch_records(result.stdout)
+                raw = None
+                if mutation == 'empty': raw = b''
+                elif mutation == 'missing-last': rows.pop()
+                elif mutation == 'extra': rows.append(list(rows[0]))
+                elif mutation == 'truncated-header': raw = result.stdout[:12]
+                elif mutation == 'truncated-body': raw = result.stdout[:result.stdout.index(b'\n') + 2]
+                elif mutation == 'missing-lf': raw = result.stdout[:-1]
+                elif mutation == 'wrong-lf': raw = result.stdout[:-1] + b'X'
+                elif mutation == 'trailing-data': raw = result.stdout + b'PRIVATE_TRAILING_SENTINEL'
+                elif mutation == 'wrong-oid': rows[0][0] = b'0' * 40
+                elif mutation == 'nonhex-oid': rows[0][0] = b'g' * 40
+                elif mutation == 'uppercase-oid': rows[0][0] = rows[0][0].upper()
+                elif mutation == 'wrong-type': rows[0][1] = b'tree'
+                elif mutation == 'wrong-size': rows[0][2] = str(int(rows[0][2]) + 1).encode()
+                elif mutation == 'negative-size': rows[0][2] = b'-1'
+                elif mutation == 'not-decimal-size': rows[0][2] = b'NaN'
+                elif mutation == 'huge-size': rows[0][2] = b'9' * 100
+                elif mutation == 'extra-header-field': raw = result.stdout.replace(b'\n', b' extra\n', 1)
+                elif mutation == 'wrong-second-oid': rows[1][0] = rows[0][0]
+                elif mutation == 'corrupt-second-body': rows[1][3] = b'X' + rows[1][3][1:]
+                else: rows[0][3] = b'X' + rows[0][3][1:]
+                result.stdout = raw if raw is not None else self.batch_bytes(rows)
+                return result
+
+            with self.subTest(mutation=mutation):
+                with self.assertRaises(ValueError):
+                    self.check(transform=corrupt)
+                self.assertTrue(touched, 'Missing required batch read must not silently pass a negative')
+
+    def test_failure_in_later_payload_chunk_cannot_return_partial_success(self):
+        touched = []
+
+        def corrupt_second_chunk(argv, kwargs, result):
+            if '--batch' in argv:
+                touched.append(True)
+                if len(touched) == 2:
+                    result.stdout = b''
+            return result
+
+        with self.assertRaises(ValueError):
+            self.check(['sizes/inclusive.c', 'sizes/one.c'], transform=corrupt_second_chunk)
+        self.assertEqual(len(touched), 2)
+
+    def test_every_git_command_failure_rejects_even_with_genuine_success_stdout(self):
+        targets = ('commit', 'ancestor', 'tree-id', 'tree', 'batch')
+        for target in targets:
+            touched = []
+
+            def failed(argv, kwargs, result):
+                selected = {'commit': 'cat-file' in argv and '-e' in argv,
+                            'ancestor': 'merge-base' in argv,
+                            'tree-id': 'rev-parse' in argv,
+                            'tree': 'ls-tree' in argv,
+                            'batch': '--batch' in argv}[target]
+                if selected:
+                    touched.append(True)
+                    result.returncode = 1
+                return result
+
+            with self.subTest(target=target):
+                with self.assertRaises(ValueError):
+                    self.check(expected_tree=self.fixture.tree, transform=failed)
+                self.assertTrue(touched, 'The required command must actually be exercised')
+
+    def test_subprocess_timeout_and_oserror_keep_existing_exception_boundary(self):
+        for exception in (subprocess.TimeoutExpired(['git'], 30), OSError('synthetic Git unavailable')):
+            with self.subTest(exception=type(exception).__name__), \
+                 mock.patch.object(profiles.subprocess, 'run', side_effect=exception), \
+                 self.assertRaises(type(exception)):
+                profiles.verify_reviewed_files(self.fixture.repo, self.fixture.head,
+                                               self.fixture.links(self.fixture.small_paths[:1]))
+
+
 if __name__ == "__main__":
     unittest.main()
