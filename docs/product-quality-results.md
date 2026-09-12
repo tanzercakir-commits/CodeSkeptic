@@ -1550,3 +1550,46 @@ sonraki ürün kapıları skipped kalır. Bağımsız salt-okunur teşhis aynı 
 doğruladı, kalıcı kök neden veya U003'ten kaynaklandığı iddia edilmedi.
 U004 RED kaydı ve CH12 dayanıklılık sahipliği değişmez. Başarılı ayrı identity
 koşusu bu genel CI'ı onarmaz; cache kodu/bütçesi, warmup veya kör rerun yoktur.
+
+### LLVM paket checkpoint'i — bağımsız hazırlık ve compiler preflight
+
+Exact `5fc09da642bd45f4555cfd343cfcd983a5089b4e` üzerindeki yedi dosyalık
+hazırlık uygulaması bağımsız PASS aldı. Karar, U003 kalıcı kanıt kökündeki
+`source-cohort-v1/checkpoint-review-5fc09da.json`, SHA-256
+`537e32ea9a9803ceae31c82216a2dc079e363d391c245f59d68c14fff1c9d379`.
+Bu, kaynak kabulü veya U003 receipt'i değil; yalnız okuyucu/hazırlık sınırıdır.
+
+Aynı temiz head'de iki gerçek TU, Ubuntu Clang 20.1.2 ve native `stdlib.h`
+ile offline/read-only container içinde ayrı ayrı kontrol edildi. Seçili CDB
+ve simüle frontend-adjusted komut biçimlerinde toplam 26 adımın 20'si exit 0;
+yanlış pointer genişliği, malloc dönüş tipi ve caller-slot parametre tipinin
+altı negatif derlemesi amaçlanan static assertion'da exit 1 verdi. İki kaynak
+ve birleşik probe için dependency listeleri önce/sonra ve komut biçimleri
+arasında eşleşti; 27 dosyalık birleşim ve 53 stream/CDB dosyası yeniden hashlendi.
+Bu gerçek fonksiyon/analyzer yürütümü veya calling-ABI/allocator davranış
+kanıtı değildir. Kaynaklar, compiler ve probe boyut/tip ön koşullarıyla sınırlıdır.
+
+İlk geçici deney değiştirilmeden saklandı. Aynı producer/source baytları kalıcı
+dizine alındıktan sonraki yeni capture kalıcı yolları bağlar; observation baytları
+aynıdır. Bu, başarısız ölçümü temizleyen rerun veya performans warmup değildir.
+Kalıcı `source-cohort-v1/native/summary.json` SHA-256
+`a5bb4cf7e5e4aeb9ebcfbd698e98ed7e09f4ab4db8b777f469fdd94114288869`,
+`native/observation/summary.json` SHA-256
+`5443995ea09a455e2d481581062379be69a4ff9791e9aa41c52243941e6d5bd3`.
+Ayrı bağımsız raw-packet denetimi `source-cohort-v1/native-review-5fc09da.json`,
+SHA-256 `ba3f01d88086ffb94032d413a1feba3284caba2b100d620b6b59a3a99bd735ef`;
+yalnız `PASS_BOUNDED_COMPILER_ONLY_PREFLIGHT` verir.
+
+Ayrı prospective sınıflandırmanın onayladığı sequence 4 baytları uygulandı:
+yalnız yeni LLVM paketi ile **157 → 158** korunan girdi. Önceki 157 satır/hash,
+52 fixture, 15 capability, tarihsel snapshot/receipt ve bütün floors korunur.
+Inventory SHA-256 `4ac2a1c318b1c44e8168d7aa7b44aec96baaa36926e1ac0044d59c0adec873d2`,
+katalog SHA-256 `56a99a03102a1988f8e1dfb896184b3a52a95cbd186c721346390ff208ca055f`.
+Uygulanmış checkpoint ayrıca yeni exact-head inceleme gerektirir.
+
+Yeni paketin source/cluster admission, bağımsız all-rule etiketleri ve hak/yayın
+clearance'ı hâlâ açık kapılardır. Caller-slot overwrite aday, komşusu aynı
+mekanizmalı nonquota kontrol olarak kalır; beklenen satır 5/sütun 3 henüz
+gözlenmiş rapor değildir. Sonraki normal eksik rapor FN kalır. Seçim **2/1020**,
+ek kota sıfır, yedi qualification false ve readiness exit 2 değişmez.
+Yeni head için hosted başarı veya tüm genel CI yeşil iddiası yoktur.

@@ -475,6 +475,10 @@
       "sha256": "f52cf61a6aae2f48e8dd427733a879bcb9b88b200027ff57ab22840a4c181ea8"
     },
     {
+      "path": "tests/product_corpus/cohorts/llvm-caller-slot-v1.json",
+      "sha256": "65f26a88ef90326a05db8de927f175d70097c5abf765625e45b389171d93b9be"
+    },
+    {
       "path": "tests/product_corpus/ground_truth.json",
       "sha256": "5b851f1c31badc59751ccdef84b150ef5b8f42099dd0fe1647d775f013f4ce03"
     },

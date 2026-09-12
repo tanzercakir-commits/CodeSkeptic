@@ -2,7 +2,7 @@
   "schema": "codeskeptic-cwe-catalog/v2",
   "selection_base": "005b1264618dcf84aa20a5685efd9c03a26bd67f",
   "profile": "linux-x86_64-clang20-cxx17-isolated-rule",
-  "inventory_sha256": "40dfedb3ebe09f3b7575fe8e8e3b5063719fab184467504283c4ba98237713c9",
+  "inventory_sha256": "4ac2a1c318b1c44e8168d7aa7b44aec96baaa36926e1ac0044d59c0adec873d2",
   "rules": {
     "alloc-size-overflow": {
       "tier_at_selection": "experimental",
@@ -1021,10 +1021,10 @@
   ],
   "evidence_version": {
     "schema": "codeskeptic-cwe-evidence-version/v1",
-    "sequence": 3,
-    "previous_catalog_sha256": "79df3c5bcc81bc5cffb4624eec374970396b40bf6f16babb41dae8cbe5440cc7",
-    "previous_inventory_sha256": "9198353752f102a98711a53946743507153df5a421f88cae3324256f98bd5ed4",
-    "previous_version_id": "72f7c04ed924c32577a0288e4091d7576d57f35f7598ff2cf848f3eac5cb734e",
+    "sequence": 4,
+    "previous_catalog_sha256": "31384b65ee813ca82d6825fd222b4f8986afe1b56218d55150c5c6b943801dc2",
+    "previous_inventory_sha256": "40dfedb3ebe09f3b7575fe8e8e3b5063719fab184467504283c4ba98237713c9",
+    "previous_version_id": "fc3e0986568a0574ac42035ed8f6f708dcb070d69ed72b2c0ece71c5058499ef",
     "registry_sha256": "17bd1d76e01534b6afd98ad04c105c656c8ed45a2778be8f4ed842716afcaadc",
     "capabilities": {
       "uninit-ptr": {
@@ -1318,6 +1318,7 @@
       "tests/product_corpus/candidates/llvm-value-return-loses-owner.cpp",
       "tests/product_corpus/candidates/llvm-value-return-selection.json",
       "tests/product_corpus/candidates/selection-record.json",
+      "tests/product_corpus/cohorts/llvm-caller-slot-v1.json",
       "tests/product_corpus/ground_truth.json",
       "tests/product_corpus/historical/measurement-index.json",
       "tests/product_corpus/licenses/LLVM.txt",
@@ -1412,17 +1413,17 @@
       "alloc-size-overflow-unknown-addend",
       "int-overflow-unknown-operands"
     ],
-    "id": "fc3e0986568a0574ac42035ed8f6f708dcb070d69ed72b2c0ece71c5058499ef",
+    "id": "3f52bde44ce897bec6ee999f4cb2e3c15e545c4e52b67efe3daa03ec4e97f8c9",
     "review": {
       "schema": "codeskeptic-cwe-successor-review/v1",
-      "source_base": "05a5c1de2f9045814b7daa424afb4cdc67527391",
-      "source_head": "8c28e275d662d222fc30e655c6aae80b73ca521f",
+      "source_base": "ef039c68cd2d059d4afa2e42b83e725597c6f813",
+      "source_head": "5fc09da642bd45f4555cfd343cfcd983a5089b4e",
       "implementer": "/root",
       "verifier": "/root/parent_child_native_verifier",
       "verdict": "PASS",
       "findings": [],
-      "reason": "Source-derived classification of the complete U003 delta: tests/product_corpus/candidates/gcc-parent-child-ground-truth.json is the independently accepted conditional 16-family/3-project-diagnostic source-label sidecar for one already admitted source; tests/product_corpus/retained_ground_truth.json is separate metadata linking that exact record to its external semantic-review receipt. Neither is executable detector logic, an additional quota sample, a native observation or a changed historical fixture. This prospective sequence-3 successor adds exactly these two current protected inputs, from 155 to 157; all previous row hashes, 52 fixture contracts, 15 installed capabilities, selection/profile, quality floors and immutable snapshots are preserved. Approval is prospective input classification only. Application requires fresh exact-head review and grants no cohort freeze, analyzer execution, native/rights/product qualification or U003 POP.",
-      "payload_sha256": "fc3e0986568a0574ac42035ed8f6f708dcb070d69ed72b2c0ece71c5058499ef"
+      "reason": "Prospective protection of one new U003 source-preparation shard containing two attributed LLVM C17 adaptations (one candidate and one same-cluster nonquota control). All 157 prior input rows, 52 fixtures, 15 capabilities, historical snapshots and stricter floors are preserved; no admission, label acceptance, rights, native, frozen-corpus or product qualification is granted.",
+      "payload_sha256": "3f52bde44ce897bec6ee999f4cb2e3c15e545c4e52b67efe3daa03ec4e97f8c9"
     }
   }
 }
