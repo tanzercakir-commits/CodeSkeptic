@@ -1,0 +1,46 @@
+{
+  "assessment": {
+    "canonical_identity": "Recorded openat, USR c:@F@openat, mangling openat, language_kind=1, linkage_kind=4. All 2 target occurrences have equal complete canonical/type records. This identifies recorded declarations, not the runtime executable binding.",
+    "definitions_redirections": "Every captured target has no definition and no recomputed definition, linkage, canonical-identity or redirection issue. Canonical spelling/expansion locations agree. No favorable target is discarded. This is not proof against runtime interposition or a substitute for the later model/case semantic contract.",
+    "header_origin": "Canonical spelling/expansion location agrees at /usr/include/fcntl.h:233:12 (offset 7877). Closure records physical file /usr/include/fcntl.h, 11442 bytes, SHA256 0a8ec5ef69559544b9da26b7d5ebee07f4ee43baa3cc9e9f35f8a33d4f157676. The packet binds the complete recorded closure, commands and selected native environment; this reader has not reopened that hosted header or established licensing/runtime provenance.",
+    "signature": "Captured canonical function type: int (int, const char *, int, ...); calling_convention=1; variadic=true. Declared parameter types: [\"int\", \"const char *\", \"int\"]. The fixed model-derived probe and captured declared parameters have no recomputed signature/type issues. Captured layouts do not prove the full runtime ABI or source/sink behavior.",
+    "visibility": "Actual retained v2 packet uses c17-posix2008/v1, language c17 and explicit _POSIX_C_SOURCE=200809L. Recomputed syntax and fixed driver visibility checks pass. This does not establish complete driver/CIndex preprocessing equivalence."
+  },
+  "boundary": "Source-bound recorded declaration candidate only, using actual hosted8953056 evidence. No independent decision is authored by this preparation, no evaluation quota or qualified pair is added, and no model/task/product completion is claimed.",
+  "id": "posix-openat-linux-x86-64-8953056-v1",
+  "model": {
+    "path": "tests/product_corpus/native-api-models.json",
+    "sha256": "c2caba2a15fef514c81af282c7fd8e1667b141698829f9354cd14118415873f4"
+  },
+  "packet": {
+    "path": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/native-declaration-hosted-8953056-v1/hosted-34722436917/native-declarations-ubuntu-24.04.json",
+    "sha256": "db310c6a273bec6356a96df7e347ca6e59ee93525e95b8b6d6e0932bfc015a59"
+  },
+  "projection_sha256": "85954f513a898aa173a4d45046b058fcad5403661871149e22c59c78f2ddc717",
+  "qualification": {
+    "evaluation_frozen": false,
+    "model_admitted": false,
+    "native_qualified": false,
+    "product_qualified": false,
+    "task_ready": false
+  },
+  "remaining_gaps": [
+    "Only the selected declaration evidence is proposed for review; source/sink/transfer/sanitizer semantics are not admitted.",
+    "Runtime ABI, allocator/environment conditions and actual case assumptions require their relevant evidence.",
+    "Other required platform/API/entry slots, SQLite and transfer/C++ overload selection remain separate obligations.",
+    "Independent corpus/security-fix/safe-control admission and the complete global pre-measurement freeze remain incomplete."
+  ],
+  "schema": "codeskeptic-native-declaration-candidate/v1",
+  "selection": {
+    "api_id": "posix.openat",
+    "platform": "linux-x86_64",
+    "visibility_profile": {
+      "feature_macros": {
+        "_POSIX_C_SOURCE": "200809L"
+      },
+      "id": "c17-posix2008/v1",
+      "language": "c17"
+    }
+  },
+  "state": "DECLARATION_EVIDENCE_FOR_INDEPENDENT_REVIEW"
+}

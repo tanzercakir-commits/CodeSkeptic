@@ -1,0 +1,46 @@
+{
+  "assessment": {
+    "canonical_identity": "Recorded openat, USR c:@F@openat, mangling _openat, language_kind=1, linkage_kind=4. All 2 target occurrences have equal complete canonical/type records. This identifies recorded declarations, not the runtime executable binding.",
+    "definitions_redirections": "Every captured target has no definition and no recomputed definition, linkage, canonical-identity or redirection issue. Canonical spelling/expansion locations agree. No favorable target is discarded. This is not proof against runtime interposition or a substitute for the later model/case semantic contract.",
+    "header_origin": "Canonical spelling/expansion location agrees at /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/fcntl.h:602:9 (offset 25056). Closure records physical file /Library/Developer/CommandLineTools/SDKs/MacOSX15.2.sdk/usr/include/sys/fcntl.h, 26353 bytes, SHA256 807bfdae1695967faf13532c1d0eb0d5eb08a67e0bef8bf529f732f6ce00176b. The packet binds the complete recorded closure, commands and selected native environment; this reader has not reopened that hosted header or established licensing/runtime provenance.",
+    "signature": "Captured canonical function type: int (int, const char *, int, ...); calling_convention=1; variadic=true. Declared parameter types: [\"int\", \"const char *\", \"int\"]. The fixed model-derived probe and captured declared parameters have no recomputed signature/type issues. Captured layouts do not prove the full runtime ABI or source/sink behavior.",
+    "visibility": "Actual retained v2 packet uses c17-posix2008/v1, language c17 and explicit _POSIX_C_SOURCE=200809L. Recomputed syntax and fixed driver visibility checks pass. This does not establish complete driver/CIndex preprocessing equivalence."
+  },
+  "boundary": "Source-bound recorded declaration candidate only, using actual hosted8953056 evidence. No independent decision is authored by this preparation, no evaluation quota or qualified pair is added, and no model/task/product completion is claimed.",
+  "id": "posix-openat-macos-arm64-8953056-v1",
+  "model": {
+    "path": "tests/product_corpus/native-api-models.json",
+    "sha256": "c2caba2a15fef514c81af282c7fd8e1667b141698829f9354cd14118415873f4"
+  },
+  "packet": {
+    "path": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/native-declaration-hosted-8953056-v1/hosted-34722436917/native-declarations-macos-14.json",
+    "sha256": "0a33ab29d7983f31af533fccab959fc9770ce76d07740878b4d0c785cf72a426"
+  },
+  "projection_sha256": "4b7c2c3df708d108babdb18b62318eaf1ae5d696a3069fa598eb4395284df5f2",
+  "qualification": {
+    "evaluation_frozen": false,
+    "model_admitted": false,
+    "native_qualified": false,
+    "product_qualified": false,
+    "task_ready": false
+  },
+  "remaining_gaps": [
+    "Only the selected declaration evidence is proposed for review; source/sink/transfer/sanitizer semantics are not admitted.",
+    "Runtime ABI, allocator/environment conditions and actual case assumptions require their relevant evidence.",
+    "Other required platform/API/entry slots, SQLite and transfer/C++ overload selection remain separate obligations.",
+    "Independent corpus/security-fix/safe-control admission and the complete global pre-measurement freeze remain incomplete."
+  ],
+  "schema": "codeskeptic-native-declaration-candidate/v1",
+  "selection": {
+    "api_id": "posix.openat",
+    "platform": "macos-arm64",
+    "visibility_profile": {
+      "feature_macros": {
+        "_POSIX_C_SOURCE": "200809L"
+      },
+      "id": "c17-posix2008/v1",
+      "language": "c17"
+    }
+  },
+  "state": "DECLARATION_EVIDENCE_FOR_INDEPENDENT_REVIEW"
+}

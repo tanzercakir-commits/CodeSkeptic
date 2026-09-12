@@ -2488,3 +2488,28 @@ açıktır. T1 bütün test kümesi464 test/30.519s ile yerelde PASS verdi (skip
 `164000f528ba94e626a4642772f96dc4c666815bf1c3882ecfed33534b997945`.
 Yeni exact-head bağımsız uygulama denetimi ayrıca gerekir; task_ready,
 native/model/product qualification ve POP iddiası yoktur.
+
+### Gerçek895 Linux/Darwin declaration candidate kayıtları
+
+Önceden bağımsız denetlenmiş iki gerçek hosted v2 packet'ten28 eklemeli candidate
+hazırlandı: her platformda14 non-SQLite library API. Kayıtlar
+`tests/product_corpus/declaration_candidates/` altındadır; yeni declaration
+yakalama veya sentetik header değildir. Her candidate özgün895 producer head'i,
+değişmemiş model digest'ini, paket kimliğini, tüm raw target'ları ve yeniden
+hesaplanan projection'ı bağlar. Canonical kimlik/imza/header/visibility ve
+definition/redirection değerlendirmeleri yalnız bildirilen kanıtla sınırlıdır.
+
+Hazırlama yakalama SHA:
+`6bc802ba1e49cc7338044a8e949a9c6af2d5e60e0f6c8905ab991340779dfd29`.
+32 odaklı metadata/review/negatif test GREEN:
+`14dc1f77c91b2854626735f78a73675a08ddab89dd8b9ef3830e41153a0d5c1d`.
+Gerçek Linux getenv candidate CLI kontrolü exit0 verdi:
+`ddb0b49a2cb5280c1257a1627658ce30bdcf57677415eac0daf34242f0a91113`.
+
+Bu hazırlama independent review değildir.28 kaydın ilk source-bound toplu
+kontrolünde hepsi declaration incelemesine uygun, fakat reviewed count0;
+qualified count0/50+3'tür. Ayrı exact-record/source-head bağımsız kararlar dış
+receipt olarak saklanmalı ve okuyucuda gerçek dosyalarıyla doğrulanmalıdır.
+Model semantics/transfer/SQLite/Windows/entry ve bütüncül corpus/security-fix/
+safe-control freeze yükümlülükleri açıktır. Scope, eski model/packet anlamları,
+kalite eşikleri, completed kayıtlar ve FIFO değişmedi; U003 henüz tamamlanmadı.
