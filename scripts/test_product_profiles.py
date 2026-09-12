@@ -594,6 +594,8 @@ class AllRuleGroundTruthTests(unittest.TestCase):
         selection_sha = write(repo / profiles.SOURCE_SELECTION, {'admissions': [{'candidate': value['candidate']}]})
         manifest = profiles.read_json(self.repo / 'scripts/product_profiles.json')
         manifest['source_selection']['sha256'] = selection_sha
+        # This isolated fixture has one source, irrespective of live cohort growth.
+        manifest['independent_quota_examples'] = 1
         for project in manifest['projects']:
             project['local_snapshot'] = str(base / 'source-projects' / project['id'])
         write(repo / 'scripts/product_profiles.json', manifest)
@@ -616,6 +618,7 @@ class AllRuleGroundTruthTests(unittest.TestCase):
     def test_staged_manifest_uses_synthetic_native_snapshot_roots(self):
         staged = self.staged_fixture()
         manifest = profiles.read_json(staged.repo / 'scripts/product_profiles.json')
+        self.assertEqual(manifest['independent_quota_examples'], 1)
         for project in manifest['projects']:
             self.assertEqual(project['local_snapshot'], str(staged.repo.parent / 'source-projects' / project['id']))
             self.assertTrue(Path(project['local_snapshot']).is_absolute())

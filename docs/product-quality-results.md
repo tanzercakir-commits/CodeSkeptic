@@ -1328,6 +1328,14 @@ Gerçek selection CLI iki source/review zincirini doğruladı: **2/1020**, memor
 buggy 2, safe 0, GCC kökeni yalnız 1. Kaynak ve semantic cluster başına tek kredi
 kuralı korunur; desired `test_1:15:1` henüz bir analyzer sonucu değildir.
 
-161 profile testi geçer; readiness beklenen exit 2'dir. Entegrasyonun exact-head
+Entegrasyonun ilk 161-test koşusu bir fixture uyumsuzluğu nedeniyle RED oldu:
+tek kaynağı mock eden all-rule fixture, canlı manifestten yeni sayı 2'yi
+devralıyordu. Bu bir ürün ground-truth hatası değil; fixture kendi tek-source
+sayımını açıkça tanımlamalıdır. Readiness beklenen exit 2'dir. Entegrasyonun exact-head
 incelemesi ve 155-input prospective successor hâlâ gereklidir. All-rule/platform,
 hak ve tam cohort freeze tamamlanmadı; U003 POP veya U004 ölçümü yapılmadı.
+
+Fixture sayımı kendi tek girişine bağlandıktan sonra 161 test yeniden geçti.
+Gerçek all-rule ve platform-label okuyucuları da eski kaynak kararlarını
+koruyarak geçti; iki-source toplamı ikinci kaynağa all-rule/platform kabulü
+vermez. Önceki başarısız test capture'ı RED olarak saklanır.
