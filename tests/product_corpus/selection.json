@@ -14,6 +14,16 @@
         "path": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/gcc-license-basis-v1/source-admission-review-d817a8d.json",
         "sha256": "b6bc33764e669176bd1a5e8a28f351e8aa656553d4f8e26d2af22e7a73fec91e"
       }
+    },
+    {
+      "candidate": {
+        "path": "tests/product_corpus/candidates/gcc-parent-child-source-candidate.json",
+        "sha256": "b9455b10f8c8b42d14c34cd4e9a429a476fca5cbd289d60b719ee7dc00236312"
+      },
+      "review": {
+        "path": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/retained-candidate-reader-v1/source-admission-810cae2.json",
+        "sha256": "f81b53999165ed6c4b7d1d98751c096f57b796e72a1560e4964ef84e80ce2d64"
+      }
     }
   ],
   "boundary": "Procedurally reviewed source-selection bookkeeping only, not a frozen evaluation denominator or task/product/native/license/distribution qualification. Each source and semantic cluster counts once globally. Historical held reviews and native observations are not rewritten. Complete cohort, all-rule ground truth, native recipes and all U003 acceptance remain mandatory before freeze."

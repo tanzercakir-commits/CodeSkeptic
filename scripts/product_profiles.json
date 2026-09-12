@@ -3,7 +3,7 @@
   "evaluation_state": "PARTIAL_INDEPENDENT_SOURCE_SELECTION_NOT_FROZEN",
   "historical_index": "tests/product_corpus/historical/measurement-index.json",
   "historical_index_sha256": "e743207feba61a008baca1bc89f93136b8f646e4335c357932c5693edc829e5d",
-  "independent_quota_examples": 1,
+  "independent_quota_examples": 2,
   "limits": {
     "addressable_recall_min": "0.70",
     "buggy_min_per_bucket": 30,
@@ -3864,7 +3864,7 @@
   "selection_base": "de642695c96224ab11c5add000c7ad9c996d0a50",
   "source_selection": {
     "path": "tests/product_corpus/selection.json",
-    "sha256": "4f541d326b86f82fa1cd436a64e8f1090a5fe009004953f2b94bf5bec2c89d73"
+    "sha256": "773825b8678f225a9d2e8db4879909ef1d2b82ef677ca858fdb5f0088caeceeb"
   },
   "state": "DRAFT_NOT_FROZEN"
 }

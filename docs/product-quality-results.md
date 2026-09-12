@@ -1308,3 +1308,26 @@ başarısız denetim korunur; düzeltme yeni exact-head bağımsız inceleme ist
 127 eski input, 52 fixture, 15 capability, floor ve snapshot byte'ları değişmez.
 Bu yalnız `ELIGIBLE_ADDITIVE_CLOSURE_ONLY` kararıdır; pending successor henüz
 uygulanmadı ve son payload/head incelemesinin yerine geçmez.
+
+### İkinci kaynak — partial selection'a bağlandı
+
+Aggregate kimlik düzeltmesi `247b61558676d9d7dce01c438b998bc152ef3af0`
+üzerinde yeni bağımsız checkpoint PASS aldı. Receipt:
+`retained-candidate-reader-v1/checkpoint-review-247b615.json`, SHA-256
+`7fa85bde580aa0fac0b8fc5dfd0feb987d91598d0c01f44c68b94d6b7a8b0371`.
+Denetçi özgün RED'e ek olarak aynı baytların geri konması, silme, boş stream'in
+büyümesi, yeni dizin, inode değiştirme ve tekrar gözlem negatiflerini de sınadı.
+Bu PASS kaynak sayım kararının entegrasyonundaki kod kapısını kapatır; inventory
+ve U003 kapılarının PASS'i değildir.
+
+Ardından değişmemiş exact `source-admission-810cae2` kararı selection'a eklendi.
+Yeni selection SHA-256:
+`773825b8678f225a9d2e8db4879909ef1d2b82ef677ca858fdb5f0088caeceeb`.
+Eski GCC admission girişi, candidate/recipe/etiket pinleri ve köken kaydı aynıdır.
+Gerçek selection CLI iki source/review zincirini doğruladı: **2/1020**, memory-leak
+buggy 2, safe 0, GCC kökeni yalnız 1. Kaynak ve semantic cluster başına tek kredi
+kuralı korunur; desired `test_1:15:1` henüz bir analyzer sonucu değildir.
+
+161 profile testi geçer; readiness beklenen exit 2'dir. Entegrasyonun exact-head
+incelemesi ve 155-input prospective successor hâlâ gereklidir. All-rule/platform,
+hak ve tam cohort freeze tamamlanmadı; U003 POP veya U004 ölçümü yapılmadı.
