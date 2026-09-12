@@ -2,7 +2,7 @@
   "schema": "codeskeptic-cwe-catalog/v2",
   "selection_base": "005b1264618dcf84aa20a5685efd9c03a26bd67f",
   "profile": "linux-x86_64-clang20-cxx17-isolated-rule",
-  "inventory_sha256": "5bbffcaa2510892e2989606ff0708ce0307bbc7b2abc6e28d5694d0c61c59c9c",
+  "inventory_sha256": "2813fb229394b535b475660b9a9d8e71c9d6c71988e93acc20334d8f0f4c0f0d",
   "rules": {
     "alloc-size-overflow": {
       "tier_at_selection": "experimental",
@@ -1021,10 +1021,10 @@
   ],
   "evidence_version": {
     "schema": "codeskeptic-cwe-evidence-version/v1",
-    "sequence": 5,
-    "previous_catalog_sha256": "56a99a03102a1988f8e1dfb896184b3a52a95cbd186c721346390ff208ca055f",
-    "previous_inventory_sha256": "4ac2a1c318b1c44e8168d7aa7b44aec96baaa36926e1ac0044d59c0adec873d2",
-    "previous_version_id": "3f52bde44ce897bec6ee999f4cb2e3c15e545c4e52b67efe3daa03ec4e97f8c9",
+    "sequence": 6,
+    "previous_catalog_sha256": "10d6031382098dc12649af86ef968c35a2da24931534341b998d65960104cfb5",
+    "previous_inventory_sha256": "5bbffcaa2510892e2989606ff0708ce0307bbc7b2abc6e28d5694d0c61c59c9c",
+    "previous_version_id": "06b371221edd01a87b22acba2960fd399bede89c6e7573b25256011872312698",
     "registry_sha256": "17bd1d76e01534b6afd98ad04c105c656c8ed45a2778be8f4ed842716afcaadc",
     "capabilities": {
       "uninit-ptr": {
@@ -1319,6 +1319,7 @@
       "tests/product_corpus/candidates/llvm-value-return-selection.json",
       "tests/product_corpus/candidates/selection-record.json",
       "tests/product_corpus/cohort_evidence/llvm-caller-slot-v1.json",
+      "tests/product_corpus/cohort_labels/llvm-caller-slot-v1.json",
       "tests/product_corpus/cohorts/llvm-caller-slot-v1.json",
       "tests/product_corpus/ground_truth.json",
       "tests/product_corpus/historical/measurement-index.json",
@@ -1414,17 +1415,17 @@
       "alloc-size-overflow-unknown-addend",
       "int-overflow-unknown-operands"
     ],
-    "id": "06b371221edd01a87b22acba2960fd399bede89c6e7573b25256011872312698",
+    "id": "9fc9f5e8ca79970ecd275854227b3040588a4426cee0e3e14c2ef2ee57342f6a",
     "review": {
       "schema": "codeskeptic-cwe-successor-review/v1",
-      "source_base": "67e131fa3fa358f50bc8433ec8378aaa6d0b1db5",
-      "source_head": "244a994411e5174b553e10304f5bdc4f559af9e0",
+      "source_base": "37e99c7f660f5cebc8f3b8a78a884cd01810a0ed",
+      "source_head": "0595f96581b7cb76698da6756a77e3746987dc39",
       "implementer": "/root",
       "verifier": "/root/retained_binding_exact_verifier",
       "verdict": "PASS",
       "findings": [],
-      "reason": "Prospective protection of one source-bound U003 compiler-evidence sidecar linking the unchanged LLVM caller-slot candidate and same-cluster nonquota control to the retained compiler-only packet. Complete source-base-to-head closure adds exactly this input; all 158 prior inputs, 52 fixture contracts, 15 capabilities, selection base, historical snapshots and quality floors remain unchanged. No source admission, label acceptance, rights, native-product, frozen-corpus or U003 qualification is granted.",
-      "payload_sha256": "06b371221edd01a87b22acba2960fd399bede89c6e7573b25256011872312698"
+      "reason": "Prospective protection of one standalone U003 source-derived all-rule label proposal for the unchanged LLVM caller-slot candidate and same-cluster nonquota control. Complete source-base-to-head closure adds exactly this label input; all 159 prior inputs, 52 fixture contracts, 15 capabilities, selection base, historical snapshots and quality floors remain unchanged. This classification does not grant semantic label acceptance, source admission, rights, native-product, frozen-corpus or U003 qualification.",
+      "payload_sha256": "9fc9f5e8ca79970ecd275854227b3040588a4426cee0e3e14c2ef2ee57342f6a"
     }
   }
 }

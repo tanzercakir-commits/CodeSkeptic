@@ -1766,3 +1766,78 @@ Otomatik config ve bütün source/header lexical alias .csk girdilerinin yokluğ
 bir gelecek çalıştırma şartıdır; şimdi doğrulanmış yokluk gibi sunulmaz.
 Dört planlı aile hâlâ PLANNED_NOT_IMPLEMENTED, control aynı cluster'da nonquota.
 All-rule kabulü, source/origin bağımsızlığı, haklar ve U003 bitişi ayrı kapılardır.
+
+### İncelenmiş all-rule etiket checkpoint'i ve korumalı girdi ardılı
+
+Temiz `0595f96581b7cb76698da6756a77e3746987dc39` üzerinde iki ayrı karar
+alındı. `/root/parent_child_native_verifier`, bütün 32 aile ve altı proje
+satırını gerçek kaynak/API extraction'ı, 22 Git referansı ve native CDB bağıyla
+inceleyip koşullu `ACCEPT_SOURCE_LABELS` verdi. Gerçek dış receipt
+`cohort-ground-truth-v1/source-label-review-0595f96.json`, SHA-256
+`1090769d2f19f23c14aa02dfce49d8b1c9fedaa00ca91cd436ec58f02e73e297`.
+Bağımsız `/root/retained_binding_exact_verifier`, okuyucu uygulamasına ve ayrı
+prospective girdi sınıflandırmasına PASS verdi; gerçek kayıt
+`cohort-ground-truth-v1/checkpoint-review-0595f96.json`, SHA-256
+`34c5ea76d112d20cab63437c02fa84524254db7c8e1d6f07d002cabd19f1c569`.
+237 profile, 88 identity ve 24 quality testi bağımsız çalıştırıldı; ek
+değişim/boş-stream/dizin negatifleri de ret verdi. Bu iki karar birbirinin
+yerine geçmez ve gerçekleşmemiş analyzer çalıştırması iddia etmez.
+
+Gerçek receipt ile CLI artık `source_labels_independently_reviewed=true` ve
+`review_head=0595f96…` döndürür. Capture SHA-256
+`afe2b7f5303eb67b2940871a3de179e3e2643fe3bc846d04cfcaeaa02c122bfc`.
+Bir önerilen CWE occurrence ve iki önerilen proje occurrence hâlâ gözlenmemiş
+hedeflerdir. Admission ve ek kota sıfır; yedi qualification bayrağı false.
+Control aynı cluster'da nonquota; koşullu safe etiketler caller'ın gelecekte
+free yapacağını veya planlı ailelerin ürün başarısını kanıtlamaz.
+
+Yalnız önceden incelenen `cohort_labels/llvm-caller-slot-v1.json` eklenerek
+korumalı input sayısı 159'dan 160'a, sequence 5'ten 6'ya çıkarıldı. Source base
+`37e99c7f660f5cebc8f3b8a78a884cd01810a0ed`, source head `0595f96` kalır.
+Önceki 159 girdi, 52 fixture sözleşmesi, 15 capability, selection, snapshots,
+eşikler ve bütün BOOK/PLAN/TODO/PROGRESS baytları korunur. Tam katalog SHA-256
+`94bfef3b3eb52a02a28f921a20b674d69a4486e9b3c41fac305cdf86d69553dd`,
+inventory `2813fb229394b535b475660b9a9d8e71c9d6c71988e93acc20334d8f0f4c0f0d`,
+payload `9fc9f5e8ca79970ecd275854227b3040588a4426cee0e3e14c2ef2ee57342f6a`.
+Gerçek `cwe_quality.py check` GREEN; ayrı exact-old/new harness'in 12
+in-memory negatifi geçti. Harness'e özgü ek iddialar production validator'a
+mal edilmez. Uygulanan temiz head için yeni bağımsız denetim gerekir.
+
+Kanıt düzeltmesi: `cohort-label-applied-catalog-tests-green.json` adındaki
+ilk capture yanlış test yolu nedeniyle sıfır test, exit 5 kaydetmiştir;
+başarı kanıtı değildir ve silinmez. Doğru hedef
+`tests/cwe_corpus/test_catalog.py` ayrıca çalıştırıldı: 65 test geçti, capture
+SHA-256 `d0e0eceaa72f235cb4b77d96d82636ddbbb8852404c45817c41001cdee3d40fd`.
+Commit öncesi guard denemesi de beklenen clean-tree şartında exit 2
+`dirty implementation` verdi; dosya adındaki GREEN sözcüğü başarı değildir.
+Gerçek guard sonucu yalnız temiz commit üzerinde yeniden alınacaktır.
+
+### Önceki 37e99c7 hosted sonuçları: başarısızlıklar korunur
+
+[Identity 34702319454](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34702319454)
+attempt 1 tamamlandı ve **başarısız**. Gerçek 31 dosya, altı API ZIP/member
+bağı, source/helper/parser kimliği bağımsız denetlendi. Ham paket özeti
+SHA-256 `b2c923169f7dca7409c6a8b1dcdb8f11793cf63bdafaf13d61f721ec559ce504`;
+`cohort-ground-truth-v1/hosted-review-37e99c7.json` kararı
+`308cbe5ebcb59af20d672771afd04ee951dfe37ae1ff226bf3ecf4c6f3ccdde8`.
+Linux/macOS işleri başarılı, Windows işi başarısızdır. Üçünde de 88 identity
+ve 140 seçili profile testi geçti; Windows profile testleri 251.217 saniye.
+Windows native-case artifact'ı yoktur. İki başarılı native-case artifact'ı
+eski GCC mixed-storage girdisidir, yeni LLVM çiftinin native-product kanıtı değil.
+
+Windows hata zinciri `capture_case → capture → native_metadata → WINDOWS_OS_QUERY`:
+30 saniyelik PowerShell TIMEOUT, ilk case metadata aşamasında, kaynak
+materialization/compiler probe başlamadan oluştu. İlgili helper baytları
+`244a994` ve `67e131f` ile aynıdır. Özgün sorgunun iç zaman dökümü yoktur;
+startup, module load, CIM, serialization veya host contention kök nedeni
+kanıtlanmış sayılmaz. Sonraki ayrı teşhis 22531 ms, CIM_LOADED 22290 ms,
+Utility import 4 ms ve gerçek CIM query aralığı 41 ms kaydetti. 45 ms ifadesi
+Utility import'u da içerir. Sonraki başarı önceki TIMEOUT'u düzeltmez veya
+onun iç nedenini kanıtlamaz; retry/warmup/timeout artırımı uygulanmadı.
+
+Aynı SHA'nın son API durumları: Project FIFO `34702319362`, Juliet
+`34702319397` ve Windows `34702319404` başarılı; genel CI `34702319380`
+başarısız. Bunlar status yenilemesidir, genel CI kök neden denetimi değildir.
+Capture SHA-256 `1af56d4c875f0a0777ddb123688ba80496bb3569a26f028e92032dc9aa2c47b1`.
+Bu sonuçlar yeni checkpoint'in hosted başarısına taşınmaz. U003 POP yok;
+selection 2/1020, LLVM non-admitted, haklar ve ürün/native qualification bekler.
