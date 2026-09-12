@@ -2299,3 +2299,33 @@ Dar düzeltme SP/HT ve fiziksel LF/CRLF gramerini açıklar; ASCII dışı repla
 karakterleri normalize edilmez, sahte Unicode boş satırlar atılmaz. Gerçek eski
 packet'ler ve iki BLOCKED inceleme korunur; F2 sonrası yeni exact-head PASS henüz
 bu paragrafın iddiası değildir. Ürün/U003 yeterliliği değişmez.
+
+### f3ec95f hosted Windows fixture RED ve dar yol-eşleme düzeltmesi
+
+Exact `f3ec95fc9474aaaa410365f81c2b7a77f611cb69` bağımsız uygulama incelemesi447
+test ve ek172 bozuk makro metni denemesiyle PASS_IMPLEMENTATION_ONLY aldı;
+F1/F2 kapandı. Receipt SHA
+`51ade62008e05f3ae1f4c0e34257ccaee3669a79b27ee428f52ad8205fe1c5e8`.
+Bu hosted/native yeterlilik değildir. Normal feature fast-forward sonrasında
+[identity run34719586304](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34719586304)
+başarısız oldu: Linux/macOS job API durumları success; Windows job103622853708
+132 identity testinde üç error ve altı skip kaydetti. Üç hata, aynı yeni child
+fixture'ının None/missing/prefix alt durumlarında Windows Path'in ters bölü
+çıktısını POSIX string anahtarlı sözlükte aramasıyla oluşan KeyError'dır.
+Başarısız adım log capture SHA
+`f447e753ef185f99ca917aa2a6ecdcc086684e347d1e6d0ef4a0ec09b7334537`.
+Windows native capture'a ulaşılmadı; üç Windows artifact'ı yok. Bu hata eski
+30s OS sorgusu timeout'undan ayrıdır; ikisi de kendi başarısızlığı olarak korunur.
+
+Yeni saf regresyon, gerçek fixture testinin bütün alt durumlarını PurePosixPath
+ve PureWindowsPath ile tekrarlar; yalnız sentetik input/library yolları farklı
+flavor kullanır, gerçek depo okumaları native kalır. Özgün kod üzerinde aynı üç
+Windows KeyError ile RED verdi; capture SHA
+`d5ec8c1a4f74ac82fee07166b24b5be62fe556b195aa88a80eb6d3fa63e75d2c`.
+Dar düzeltme fixture sözlüğünü Path anahtarlarıyla kurup Path ile okur. Pozitif
+argv/14-request kontrolleri, beş negatif ve backend.assert_not_called korunur;
+test skip edilmez ve üretim kodu değişmez. Focused GREEN capture SHA
+`4b56b2feb906c1e1d4fb95d6b63a032617b005eb004bf3b63499ca6c79479789`.
+Bu saf iki-flavor deneyi gerçek Windows CI değildir. Yeni exact-head bağımsız
+inceleme ve gerçek hosted sonuç ayrıca gerekir; eski PASS yeni head'e taşınmaz.
+Selection2/1020, native/model/rights kapıları, main ve U003 FRONT değişmez; POP yok.

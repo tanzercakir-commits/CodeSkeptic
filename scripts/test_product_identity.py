@@ -5,7 +5,7 @@ from contextlib import contextmanager, ExitStack
 import hashlib
 import io
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import subprocess
 import sys
 import tempfile
@@ -2142,7 +2142,7 @@ class PosixDeclarationProfileTests(unittest.TestCase):
         config = {key: value[key] for key in ('native_identity', 'environment', 'library', 'profile')}
         config['input'] = value['probe']['input']
         native = config['native_identity']
-        files = {row['path']: row for row in (config['input'], config['library'])}
+        files = {Path(row['path']): row for row in (config['input'], config['library'])}
         for mutation in (None, 'missing', 'unknown', 'extra', 'prefix', 'windows'):
             candidate = copy.deepcopy(config)
             if mutation == 'missing': del candidate['profile']
@@ -2153,7 +2153,7 @@ class PosixDeclarationProfileTests(unittest.TestCase):
                   mock.patch.object(identity.platform, 'system', return_value='Windows' if mutation == 'windows' else 'Linux'),
                   mock.patch.object(identity, 'case_environment', return_value=value['environment']),
                   mock.patch.object(identity, 'source_identity', return_value=native['source']),
-                  mock.patch.object(identity, 'file_identity', side_effect=lambda path: files[str(path)]),
+                  mock.patch.object(identity, 'file_identity', side_effect=lambda path: files[path]),
                   mock.patch.object(identity, 'declaration_backend') as backend):
                 backend.return_value.observe.return_value = {'child': 'observed'}
                 if mutation is None:
@@ -2164,6 +2164,22 @@ class PosixDeclarationProfileTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         identity.declaration_worker(candidate)
                     backend.assert_not_called()
+
+    def test_child_profile_fixture_supports_both_lexical_path_flavors(self):
+        value, _ = self.packet()
+        synthetic_paths = {value['probe']['input']['path'], value['library']['path']}
+        native_path = Path
+        for flavor in (PurePosixPath, PureWindowsPath):
+            def fixture_path(path):
+                # Only synthetic identities change flavor; repository reads remain native.
+                if isinstance(path, str) and path in synthetic_paths:
+                    return flavor(path)
+                return native_path(path)
+
+            with (self.subTest(path_flavor=flavor.__name__),
+                  mock.patch.object(identity, 'Path', side_effect=fixture_path),
+                  mock.patch.object(sys.modules[__name__], 'Path', side_effect=fixture_path)):
+                self.test_child_reconstructs_explicit_profile_before_backend_loading()
 
     @unittest.skipIf(sys.platform == 'win32', 'Synthetic Linux v2 writer requires POSIX paths; no Windows native claim.')
     def test_explicit_v2_writer_propagates_profile_and_preserves_both_failures(self):
