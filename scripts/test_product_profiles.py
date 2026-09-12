@@ -5209,6 +5209,17 @@ class ReviewedFilesTests(unittest.TestCase):
             self.assertLessEqual(len(subprocess.list2cmdline(argv).encode('utf-16-le')) // 2, 8192)
         self.require_batch()
 
+    @unittest.skipUnless(os.name == 'posix', 'Actual undecodable byte names require POSIX surrogateescape')
+    def test_posix_surrogateescape_checkout_root_preserves_historical_reads(self):
+        with tempfile.TemporaryDirectory(prefix='codeskeptic-reviewed-posix-') as temporary:
+            repo = Path(temporary) / 'posix-\udcff-root'
+            self.assertEqual(os.fsencode(repo.name), b'posix-\xff-root')
+            self.fixture.git('clone', '--quiet', '--shared', '--no-checkout', str(self.fixture.repo), str(repo))
+            repo = repo.resolve(strict=True)
+            paths = self.fixture.small_paths[:2]
+            self.assertEqual(profiles.verify_reviewed_files(repo, self.fixture.head, self.fixture.links(paths)),
+                             self.fixture.expected(paths))
+
     def test_singleton_path_survives_soft_budget_even_when_serialized_root_is_large(self):
         # A physical >8K checkout path is not portable. Inflate only the
         # independent serialization measurement; actual Git still reads the

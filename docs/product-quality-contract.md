@@ -582,3 +582,11 @@ Her yeni doğrulama Git'i yeniden okur; sanitize edilmiş environment ve mevcut
 doğrulanır; hostile Git executable'a karşı hard streaming memory sınırı değildir.
 Süre/kota/eşik gevşetilmez. Süreç sayısının azalması tek başına gerçek Windows
 hosted başarısı ya da native ürün yeterliliği kanıtı değildir.
+
+Bu platformlar-arası argv hesabı POSIX'in geçerli byte-dizin adlarını daraltamaz.
+Python surrogateescape ile temsil edilen checkout kökü için UTF-16 unit sayımı
+`surrogatepass` kullanır; gerçek Git'e aynı yol verilir. Windows non-BMP/quoting
+hesabı ve portable reviewed-file yolu grameri değişmez. Gerçek undecodable byte
+filesystem testi yalnız POSIX'te anlamlıdır ve Windows'ta açık skip gerekçesi
+taşır; ortak Unicode, boyut, protocol ve Git-mode testleri platform nedeniyle
+atlanmaz. Skip veya sentetik serialization testi native platform PASS'i değildir.

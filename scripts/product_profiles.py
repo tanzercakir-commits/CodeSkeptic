@@ -1174,7 +1174,9 @@ def verify_reviewed_files(repo, head, links, *, expected_tree=None):
     groups, group = [], []
     for relative in requested:
         command = [*command_prefix, *listing_prefix, *group, relative]
-        units = len(subprocess.list2cmdline(command).encode('utf-16-le')) // 2
+        # POSIX byte names may contain surrogateescape code points. Count
+        # their units without rejecting roots accepted by the actual Git call.
+        units = len(subprocess.list2cmdline(command).encode('utf-16-le', errors='surrogatepass')) // 2
         if group and units > 8192:
             groups.append(group)
             group = []

@@ -1948,3 +1948,49 @@ Gerçek reviewed-label, legacy-label ve native-packet CLI okumaları ile invento
 kontrolü GREEN; readiness beklenen exit 2 ve selection 2/1020 olarak kaldı.
 Bunlar commit öncesi yerel sonuçlardır; temiz exact-head guard/bağımsız denetim
 ve yeni hosted Windows başarısının yerine geçmez. Yeni quota veya U003 POP yoktur.
+
+### f2f2dad bağımsız ret ve POSIX byte-yol regresyonu
+
+Temiz `f2f2dadfe176fa81f9684f6b3aebd402613ac322` bağımsız denetimi
+`BLOCKED_FINDINGS` verdi; bu head push edilmedi. Gerçek karar
+`cohort-provenance-v1/checkpoint-review-f2f2dad-blocked.json`, SHA-256
+`f3195e7375cbcd18ddd0b4ce0b82ed26bae72bd2383d813ffec3849409a0f56d`.
+259/88/24 test ve temiz guard geçse de, geçerli canonical POSIX checkout kökündeki
+undecodable filename byte'ı için yeni UTF-16 hesabı `UnicodeEncodeError` üretti.
+Hakem aynı historical Git blob'unu eski 9900 okuyucunun kabul ettiğini gösterdi.
+Primary eski-kod GREEN ve f2f2dad RED tekrarlarını ayrı kaydetti; yeni dar
+regresyon testi de düzeltmeden önce RED, capture SHA-256
+`a4f68f1f7bc0ca3f47b67e53c729ebe8cf3f9730f4877062d2587d2a1b505547`.
+
+Sayımda `surrogatepass` kullanımı bu kabul daralmasını giderir; Git'e verilen yol,
+Windows UTF-16 unit/quoting hesabı ve tüm diğer sınırlar korunur. Gerçek
+byte-yol probe GREEN; 23 focused test GREEN, SHA-256
+`f9324ef2ed7d9559588028fc04f444db82fc61ab6eca554fed27d65fca79dc00`.
+Tam Linux profile suite 260 test ve 88 identity testi geçti; full-profile capture
+`7e193bc036471fe01b30287d3f7a7386ad9e4a2ae98ff41129dfa9a61638a041`.
+Yeni filesystem regresyonunun POSIX koşulu Windows'ta açık skip gerekçesidir;
+önceki 22 ortak test atlanmaz. Bu sonuçlar yeni exact-head bağımsız PASS değildir;
+ilk ret kaydı ve eski hosted failures korunur.
+
+### 9900bbf genel CI başarısızlığı ayrı kalır
+
+[Genel CI 34704593063](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34704593063)
+1583 CTest kaydından birinde başarısız, exit 8: `AnalysisCacheTest.`
+`CheckpointSnapshotBindsPendingHeaderAndSidecarWithoutPublishingFindings`.
+`reusableWorkerResponse` ilk assertion'ı false döner; sonraki resume/header/sidecar
+assertion'larına ulaşılmaz. Exact log, runtime-before proof'un `module_read`
+aşamasında beş saniyelik deadline'ı aştığını bildirir: wall 5005114 µs,
+thread CPU 764590 µs, iki modülde 174537400 byte read/hash. Runtime digest ve
+input witness boş; fresh analyzed coverage kaybolmaz, fakat reuse kanıtı verilmez.
+Bu I/O, scheduler veya contention alt nedenini ya da hangi modülü kanıtlamaz.
+
+`/root/parent_child_native_verifier` ham capture ve 3207 log satırını,
+9900 exact source bağını bağımsız denetledi. Karar
+`cohort-provenance-v1/prior-ci-review-9900bbf.json`, SHA-256
+`7e919adedb6887985bed41c3afad3971592b078561c35a4a450be2a1972fe40a`.
+Collector head f2f2dad ile gerçek hosted head 9900 ayrıdır. Failing runtime/test
+ve genel CI dosyaları U003 kapsamı dışındadır ve 37e99c7'den beri değişmemiştir;
+bu kayıt onları burada değiştirme izni değildir. U004 RED baseline ve sonraki
+CH12 dayanıklılık sorumluluğu korunur. Git batching bu ayrı hatanın düzeltmesi
+olarak sunulmaz; sonraki single-process/smoke/dogfood/corpus/thesis kapıları
+çalışmamıştır ve all-CI PASS yoktur.
