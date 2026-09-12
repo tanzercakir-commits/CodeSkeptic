@@ -1,0 +1,23 @@
+{
+  "schema": "codeskeptic-product-reviewed-platform-source-labels/v1",
+  "state": "CONDITIONAL_PLATFORM_SOURCE_LABELS_NOT_NATIVE_QUALIFIED",
+  "recipes": [
+    {
+      "path": "tests/product_corpus/candidates/gcc-mixed-storage-windows.json",
+      "sha256": "2764799dc6f872a501ef254d38d9e7780411488ae5362cb809d46b443565b8b2"
+    },
+    {
+      "path": "tests/product_corpus/candidates/gcc-mixed-storage-macos.json",
+      "sha256": "f3dbd2a0df4402bb1f13fc6a5fabf61631f7df5f0112d5fa141ff17f8b390460"
+    }
+  ],
+  "ground_truth": {
+    "path": "tests/product_corpus/candidates/gcc-mixed-storage-ground-truth.json",
+    "sha256": "5139cb49a5bff0dbf4f65f4d5d8d7556b8a2a0dcc5def049e977a5a674ee179f"
+  },
+  "review": {
+    "path": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/gcc-platform-recipes-v1/source-applicability-review-7568f69.json",
+    "sha256": "c782ce6c939a868af2295545a32db151fa3c404fa61be16a35d131071fd31a5d"
+  },
+  "boundary": "Additive conditional source-label review for two unchanged prospective recipes of one existing source. Every reviewer condition remains a prerequisite, not a measured or satisfied fact. No additional quota examples, source admission, native byte reopening, adjusted header closure, embedded-frontend compatibility, analyzer observation, licensing, redistribution, evaluation freeze, task completion or product qualification is established. Missing external review or changed bound bytes fail closed. This shared-account procedural review is not signed provenance. Original source, Linux recipe, all-rule labels, admission and selection remain unchanged."
+}

@@ -930,6 +930,7 @@ GCC_PLATFORM_FILES = {
     "Windows": "tests/product_corpus/candidates/gcc-mixed-storage-windows.json",
     "Darwin": "tests/product_corpus/candidates/gcc-mixed-storage-macos.json",
 }
+GCC_PLATFORM_REVIEW_INDEX = "tests/product_corpus/platform_source_labels.json"
 GCC_PLATFORM_REFERENCES = (
     "src/source_manager/SourceManager.cpp", "src/source_manager/ResourceDir.cpp",
     "src/config/Config.cpp", "src/config/Config.h", "src/core/RuleCapabilities.def",
@@ -1163,6 +1164,106 @@ def verify_gcc_platform_recipes(repo):
                 "additional_quota_examples": 0, **{key: False for key in GCC_PLATFORM_QUALIFICATION}}
     except (ValueError, OSError, TypeError, KeyError, IndexError, RecursionError, RuntimeError, subprocess.SubprocessError):
         raise ValueError("GCC prospective platform recipes rejected") from None
+
+
+def gcc_platform_source_review_metadata(review, recipes, ground_truth):
+    """Validate a procedural conditional judgment, never its native prerequisites."""
+    fields(review, "schema repository_head implementer verifier verdict findings source_sha256 recipes ground_truth "
+           "additional_quota_examples conditions rationale qualification", "platform source review")
+    require(type(recipes) is list and len(recipes) == len(GCC_PLATFORM_FILES), "reviewed platform coverage")
+    for link, path in zip(recipes, GCC_PLATFORM_FILES.values()):
+        fields(link, "path sha256", "reviewed platform recipe")
+        require(link["path"] == path, "reviewed platform path")
+        external_digest(link["sha256"])
+    fields(ground_truth, "path sha256", "reviewed platform ground truth")
+    require(ground_truth["path"] == GCC_GROUND_TRUTH, "reviewed platform ground-truth path")
+    external_digest(ground_truth["sha256"])
+    require(review["schema"] == "codeskeptic-platform-source-applicability-review/v1"
+            and type(review["repository_head"]) is str and re.fullmatch(r"[0-9a-f]{40}", review["repository_head"])
+            and review["repository_head"] != "0" * 40
+            and review["verdict"] == "ACCEPT_CONDITIONAL_PLATFORM_SOURCE_LABELS" and review["findings"] == []
+            and review["source_sha256"] == GCC_CASE_SHA
+            and canonical(review["recipes"]) == canonical(recipes)
+            and canonical(review["ground_truth"]) == canonical(ground_truth), "platform source reviewed identity")
+    for key in ("implementer", "verifier"):
+        require(type(review[key]) is str and re.fullmatch(r"/[a-z0-9_]+(?:/[a-z0-9_]+)*", review[key])
+                and len(review[key]) <= 128, "platform source reviewer identity")
+    require(review["implementer"] != review["verifier"]
+            and type(review["additional_quota_examples"]) is int and review["additional_quota_examples"] == 0
+            and nonempty(review["rationale"]) and len(review["rationale"]) <= 8192
+            and type(review["conditions"]) is list and 1 <= len(review["conditions"]) <= 32
+            and all(nonempty(item) and len(item) <= 2048 for item in review["conditions"]),
+            "platform source review independence/conditions")
+    qualification = tuple(key for key in GCC_PLATFORM_QUALIFICATION if key != "platform_source_labels_reviewed")
+    fields(review["qualification"], " ".join(qualification), "platform source review qualification")
+    require(all(value is False for value in review["qualification"].values()), "conditional review is not qualification")
+    return {"platform_source_labels_reviewed": True, "conditional_only": True, "conditions_satisfied": False,
+            "conditions": list(review["conditions"]), "review_head": review["repository_head"],
+            "additional_quota_examples": 0, **review["qualification"]}
+
+
+def verify_gcc_platform_source_labels(repo):
+    """Bind an additive review while preserving both original prospective records.
+
+    Agent identities and reviewed Git bytes establish the repository's shared-user
+    review procedure, not a signature or automatic proof of genuine authorship.
+    No condition is declared satisfied and no native tool is invoked.
+    """
+    try:
+        repo = Path(repo)
+        require(repo.is_absolute() and repo.resolve(strict=True) == repo, "platform source checkout root")
+        observations = {}
+
+        def read(path, expected=None):
+            info, before, raw = external_read(path, capture=True)
+            require(info["size_bytes"] <= 65536 and (expected is None or info["sha256"] == expected),
+                    "platform source review size/hash")
+            if path in observations:
+                require(external_identity(observations[path]) == external_identity(before),
+                        "platform source evidence changed between reads")
+            observations[path] = before
+            return parse_json(raw.decode("utf-8"))
+
+        index = read(repo / GCC_PLATFORM_REVIEW_INDEX)
+        fields(index, "schema state recipes ground_truth review boundary", "platform source review index")
+        require(index["schema"] == "codeskeptic-product-reviewed-platform-source-labels/v1"
+                and index["state"] == "CONDITIONAL_PLATFORM_SOURCE_LABELS_NOT_NATIVE_QUALIFIED"
+                and nonempty(index["boundary"]) and len(index["boundary"]) <= 8192, "platform source review index state")
+        fields(index["review"], "path sha256", "platform source review link")
+        external_digest(index["review"]["sha256"])
+        review_path = Path(index["review"]["path"])
+        require(review_path.is_absolute() and repo not in review_path.parents, "platform source review must be external")
+        review = read(review_path, index["review"]["sha256"])
+        accepted = gcc_platform_source_review_metadata(review, index["recipes"], index["ground_truth"])
+        links = {}
+
+        def linked(link):
+            fields(link, "path sha256", "platform source reviewed file")
+            relative = external_relative(link["path"]).as_posix()
+            external_digest(link["sha256"])
+            require(relative not in links or links[relative] == link, "platform source shared link changed")
+            links[relative] = link
+            return read(repo / relative, link["sha256"])
+
+        linked(index["ground_truth"])
+        for link in index["recipes"]:
+            value = linked(link)
+            require(value["ground_truth"] == index["ground_truth"], "platform source label binding changed")
+            for key in ("compilation_database", "candidate", "linux_recipe", "ground_truth_index"):
+                linked(value[key])
+        verify_reviewed_files(repo, review["repository_head"], list(links.values()))
+        actual = verify_gcc_platform_recipes(repo)
+        current_links = [{"path": GCC_PLATFORM_FILES[row["platform"]], "sha256": row["record_sha256"]}
+                         for row in actual["recipes"]]
+        require(canonical(current_links) == canonical(index["recipes"]), "platform source reviewed recipes changed")
+        for path, before in observations.items():
+            require(path.resolve(strict=True) == path and external_identity(path.lstat()) == external_identity(before),
+                    "platform source review final identity changed")
+        return {**actual, **accepted, "review_sha256": index["review"]["sha256"],
+                "recipes": [{**row, "platform_source_labels_reviewed": True,
+                             "conditional_only": True, "conditions_satisfied": False} for row in actual["recipes"]]}
+    except (ValueError, OSError, TypeError, KeyError, IndexError, RecursionError, RuntimeError, subprocess.SubprocessError):
+        raise ValueError("reviewed GCC platform source labels rejected") from None
 
 
 def adapt_gcc_source(raw):
@@ -1608,7 +1709,7 @@ def draft_readiness(manifest, root=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check", "ground-truth-candidate-check", "ground-truth-check", "platform-recipes-check"))
+    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check", "ground-truth-candidate-check", "ground-truth-check", "platform-recipes-check", "platform-source-labels-check"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--historical-sources", type=Path, default=Path(
         "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S04-U001/corpus-diagnostic-comparison"))
@@ -1620,10 +1721,11 @@ def main():
         if args.command == "selection-check":
             require(args.binding is None and args.evidence_root is None and args.external_root is None,
                     "reviewed selection uses its explicit tracked roots")
-        if args.command == "platform-recipes-check":
+        if args.command in ("platform-recipes-check", "platform-source-labels-check"):
             require(args.binding is None and args.evidence_root is None and args.external_root is None,
                     "native recipes use their fixed tracked roots")
-            result = verify_gcc_platform_recipes(args.root)
+            result = (verify_gcc_platform_recipes(args.root) if args.command == "platform-recipes-check"
+                      else verify_gcc_platform_source_labels(args.root))
         elif args.command in ("ground-truth-candidate-check", "ground-truth-check"):
             require(args.binding is None and args.evidence_root is None and args.external_root is None,
                     "all-rule source labels use their fixed tracked roots")

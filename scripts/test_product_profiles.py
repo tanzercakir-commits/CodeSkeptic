@@ -31,6 +31,168 @@ def quota_rows():
 
 
 class NativeRecipeTests(unittest.TestCase):
+    def platform_source_review_fixture(self):
+        staged = self.staged_fixture()
+        recipes = [{'path': path, 'sha256': profiles.file_sha(staged.repo / path)}
+                   for path in profiles.GCC_PLATFORM_FILES.values()]
+        ground_truth = {'path': profiles.GCC_GROUND_TRUTH,
+                        'sha256': profiles.file_sha(staged.repo / profiles.GCC_GROUND_TRUTH)}
+        staged.review = {'schema': 'codeskeptic-platform-source-applicability-review/v1',
+                         'repository_head': 'd' * 40, 'implementer': '/root',
+                         'verifier': '/root/synthetic_reviewer',
+                         'verdict': 'ACCEPT_CONDITIONAL_PLATFORM_SOURCE_LABELS', 'findings': [],
+                         'source_sha256': profiles.GCC_CASE_SHA,
+                         'recipes': copy.deepcopy(recipes), 'ground_truth': copy.deepcopy(ground_truth),
+                         'additional_quota_examples': 0,
+                         'conditions': ['Synthetic conditional review; no real platform qualification.'],
+                         'rationale': 'Synthetic metadata fixture, not an independent source judgment.',
+                         'qualification': {key: False for key in profiles.GCC_PLATFORM_QUALIFICATION
+                                           if key != 'platform_source_labels_reviewed'}}
+        staged.review_path = staged.repo.parent / 'platform-review.json'
+        staged.index_path = staged.repo / 'tests/product_corpus/platform_source_labels.json'
+        staged.index = {'schema': 'codeskeptic-product-reviewed-platform-source-labels/v1',
+                        'state': 'CONDITIONAL_PLATFORM_SOURCE_LABELS_NOT_NATIVE_QUALIFIED',
+                        'recipes': recipes, 'ground_truth': ground_truth,
+                        'review': {'path': str(staged.review_path),
+                                   'sha256': staged.write(staged.review_path, staged.review)},
+                        'boundary': 'Synthetic index; no task or native qualification.'}
+        staged.write(staged.index_path, staged.index)
+        return staged
+
+    def test_platform_source_review_metadata_is_conditional_and_adds_no_quota(self):
+        staged = self.platform_source_review_fixture()
+        result = profiles.gcc_platform_source_review_metadata(
+            staged.review, staged.index['recipes'], staged.index['ground_truth'])
+        self.assertTrue(result['platform_source_labels_reviewed'])
+        self.assertTrue(result['conditional_only'])
+        self.assertFalse(result['conditions_satisfied'])
+        self.assertEqual(result['additional_quota_examples'], 0)
+        self.assertEqual(result['conditions'], staged.review['conditions'])
+        self.assertTrue(all(result[key] is False for key in staged.review['qualification']))
+
+    def test_platform_source_review_metadata_rejects_forged_identity_or_qualification(self):
+        staged = self.platform_source_review_fixture()
+        replacements = [('schema', 'other'), ('repository_head', 'HEAD'), ('repository_head', '0' * 40),
+                        ('verdict', 'PASS'), ('verdict', 'HOLD'), ('findings', ['unresolved']),
+                        ('implementer', '/root/synthetic_reviewer'), ('verifier', 'invalid'),
+                        ('source_sha256', 'e' * 64), ('additional_quota_examples', False),
+                        ('additional_quota_examples', 1), ('rationale', ''), ('rationale', 'x' * 8193),
+                        ('conditions', []), ('conditions', ['']), ('conditions', [True]),
+                        ('conditions', ['x' * 2049]), ('conditions', ['x'] * 33), ('conditions', 'text'),
+                        ('recipes', list(reversed(staged.index['recipes']))),
+                        ('ground_truth', {'path': profiles.GCC_GROUND_TRUTH, 'sha256': 'e' * 64})]
+        for key in staged.review['qualification']:
+            for bad in (True, 0):
+                replacements.append(('qualification', {**staged.review['qualification'], key: bad}))
+        replacements.append(('qualification', {**staged.review['qualification'], 'platform_source_labels_reviewed': True}))
+        for key, replacement in replacements:
+            review = copy.deepcopy(staged.review)
+            review[key] = replacement
+            with self.subTest(key=key, replacement=replacement), self.assertRaises(ValueError):
+                profiles.gcc_platform_source_review_metadata(review, staged.index['recipes'], staged.index['ground_truth'])
+
+    def test_platform_source_review_reader_reopens_recipes_and_does_not_execute_native_tools(self):
+        staged = self.platform_source_review_fixture()
+        with mock.patch.object(profiles, 'verify_ground_truth_index', return_value=staged.accepted), \
+             mock.patch.object(profiles, 'verify_reviewed_files') as objects, \
+             mock.patch.object(profiles.subprocess, 'run') as execute, \
+             mock.patch.object(profiles.urllib.request, 'urlopen') as download:
+            before = profiles.verify_gcc_platform_recipes(staged.repo)
+            result = profiles.verify_gcc_platform_source_labels(staged.repo)
+            after = profiles.verify_gcc_platform_recipes(staged.repo)
+        self.assertEqual(before, after)
+        self.assertFalse(after['platform_source_labels_reviewed'])
+        self.assertTrue(result['platform_source_labels_reviewed'])
+        self.assertTrue(result['conditional_only'])
+        self.assertFalse(result['conditions_satisfied'])
+        self.assertEqual(result['recipe_count'], 2)
+        self.assertEqual(result['unique_source_count'], 1)
+        self.assertEqual(result['source_selection_quota_examples'], 1)
+        self.assertEqual(result['additional_quota_examples'], 0)
+        for recipe in result['recipes']:
+            self.assertTrue(recipe['platform_source_labels_reviewed'])
+            self.assertFalse(recipe['conditions_satisfied'])
+        for key in staged.review['qualification']:
+            self.assertIs(result[key], False)
+        review_calls = [call for call in objects.call_args_list if call.args[1] == 'd' * 40]
+        self.assertEqual(len(review_calls), 1)
+        self.assertEqual(len(review_calls[0].args[2]), 8)
+        execute.assert_not_called()
+        download.assert_not_called()
+
+    def test_platform_source_review_reader_rejects_missing_stale_or_changed_evidence_privately(self):
+        mutations = ('missing-index', 'missing-review', 'review-hash', 'review-in-repo', 'review-symlink',
+                     'duplicate-recipe', 'missing-recipe', 'wrong-path', 'recipe-hash', 'cdb-hash', 'labels-hash',
+                     'held-review', 'same-agent', 'empty-conditions', 'stale-head', 'source-unavailable',
+                     'native-hash', 'final-index', 'final-review', 'final-recipe')
+        for mutation in mutations:
+            staged = self.platform_source_review_fixture()
+            recipe_path = staged.repo / profiles.GCC_PLATFORM_FILES['Windows']
+            if mutation == 'missing-review': staged.review_path.unlink()
+            elif mutation == 'review-hash': staged.review_path.write_bytes(b'PRIVATE_SENTINEL')
+            elif mutation == 'review-in-repo': staged.index['review']['path'] = str(staged.repo / 'private.json')
+            elif mutation == 'review-symlink':
+                saved = staged.review_path.with_suffix('.saved')
+                staged.review_path.rename(saved)
+                try:
+                    staged.review_path.symlink_to(saved)
+                except OSError as error:
+                    with self.subTest(mutation=mutation):
+                        self.skipTest('temporary symlink unavailable: ' + str(error))
+                    continue
+            elif mutation == 'duplicate-recipe': staged.index['recipes'] *= 2
+            elif mutation == 'missing-recipe': staged.index['recipes'].pop()
+            elif mutation == 'wrong-path': staged.index['recipes'][0]['path'] = '../PRIVATE_SENTINEL'
+            elif mutation == 'recipe-hash': recipe_path.write_bytes(b'PRIVATE_SENTINEL')
+            elif mutation == 'cdb-hash':
+                (staged.repo / staged.rows['Windows'].value['compilation_database']['path']).write_bytes(b'PRIVATE_SENTINEL')
+            elif mutation == 'labels-hash': (staged.repo / profiles.GCC_GROUND_TRUTH).write_bytes(b'PRIVATE_SENTINEL')
+            elif mutation in ('held-review', 'same-agent', 'empty-conditions'):
+                key, replacement = {'held-review': ('verdict', 'HOLD'), 'same-agent': ('verifier', '/root'),
+                                    'empty-conditions': ('conditions', [])}[mutation]
+                staged.review[key] = replacement
+                staged.index['review']['sha256'] = staged.write(staged.review_path, staged.review)
+            elif mutation == 'native-hash':
+                Path(staged.rows['Windows'].value['native_evidence']['case']['path']).write_bytes(b'PRIVATE_SENTINEL')
+            staged.write(staged.index_path, staged.index)
+            if mutation == 'missing-index': staged.index_path.unlink()
+            def reviewed(repo, head, links, **kwargs):
+                if mutation == 'stale-head' and head == 'd' * 40:
+                    raise ValueError('PRIVATE_SENTINEL')
+                if mutation.startswith('final-'):
+                    target = {'final-index': staged.index_path, 'final-review': staged.review_path,
+                              'final-recipe': recipe_path}[mutation]
+                    target.write_bytes(b'PRIVATE_SENTINEL')
+            with mock.patch.object(profiles, 'verify_ground_truth_index', return_value=staged.accepted,
+                                   side_effect=ValueError('PRIVATE_SENTINEL') if mutation == 'source-unavailable' else None), \
+                 mock.patch.object(profiles, 'verify_reviewed_files', side_effect=reviewed), \
+                 self.subTest(mutation=mutation), self.assertRaisesRegex(ValueError, '^reviewed GCC platform source labels rejected$'):
+                profiles.verify_gcc_platform_source_labels(staged.repo)
+
+    def test_platform_source_review_recipe_and_cdb_links_require_actual_commit_bytes(self):
+        repo = Path(__file__).resolve().parents[1]
+        head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repo, text=True).strip()
+        links = [{'path': path, 'sha256': profiles.file_sha(repo / path)} for path in profiles.GCC_PLATFORM_FILES.values()]
+        links += [profiles.read_json(repo / link['path'])['compilation_database'] for link in list(links)]
+        links += [{'path': profiles.GCC_GROUND_TRUTH, 'sha256': profiles.file_sha(repo / profiles.GCC_GROUND_TRUTH)}]
+        profiles.verify_reviewed_files(repo, head, links)
+        for offset in range(len(links)):
+            changed = copy.deepcopy(links)
+            changed[offset]['sha256'] = 'e' * 64
+            with self.subTest(offset=offset), self.assertRaises(ValueError):
+                profiles.verify_reviewed_files(repo, head, changed)
+
+    def test_platform_source_review_cli_is_private_and_has_no_root_override(self):
+        with tempfile.TemporaryDirectory(prefix='codeskeptic-platform-review-cli-') as temporary:
+            root = Path(temporary).resolve()
+            for suffix in ([], ['--binding', str(root / 'PRIVATE_SENTINEL')], ['--external-root', str(root)],
+                           ['--evidence-root', str(root)]):
+                result = subprocess.run([sys.executable, '-B', profiles.__file__, 'platform-source-labels-check',
+                                         '--root', str(root), *suffix], capture_output=True, timeout=10)
+                self.assertEqual(result.returncode, 2)
+                self.assertEqual(result.stdout, b'')
+                self.assertNotIn(b'PRIVATE_SENTINEL', result.stderr)
+
     def fixture(self, system):
         import product_identity as identity
         from test_product_identity import CaseCaptureTests

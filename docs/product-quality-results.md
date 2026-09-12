@@ -1064,9 +1064,42 @@ bozulmasını, producer tree ve exact workflow Git blob'unu denetler. Compiler v
 network çağrısı yapılmadığı ayrıca kontrol edilir. Native workflow test seçimi
 37'den 47'ye çıkar; bu değişiklik tek başına yeni hosted PASS değildir.
 
-Durum `PREDECLARED_NATIVE_RECIPE_NOT_QUALIFIED` kalır. Explicit küçültülmüş
+Tariflerin ilk `7568f69` checkpoint'indeki durum
+`PREDECLARED_NATIVE_RECIPE_NOT_QUALIFIED`'dır. Explicit küçültülmüş
 analyzer environment'in native eşdeğerliği, SourceManager tarafından eklenen
 header seçenekleriyle closure eşitliği, embedded frontend uyumu, güncel native
 byte reopening ve ek platform source-label incelemesi pending'dir. Mevcut Linux
 etiket kabulü bu kapıları kapatmaz. Tüm qualification bayrakları false kalır;
 genel readiness başarısız, U003 ve tam ürün hedefi açık durumdadır.
+
+### GCC platform kaynak etiketleri — ek koşullu kabul
+
+`7568f69427dd6d78704c7c40d5e11297dee489c9` üzerinde bağımsız kaynak hakemi
+iki exact tarif için `ACCEPT_CONDITIONAL_PLATFORM_SOURCE_LABELS` verdi.
+Özgün dış receipt SHA-256:
+`c782ce6c939a868af2295545a32db151fa3c404fa61be16a35d131071fd31a5d`.
+Yeni `platform_source_labels.json` index'i bu kaydı, iki özgün tarif hash'ini ve
+eski all-rule etiket hash'ini bağlar; eski tarif/CDB/kaynak/admission/selection
+byte'ları değiştirilmez. Koşullu kaynak kararı uygulama PASS'i değildir.
+Kesintiye uğrayan kod incelemesi ayrıca aynı temiz `7568f69` üzerinde yenilendi
+ve yalnız prospective-tarif checkpoint'i için bağımsız PASS alındı; bu bölümün
+ek entegrasyonu kendi yeni exact-head incelemesini gerektirir.
+
+`platform-source-labels-check` eski native/source kanıt zincirini de doğrular.
+Hash eksikliği, stale review, aynı implementer/verifier, boş koşul, değişmiş
+tarif/CDB/etiket veya dosya kimliği başarısız olur. Source-review bayrağı true
+olsa da `conditional_only=true`, `conditions_satisfied=false` ve diğer dokuz
+qualification bayrağı false kalır; sekiz hakem koşulu çıktıda aynen korunur.
+
+Önemli sınır: tutulan native ABI helper `INT_MAX` veya `SIZE_MAX` değerini ve
+padding yokluğunu assert etmez. `INT_MAX<=2147483647` ve
+`SIZE_MAX>=8589934588`, pozitif n'nin kayıpsız dönüşümüyle birlikte aritmetik
+gerekçe için yeterli koşuldur; bu değerler yeni ölçüm yapılmış gibi sunulmaz.
+Native malloc/header annotation davranışı, adjusted closure ve frontend/runtime
+eşdeğerliği açık kalır. Dört planlı aile kurulu sayılmaz; eksik leak bir miss,
+beklenmeyen diagnostic adjudication gerektiren gözlemdir, bastırma gerekçesi değil.
+
+Altı yeni odaklı metadata/IO/Git/CLI testi `NativeRecipeTests` seçimine eklenir;
+native workflow aynı selector ile bunları da seçer. Yerel testler ve kaynak
+incelemesi yeni hosted başarı anlamına gelmez. Korpus 1/1020, ek kota 0;
+evaluation freeze, U004 çalışması, U003 POP ve ürün yeterliliği hâlâ yoktur.

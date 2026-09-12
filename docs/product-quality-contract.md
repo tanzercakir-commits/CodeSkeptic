@@ -327,8 +327,24 @@ pozitif native doğrulama gereklidir. Ortamın küçültülmüş olması gözlen
 eşdeğerliğini kanıtlamaz. Kaynak/SDK/header byte'ları fiilen yeniden açılmadan ve
 selected/adjusted header closure karşılaştırılmadan bu kapılar geçmez.
 
-Eski etiket kabulü Linux tarifine bağlı koşulları sessizce Windows/macOS'a taşımaz;
-ek platform source-label applicability incelemesi ayrı ve pending kalır. Native
-tarif sayısı iki olsa da ek kota sıfırdır. Önceki başarısız koşular korunur;
+Eski etiket kabulü Linux tarifine bağlı koşulları sessizce Windows/macOS'a taşımaz.
+Ek platform source-label applicability incelemesi ayrı
+`tests/product_corpus/platform_source_labels.json` index'ine bağlıdır.
+`platform-source-labels-check` iki özgün tarifi, CDB'leri, eski etiket/kaynak
+bağlarını ve dışarıdaki exact-head hakem kaydını yeniden açar. Yalnız bu ek
+kontrol `platform_source_labels_reviewed=true` döndürür; `conditional_only=true`
+ve `conditions_satisfied=false` zorunludur, diğer dokuz qualification bayrağı
+false kalır. Özgün tarifler ve `platform-recipes-check` değiştirilmiş kabul
+kayıtları gibi gösterilmez; onların prospective/pending durumu korunur.
+
+Hakemin bütün koşulları çıktıda korunur. Özellikle sizeof/prototype preflight'ı
+`INT_MAX`, `SIZE_MAX`, padding yokluğu veya runtime allocator/calling ABI kanıtı
+değildir. Pozitif n'nin kayıpsız dönüşümü ve `4*n` işleminin temsil edilebilirliği
+ayrıca gerekir. Header/macro/declaration, küçültülmüş environment ve embedded
+frontend koşulları fiilen doğrulanmadan sağlanmış ilan edilemez. Hash/Git bağı
+ve farklı ajan kimlikleri ortak kullanıcı hesabındaki prosedürel denetimdir;
+imza veya yalnız schema'dan çıkarılan gerçek hakemlik kanıtı değildir.
+
+Native tarif sayısı iki olsa da ek kota sıfırdır. Önceki başarısız koşular korunur;
 rolling hosted image tarihsel preflight'ı güncel native/product yeterlilik veya
 evaluation freeze değildir. Bu ekler U004'ü başlatmaz, U003'ü POP etmez.
