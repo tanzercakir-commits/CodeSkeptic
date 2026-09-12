@@ -590,3 +590,12 @@ hesabı ve portable reviewed-file yolu grameri değişmez. Gerçek undecodable b
 filesystem testi yalnız POSIX'te anlamlıdır ve Windows'ta açık skip gerekçesi
 taşır; ortak Unicode, boyut, protocol ve Git-mode testleri platform nedeniyle
 atlanmaz. Skip veya sentetik serialization testi native platform PASS'i değildir.
+
+Test-owned Git fixture başarısızlığı, asıl reader çalışmış veya platform yeterliymiş
+gibi yorumlanamaz. Başarısız fixture komutu yine `CalledProcessError` alt türüyle
+reddedilir; özgün returncode/cmd/output/stderr ve cause korunur. Log ayrıntısı
+yalnız phase, exit, stdout/stderr tam byte sayıları, ilk 256 byte'ın escaped `repr`
+biçimi ve truncation bayraklarını taşır. Bu post-capture log sınırıdır, hard memory
+sınırı değildir. Başarılı stdout byte'ları ile OSError/TimeoutExpired davranışı
+değişmez; tekrar deneme, fallback veya başarısız clone'u skip sayma yoktur.
+Synthetic binary hata-transport testleri özgün Git'in ürettiği çıktı diye sunulmaz.

@@ -4916,6 +4916,22 @@ class SourceCohortGroundTruthTests(unittest.TestCase):
         self.assertNotIn(str(self.fixture.base), result.stderr)
 
 
+class _ReviewedFilesGitFailure(subprocess.CalledProcessError):
+    """Keep a failed fixture failed, with bounded byte-safe evidence in logs."""
+
+    def __init__(self, original, phase):
+        super().__init__(original.returncode, original.cmd, output=original.output, stderr=original.stderr)
+        self.phase = phase
+
+    def __str__(self):
+        detail = {'phase': self.phase, 'exit_code': self.returncode}
+        for name, raw in (('stdout', self.stdout), ('stderr', self.stderr)):
+            detail[name + '_bytes'] = len(raw)
+            detail[name + '_prefix'] = repr(raw[:256])
+            detail[name + '_truncated'] = len(raw) > 256
+        return 'reviewed fixture Git failure: ' + json.dumps(detail, sort_keys=True)
+
+
 class _ReviewedFilesGitFixture:
     """Tiny real Git history; no source receipt, native run or admission claim.
 
@@ -4997,12 +5013,15 @@ class _ReviewedFilesGitFixture:
         dirty.write_bytes(b'DIRTY_WORKTREE_SENTINEL\n')
 
     def git(self, *args, input=None):
-        result = subprocess.run(['git', '-C', str(self.repo), '-c', 'user.name=Synthetic Object Test',
-                                 '-c', 'user.email=synthetic@example.invalid',
-                                 '-c', 'core.hooksPath=' + str(self.empty_hooks),
-                                 '-c', 'commit.gpgsign=false', '-c', 'tag.gpgsign=false', *args], input=input,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30,
-                                env=self.environment, check=True)
+        try:
+            result = subprocess.run(['git', '-C', str(self.repo), '-c', 'user.name=Synthetic Object Test',
+                                     '-c', 'user.email=synthetic@example.invalid',
+                                     '-c', 'core.hooksPath=' + str(self.empty_hooks),
+                                     '-c', 'commit.gpgsign=false', '-c', 'tag.gpgsign=false', *args], input=input,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30,
+                                    env=self.environment, check=True)
+        except subprocess.CalledProcessError as error:
+            raise _ReviewedFilesGitFailure(error, args[0]) from error
         return result.stdout
 
     def blob(self, raw):
@@ -5447,6 +5466,133 @@ class ReviewedFilesTests(unittest.TestCase):
                  self.assertRaises(type(exception)):
                 profiles.verify_reviewed_files(self.fixture.repo, self.fixture.head,
                                                self.fixture.links(self.fixture.small_paths[:1]))
+
+    def assert_fixture_git_diagnostic(self, error, original, phase):
+        prefix = 'reviewed fixture Git failure: '
+        formatted = str(error)
+        self.assertTrue(formatted.startswith(prefix), 'Failed fixture Git output must remain observable')
+        self.assertIsInstance(error, subprocess.CalledProcessError)
+        self.assertIsNot(type(error), subprocess.CalledProcessError)
+        self.assertIs(error.__cause__, original)
+        self.assertIsNot(error, original)
+        self.assertEqual(error.returncode, original.returncode)
+        self.assertEqual(error.cmd, original.cmd)
+        self.assertEqual(error.output, original.output)
+        self.assertEqual(error.stdout, original.stdout)
+        self.assertEqual(error.stderr, original.stderr)
+        expected = {'phase': phase, 'exit_code': original.returncode,
+                    'stdout_bytes': len(original.stdout), 'stderr_bytes': len(original.stderr),
+                    'stdout_prefix': repr(original.stdout[:256]), 'stderr_prefix': repr(original.stderr[:256]),
+                    'stdout_truncated': len(original.stdout) > 256,
+                    'stderr_truncated': len(original.stderr) > 256}
+        payload = formatted[len(prefix):]
+        self.assertEqual(json.loads(payload), expected)
+        # Check exact field names and sorted order, without prescribing JSON
+        # whitespace. No extra unstructured text can trail this JSON value.
+        self.assertEqual(json.loads(payload, object_pairs_hook=lambda pairs: pairs), sorted(expected.items()))
+        self.assertIs(type(json.loads(payload)['stdout_truncated']), bool)
+        self.assertIs(type(json.loads(payload)['stderr_truncated']), bool)
+        self.assertLessEqual(len(formatted), 8192)
+
+    def test_fixture_git_real_failed_clone_retains_bounded_diagnostic_and_cause(self):
+        with tempfile.TemporaryDirectory(prefix='codeskeptic-failed-clone-') as directory:
+            destination = Path(directory) / 'existing-regular-file'
+            preserved = b'TEST_OWNED_DESTINATION_MUST_STAY_UNCHANGED\n'
+            destination.write_bytes(preserved)
+            original_run = subprocess.run
+            failures = []
+
+            def observe_failure(argv, **kwargs):
+                try:
+                    return original_run(argv, **kwargs)
+                except subprocess.CalledProcessError as error:
+                    failures.append(error)
+                    raise
+
+            with mock.patch.object(subprocess, 'run', side_effect=observe_failure) as execute, \
+                 self.assertRaises(subprocess.CalledProcessError) as raised:
+                self.fixture.git('clone', '--no-checkout', str(self.fixture.repo), str(destination))
+            self.assertEqual(execute.call_count, 1, 'Failed fixture commands must not be retried')
+            self.assertEqual(len(failures), 1)
+            self.assertEqual(failures[0].returncode, 128)
+            self.assertIs(type(failures[0].stdout), bytes)
+            self.assertIs(type(failures[0].stderr), bytes)
+            self.assertTrue(failures[0].stderr)
+            self.assertEqual(destination.read_bytes(), preserved)
+            self.assert_fixture_git_diagnostic(raised.exception, failures[0], 'clone')
+
+    def test_fixture_git_synthetic_binary_error_transport_is_bounded_at_256_bytes(self):
+        # These bytes are deliberately injected into an actual failed local
+        # Git call's exception. They are transport fixtures, not Git output or
+        # evidence for the cause of the hosted macOS failure.
+        with tempfile.TemporaryDirectory(prefix='codeskeptic-binary-clone-error-') as directory:
+            destination = Path(directory) / 'existing-regular-file'
+            destination.write_bytes(b'TEST_OWNED_FAILURE_TARGET\n')
+            original_run = subprocess.run
+            sentinel = b'SYNTHETIC_TRAILING_SENTINEL_MUST_NOT_BE_FORMATTED'
+            for length in (0, 255, 256, 257, 16384):
+                stdout = (bytes(range(256)) * (1 + length // 256))[:length]
+                stderr = (b'\xff\x00\n\r\t\'"\\' * (1 + length // 8))[:length]
+                if length > 257:
+                    stdout += sentinel
+                    stderr += sentinel
+                failures = []
+
+                def inject_synthetic_transport(argv, **kwargs):
+                    try:
+                        return original_run(argv, **kwargs)
+                    except subprocess.CalledProcessError as error:
+                        self.assertEqual(error.returncode, 128)
+                        self.assertIs(type(error.stdout), bytes)
+                        self.assertIs(type(error.stderr), bytes)
+                        error.output = stdout
+                        error.stderr = stderr
+                        failures.append(error)
+                        raise
+
+                with self.subTest(captured_prefix_boundary=length):
+                    with mock.patch.object(subprocess, 'run', side_effect=inject_synthetic_transport) as execute, \
+                         self.assertRaises(subprocess.CalledProcessError) as raised:
+                        self.fixture.git('clone', '--no-checkout', str(self.fixture.repo), str(destination))
+                    self.assertEqual(execute.call_count, 1)
+                    self.assertEqual(len(failures), 1)
+                    self.assertEqual(raised.exception.output, stdout)
+                    self.assertEqual(raised.exception.stderr, stderr)
+                    self.assertNotIn(sentinel.decode('ascii'), str(raised.exception))
+                    self.assert_fixture_git_diagnostic(raised.exception, failures[0], 'clone')
+
+    def test_fixture_git_success_preserves_original_raw_bytes_without_retry(self):
+        observed = []
+        original_run = subprocess.run
+        oid = self.fixture.entries[self.fixture.small_paths[0]]['oid']
+
+        def observe_success(argv, **kwargs):
+            result = original_run(argv, **kwargs)
+            observed.append(result)
+            return result
+
+        with mock.patch.object(subprocess, 'run', side_effect=observe_success) as execute:
+            actual = self.fixture.git('cat-file', 'blob', oid)
+        self.assertEqual(execute.call_count, 1)
+        self.assertEqual(len(observed), 1)
+        self.assertEqual(observed[0].returncode, 0)
+        self.assertIs(actual, observed[0].stdout)
+        self.assertEqual(actual, b'first\x00binary\nsource\xff\n')
+        self.assertIs(type(actual), bytes)
+
+    def test_fixture_git_oserror_and_timeout_remain_original_exceptions_without_retry(self):
+        exceptions = [OSError('SYNTHETIC_FIXTURE_GIT_UNAVAILABLE'),
+                      subprocess.TimeoutExpired(['git', 'rev-parse', 'HEAD'], 30,
+                                                output=b'SYNTHETIC_TIMEOUT_STDOUT\x00\xff',
+                                                stderr=b'SYNTHETIC_TIMEOUT_STDERR\x00\xff')]
+        for original in exceptions:
+            with self.subTest(exception=type(original).__name__):
+                with mock.patch.object(subprocess, 'run', side_effect=original) as execute, \
+                     self.assertRaises(type(original)) as raised:
+                    self.fixture.git('rev-parse', 'HEAD')
+                self.assertEqual(execute.call_count, 1)
+                self.assertIs(raised.exception, original)
+                self.assertIsNone(raised.exception.__cause__)
 
 
 if __name__ == "__main__":

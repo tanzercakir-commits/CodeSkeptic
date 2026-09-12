@@ -1994,3 +1994,59 @@ bu kayıt onları burada değiştirme izni değildir. U004 RED baseline ve sonra
 CH12 dayanıklılık sorumluluğu korunur. Git batching bu ayrı hatanın düzeltmesi
 olarak sunulmaz; sonraki single-process/smoke/dogfood/corpus/thesis kapıları
 çalışmamıştır ve all-CI PASS yoktur.
+
+### a4cac55 gerçek hosted sonucu ve eksik fixture hata ayrıntısı
+
+Bağımsız `PASS_IMPLEMENTATION_ONLY` alınan
+`a4cac55f1996f50ef1fa253c7ac1f7ec385352e8` feature'a fast-forward gönderildi;
+main ve ledger değişmedi. Gerçek review SHA-256
+`2a963bb6dfce895700f355f77a1729ea06417920463e6f655bd5c27613ab3fd4`.
+[Identity 34707372235](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34707372235)
+attempt 1 **failure** ile tamamlandı; bu yerel review hosted/native PASS değildir.
+Linux başarılı, macOS ve Windows işleri başarısız. Terminal packet özeti
+`cohort-provenance-v1/hosted-34707372235/summary.json`, SHA-256
+`4cf0aaad72e401f7198429423f3c91110652e9baf792de45440b216ddb899ee1`;
+üç identity, yalnız Linux native-case ve bir Windows diagnostic artifact'ı vardır.
+Linux native-case eski 636-byte GCC mixed-storage girdisidir; LLVM kanıtı değildir.
+
+macOS 88 identity testini geçtikten sonra 186 profile testinde bir error verdi
+(48.432 saniye). POSIX byte-root regresyonunun `os.fsencode` assertion'ı geçti;
+fixture Git clone exit 128 verdi. Canonical destination çözümü ve production
+`verify_reviewed_files` çağrısı henüz gerçekleşmedi. Captured stderr exception
+metninde görünmediğinden filesystem, Git, normalization, config veya izin nedenleri
+ayırt edilemez; APFS veya doğal macOS UTF-8 yasağı diye ilan edilmez. Diğer 185
+test error/failure/skip bildirmedi. Native-case'e ulaşılmadı; artifact'ın yokluğu
+compiler hatası kanıtı değildir. Bağımsız dar teşhis
+`reviewed-fixture-diagnostics-v1/macos-fixture-review-a4cac55.json`, SHA-256
+`17ce829f64d18e84fa7284fc409c70eb270e2c5a182a4ebd5a544c67cb28fcad`,
+`CONFIRMED_FIXTURE_FAILURE_CAUSE_UNRESOLVED` kararıdır. O ilk snapshot'taki
+Windows-running durumu sonraki terminal sonuca geriye dönük çevrilmez.
+
+Windows bu kez 186 profile testini 319.623 saniyede tamamladı: 185 PASS, yalnız
+POSIX filesystem regresyonu skipped=1. Bu tek actual completion, bütün gelecekteki
+job deadline'larının çözüldüğünü veya kontrollü Windows performans farkını kanıtlamaz.
+Ardından native-case, ilk kimlik toplamadaki `WINDOWS_OS_QUERY` sırasında 30 saniye
+TIMEOUT verdi; native-case artifact'ı yoktur. Sonraki ayrı staged diagnostic OK:
+elapsed 17547 ms, CIM_LOADED 17276 ms, Utility import aralığı 3 ms, CIM query
+aralığı 36 ms ve serialization/son marker aralığı 18 ms. Bu sonraki ölçümler ilk
+timeout'un iç dökümü değildir; sonraki başarı önceki başarısızlığı düzeltmez.
+Policy gözleminde preference absent, effective/LocalMachine Unrestricted, diğer
+scope'lar Undefined; bu tek başına performans kök nedeni veya policy değişikliği
+gereği değildir. Query, timeout, environment ve workflow değiştirilmedi.
+
+Eksik macOS hata kanıtı için yalnız test-owned fixture hata biçimlendirmesi eklendi:
+asıl `CalledProcessError` cause ve byte alanları korunur; phase/exit/tam byte sayıları,
+ilk 256 byte'ın escaped temsili ve truncation bayrakları görünür olur. Komut bir kez
+çalışır; hata yine hatadır. Yeni dört test eski exact-a4 fixture'da altı beklenen
+failure, sıfır error/skip verdi; primary RED capture SHA-256
+`27fed4a681775c5a23a111f324b326dbd19a0914e004773b083ec1d98330dbd2`.
+Gerçek yerel clone hatası ve açıkça synthetic 0/255/256/257/16384-byte transport
+sınırları kullanıldı; test-owned destination korunur, stdout/OS_ERROR/TIMEOUT
+davranışı değişmez. Yeni GREEN capture
+`09613b4466e1b48bcd50ffae3b3b391b3bf6ff9d13e33249ef94157904992168`.
+Tam 264 profile, 88 identity ve 24 quality testi GREEN; full-profile capture
+`b214bcd9a214f30a36c212c5865612575539092b6948e67c8f6c14058b69d073`.
+Bu diagnostic-only değişiklik macOS clone nedenini veya Windows timeout'unu
+henüz çözmez. Yeni exact-head bağımsız denetim ve gerçek hosted hata ayrıntısı
+gerekir. Production, selection 2/1020, LLVM HOLD, native/source/label/inventory
+ve ledger baytları korunur; yeni kota veya U003 POP yoktur.
