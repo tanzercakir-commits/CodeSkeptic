@@ -1,0 +1,147 @@
+{
+  "boundary": "Two actual separately hashed C17 source adaptations in one bounded content-addressed shard: one proposed evaluation candidate and one same-mechanism nonquota control. Origin entries identify pinned input files, not independently established provenance lineages. Source/API/extraction byte equality is not rights clearance, producer blindness, independent all-rule ground truth, native qualification, source admission, full cohort freeze or U003 readiness. The separate preliminary review is retained as llvm-ordinary-preparation-review-ef039c6.json, SHA256 65f1e81d4c8ab29d7c34c598995d0411cc5aa08f1365216f50d6006f6c3af853; it is not an admission receipt for this newly adapted shard.",
+  "id": "llvm-caller-slot-v1",
+  "limits": {
+    "addressable_recall_min": "0.70",
+    "buggy_min_per_bucket": 30,
+    "campaign_timeout_seconds": 43200,
+    "capture_bytes_per_stream": 2097152,
+    "case_timeout_seconds": 30,
+    "family_precision_min": "0.90",
+    "linux_harness_cpu_quota": 2,
+    "linux_harness_memory_mib": 6144,
+    "linux_harness_memory_plus_swap_mib": 12288,
+    "linux_harness_pids_max": 256,
+    "linux_harness_tmpfs_mib": 1024,
+    "origins_min_per_bucket": 3,
+    "project_timeout_seconds": 1200,
+    "repetitions": 3,
+    "safe_fp_max": 0,
+    "safe_min_per_bucket": 30,
+    "string_flow_call_depth_max": 4,
+    "string_flow_states_per_function_max": 256,
+    "string_flow_transfer_steps_per_function_max": 65536,
+    "unique_quota_sources_min": 1020,
+    "worker_memory_mib": 2048,
+    "worker_timeout_ms": 120000
+  },
+  "origins": [
+    {
+      "api_capture": {
+        "path": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/retained-label-host-path-v1/llvm-malloc-pinned-membership.json",
+        "sha256": "606c92e4f466553494f12309868f4712a9803bb6e7cea0e302e28d134b7f4acb",
+        "size_bytes": 68584
+      },
+      "git_blob": "0dc667bc1ed505cc5a44b7e5c8baae6a80601e9a",
+      "id": "llvm-malloc-pinned-file",
+      "path": "clang/test/Analysis/malloc.c",
+      "repository": "https://github.com/llvm/llvm-project",
+      "revision": "87f0227cb60147a26a1eeb4fb06e3b505e9c7261",
+      "source": {
+        "path": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/upstream-candidates/llvm-20.1.8/malloc.c",
+        "sha256": "f6472fecd8b96331595bf990ffebb1fe01df9b49684027e81b731a287f1817fc",
+        "size_bytes": 47828
+      }
+    }
+  ],
+  "qualification": {
+    "analyzer_run": false,
+    "evaluation_frozen": false,
+    "license_qualified": false,
+    "native_product_qualified": false,
+    "product_qualified": false,
+    "redistribution_approved": false,
+    "task_ready": false
+  },
+  "records": [
+    {
+      "sha256": "f5254e063a97a81e06197a6c1bbcb85889ffe7ff4c91f1159131861b3bd56203",
+      "value": {
+        "assumptions": [
+          "p designates a live, properly aligned, writable int * object throughout the call; NULL or invalid p is outside this conditional source model.",
+          "The caller-owned slot initially contains NULL and owns no prior allocation whose preservation is required.",
+          "Native C17 malloc has ordinary allocation-failure and successful-allocation semantics, with no replacement, interposition, concurrent access or asynchronous retention of the transient handle.",
+          "The conditional native model assumes CHAR_BIT=8, int=32 bits and size_t, void *, int * and int ** all 64 bits; proposed compiler probes must establish their applicable syntax/ABI facts separately.",
+          "This is pre-result source preparation only. No analyzer output, function execution, native product qualification or all-rule source-label acceptance is asserted."
+        ],
+        "boundary": "On allocation success the same caller-owned slot is immediately overwritten, losing the fresh allocation. The line-5 occurrence is a proposed unobserved target, not implemented-emission evidence. A later normal missing report is FN; infrastructure failure is RED. Preliminary independent preparation review distinguishes publication followed by revocation from inspected training; full cluster/source admission and all-rule labels remain pending.",
+        "cluster": "fresh-allocation-published-to-caller-slot-then-synchronously-erased",
+        "expected": [
+          {
+            "column": 3,
+            "cwes": [
+              401
+            ],
+            "function": "testMallocWithParam",
+            "line": 5,
+            "multiplicity": 1,
+            "rule": "memory-leak"
+          }
+        ],
+        "extraction": {
+          "adaptation": "native-stdlib-prefix/v1",
+          "ranges": [
+            [
+              1930,
+              1933
+            ]
+          ],
+          "raw_sha256": "68dbf1ceece52bc8182119163350ad1f4a5d0da6307bbecdf8471d10a7a8613d"
+        },
+        "family": "memory-leak",
+        "id": "llvm-caller-slot-overwrite",
+        "origin": "llvm-malloc-pinned-file",
+        "related_to": null,
+        "role": "buggy",
+        "selection": "independent-evaluation-candidate",
+        "source": {
+          "language": "C17",
+          "sha256": "a118c66873a197c3b55534f86500828492724ebd2e347df4414e2a71d322617a",
+          "size_bytes": 131,
+          "text": "#include <stdlib.h>\n\nvoid testMallocWithParam(int **p) {\n  *p = (int*) malloc(sizeof(int));\n  *p = 0; // FIXME: should warn here\n}\n"
+        },
+        "subprofile": null
+      }
+    },
+    {
+      "sha256": "b2010e8886f09eb7323c299ef6b5fd30511581e85f48035b4032c2150abbfc57",
+      "value": {
+        "assumptions": [
+          "p designates a live, properly aligned, writable int * object throughout the call; NULL or invalid p is outside this conditional source model.",
+          "The caller-owned slot initially contains NULL and owns no prior allocation whose preservation is required.",
+          "Native C17 malloc has ordinary allocation-failure and successful-allocation semantics, with no replacement, interposition, concurrent access or asynchronous retention of the transient handle.",
+          "The conditional native model assumes CHAR_BIT=8, int=32 bits and size_t, void *, int * and int ** all 64 bits; proposed compiler probes must establish their applicable syntax/ABI facts separately.",
+          "This is pre-result source preparation only. No analyzer output, function execution, native product qualification or all-rule source-label acceptance is asserted."
+        ],
+        "boundary": "The fresh handle remains published to the caller-owned slot; no same-function local ownership loss is expected under the stated valid-slot conditions. Eventual caller cleanup is not proven. This neighboring same-mechanism control is supplemental and cannot supply independent safe quota or a second origin.",
+        "cluster": "fresh-allocation-published-to-caller-slot-then-synchronously-erased",
+        "expected": [],
+        "extraction": {
+          "adaptation": "native-stdlib-prefix/v1",
+          "ranges": [
+            [
+              1935,
+              1937
+            ]
+          ],
+          "raw_sha256": "e98b854e7c100703cbf6b797fea94755140a6c69537a75df01b7e8ead9aa6f2f"
+        },
+        "family": "memory-leak",
+        "id": "llvm-caller-slot-retained-control",
+        "origin": "llvm-malloc-pinned-file",
+        "related_to": "llvm-caller-slot-overwrite",
+        "role": "safe",
+        "selection": "supplemental-control",
+        "source": {
+          "language": "C17",
+          "sha256": "a99952fd6198cb713db7d260925467f68181fcba3f9d6acc571eb2c87386381a",
+          "size_bytes": 110,
+          "text": "#include <stdlib.h>\n\nvoid testMallocWithParam_2(int **p) {\n  *p = (int*) malloc(sizeof(int)); // no-warning\n}\n"
+        },
+        "subprofile": null
+      }
+    }
+  ],
+  "schema": "codeskeptic-product-source-cohort/v1",
+  "state": "PRE_RESULT_SOURCE_PREPARATION_NOT_ADMITTED"
+}

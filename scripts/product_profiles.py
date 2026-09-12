@@ -2296,6 +2296,202 @@ def native_api_metadata(model):
             "metadata_only": True}
 
 
+SOURCE_COHORT_SCHEMA = 'codeskeptic-product-source-cohort/v1'
+SOURCE_COHORT_RECORDS_MAX = 64
+SOURCE_COHORT_LINKED_BYTES_MAX = 64 * 1024 * 1024
+
+
+def source_cohort_metadata(value):
+    """Bound content-addressed preparation records, never grant source credit.
+
+    Individual record hashes do not depend on unrelated records in the same
+    shard. A later admission protocol must bind its own actual reviewed Git
+    objects and decisions; these proposed labels are not that review.
+    """
+    fields(value, 'schema state id origins records limits boundary qualification', 'source cohort')
+    identifier = lambda item: type(item) is str and re.fullmatch(r'[a-z][a-z0-9-]{0,95}', item)
+    text_bound = lambda item, maximum: nonempty(item) and len(item) <= maximum
+    require(value['schema'] == SOURCE_COHORT_SCHEMA
+            and value['state'] == 'PRE_RESULT_SOURCE_PREPARATION_NOT_ADMITTED'
+            and identifier(value['id']) and text_bound(value['boundary'], 8192), 'source cohort identity')
+    validate_limits(value['limits'])
+    fields(value['qualification'], SOURCE_QUALIFICATION, 'source cohort qualification')
+    require(all(item is False for item in value['qualification'].values()), 'source cohort cannot qualify')
+    require(type(value['origins']) is list and 1 <= len(value['origins']) <= 64, 'source cohort origins')
+    origins, linked_bytes = set(), 0
+    for origin in value['origins']:
+        fields(origin, 'id repository revision path git_blob source api_capture', 'source cohort origin')
+        require(identifier(origin['id']) and origin['id'] not in origins, 'duplicate source cohort origin')
+        origins.add(origin['id'])
+        require(type(origin['repository']) is str and re.fullmatch(
+            r'https://github\.com/[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}',
+            origin['repository']) and not origin['repository'].endswith('.git'), 'source cohort repository')
+        require(all(type(origin[key]) is str and re.fullmatch(r'[0-9a-f]{40}', origin[key])
+                    and origin[key] != '0' * 40 for key in ('revision', 'git_blob')), 'source cohort Git identity')
+        path = origin['path']
+        require(type(path) is str and 0 < len(path) <= 512 and len(path.split('/')) <= 16
+                and all(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._+-]{0,127}', part)
+                        and not part.endswith('.') for part in path.split('/')), 'source cohort upstream path')
+        for link in (origin['source'], origin['api_capture']):
+            fields(link, 'path sha256 size_bytes', 'source cohort external link')
+            external_digest(link['sha256'])
+            require(nonempty(link['path']) and len(link['path']) <= 4096
+                    and Path(link['path']).is_absolute()
+                    and type(link['size_bytes']) is int and 0 < link['size_bytes'] <= 16 * 1024 * 1024,
+                    'source cohort external identity')
+            linked_bytes += link['size_bytes']
+    require(linked_bytes <= SOURCE_COHORT_LINKED_BYTES_MAX, 'source cohort linked byte budget')
+    require(type(value['records']) is list and 1 <= len(value['records']) <= SOURCE_COHORT_RECORDS_MAX,
+            'source cohort record bound')
+    records, hashes, candidate_clusters, used_origins, results = {}, set(), set(), set(), []
+    for entry in value['records']:
+        fields(entry, 'sha256 value', 'source cohort entry')
+        external_digest(entry['sha256'])
+        record = entry['value']
+        require(hashlib.sha256(canonical(record).encode('utf-8')).hexdigest() == entry['sha256'],
+                'source cohort entry digest')
+        fields(record, 'id selection family subprofile role origin cluster related_to source extraction '
+               'assumptions expected boundary', 'source cohort record')
+        require(identifier(record['id']) and record['id'] not in records
+                and identifier(record['cluster']) and type(record['origin']) is str
+                and record['origin'] in origins, 'source cohort record identity')
+        records[record['id']] = record
+        used_origins.add(record['origin'])
+        require(type(record['selection']) is str and record['selection'] in
+                ('independent-evaluation-candidate', 'supplemental-control'), 'source cohort selection')
+        if record['selection'] == 'independent-evaluation-candidate':
+            require(record['related_to'] is None and record['cluster'] not in candidate_clusters,
+                    'source cohort candidate cluster')
+            candidate_clusters.add(record['cluster'])
+        else:
+            require(identifier(record['related_to']) and record['related_to'] != record['id'],
+                    'source cohort supplemental relation')
+        require(type(record['family']) is str and record['family'] in FAMILIES - GROUND_TRUTH_PLANNED
+                and type(record['role']) is str and record['role'] in ('buggy', 'safe')
+                and (record['subprofile'] in ('cwe-121', 'cwe-122') if record['family'] == 'bounds'
+                     else record['subprofile'] is None), 'source cohort ordinary family')
+        source = record['source']
+        fields(source, 'language text sha256 size_bytes', 'source cohort adapted source')
+        external_digest(source['sha256'])
+        require(source['language'] == 'C17' and type(source['text']) is str
+                and '\0' not in source['text'] and source['text'].endswith('\n'), 'source cohort source form')
+        raw = source['text'].encode('utf-8')
+        require(type(source['size_bytes']) is int and 0 < len(raw) == source['size_bytes'] <= 65536
+                and hashlib.sha256(raw).hexdigest() == source['sha256'] and source['sha256'] not in hashes,
+                'source cohort source identity or duplicate')
+        hashes.add(source['sha256'])
+        extraction = record['extraction']
+        fields(extraction, 'ranges raw_sha256 adaptation', 'source cohort extraction')
+        external_digest(extraction['raw_sha256'])
+        require(extraction['adaptation'] == 'native-stdlib-prefix/v1'
+                and type(extraction['ranges']) is list and 1 <= len(extraction['ranges']) <= 64,
+                'source cohort extraction form')
+        last = 0
+        for pair in extraction['ranges']:
+            require(type(pair) is list and len(pair) == 2 and all(type(n) is int for n in pair)
+                    and last < pair[0] <= pair[1] <= 1000000, 'source cohort extraction ranges')
+            last = pair[1]
+        require(type(record['assumptions']) is list and 1 <= len(record['assumptions']) <= 16
+                and all(text_bound(item, 2048) for item in record['assumptions'])
+                and text_bound(record['boundary'], 8192), 'source cohort conditional source model')
+        require(type(record['expected']) is list and len(record['expected']) <= 64
+                and bool(record['expected']) == (record['role'] == 'buggy'), 'source cohort expectations')
+        occurrences, line_count = set(), len(source['text'].splitlines())
+        for occurrence in record['expected']:
+            fields(occurrence, 'rule function line column cwes multiplicity', 'source cohort occurrence')
+            require(occurrence['rule'] == record['family'] and text_bound(occurrence['function'], 512)
+                    and type(occurrence['line']) is int and 1 <= occurrence['line'] <= line_count
+                    and all(type(occurrence[key]) is int and 1 <= occurrence[key] <= 1000000
+                            for key in ('column', 'multiplicity'))
+                    and type(occurrence['cwes']) is list and 1 <= len(occurrence['cwes']) <= 26
+                    and all(type(cwe) is int and 1 <= cwe <= 10000 for cwe in occurrence['cwes'])
+                    and occurrence['cwes'] == sorted(set(occurrence['cwes'])), 'source cohort occurrence shape')
+            identity = canonical({key: item for key, item in occurrence.items() if key != 'multiplicity'})
+            require(identity not in occurrences, 'source cohort duplicate occurrence')
+            occurrences.add(identity)
+        results.append({key: record[key] for key in
+                        ('id', 'origin', 'cluster', 'selection', 'role', 'family', 'related_to')} | {
+                            'record_sha256': entry['sha256'], 'source_sha256': source['sha256']})
+    require(used_origins == origins, 'source cohort unused origins')
+    for record in records.values():
+        if record['selection'] == 'supplemental-control':
+            parent = records.get(record['related_to'])
+            require(parent is not None and parent['selection'] == 'independent-evaluation-candidate'
+                    and all(parent[key] == record[key] for key in ('origin', 'family', 'subprofile', 'cluster')),
+                    'source cohort control must belong to its candidate mechanism')
+    return {'records': results, 'total_sources': len(results), 'preparation_candidates': len(candidate_clusters),
+            'control_sources': len(results) - len(candidate_clusters), 'source_bytes_verified': False,
+            'independently_reviewed': False, 'admitted_sources': 0, 'additional_quota_examples': 0,
+            **value['qualification']}
+
+
+def verify_source_cohort(repo, cohort_path):
+    """Read one bounded preparation shard and all linked provenance atomically
+    with respect to ordinary observed drift, not as a hostile-root snapshot.
+
+    No prior fictional HOLD/supplement history is required. Real independent
+    source, cluster, all-rule, rights and native qualification remain later
+    gates. Returned per-entry digests are not admission receipts.
+    """
+    try:
+        repo = Path(repo)
+        require(repo.is_absolute() and repo.resolve(strict=True) == repo, 'source cohort checkout')
+        relative = external_relative(cohort_path).as_posix()
+        require(relative.startswith('tests/product_corpus/cohorts/'), 'source cohort scope')
+        guard = {}
+        info, value = _ground_truth_input(repo / relative, guard, maximum=16 * 1024 * 1024)
+        result = source_cohort_metadata(value)
+
+        def read_link(link):
+            path = Path(link['path'])
+            require(repo != path and repo not in path.parents, 'source cohort evidence must be external')
+            actual, before, raw = external_read(path, capture=True)
+            require(actual == {key: link[key] for key in ('sha256', 'size_bytes')}, 'source cohort input drift')
+            remember_input_identities(guard, {path: before})
+            return raw
+
+        # Shared origins are reopened once in this transaction, not cached
+        # across invocations. Every file remains in the final identity guard.
+        origins = {}
+        for origin in value['origins']:
+            raw = read_link(origin['source'])
+            raw.decode('utf-8')
+            blob = hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest()
+            require(blob == origin['git_blob'], 'source cohort origin blob')
+            capture = parse_json(read_link(origin['api_capture']).decode('utf-8'))
+            fields(capture, 'command cwd exit expected_exit head working_diff_sha256 stdout stderr '
+                   'capture_script_sha256', 'source cohort API capture')
+            route = ('repos/' + origin['repository'].removeprefix('https://github.com/') + '/contents/'
+                     + quote(origin['path'], safe='/') + '?ref=' + origin['revision'])
+            require(capture['command'] == ['gh', 'api', route]
+                    and type(capture['exit']) is int and capture['exit'] == 0
+                    and type(capture['expected_exit']) is int and capture['expected_exit'] == 0
+                    and capture['stderr'] == '' and type(capture['stdout']) is str,
+                    'source cohort pinned API command')
+            api = parse_json(capture['stdout'])
+            require(type(api) is dict and api['type'] == 'file' and api['encoding'] == 'base64'
+                    and api['path'] == origin['path'] and api['sha'] == blob
+                    and type(api['size']) is int and api['size'] == len(raw)
+                    and api['url'] == 'https://api.github.com/' + route and type(api['content']) is str,
+                    'source cohort API identity')
+            require(base64.b64decode(''.join(api['content'].split()), validate=True) == raw,
+                    'source cohort API source bytes')
+            origins[origin['id']] = raw.splitlines(keepends=True)
+        for entry in value['records']:
+            record = entry['value']
+            lines = origins[record['origin']]
+            ranges = record['extraction']['ranges']
+            require(ranges[-1][-1] <= len(lines), 'source cohort extraction exceeds actual source')
+            selected = b''.join(line for first, last in ranges for line in lines[first - 1:last])
+            require(hashlib.sha256(selected).hexdigest() == record['extraction']['raw_sha256']
+                    and b'#include <stdlib.h>\n\n' + selected == record['source']['text'].encode('utf-8'),
+                    'source cohort extraction bytes or adaptation changed')
+        verify_input_identities(guard)
+        return {**result, 'source_bytes_verified': True, 'cohort_sha256': info['sha256']}
+    except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError, subprocess.SubprocessError):
+        raise ValueError('source cohort preparation rejected') from None
+
+
 def source_metadata(manifest):
     require(type(manifest) is dict, "profile manifest")
     version2 = manifest.get("schema") == "codeskeptic-product-profiles/v2"
@@ -2442,13 +2638,14 @@ def draft_readiness(manifest, root=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check", "ground-truth-candidate-check", "ground-truth-check", "retained-ground-truth-check", "platform-recipes-check", "platform-source-labels-check"))
+    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check", "ground-truth-candidate-check", "ground-truth-check", "retained-ground-truth-check", "source-cohort-check", "platform-recipes-check", "platform-source-labels-check"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--historical-sources", type=Path, default=Path(
         "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S04-U001/corpus-diagnostic-comparison"))
     parser.add_argument("--binding", type=Path, help="tracked binding manifest (absolute path)")
     parser.add_argument('--candidate', help='explicit repository-relative source-candidate record; source-candidate-check only')
     parser.add_argument('--ground-truth', help='explicit retained label record; ground-truth-candidate-check only')
+    parser.add_argument('--cohort', help='explicit repository-relative source preparation shard; source-cohort-check only')
     parser.add_argument("--external-root", type=Path, help="explicit external snapshot root (absolute canonical path)")
     parser.add_argument("--evidence-root", type=Path, help="explicit external license-reference directory")
     args = parser.parse_args()
@@ -2457,10 +2654,16 @@ def main():
                 'candidate selector is only valid for source-candidate-check')
         require(args.command == 'ground-truth-candidate-check' or args.ground_truth is None,
                 'ground-truth selector is only valid for ground-truth-candidate-check')
+        require(args.command == 'source-cohort-check' or args.cohort is None,
+                'cohort selector is only valid for source-cohort-check')
         if args.command == "selection-check":
             require(args.binding is None and args.evidence_root is None and args.external_root is None,
                     "reviewed selection uses its explicit tracked roots")
-        if args.command in ("platform-recipes-check", "platform-source-labels-check"):
+        if args.command == 'source-cohort-check':
+            require(args.cohort is not None and args.binding is None and args.evidence_root is None
+                    and args.external_root is None, 'source cohort uses its explicit linked inputs')
+            result = verify_source_cohort(args.root, args.cohort)
+        elif args.command in ("platform-recipes-check", "platform-source-labels-check"):
             require(args.binding is None and args.evidence_root is None and args.external_root is None,
                     "native recipes use their fixed tracked roots")
             result = (verify_gcc_platform_recipes(args.root) if args.command == "platform-recipes-check"

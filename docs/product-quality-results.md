@@ -1504,3 +1504,49 @@ yeni gerçek CI sonucu ister. U003 seçimi 2/1020 ve readiness exit 2 kalır.
 commit öncesi dirty-tree guard reddi ayrı başarısız denemeler olarak saklanır;
 hedef RED veya ürün regresyonu kanıtı yerine kullanılmaz. Dosya adında
 `green` bulunması gerçek exit değerini değiştirmez.
+
+### Gerçek LLVM kaynak çifti — paketli hazırlık, henüz kabul değil
+
+`tests/product_corpus/cohorts/llvm-caller-slot-v1.json`, pinned LLVM `malloc.c`
+1930–1933 satırlarındaki caller-slot overwrite adayını ve 1935–1937 komşu
+kontrolünü tek content-addressed hazırlık dosyasında tutar. Native `stdlib.h`
+öneki dışında özgün ifadeler/yorumlar/boşluklar değişmez. Tam TU SHA-256'ları
+`a118c66873a197c3b55534f86500828492724ebd2e347df4414e2a71d322617a`
+ve `a99952fd6198cb713db7d260925467f68181fcba3f9d6acc571eb2c87386381a`.
+
+Bağımsız ön inceleme, overwrite mekanizmasını hazırlığa uygun buldu; komşu
+kontrol ayrı safe kota değildir. Diğer logical-result-after-free adayı mevcut
+frozen scalar-after-release örneğine yakın bulundu ve kota dışında tutuldu.
+Gerçek API response/base64/file/blob/span eşleşmesi ve ön karar U003
+`retained-label-host-path-v1` kanıtlarında korunur; önceki dosyanın yalnız dizin
+adı veya başka LLVM dosyasının receipt'i köken kanıtı yapılmadı. Kaynak/API
+eşleşmesi signed-tag, kaynak-bağımsız lineage veya hak/yayın izni ispatı değildir.
+
+Yeni explicit `source-cohort-check --cohort ...` okuyucusu 64 kayıtlık paket,
+ayrı canonical kayıt/source hashleri, shared-origin API/raw satır eşleşmesi,
+same-cluster kontrol bağı ve bütün okuma boyunca son kimlik denetimi kullanır.
+20 yeni sentetik test; bozuk/çapraz API, hash/range/rewrite, duplicate/orphan,
+erken qualification, 64 MiB bağlı girdi bütçesi, geç kaynak/API/paket değişimi
+ve private payload sızıntısını sınar. İzole eski kod + yeni test RED'i saklandı;
+uygulama sonrası 191 profile ve 88 identity testi, 117 testlik aynı workflow
+seçimi ve gerçek çiftin CLI kontrolü yerelde geçti. 1020 sentetik kaydın 16
+pakete sığması yalnız temsil testi, gerçek korpus veya bağımsızlık kanıtı değildir.
+
+Gerçek kaynak çiftinin native compiler/ABI preflight'i, all-rule etiketleri,
+rights/admission ve katalog farkının bağımsız prospective successor'ı bu
+hazırlıktan ayrı kapılardır. Mevcut seçim 2/1020 kalır; yeni candidate/control
+henüz eklenmez, admitted_sources ve ek kota sıfır, yedi qualification false.
+Korumalı eski 157 girdi ve daha sıkı kalite eşikleri değiştirilmez.
+
+### Yeni genel CI koşusunda aynı deadline RED'i
+
+Exact `ef039c68cd2d059d4afa2e42b83e725597c6f813` için genel
+[CI 34696545887](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34696545887)
+yine 1/1583 testte başarısızdır. Aynı checkpoint testinin ilk reusable-response
+assertion'ı, `runtime_before` beş saniyelik deadline'ı nedeniyle düşer: bu kez
+8 modül, 208542936 byte read/hash, 5015822 us wall ve 412150 us thread CPU.
+İlgili runtime/coordinator/test/workflow baytları `05a5c1d` ile aynıdır;
+sonraki ürün kapıları skipped kalır. Bağımsız salt-okunur teşhis aynı mekanizmayı
+doğruladı, kalıcı kök neden veya U003'ten kaynaklandığı iddia edilmedi.
+U004 RED kaydı ve CH12 dayanıklılık sahipliği değişmez. Başarılı ayrı identity
+koşusu bu genel CI'ı onarmaz; cache kodu/bütçesi, warmup veya kör rerun yoktur.

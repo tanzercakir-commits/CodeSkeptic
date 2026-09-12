@@ -406,3 +406,36 @@ başarısızdır. Sonuç yalnız bu ayrı index'in `reviewed_sources` adedini bi
 tam cohort etiketi veya ek örnek kotası değildir. Yedi qualification alanı false,
 ek kota sıfır ve readiness kapısı ayrı kalır. Yeni etiketlerin gerektirdiği
 protected-input farkı ayrıca bağımsız sınıflandırılmış successor ister.
+
+### Paketli kaynak hazırlığı — kabul ve kotadan ayrı
+
+`source-cohort-check --cohort tests/product_corpus/cohorts/<name>.json`,
+`codeskeptic-product-source-cohort/v1` hazırlık paketini salt okunur doğrular.
+Paket başına en fazla 64 kayıt ve 64 kaynak dosyası kökeni, 16 MiB paket ve
+64 MiB toplam bağlı kaynak/API baytı vardır. Her kaydın canonical JSON+LF
+SHA-256 kimliği diğer kayıtların içeriğinden bağımsızdır; gelecekteki hakem
+kararı yine gerçek historical Git nesnesini ve o kayıt kimliğini bağlamak
+zorundadır. Bu kimlik henüz bir admission receipt değildir.
+
+İlk gerçek paket, LLVM caller-slot overwrite adayı ile komşu safe kontrolünü
+ayrı kaynak hashleriyle tutar. Tek ek dosya binlerce küçük metadata dosyasını
+zorunlu kılmaz; korumalı inventory'nin 2000 dosya sınırı değiştirilmez. 1020
+sentetik kaydın 16 pakete sığdığı test yalnız temsil sınırını sınar; gerçek
+1020 kaynak, 17 bucket, üç bağımsız köken veya ground truth kanıtı değildir.
+
+Kaynak kökeni kayıtları pinned dosya/API eşleşmeleridir, kanıtlanmış bağımsız
+genetik lineage sayıları değildir. Gerçek harici kaynak ve API capture tekrar
+açılır; Git blob, decoded API content, exact commit/path ve seçili raw satırlar
+karşılaştırılır. C17 adaptasyonu yalnız native `stdlib.h` include öneki ekler;
+seçili özgün ifadeler, boşluklar ve yorumlar aynen kalır. Aynı packet içindeki
+köken bir kez okunur ve bütün bağlı dosyalar son kimlik denetimine kadar izlenir.
+Eski cache girdisi, serbest biçimli rewrite veya yarım sayı sonucu kullanılmaz.
+
+`independent-evaluation-candidate` hazırlık niyetidir, bağımsız kabul değildir.
+`supplemental-control` aynı family/origin/cluster içindeki gerçek adayına bağlıdır
+ve ayrıca bağımsız safe kota vermez. Yerel hedef occurrence'lar henüz gözlenmemiş
+öneridir. Tam all-rule etiketleri, gerçek native tarif/kanıt, haklar ve bağımsız
+source/cluster/admission kararları tamamlanmadan bu kayıtlar mevcut selection'a
+katılamaz. Yapısal byte check bunların yerine geçmez; admitted_sources ve ek
+kota sıfır, bağımsız review ve yedi qualification alanı false kalır. Eski iki
+kaynak, platform/etiket kayıtları, quality floors ve readiness kapısı değişmez.

@@ -3119,5 +3119,492 @@ class GccStagingTests(unittest.TestCase):
             self.assertEqual(marker.read_bytes(), b"original")
 
 
+class SourceCohortFixture:
+    """Private synthetic source/API bytes, never real provenance or admission."""
+
+    def __init__(self, owner):
+        temporary = tempfile.TemporaryDirectory(prefix='codeskeptic-source-cohort-')
+        owner.addCleanup(temporary.cleanup)
+        self.base = Path(temporary.name).resolve()
+        self.repo = self.base / 'repo'
+        self.repo.mkdir()
+        self.path = 'tests/product_corpus/cohorts/synthetic-shared-origin.json'
+        self.cohort_path = self.repo / self.path
+        self.cohort_path.parent.mkdir(parents=True)
+        self.source_path = self.base / 'PRIVATE_SOURCE_SENTINEL.c'
+        self.capture_path = self.base / 'PRIVATE_CAPTURE_SENTINEL.json'
+        self.raw = ('/* PRIVATE_PAYLOAD_SENTINEL: café, synthetic only. */\n'
+                    'void candidate(void) {\n'
+                    '  void *p = malloc(1);\n'
+                    '  p = 0;\n'
+                    '}\n'
+                    '\n'
+                    '/* Same mechanism safe control; no independent quota. */\n'
+                    'void safe_control(void) {\n'
+                    '  void *p = malloc(1);\n'
+                    '  free(p);\n'
+                    '  p = 0;\n'
+                    '}\n').encode('utf-8')
+        self.source_path.write_bytes(self.raw)
+        self.revision = 'a' * 40
+        self.upstream_path = 'tests/source.c'
+        self.endpoint = 'repos/example/synthetic/contents/' + self.upstream_path + '?ref=' + self.revision
+        self.blob = hashlib.sha1(b'blob ' + str(len(self.raw)).encode() + b'\0' + self.raw).hexdigest()
+        self.api = {'type': 'file', 'path': self.upstream_path, 'size': len(self.raw), 'sha': self.blob,
+                    'url': 'https://api.github.com/' + self.endpoint, 'encoding': 'base64',
+                    'content': base64.b64encode(self.raw).decode('ascii')}
+        self.capture = {'command': ['gh', 'api', self.endpoint], 'cwd': str(self.repo), 'exit': 0,
+                        'expected_exit': 0, 'head': 'b' * 40, 'working_diff_sha256': 'c' * 64,
+                        'stdout': profiles.canonical(self.api), 'stderr': '', 'capture_script_sha256': 'd' * 64}
+        self.capture_path.write_text(profiles.canonical(self.capture), encoding='utf-8')
+        self.origin = {'id': 'synthetic-origin', 'repository': 'https://github.com/example/synthetic',
+                       'revision': self.revision, 'path': self.upstream_path, 'git_blob': self.blob,
+                       'source': self.link(self.source_path), 'api_capture': self.link(self.capture_path)}
+        self.value = {'schema': 'codeskeptic-product-source-cohort/v1',
+                      'state': 'PRE_RESULT_SOURCE_PREPARATION_NOT_ADMITTED', 'id': 'synthetic-shared-origin',
+                      'origins': [self.origin],
+                      'records': [self.record('synthetic-candidate', 'buggy', [[1, 5]]),
+                                  self.record('synthetic-control', 'safe', [[7, 12]])],
+                      'limits': copy.deepcopy(profiles.LIMITS),
+                      'boundary': 'Synthetic preparation test only; no genuine upstream provenance or source admission.',
+                      'qualification': {key: False for key in profiles.SOURCE_QUALIFICATION.split()}}
+        self.save()
+
+    @staticmethod
+    def digest(data):
+        return hashlib.sha256(data).hexdigest()
+
+    @classmethod
+    def link(cls, path):
+        data = path.read_bytes()
+        return {'path': str(path), 'sha256': cls.digest(data), 'size_bytes': len(data)}
+
+    @classmethod
+    def address(cls, value):
+        return {'sha256': cls.digest(profiles.canonical(value).encode('utf-8')), 'value': value}
+
+    @classmethod
+    def source(cls, text):
+        data = text.encode('utf-8')
+        return {'language': 'C17', 'text': text, 'sha256': cls.digest(data), 'size_bytes': len(data)}
+
+    def record(self, name, role, ranges):
+        lines = self.raw.splitlines(keepends=True)
+        extracted = b''.join(b''.join(lines[start - 1:end]) for start, end in ranges)
+        value = {'id': name, 'selection': ('independent-evaluation-candidate' if role == 'buggy'
+                                         else 'supplemental-control'),
+                 'family': 'memory-leak', 'subprofile': None, 'role': role, 'origin': 'synthetic-origin',
+                 'cluster': 'synthetic-caller-slot', 'related_to': None if role == 'buggy' else 'synthetic-candidate',
+                 'source': self.source('#include <stdlib.h>\n\n' + extracted.decode('utf-8')),
+                 'extraction': {'ranges': ranges, 'raw_sha256': self.digest(extracted),
+                                'adaptation': 'native-stdlib-prefix/v1'},
+                 'assumptions': ['Synthetic labels still require independent semantic review.'],
+                 'expected': ([{'rule': 'memory-leak', 'function': 'candidate', 'line': 6, 'column': 3,
+                                'cwes': [401], 'multiplicity': 1}] if role == 'buggy' else []),
+                 'boundary': 'Preparation only; no native execution, independent sample judgment or quota.'}
+        return self.address(value)
+
+    def save(self, refresh_records=True):
+        if refresh_records:
+            self.value['records'] = [self.address(row['value']) for row in self.value['records']]
+        self.cohort_path.write_text(profiles.canonical(self.value), encoding='utf-8')
+
+    def save_capture(self, refresh_api=True):
+        if refresh_api:
+            self.capture['stdout'] = profiles.canonical(self.api)
+        self.capture_path.write_text(profiles.canonical(self.capture), encoding='utf-8')
+        self.value['origins'][0]['api_capture'] = self.link(self.capture_path)
+        self.save()
+
+    def check(self):
+        return profiles.verify_source_cohort(self.repo, self.path)
+
+
+class SourceCohortTests(unittest.TestCase):
+    """Bounded synthetic preparation checks cannot establish a real cohort."""
+
+    def setUp(self):
+        self.fixture = SourceCohortFixture(self)
+
+    def assert_uncredited(self, result, verified, total=2, candidates=1, controls=1):
+        self.assertIs(result['source_bytes_verified'], verified)
+        self.assertEqual(result['total_sources'], total)
+        self.assertEqual(result['preparation_candidates'], candidates)
+        self.assertEqual(result['control_sources'], controls)
+        self.assertIs(result['independently_reviewed'], False)
+        self.assertEqual(result['admitted_sources'], 0)
+        self.assertEqual(result['additional_quota_examples'], 0)
+        for key in profiles.SOURCE_QUALIFICATION.split():
+            self.assertIs(result[key], False)
+        public = profiles.canonical(result)
+        self.assertNotIn('PRIVATE_', public)
+        self.assertNotIn('#include', public)
+        self.assertNotIn(str(self.fixture.base), public)
+
+    @staticmethod
+    def replace(value, keys, replacement):
+        target = value
+        for key in keys[:-1]:
+            target = target[key]
+        target[keys[-1]] = replacement
+
+    def assert_metadata_rejects(self, variants):
+        validate = profiles.source_cohort_metadata
+        for keys, replacement in variants:
+            value = copy.deepcopy(self.fixture.value)
+            self.replace(value, keys, replacement)
+            value['records'] = [self.fixture.address(row['value']) for row in value['records']]
+            with self.subTest(path=keys, replacement=repr(replacement)[:100]), self.assertRaises(ValueError):
+                validate(value)
+
+    def cli(self, *arguments):
+        return subprocess.run([sys.executable, '-B', str(Path(__file__).with_name('product_profiles.py').resolve()),
+                               *arguments], capture_output=True, text=True, check=False, timeout=10)
+
+    def test_metadata_projects_content_addresses_without_reading_or_credit(self):
+        validate = profiles.source_cohort_metadata
+        original = copy.deepcopy(self.fixture.value)
+        with mock.patch.object(profiles, 'external_read', side_effect=AssertionError('metadata must be pure')):
+            result = validate(self.fixture.value)
+        self.assertEqual(profiles.SOURCE_COHORT_SCHEMA, 'codeskeptic-product-source-cohort/v1')
+        self.assertEqual(self.fixture.value, original)
+        self.assert_uncredited(result, False)
+        self.assertEqual(result['records'], [
+            {'id': row['value']['id'], 'record_sha256': row['sha256'],
+             'source_sha256': row['value']['source']['sha256'],
+             **{key: row['value'][key] for key in ('origin', 'cluster', 'selection', 'role', 'family', 'related_to')}}
+            for row in self.fixture.value['records']])
+
+    def test_reader_binds_shared_origin_once_without_execution_network_or_writes(self):
+        read = profiles.verify_source_cohort
+        original_read = profiles.external_read
+        seen = []
+        def observe(path, capture=False):
+            seen.append(Path(path))
+            return original_read(path, capture)
+        with mock.patch.object(profiles, 'external_read', side_effect=observe), \
+                mock.patch.object(profiles.subprocess, 'run', side_effect=AssertionError('no native execution')), \
+                mock.patch.object(profiles.urllib.request, 'urlopen', side_effect=AssertionError('no network')), \
+                mock.patch.object(profiles.urllib.request, 'build_opener', side_effect=AssertionError('no network')), \
+                mock.patch.object(Path, 'write_bytes', side_effect=AssertionError('reader must not write')), \
+                mock.patch.object(Path, 'write_text', side_effect=AssertionError('reader must not write')):
+            result = read(self.fixture.repo, self.fixture.path)
+        self.assert_uncredited(result, True)
+        self.assertEqual(seen.count(self.fixture.source_path), 1)
+        self.assertEqual(seen.count(self.fixture.capture_path), 1)
+        self.assertEqual(result['records'], profiles.source_cohort_metadata(self.fixture.value)['records'])
+
+    def test_1020_synthetic_sources_fit_sixteen_bounded_shards_with_zero_credit(self):
+        validate = profiles.source_cohort_metadata
+        total, addresses, shard_sizes = 0, set(), []
+        # This exercises bounded representation, not 17-bucket coverage or real independence.
+        for start in range(0, 1020, 64):
+            value = copy.deepcopy(self.fixture.value)
+            value['id'] = 'synthetic-shard-' + str(start // 64)
+            value['records'] = []
+            for number in range(start, min(start + 64, 1020)):
+                row = copy.deepcopy(self.fixture.value['records'][0]['value'])
+                row.update(id='synthetic-case-' + str(number), cluster='synthetic-cluster-' + str(number),
+                           role='safe', expected=[])
+                row['source'] = self.fixture.source('#include <stdlib.h>\n\nvoid case_' + str(number) + '(void) {}\n')
+                value['records'].append(self.fixture.address(row))
+            result = validate(value)
+            count = len(value['records'])
+            self.assert_uncredited(result, False, count, count, 0)
+            total += result['total_sources']
+            shard_sizes.append(count)
+            addresses.update(row['source_sha256'] for row in result['records'])
+        self.assertEqual((total, len(addresses), len(shard_sizes)), (1020, 1020, 16))
+        self.assertEqual(shard_sizes, [64] * 15 + [60])
+        oversized = copy.deepcopy(value)
+        oversized['records'] = []
+        for number in range(65):
+            row = copy.deepcopy(value['records'][0]['value'])
+            row.update(id='overflow-' + str(number), cluster='overflow-' + str(number))
+            row['source'] = self.fixture.source('#include <stdlib.h>\n\nvoid overflow_' + str(number) + '(void) {}\n')
+            oversized['records'].append(self.fixture.address(row))
+        with self.assertRaises(ValueError):
+            validate(oversized)
+
+    def test_envelope_and_qualification_are_exact_and_strictly_typed(self):
+        variants = [(('schema',), 'other'), (('state',), 'ADMITTED'), (('id',), True),
+                    (('id',), '../PRIVATE_SENTINEL'), (('id',), 'x' * 97), (('boundary',), ''),
+                    (('boundary',), 'x' * 8193), (('unexpected',), True),
+                    (('origins',), []), (('records',), []), (('limits', 'repetitions'), True)]
+        for key in profiles.SOURCE_QUALIFICATION.split():
+            variants.extend([(('qualification', key), True), (('qualification', key), 0)])
+        variants.append((('qualification', 'admitted_sources'), 1))
+        self.assert_metadata_rejects(variants)
+
+    def test_declared_linked_bytes_and_origin_count_are_bounded_before_any_read(self):
+        validate = profiles.source_cohort_metadata
+        self.assertEqual(profiles.SOURCE_COHORT_RECORDS_MAX, 64)
+        self.assertEqual(profiles.SOURCE_COHORT_LINKED_BYTES_MAX, 64 * 1024 * 1024)
+        value = copy.deepcopy(self.fixture.value)
+        value['origins'], value['records'] = [], []
+        for number in range(4):
+            origin = copy.deepcopy(self.fixture.origin)
+            origin['id'] = 'synthetic-origin-' + str(number)
+            origin['source'].update(path=str(self.fixture.base / ('origin-' + str(number) + '.c')),
+                                    size_bytes=16 * 1024 * 1024)
+            origin['api_capture']['path'] = str(self.fixture.base / ('capture-' + str(number) + '.json'))
+            row = copy.deepcopy(self.fixture.value['records'][0]['value'])
+            row.update(id='synthetic-case-' + str(number), cluster='synthetic-cluster-' + str(number),
+                       origin=origin['id'], role='safe', expected=[])
+            row['source'] = self.fixture.source('#include <stdlib.h>\n\nvoid case_' + str(number) + '(void) {}\n')
+            value['origins'].append(origin)
+            value['records'].append(self.fixture.address(row))
+        with mock.patch.object(profiles, 'external_read', side_effect=AssertionError('metadata must be pure')):
+            with self.assertRaises(ValueError):
+                validate(value)
+        value = copy.deepcopy(self.fixture.value)
+        value['origins'] = [{**copy.deepcopy(self.fixture.origin), 'id': 'origin-' + str(number)}
+                            for number in range(65)]
+        with self.assertRaises(ValueError):
+            validate(value)
+
+    def test_origin_metadata_rejects_foreign_shapes_paths_and_byte_identities(self):
+        prefix = ('origins', 0)
+        variants = [(prefix + (key,), value) for key, value in (
+            ('id', 'INVALID'), ('repository', 'https://github.com/example/synthetic.git'),
+            ('repository', 'https://example.invalid/example/synthetic'), ('revision', 'HEAD'),
+            ('revision', '0' * 40), ('git_blob', 'x' * 40), ('path', '../source.c'),
+            ('path', 'a//source.c'), ('path', 'a\\source.c'), ('path', '/source.c'),
+            ('path', 'x' * 513), ('unexpected', 'PRIVATE_SENTINEL'))]
+        for link in ('source', 'api_capture'):
+            for key, value in (('path', 'relative/PRIVATE_SENTINEL'), ('sha256', 'bad'),
+                               ('size_bytes', True), ('size_bytes', 0), ('size_bytes', 16777217),
+                               ('unexpected', 'PRIVATE_SENTINEL')):
+                variants.append((prefix + (link, key), value))
+        self.assert_metadata_rejects(variants)
+
+    def test_record_shapes_sources_and_expected_occurrences_reject_rehashed_forgery(self):
+        prefix = ('records', 0, 'value')
+        variants = [(prefix + (key,), value) for key, value in (
+            ('id', True), ('cluster', '../escape'), ('origin', 'missing-origin'),
+            ('selection', 'independent-evaluation'), ('related_to', 'synthetic-control'),
+            ('family', 'sql-injection'), ('family', 'unknown-family'), ('family', 'bounds'),
+            ('subprofile', 'cwe-121'), ('role', 'unknown'), ('expected', []), ('assumptions', []),
+            ('assumptions', ['']), ('assumptions', ['x' * 2049]), ('assumptions', ['x'] * 17),
+            ('boundary', ''), ('boundary', 'x' * 8193), ('quota', True))]
+        for key, value in (('language', 'C++20'), ('text', 'not terminated'), ('text', 'bad\0\n'),
+                           ('sha256', '0' * 64), ('size_bytes', True), ('size_bytes', 1),
+                           ('unexpected', 'PRIVATE_SENTINEL')):
+            variants.append((prefix + ('source', key), value))
+        variants.append((prefix + ('source',), self.fixture.source('x' * 65536 + '\n')))
+        for key, value in (('rule', 'double-free'), ('function', ''), ('line', True), ('line', 999),
+                           ('column', False), ('column', 0), ('cwes', [401, 401]), ('cwes', [415, 401]),
+                           ('cwes', [True]), ('multiplicity', 0), ('multiplicity', True), ('extra', 1)):
+            variants.append((prefix + ('expected', 0, key), value))
+        variants.append((prefix + ('expected',), self.fixture.value['records'][0]['value']['expected'] * 2))
+        variants.append((('records', 1, 'value', 'expected'), self.fixture.value['records'][0]['value']['expected']))
+        self.assert_metadata_rejects(variants)
+
+    def test_record_digests_duplicate_ids_sources_origins_and_candidate_clusters_are_rejected(self):
+        validate = profiles.source_cohort_metadata
+        for mutation in ('digest', 'duplicate-id', 'duplicate-source', 'duplicate-origin', 'unused-origin',
+                         'candidate-cluster', 'record-wrapper-field'):
+            value = copy.deepcopy(self.fixture.value)
+            if mutation == 'duplicate-id': value['records'][1]['value']['id'] = value['records'][0]['value']['id']
+            elif mutation == 'duplicate-source': value['records'][1]['value']['source'] = value['records'][0]['value']['source']
+            elif mutation in ('duplicate-origin', 'unused-origin'):
+                origin = copy.deepcopy(value['origins'][0])
+                if mutation == 'unused-origin': origin['id'] = 'unused-origin'
+                value['origins'].append(origin)
+            elif mutation == 'candidate-cluster':
+                value['records'][1]['value'].update(selection='independent-evaluation-candidate', related_to=None)
+            value['records'] = [self.fixture.address(row['value']) for row in value['records']]
+            if mutation == 'digest': value['records'][0]['sha256'] = '0' * 64
+            elif mutation == 'record-wrapper-field': value['records'][0]['private'] = 'PRIVATE_SENTINEL'
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                validate(value)
+
+    def test_controls_require_an_in_packet_candidate_with_matching_origin_family_and_cluster(self):
+        prefix = ('records', 1, 'value')
+        self.assert_metadata_rejects([(prefix + ('related_to',), None),
+                                     (prefix + ('related_to',), 'synthetic-control'),
+                                     (prefix + ('related_to',), 'external-candidate'),
+                                     (prefix + ('cluster',), 'other-cluster'),
+                                     (prefix + ('family',), 'double-free')])
+        value = copy.deepcopy(self.fixture.value)
+        value['origins'].append({**copy.deepcopy(value['origins'][0]), 'id': 'other-origin'})
+        value['records'][1]['value']['origin'] = 'other-origin'
+        value['records'] = [self.fixture.address(row['value']) for row in value['records']]
+        with self.assertRaises(ValueError):
+            profiles.source_cohort_metadata(value)
+
+    def test_extraction_requires_sorted_nonoverlapping_bounded_integer_spans(self):
+        prefix = ('records', 0, 'value', 'extraction')
+        variants = [(prefix + ('ranges',), value) for value in (
+            [], [[True, 5]], [[0, 5]], [[5, 1]], [[1, 5], [5, 6]], [[7, 8], [1, 5]],
+            [[1, 2, 3]], [[1, 1]] * 65)]
+        variants.extend([(prefix + ('adaptation',), 'arbitrary-rewrite'),
+                         (prefix + ('raw_sha256',), 'bad'), (prefix + ('extra',), True)])
+        self.assert_metadata_rejects(variants)
+
+    def test_reader_rejects_rehashed_extraction_edits_and_out_of_origin_spans(self):
+        read = profiles.verify_source_cohort
+        for mutation in ('range', 'raw-hash', 'rewrite', 'prefix', 'line-endings'):
+            fixture = SourceCohortFixture(self)
+            row = fixture.value['records'][0]['value']
+            if mutation == 'range': row['extraction']['ranges'] = [[1, 999]]
+            elif mutation == 'raw-hash': row['extraction']['raw_sha256'] = 'f' * 64
+            else:
+                text = row['source']['text']
+                if mutation == 'rewrite': text = text.replace('p = 0;', 'free(p);')
+                elif mutation == 'prefix': text = text.replace('#include <stdlib.h>\n\n', '#include <stdlib.h>\n')
+                else: text = text.replace('\n', '\r\n')
+                row['source'] = fixture.source(text)
+            fixture.save()
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                read(fixture.repo, fixture.path)
+
+    def test_adjacent_extraction_ranges_preserve_original_utf8_comments_and_whitespace(self):
+        read = profiles.verify_source_cohort
+        row = self.fixture.value['records'][0]['value']
+        row['extraction']['ranges'] = [[1, 3], [4, 5]]
+        self.fixture.save()
+        self.assert_uncredited(read(self.fixture.repo, self.fixture.path), True)
+        self.fixture.source_path.write_bytes(self.fixture.raw.replace(b'p = 0;', b'p = 1;'))
+        self.fixture.value['origins'][0]['source'] = self.fixture.link(self.fixture.source_path)
+        self.fixture.save()
+        with self.assertRaises(ValueError):
+            read(self.fixture.repo, self.fixture.path)
+
+    def test_api_capture_rejects_foreign_repository_revision_path_blob_content_and_exit(self):
+        read = profiles.verify_source_cohort
+        variants = [('api', 'type', 'directory'), ('api', 'path', 'other.c'), ('api', 'sha', 'e' * 40),
+                    ('api', 'size', True), ('api', 'size', 1), ('api', 'encoding', 'utf-8'),
+                    ('api', 'content', base64.b64encode(b'PRIVATE_PAYLOAD_SENTINEL').decode()),
+                    ('api', 'content', '%%%PRIVATE_SENTINEL'),
+                    ('api', 'url', 'https://api.github.com/repos/foreign/project/contents/source.c?ref=' + 'a' * 40),
+                    ('capture', 'command', ['gh', 'api', self.fixture.endpoint.replace('example/synthetic', 'foreign/project')]),
+                    ('capture', 'command', ['gh', 'api', self.fixture.endpoint.replace('a' * 40, 'b' * 40)]),
+                    ('capture', 'command', ['gh', 'api', self.fixture.endpoint, '--jq', '.content']),
+                    ('capture', 'exit', 1), ('capture', 'expected_exit', 1), ('capture', 'exit', False),
+                    ('capture', 'stderr', 'PRIVATE_PAYLOAD_SENTINEL'), ('capture', 'unexpected', True)]
+        for section, key, replacement in variants:
+            fixture = SourceCohortFixture(self)
+            getattr(fixture, section)[key] = replacement
+            fixture.save_capture()
+            with self.subTest(section=section, key=key), self.assertRaises(ValueError) as caught:
+                read(fixture.repo, fixture.path)
+            self.assertNotIn('PRIVATE_', str(caught.exception))
+
+    def test_external_source_and_capture_paths_are_exact_host_local_files(self):
+        read = profiles.verify_source_cohort
+        for kind in ('source', 'api_capture'):
+            for mutation in ('missing', 'stale', 'host-relative', 'in-repo', 'parent-alias', 'foreign-host', 'symlink'):
+                fixture = SourceCohortFixture(self)
+                link = fixture.value['origins'][0][kind]
+                target = Path(link['path'])
+                if mutation == 'missing': target.unlink()
+                elif mutation == 'stale': target.write_bytes(b'PRIVATE_PAYLOAD_SENTINEL\n')
+                elif mutation == 'host-relative': link['path'] = target.name
+                elif mutation == 'in-repo':
+                    inner = fixture.repo / target.name
+                    inner.write_bytes(target.read_bytes())
+                    link['path'] = str(inner)
+                elif mutation == 'parent-alias':
+                    (fixture.base / 'alias').mkdir()
+                    link['path'] = str(fixture.base / 'alias') + '/../' + target.name
+                elif mutation == 'foreign-host':
+                    link['path'] = ('/foreign-host/PRIVATE_SENTINEL.c' if os.name == 'nt'
+                                    else r'C:\foreign-host\PRIVATE_SENTINEL.c')
+                else:
+                    saved = target.with_suffix('.saved')
+                    target.rename(saved)
+                    try: target.symlink_to(saved)
+                    except OSError: continue  # Hosts that cannot create symlinks still exercise every other case.
+                fixture.save()
+                with self.subTest(kind=kind, mutation=mutation), self.assertRaises(ValueError) as caught:
+                    read(fixture.repo, fixture.path)
+                self.assertNotIn('PRIVATE_', str(caught.exception))
+                self.assertNotIn(str(fixture.base), str(caught.exception))
+
+    def test_cohort_selector_is_repo_relative_and_cannot_escape_its_directory(self):
+        read = profiles.verify_source_cohort
+        for path in (str(self.fixture.cohort_path), '../PRIVATE_SENTINEL.json',
+                     'tests/product_corpus/candidates/PRIVATE_SENTINEL.json',
+                     'tests/product_corpus/cohorts/../PRIVATE_SENTINEL.json',
+                     'tests/product_corpus/cohorts//PRIVATE_SENTINEL.json'):
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                read(self.fixture.repo, path)
+
+    def test_duplicate_json_keys_are_rejected_in_cohort_capture_and_api(self):
+        read = profiles.verify_source_cohort
+        for where in ('cohort', 'capture', 'api'):
+            fixture = SourceCohortFixture(self)
+            if where == 'cohort':
+                text = profiles.canonical(fixture.value)
+                fixture.cohort_path.write_text('{"id":"PRIVATE_SENTINEL",' + text[1:], encoding='utf-8')
+            elif where == 'capture':
+                text = profiles.canonical(fixture.capture)
+                fixture.capture_path.write_text('{"exit":0,' + text[1:], encoding='utf-8')
+                fixture.value['origins'][0]['api_capture'] = fixture.link(fixture.capture_path)
+                fixture.save()
+            else:
+                fixture.capture['stdout'] = '{"type":"file",' + profiles.canonical(fixture.api)[1:]
+                fixture.save_capture(refresh_api=False)
+            with self.subTest(where=where), self.assertRaises(ValueError):
+                read(fixture.repo, fixture.path)
+
+    def test_final_identity_audit_rejects_late_source_capture_and_cohort_drift_without_partial_counts(self):
+        read = profiles.verify_source_cohort
+        original_read = profiles.external_read
+        for target_name in ('source_path', 'capture_path', 'cohort_path'):
+            fixture = SourceCohortFixture(self)
+            seen, changed = set(), []
+            expected = {fixture.source_path, fixture.capture_path, fixture.cohort_path}
+            def mutate_after_last_read(path, capture=False):
+                result = original_read(path, capture)
+                seen.add(Path(path))
+                if expected <= seen and not changed:
+                    target = getattr(fixture, target_name)
+                    target.write_bytes(target.read_bytes() + b'\nPRIVATE_LATE_DRIFT_SENTINEL\n')
+                    changed.append(target)
+                return result
+            output = io.StringIO()
+            with mock.patch.object(profiles, 'external_read', side_effect=mutate_after_last_read), \
+                    mock.patch.object(sys, 'stdout', output), self.subTest(target=target_name), \
+                    self.assertRaises(ValueError) as caught:
+                read(fixture.repo, fixture.path)
+            self.assertTrue(changed, 'mutation must occur after all three actual inputs were read')
+            self.assertEqual(output.getvalue(), '')
+            self.assertNotIn('PRIVATE_', str(caught.exception))
+
+    def test_completed_invocations_do_not_cache_later_private_source_drift(self):
+        read = profiles.verify_source_cohort
+        self.assert_uncredited(read(self.fixture.repo, self.fixture.path), True)
+        self.fixture.source_path.write_bytes(b'PRIVATE_NEW_INVOCATION_SENTINEL\n')
+        with self.assertRaises(ValueError):
+            read(self.fixture.repo, self.fixture.path)
+
+    def test_real_cli_dispatch_reports_only_uncredited_projection(self):
+        result = self.cli('source-cohort-check', '--root', str(self.fixture.repo), '--cohort', self.fixture.path)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stderr, '')
+        self.assert_uncredited(json.loads(result.stdout), True)
+
+    def test_real_cli_missing_selector_unrelated_overrides_and_private_failures_have_no_partial_json(self):
+        base = ['source-cohort-check', '--root', str(self.fixture.repo), '--cohort', self.fixture.path]
+        commands = [['source-cohort-check', '--root', str(self.fixture.repo)],
+                    ['limits', '--cohort', self.fixture.path]]
+        for option in ('--binding', '--candidate', '--ground-truth', '--external-root', '--evidence-root'):
+            commands.append([*base, option, 'PRIVATE_OPTION_SENTINEL'])
+        for arguments in commands:
+            result = self.cli(*arguments)
+            with self.subTest(arguments=arguments):
+                self.assertEqual(result.returncode, 2)
+                self.assertEqual(result.stdout, '')
+                self.assertNotIn('PRIVATE_', result.stderr)
+        self.fixture.source_path.write_bytes(b'PRIVATE_PAYLOAD_SENTINEL\n')
+        result = self.cli(*base)
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, '')
+        self.assertNotIn('PRIVATE_', result.stderr)
+        self.assertNotIn(str(self.fixture.base), result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
