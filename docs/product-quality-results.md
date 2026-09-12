@@ -1282,3 +1282,29 @@ inventory/catalog successor gerekir; kontrol veya collector gevşetilmez.
 Bu kayıt kaynak ADMIT değildir: ikinci aday için ayrı exact-source kabul ve
 selection entegrasyonu henüz yok; seçim **1/1020** kalır. Tam all-rule/platform
 ve hak yeterliliği, cohort freeze, U003 POP ve U004 ölçümü açık kapılardır.
+
+### İkinci kaynak kararı ve selection okuma penceresi
+
+Bağımsız kaynak hakemi exact `810cae2bc134e618482d7ec2aca9ba2a183c54cd`
+üzerinde yalnız bir-source partial admission verdi. Karar U003
+`retained-candidate-reader-v1/source-admission-810cae2.json`, SHA-256
+`f81b53999165ed6c4b7d1d98751c096f57b796e72a1560e4964ef84e80ce2d64`.
+GCC köken sayısı artmaz; LLVM benzeri ve dil/platform varyantları ek kaynak
+sayılmaz. Yedi qualification alanı false ve bütün açık kapılar korunur.
+Bu karar henüz selection'a uygulanmadı; sayı **1/1020** kalır.
+
+Ayrı implementation denetimi aynı head'e PASS vermedi: ikinci sentetik aday
+okunurken ilk adayın gerçek kaynak baytları değiştirildiğinde toplam hâlâ 2
+dönebiliyordu. `selection-transitive-window-red.json` bu bulguyu yeniden üretir.
+Legacy ve retained kaynak/rights/stream/dizin kimliklerini bütün selection
+boyunca taşıyan private kontrol eklendi. İlk adayın source, rights, raw stream
+ve dizin değişimi negatifleri ile legacy guard regresyonu sonrasında 161
+profile testi ve iki gerçek candidate/selection CLI kontrolü geçti. Eski
+başarısız denetim korunur; düzeltme yeni exact-head bağımsız inceleme ister.
+
+28 dosyalık eklemeli inventory farkı ayrıca bağımsız sınıflandırıldı:
+`retained-candidate-reader-v1/input-classification-810cae2.json`, SHA-256
+`e07e208199dcee3b60884f453ec5a0c29348a9a5f5bd6158b1182bf4e4dedc46`.
+127 eski input, 52 fixture, 15 capability, floor ve snapshot byte'ları değişmez.
+Bu yalnız `ELIGIBLE_ADDITIVE_CLOSURE_ONLY` kararıdır; pending successor henüz
+uygulanmadı ve son payload/head incelemesinin yerine geçmez.

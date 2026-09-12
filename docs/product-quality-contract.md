@@ -378,3 +378,10 @@ açık kalan kapıları bağlar. Bütün selection okunup doğrulanmadan kısmi 
 dönülmez; aynı hash/cluster veya farklı isimli aynı köken sayımı şişiremez.
 Bu prosedürel kaynak sayımı full cohort freeze, all-rule/platform yeterlilik,
 lisans/yayın onayı veya U003 POP değildir.
+
+Selection işlemi tek adayın kendi son kontrolüyle yetinmez: legacy ve retained
+okuyucuların gerçek kaynak, hak referansı, ham stream ve dizin kimlikleri private
+bir ortak okuma kontrolünde tutulur. Sonraki adayı okurken önceki girdinin
+değişmesi, yeniden okunurken üzerine yazılması veya ek dosya oluşması toplam
+sayı dönmeden reddedilir. Bu kimlikler JSON çıktısına/private path export'a
+eklenmez; kilitli filesystem snapshot veya hostile-root direnci iddiası değildir.

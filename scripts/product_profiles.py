@@ -328,6 +328,23 @@ def external_tree(root, expected):
     return identities
 
 
+def remember_input_identities(guard, files, directories=None):
+    """Private read-transaction guard; never part of JSON evidence output."""
+    if guard is None:
+        return
+    identities = {path: external_identity(info) for path, info in files.items()}
+    identities.update(directories or {})
+    for path, identity in identities.items():
+        require(path not in guard or guard[path] == identity, 'earlier input identity changed')
+        guard[path] = identity
+
+
+def verify_input_identities(guard):
+    for path, identity in guard.items():
+        require(path.resolve(strict=True) == path and external_identity(path.lstat()) == identity,
+                'transitive input identity changed')
+
+
 RETAINED_GITHUB_INPUTS = 'codeskeptic-product-retained-github-inputs/v1'
 
 
@@ -390,7 +407,7 @@ def retained_github_evidence(review, rows, captured):
             'retained reviewed comparison bytes')
 
 
-def verify_external_inputs(binding_path, repo, source_root):
+def verify_external_inputs(binding_path, repo, source_root, *, _input_guard=None):
     """Verify reviewed source bytes only; never execute, download or admit a case.
 
     The tracked binding plus exact-head human review is the trust anchor, not
@@ -468,6 +485,7 @@ def verify_external_inputs(binding_path, repo, source_root):
         for path, before in files.items():
             require(path.resolve(strict=True) == path and external_identity(path.lstat()) == external_identity(before),
                     "external final identity changed")
+        remember_input_identities(_input_guard, files, before_tree)
         result = {"schema": "codeskeptic-product-external-input-check/v1", "id": manifest["id"],
                 "binding_sha256": binding_hash["sha256"], "adjudication_sha256": review_hash["sha256"],
                 "source_bytes_verified": True, "verified_inputs": len(rows), "verified_bytes": total,
@@ -547,9 +565,10 @@ def gcc_license_metadata(value):
             "independent_quota_examples": 0, "task_ready": False, "product_qualified": False}
 
 
-def verify_gcc_license_basis(repo, evidence_root, source_root):
+def verify_gcc_license_basis(repo, evidence_root, source_root, *, _input_guard=None):
     """Bind actual references to the unchanged source snapshot; never download."""
     try:
+        guard = {} if _input_guard is None else _input_guard
         repo, root = Path(repo), Path(evidence_root)
         require(root.is_absolute() and root.resolve(strict=True) == root and root.is_dir()
                 and root != repo and repo not in root.parents and root not in repo.parents,
@@ -558,7 +577,7 @@ def verify_gcc_license_basis(repo, evidence_root, source_root):
         actual, info, raw = external_read(path, capture=True)
         value = parse_json(raw.decode("utf-8"))
         result = gcc_license_metadata(value)
-        binding = verify_external_inputs(repo / GCC_BINDING, repo, source_root)
+        binding = verify_external_inputs(repo / GCC_BINDING, repo, source_root, _input_guard=guard)
         require(binding['schema'] == 'codeskeptic-product-external-input-check/v1'
                 and binding["binding_sha256"] == value["source_binding"]["sha256"], "GCC license binding drift")
         manifest = read_json(repo / GCC_BINDING)
@@ -577,6 +596,8 @@ def verify_gcc_license_basis(repo, evidence_root, source_root):
         for path, before in observations.items():
             require(path.resolve(strict=True) == path and external_identity(path.lstat()) == external_identity(before),
                     "GCC license final identity changed")
+        remember_input_identities(guard, observations)
+        verify_input_identities(guard)
         return {**result, "reference_bytes_verified": True, "source_bytes_verified": True,
                 "license_record_sha256": actual["sha256"], "source_binding_sha256": binding["binding_sha256"],
                 "source_sha256": value["source_sha256"], "verified_references": len(rows)}
@@ -621,9 +642,10 @@ def gcc_candidate_metadata(value):
         "sha256": source["sha256"], "quota": False}
 
 
-def verify_gcc_source_candidate(repo):
+def verify_gcc_source_candidate(repo, *, _input_guard=None):
     """Verify actual proposed inputs and predeclared recipe; do not run/admit it."""
     try:
+        guard = {} if _input_guard is None else _input_guard
         repo = Path(repo)
         require(repo.is_absolute() and repo.resolve(strict=True) == repo, "candidate checkout root")
         observations = {}
@@ -638,7 +660,8 @@ def verify_gcc_source_candidate(repo):
         projection = gcc_candidate_metadata(value)
         linked = {name: read_bound(repo / link["path"], link["sha256"])[0]
                   for name, link in value["links"].items()}
-        licensing = verify_gcc_license_basis(repo, value["license_evidence_root"], value["source"]["snapshot_root"])
+        licensing = verify_gcc_license_basis(repo, value["license_evidence_root"], value["source"]["snapshot_root"],
+                                            _input_guard=guard)
         require(licensing["license_record_sha256"] == value["links"]["license_basis"]["sha256"]
                 and licensing["source_sha256"] == projection["sha256"], "candidate license identity")
         binding, review, recipe = (linked[key] for key in ("source_binding", "source_review", "analysis_profile"))
@@ -672,6 +695,8 @@ def verify_gcc_source_candidate(repo):
         for path, before in observations.items():
             require(path.resolve(strict=True) == path and external_identity(path.lstat()) == external_identity(before),
                     "candidate evidence final identity changed")
+        remember_input_identities(guard, observations)
+        verify_input_identities(guard)
         return {"candidate_sha256": candidate_sha, "projection": projection,
                 "linked_evidence_files": len(observations), "source_bytes_verified": True,
                 "pre_result_recipe_bound": True, "fresh_independent_admission_required": True,
@@ -767,9 +792,10 @@ def retained_candidate_metadata(value):
         'sha256': source['sha256'], 'quota': False}
 
 
-def verify_retained_source_candidate(repo, candidate_path):
+def verify_retained_source_candidate(repo, candidate_path, *, _input_guard=None):
     """Read the reviewed source, rights boundary and native preflight, not admit."""
     try:
+        guard = {} if _input_guard is None else _input_guard
         repo = Path(repo)
         require(repo.is_absolute() and repo.resolve(strict=True) == repo, 'retained checkout')
         observations = {}
@@ -794,7 +820,8 @@ def verify_retained_source_candidate(repo, candidate_path):
         projection = retained_candidate_metadata(value)
         links = value['links']
         records = {name: linked(link) for name, link in links.items()}
-        binding = verify_external_inputs(repo / links['source_binding']['path'], repo, value['source']['snapshot_root'])
+        binding = verify_external_inputs(repo / links['source_binding']['path'], repo, value['source']['snapshot_root'],
+                                         _input_guard=guard)
         require(binding['schema'] == 'codeskeptic-product-retained-github-input-check/v1'
                 and binding['binding_sha256'] == links['source_binding']['sha256']
                 and binding['adjudication_sha256'] == links['source_review']['sha256'], 'retained binding protocol')
@@ -1045,6 +1072,8 @@ def verify_retained_source_candidate(repo, candidate_path):
         for path, before in observations.items():
             require(path.resolve(strict=True) == path and external_identity(path.lstat()) == external_identity(before),
                     'retained candidate final identity')
+        remember_input_identities(guard, observations, {**source_tree, **initial_tree})
+        verify_input_identities(guard)
         return {'candidate_sha256': candidate_sha, 'projection': projection, 'source_bytes_verified': True,
                 'pre_result_recipe_bound': True, 'fresh_independent_admission_required': True,
                 'linked_evidence_files': len(observations), 'independent_quota_examples': 0,
@@ -1163,6 +1192,7 @@ def verify_source_selection(repo, link):
         repo = Path(repo)
         require(repo.is_absolute() and repo.resolve(strict=True) == repo, "selection checkout root")
         observations = {}
+        input_guard = {}
 
         def read_link(item, external=False, maximum=16 * 1024 * 1024):
             fields(item, "path sha256", "selection link")
@@ -1200,8 +1230,8 @@ def verify_source_selection(repo, link):
             require(origins.get(projection["origin"]) == (candidate['origin_repository'] if retained
                                                         else "https://github.com/gcc-mirror/gcc"), "candidate canonical origin")
             verify_reviewed_files(repo, review["repository_head"], [entry["candidate"], *review["reviewed_links"].values()])
-            actual = (verify_retained_source_candidate(repo, candidate_path) if retained
-                      else verify_gcc_source_candidate(repo))
+            actual = (verify_retained_source_candidate(repo, candidate_path, _input_guard=input_guard) if retained
+                      else verify_gcc_source_candidate(repo, _input_guard=input_guard))
             require(actual["candidate_sha256"] == entry["candidate"]["sha256"]
                     and canonical({**actual["projection"], "quota": True}) == canonical(projection),
                     "admitted candidate no longer matches actual inputs")
@@ -1210,6 +1240,7 @@ def verify_source_selection(repo, link):
         for path, before in observations.items():
             require(path.resolve(strict=True) == path and external_identity(path.lstat()) == external_identity(before),
                     "selection evidence final identity changed")
+        verify_input_identities(input_guard)
         return {**result, "state": value["state"], "selection_sha256": link["sha256"],
                 "source_admission_reviews_bound": len(rows), "evaluation_frozen": False,
                 "task_ready": False, "native_product_qualified": False, "license_qualified": False,

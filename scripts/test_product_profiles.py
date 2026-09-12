@@ -1103,6 +1103,20 @@ class LicenseBasisTests(unittest.TestCase):
             with self.subTest(target=target), self.assertRaisesRegex(ValueError, "^GCC license reference binding rejected$"):
                 profiles.verify_gcc_license_basis(repo, evidence, source)
 
+    def test_private_guard_retains_legacy_source_and_reference_identities_without_export(self):
+        for target in ('source', 'reference'):
+            repo, source, evidence = self.fixture()
+            guard = {}
+            result = profiles.verify_gcc_license_basis(repo, evidence, source, _input_guard=guard)
+            path = source / 'case.c' if target == 'source' else evidence / 'root-README'
+            self.assertIn(path, guard)
+            self.assertIn(source, guard)
+            self.assertNotIn(str(source), profiles.canonical(result))
+            profiles.verify_input_identities(guard)
+            path.write_bytes(b'Changed previously verified legacy input\n')
+            with self.subTest(target=target), self.assertRaises(ValueError):
+                profiles.verify_input_identities(guard)
+
     def test_legacy_license_reader_rejects_retained_protocol_result(self):
         repo, source, evidence = self.fixture()
         observed = profiles.verify_external_inputs(repo / profiles.GCC_BINDING, repo, source)
@@ -2597,6 +2611,25 @@ class RetainedCandidateTests(unittest.TestCase):
         self.assertEqual(result['source_admission_reviews_bound'], 2)
         self.assertEqual(result['buckets']['memory-leak'], {'buggy': 2, 'safe': 0, 'origins': ['synthetic-origin']})
         self.assertFalse(result['evaluation_frozen'])
+        original_reader = profiles.verify_retained_source_candidate
+        # A later candidate must not let an earlier candidate's source, rights,
+        # stream or directory identity drift out of the aggregate transaction.
+        for target in (first.source / 'case.c', first.base / 'project-statement.txt',
+                       first.observation / 'cdb-wrong-width.stderr', first.source / 'unexpected.txt'):
+            original_bytes = target.read_bytes() if target.exists() else None
+            def mutate_earlier_input(repo, candidate_path, **kwargs):
+                observed = original_reader(repo, candidate_path, **kwargs)
+                if candidate_path == second.path:
+                    target.write_bytes(b'Changed earlier transitive input during later reader\n')
+                return observed
+            with mock.patch.object(profiles, 'verify_retained_source_candidate', side_effect=mutate_earlier_input):
+                with self.subTest(earlier_input=target.name), self.assertRaises(ValueError):
+                    check(index)
+            if original_bytes is None:
+                target.unlink()
+            else:
+                target.write_bytes(original_bytes)
+            self.assertEqual(check(index)['quota_examples'], 2)
         for mutation in ('duplicate', 'origin-alias', 'later-source-drift'):
             changed = copy.deepcopy(index)
             if mutation == 'duplicate':
