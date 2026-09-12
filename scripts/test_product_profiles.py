@@ -2140,6 +2140,475 @@ class RetainedExternalInputTests(ExternalInputTests):
                 self.check()
 
 
+class RetainedCandidateFixture:
+    """Synthetic bytes and Git objects only; never native execution or admission.
+
+    Compose the existing input fixture instead of inheriting and rerunning its
+    tests. Every transitive file is temporary; no user's retained packet is read.
+    """
+    def __init__(self, owner, name='synthetic-retained-one', repo=None):
+        inputs = RetainedExternalInputTests('test_actual_bytes_bound_without_execution_or_admission')
+        owner.addCleanup(inputs.doCleanups)
+        inputs.setUp()
+        self.base, self.source = inputs.base, inputs.source
+        self.repo = repo or inputs.repo
+        inputs.repo = self.repo
+        self.inputs = inputs
+        self.prefix = 'tests/product_corpus/candidates/' + name
+        self.path = self.prefix + '-candidate.json'
+        original_repo = Path(__file__).resolve().parents[1]
+        template = original_repo / 'tests/product_corpus/candidates'
+        self.candidate = profiles.read_json(template / 'gcc-parent-child-source-candidate.json')
+        self.recipe = profiles.read_json(template / 'gcc-parent-child-linux.json')
+        self.rights = profiles.read_json(template / 'gcc-parent-child-rights-basis.json')
+        self.review = profiles.read_json(template / 'gcc-parent-child-selection.json')
+        self.candidate.update(id=name, origin='synthetic-origin',
+                              origin_repository='https://github.com/example/project', cluster=name + '-cluster')
+        source = self.source / 'case.c'
+        source.write_bytes(('SOURCE_SENTINEL_' + name + '\n').encode())
+        source_row = next(row for row in inputs.rows if row['role'] == 'candidate')
+        source_row.update(self.content(source))
+        inputs.review['source']['sha256'] = source_row['sha256']
+        inputs.extraction['source_sha256'] = source_row['sha256']
+        inputs.save_evidence('extraction', inputs.extraction)
+        self.candidate['source'].update(sha256=source_row['sha256'], snapshot_root=str(self.source))
+        self.review.update(id=name)
+        self.review['source'].update(inputs.review['source'], local_evidence=str(source), line_count=1)
+        self.review['origin'].update(inputs.review['origin'], id='synthetic-origin',
+                                     local_evidence=str(self.source / 'origin.c'))
+        self.review['independence'].update(cluster=name + '-cluster')
+        self.review['independence']['same_cluster_comparison'].update(
+            inputs.review['independence']['same_cluster_comparison'],
+            local_evidence=str(self.source / 'lineage/parent.c'))
+        self.review['review'].update(source_sha256=source_row['sha256'], reviewer='/root/synthetic_source_reviewer')
+        for key in ('proof_evidence', 'initial_review', 'addressability_proposal', 'supplement'):
+            path = self.base / (key + '.json')
+            self.write(path, {'synthetic': key, 'boundary': 'No real review or source judgment.'})
+            self.review['review'][key] = str(path)
+            self.review['review'][key + '_sha256'] = profiles.file_sha(path)
+        self.manifest = inputs.manifest
+        self.manifest['id'] = name
+        self.manifest['adjudication']['path'] = self.prefix + '-review.json'
+        for key, suffix in (('source_binding', '-binding.json'), ('source_review', '-review.json'),
+                            ('license_basis', '-rights.json'), ('analysis_profile', '-native.json'),
+                            ('compiler_commands', '/compile_commands.json')):
+            self.candidate['links'][key] = {'path': self.prefix + suffix, 'sha256': 'a' * 64}
+        self.rights.update(id=name, source_sha256=source_row['sha256'], origin_revision='a' * 40)
+        self.rights['references'] = []
+        notice = self.source / 'notices/COPYING'
+        for role in ('license-text', 'project-statement', 'root-notice'):
+            path = self.base / (role + '.txt')
+            path.write_bytes(notice.read_bytes() if role != 'project-statement' else b'Synthetic project statement\n')
+            self.rights['references'].append({'role': role, 'path': str(path),
+                                             'url': 'https://example.invalid/' + role, **self.content(path)})
+        definitions = ('src/source_manager/SourceManager.cpp', 'src/main.cpp', 'src/core/RuleCapabilities.def')
+        helpers = ('scripts/product_profiles.py', 'scripts/product_identity.py', 'scripts/product_quality.py')
+        if not (self.repo / '.git').exists():
+            for relative in (*definitions, *helpers):
+                path = self.repo / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('Synthetic reviewed producer ' + relative + '\n', encoding='utf-8')
+            self.git('init', '--initial-branch=synthetic-retained-tests', '--quiet')
+            self.git('add', '--', *definitions, *helpers)
+            self.git('commit', '--no-gpg-sign', '-qm', 'synthetic producer definition')
+        self.head = self.git('rev-parse', 'HEAD')
+        self.recipe.update(id=name, source={key: self.candidate['source'][key] for key in ('path', 'sha256', 'language')})
+        self.recipe['definition_reference'] = {'head': self.head,
+            'files': [{'path': relative, 'sha256': profiles.file_sha(self.repo / relative)} for relative in definitions]}
+        self.recipe['preflight']['head'] = self.head
+        self.cdb = profiles.read_json(template / 'gcc-parent-child-linux/compile_commands.json')
+        self.observation = self.base / 'observation'
+        self.observation.mkdir()
+        resource = self.recipe['environment']['resource_directory']
+        compiler = '/usr/bin/clang-20'
+        argv = self.cdb[0]['arguments']
+        adjusted = [compiler, '-resource-dir', resource, '-fparse-all-comments', *argv[1:]]
+        environment = {'PATH': '/usr/bin:/bin', 'LANG': 'C', 'LC_ALL': 'C', 'TMPDIR': '/tmp'}
+        commands = []
+        for label, option in (('resource-directory', '-print-resource-dir'), ('compiler-version', '--version')):
+            commands.append({'name': label, 'argv': [compiler, '--no-default-config', option],
+                             'cwd': '/input', 'environment': environment, 'exit_code': 0,
+                             'expected_exit': 0, 'stderr_marker': None})
+        for form, selected in (('cdb', argv), ('frontend-adjusted', adjusted)):
+            for suffix in ('candidate-dependencies-before', 'abi-dependencies-before', 'candidate-syntax',
+                           'abi-syntax', 'wrong-width', 'wrong-malloc', 'wrong-free',
+                           'candidate-dependencies-after', 'abi-dependencies-after'):
+                bad = suffix.startswith('wrong-')
+                source_path = '/runner/' + suffix + '.c' if bad else (
+                    '/runner/probe.c' if suffix.startswith('abi-') else '/input/case.c')
+                selected_argv = ([arg for arg in selected[:-1] if arg != '-fsyntax-only']
+                    + ['-M', '-MT', 'identity-probe', source_path] if 'dependencies' in suffix
+                    else [*selected[:-1], source_path])
+                commands.append({'name': form + '-' + suffix, 'argv': selected_argv, 'cwd': '/input',
+                                 'environment': {**environment, 'CODESKEPTIC_RESOURCE_DIR': resource},
+                                 'exit_code': int(bad), 'expected_exit': int(bad),
+                                 'stderr_marker': 'parent-child-' + suffix + '-control' if bad else None})
+        for command in commands:
+            for suffix in ('.stdout', '.stderr'):
+                payload = ((command['stderr_marker'] + '\n').encode()
+                           if suffix == '.stderr' and command['stderr_marker'] else b'')
+                (self.observation / (command['name'] + suffix)).write_bytes(payload)
+        self.write(self.observation / 'compile_commands.json', self.cdb)
+        self.native = {'schema': 'codeskeptic-retained-linux-native-preflight/v1',
+                       'source_sha256': source_row['sha256'], 'commands': commands,
+                       'compilation_database': self.cdb, 'compilation_database_sha256': profiles.file_sha(
+                           self.observation / 'compile_commands.json'),
+                       'frontend_adjusted_arguments': adjusted, 'resource_directory': resource,
+                       'observed_kernel': 'synthetic-unexecuted-kernel',
+                       'initial_identities': {'/usr/bin/clang-20': {
+                           'path': compiler, 'resolved_path': '/usr/lib/llvm-20/bin/clang',
+                           'sha256': 'a' * 64, 'bytes': 100}, '/etc/os-release': {
+                           'path': '/etc/os-release', 'resolved_path': '/usr/lib/os-release',
+                           'sha256': 'b' * 64, 'bytes': 100}},
+                       'candidate_and_abi_syntax_verified': True, 'same_header_closure_verified': True,
+                       'before_after_input_identity_verified': True, 'files': []}
+        self.native.update({key: False for key in ('analyzer_run', 'candidate_executed', 'native_product_qualified',
+                                                  'quota_credit', 'task_ready')})
+        self.native['files'] = [{'file': path.name, **self.content(path)} for path in sorted(self.observation.iterdir())]
+        producer_inputs = {}
+        for relative in helpers:
+            path = self.repo / relative
+            producer_inputs[str(path)] = {'content': self.content(path)}
+        for name in ('run.py', 'observe.py', 'probe.c', 'wrong-width.c', 'wrong-malloc.c', 'wrong-free.c'):
+            path = self.base / name
+            path.write_text('Synthetic producer ' + name + '\n', encoding='utf-8')
+            producer_inputs[str(path)] = {'content': self.content(path)}
+        self.wrapper = {'schema': 'codeskeptic-retained-linux-native-preflight-driver/v1',
+                        'head': self.head, 'exit_code': 0, 'producer_inputs': producer_inputs,
+                        'image': 'c' * 64, 'image_manifest_digest': 'sha256:' + 'd' * 64}
+        self.native_review = {'schema': 'codeskeptic-native-preflight-review/v1',
+            'task_id': 'CS3-CH08-S01-U003', 'head': self.head, 'source_sha256': source_row['sha256'],
+            'verdict': 'PASS_WITH_STATED_BOUNDARIES', 'findings': [],
+            'implementer': '/root', 'verifier': '/root/synthetic_native_reviewer',
+            'compilation_database_sha256': self.native['compilation_database_sha256'],
+            'qualification': {key: False for key in ('admission_ready allocator_noninterposition_verified analyzer_run '
+                'calling_abi_verified candidate_executed compiler_runtime_closure_verified embedded_frontend_verified '
+                'evaluation_frozen hosted_qualification_verified image_signature_authenticated implemented_emission_verified '
+                'license_qualified native_product_qualified pop_authorized product_qualified publication_approved '
+                'quota_credit redistribution_approved runtime_allocator_semantics_verified source_admitted task_ready '
+                'upstream_authenticated').split()}}
+        self.recipe['environment'].update(image_id=self.wrapper['image'],
+            image_manifest_digest=self.wrapper['image_manifest_digest'],
+            compiler=self.native['initial_identities'][compiler],
+            os_release=self.native['initial_identities']['/etc/os-release'], observed_kernel=self.native['observed_kernel'])
+        self.sync()
+
+    @staticmethod
+    def content(path):
+        data = path.read_bytes()
+        return {'size_bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
+
+    @staticmethod
+    def write(path, value):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(profiles.canonical(value), encoding='utf-8')
+        return profiles.file_sha(path)
+
+    def git(self, *args):
+        return subprocess.run(['git', '-C', str(self.repo), '-c', 'user.name=Synthetic Test',
+            '-c', 'user.email=test@example.invalid', '-c', 'commit.gpgsign=false',
+            '-c', 'core.hooksPath=' + str(self.base / 'disabled-hooks'), *args],
+            capture_output=True, text=True, check=True, timeout=10).stdout.strip()
+
+    def tracked(self, key, value):
+        link = self.candidate['links'][key]
+        link['sha256'] = self.write(self.repo / link['path'], value)
+        return copy.deepcopy(link)
+
+    def sync(self):
+        """Rehash outer links while leaving intentionally mutated inner facts."""
+        self.manifest['adjudication'] = self.tracked('source_review', self.review)
+        binding_link = self.tracked('source_binding', self.manifest)
+        self.rights['source_binding'] = binding_link
+        self.tracked('license_basis', self.rights)
+        self.recipe['source_binding'] = binding_link
+        self.recipe['compiler_commands'] = self.tracked('compiler_commands', self.cdb)
+        self.wrapper['source_binding'] = profiles.verify_external_inputs(
+            self.repo / binding_link['path'], self.repo, self.source)
+        observation_path = self.observation / 'summary.json'
+        observation_sha = self.write(observation_path, self.native)
+        self.wrapper['observation_sha256'] = observation_sha
+        wrapper_path = self.base / 'wrapper.json'
+        wrapper_sha = self.write(wrapper_path, self.wrapper)
+        self.native_review.update(wrapper_summary_sha256=wrapper_sha, observation_summary_sha256=observation_sha)
+        review_path = self.base / 'native-review.json'
+        review_sha = self.write(review_path, self.native_review)
+        self.recipe['preflight'].update(wrapper={'path': str(wrapper_path), 'sha256': wrapper_sha},
+            observation={'path': str(observation_path), 'sha256': observation_sha},
+            review={'path': str(review_path), 'sha256': review_sha})
+        self.tracked('analysis_profile', self.recipe)
+        self.write(self.repo / self.path, self.candidate)
+
+    def check(self):
+        return profiles.verify_source_candidate(self.repo, self.path)
+
+    def admission(self, head):
+        return {'schema': 'codeskeptic-source-admission-review/v2', 'repository_head': head,
+                'candidate_path': self.path, 'candidate_sha256': profiles.file_sha(self.repo / self.path),
+                'source_sha256': self.candidate['source']['sha256'], 'implementer': '/root',
+                'verifier': '/root/synthetic_source_reviewer', 'verdict': 'ADMIT_ONE_SOURCE',
+                'admitted_source_count': 1, 'projection': {**profiles.retained_candidate_metadata(self.candidate), 'quota': True},
+                'reviewed_links': copy.deepcopy(self.candidate['links']), 'rationale': 'Synthetic protocol test only.',
+                'remaining_gaps': ['No actual source admission, native execution, rights clearance or product qualification.'],
+                'qualification': copy.deepcopy(self.candidate['qualification'])}
+
+
+class RetainedCandidateTests(unittest.TestCase):
+    def setUp(self):
+        self.fixture = RetainedCandidateFixture(self)
+
+    def test_actual_synthetic_packet_and_git_ancestors_are_read_without_native_execution(self):
+        fixture = self.fixture
+        execute = subprocess.run
+        calls = []
+        def git_only(argv, *args, **kwargs):
+            self.assertEqual(argv[0], 'git', 'reader must not launch a compiler, analyzer or shell')
+            calls.append(argv)
+            return execute(argv, *args, **kwargs)
+        with mock.patch.object(profiles.subprocess, 'run', side_effect=git_only), \
+                mock.patch.object(profiles.urllib.request, 'urlopen', side_effect=AssertionError('no network')):
+            result = fixture.check()
+        self.assertTrue(calls)
+        self.assertTrue(result['source_bytes_verified'])
+        self.assertTrue(result['pre_result_recipe_bound'])
+        self.assertTrue(result['fresh_independent_admission_required'])
+        self.assertFalse(result['projection']['quota'])
+        self.assertEqual(result['independent_quota_examples'], 0)
+        self.assertFalse(result['task_ready'])
+        self.assertFalse(result['product_qualified'])
+        self.assertNotIn('SOURCE_SENTINEL', profiles.canonical(result))
+
+    def test_metadata_rejects_wrong_types_scopes_labels_and_premature_qualification(self):
+        original = self.fixture.candidate
+        mutations = [('id', True), ('id', '../escape'), ('origin_repository', 'https://github.com/example/project.git'),
+                     ('family', []), ('family', 'sql-injection'), ('family', 'bounds'), ('role', 'safe'),
+                     ('analysis_selection', '../native'), ('selection', 'training')]
+        for key, value in mutations:
+            candidate = copy.deepcopy(original)
+            candidate[key] = value
+            with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                profiles.retained_candidate_metadata(candidate)
+        for section, key, value in [('expected', 'line', True), ('expected', 'cwes', [401, 401]),
+                                    ('expected', 'multiplicity', 0), ('limits', 'repetitions', True),
+                                    ('qualification', 'task_ready', 0), ('qualification', 'evaluation_frozen', True)]:
+            candidate = copy.deepcopy(original)
+            target = candidate['expected'][0] if section == 'expected' else candidate[section]
+            target[key] = value
+            with self.subTest(section=section, key=key), self.assertRaises(ValueError):
+                profiles.retained_candidate_metadata(candidate)
+        for bad in ('../escape.json', '/tmp/escape.json', 'tests/product_corpus/candidates/CON.json'):
+            candidate = copy.deepcopy(original)
+            candidate['links']['source_review']['path'] = bad
+            with self.subTest(path=bad), self.assertRaises(ValueError):
+                profiles.retained_candidate_metadata(candidate)
+
+    def test_full_reader_rejects_rehashed_inconsistent_review_rights_native_and_recipe(self):
+        fixture = self.fixture
+        variants = [('review', ('source_label', 'family'), 'bounds'),
+                    ('review', ('independence', 'cluster'), 'other-cluster'),
+                    ('review', ('prospective_mapping', 'line'), 16),
+                    ('rights', ('source_sha256',), 'f' * 64),
+                    ('rights', ('assessment', 'license_qualified'), True),
+                    ('rights', ('references', 0, 'size_bytes'), True),
+                    ('native', ('candidate_and_abi_syntax_verified',), 1),
+                    ('native', ('quota_credit',), 0),
+                    ('native', ('commands', 0, 'exit_code'), True),
+                    ('native', ('commands', 4, 'argv'), ['/usr/bin/clang-20', '--version']),
+                    ('wrapper', ('exit_code',), False),
+                    ('native_review', ('verifier',), '/root'),
+                    ('native_review', ('qualification', 'calling_abi_verified'), 0),
+                    ('native_review', ('findings',), ['Unresolved synthetic finding']),
+                    ('recipe', ('analyzer', 'executable_sha256'), 'f' * 64),
+                    ('recipe', ('analyzer', 'selected_rule'), ['/product/bin/codeskeptic']),
+                    ('recipe', ('environment', 'image_id'), 'f' * 64),
+                    ('recipe', ('definition_reference', 'head'), 'f' * 40)]
+        for name, keys, value in variants:
+            record = getattr(fixture, name)
+            target = record
+            for key in keys[:-1]:
+                target = target[key]
+            original = copy.deepcopy(target[keys[-1]])
+            target[keys[-1]] = value
+            fixture.sync()
+            with self.subTest(record=name, path=keys), self.assertRaises(ValueError):
+                fixture.check()
+            target[keys[-1]] = original
+            fixture.sync()
+        self.assertTrue(fixture.check()['source_bytes_verified'])
+
+    def test_raw_stream_missing_drift_extra_file_and_wrong_negative_marker_fail_closed(self):
+        fixture = self.fixture
+        path = fixture.observation / 'cdb-wrong-width.stderr'
+        original = path.read_bytes()
+        for mutation in ('missing', 'drift', 'rehash-wrong-marker', 'extra'):
+            rows = copy.deepcopy(fixture.native['files'])
+            extra = fixture.observation / 'unexpected.txt'
+            if mutation == 'missing':
+                path.unlink()
+            elif mutation == 'extra':
+                extra.write_bytes(b'Unexpected extra output')
+            else:
+                path.write_bytes(b'Unrelated failure without required assertion marker\n')
+                if mutation == 'rehash-wrong-marker':
+                    next(row for row in fixture.native['files'] if row['file'] == path.name).update(fixture.content(path))
+                    fixture.sync()
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                fixture.check()
+            path.write_bytes(original)
+            if extra.exists():
+                extra.unlink()
+            fixture.native['files'] = rows
+            fixture.sync()
+        self.assertTrue(fixture.check()['source_bytes_verified'])
+
+    def test_empty_compiler_stream_does_not_relax_empty_source_or_other_file_rejection(self):
+        fixture = self.fixture
+        stream = fixture.observation / 'compiler-version.stderr'
+        self.assertEqual(stream.stat().st_size, 0)
+        self.assertEqual(profiles.empty_native_stream(stream).st_size, 0)
+        for path in (fixture.source / 'case.c', fixture.base / 'not-a-stream.json'):
+            path.write_bytes(b'')
+            with self.subTest(path=path.name), self.assertRaises(ValueError):
+                profiles.empty_native_stream(path)
+        with self.assertRaises(ValueError):
+            fixture.check()
+
+    def test_ancestor_blobs_are_used_but_external_producer_and_definition_drift_reject(self):
+        fixture = self.fixture
+        path = fixture.repo / 'scripts/product_profiles.py'
+        path.write_text('Later implementation may differ from preflight producer\n', encoding='utf-8')
+        self.assertTrue(fixture.check()['source_bytes_verified'])
+        producer = fixture.base / 'observe.py'
+        producer.write_text('Altered retained producer\n', encoding='utf-8')
+        with self.assertRaises(ValueError):
+            fixture.check()
+
+    def test_git_timeout_is_redacted_by_actual_reader_and_cli(self):
+        fixture = self.fixture
+        error = subprocess.TimeoutExpired(['git', 'SOURCE_SENTINEL_PRIVATE_TIMEOUT'], 30)
+        with mock.patch.object(profiles, 'verify_reviewed_files', side_effect=error):
+            for reader in (profiles.verify_retained_source_candidate, profiles.verify_source_candidate):
+                with self.subTest(reader=reader.__name__):
+                    with self.assertRaisesRegex(ValueError, 'candidate.*rejected') as caught:
+                        reader(fixture.repo, fixture.path)
+                    self.assertNotIn('SOURCE_SENTINEL', str(caught.exception))
+            argv = ['product_profiles.py', 'source-candidate-check', '--root', str(fixture.repo),
+                    '--candidate', fixture.path]
+            output, errors = io.StringIO(), io.StringIO()
+            with mock.patch.object(sys, 'argv', argv), mock.patch.object(sys, 'stdout', output), \
+                    mock.patch.object(sys, 'stderr', errors):
+                self.assertEqual(profiles.main(), 2)
+            self.assertEqual(output.getvalue(), '')
+            self.assertNotIn('SOURCE_SENTINEL', errors.getvalue())
+
+    def test_source_change_after_initial_binding_is_rechecked_before_success(self):
+        fixture = self.fixture
+        original = profiles.verify_external_inputs
+        calls = 0
+        def mutate_after_binding(*args, **kwargs):
+            nonlocal calls
+            result = original(*args, **kwargs)
+            calls += 1
+            if calls == 1:
+                (fixture.source / 'case.c').write_bytes(b'Changed source after first binding\n')
+            return result
+        with mock.patch.object(profiles, 'verify_external_inputs', side_effect=mutate_after_binding):
+            with self.assertRaises(ValueError):
+                fixture.check()
+        self.assertGreaterEqual(calls, 1)
+
+    def test_environment_shape_kind_and_compiler_identity_are_not_free_form_claims(self):
+        fixture = self.fixture
+        original = copy.deepcopy(fixture.recipe['environment'])
+        for key, value in (('kind', 'HOSTED_PRODUCT_QUALIFIED'), ('unexpected', True)):
+            fixture.recipe['environment'][key] = value
+            fixture.sync()
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                fixture.check()
+            fixture.recipe['environment'] = copy.deepcopy(original)
+        # Keep all superficial references internally consistent; the observed
+        # /usr/bin/clang-20 identity must not describe a different selected tool.
+        fixture.recipe['environment']['compiler']['path'] = '/usr/bin/other-compiler'
+        fixture.native['initial_identities']['/usr/bin/clang-20']['path'] = '/usr/bin/other-compiler'
+        fixture.sync()
+        with self.assertRaises(ValueError):
+            fixture.check()
+
+    def test_v2_admission_and_legacy_v1_are_not_interchangeable(self):
+        fixture = self.fixture
+        review = fixture.admission(fixture.head)
+        result = profiles.admission_review_metadata(review, fixture.candidate,
+                                                    review['candidate_sha256'], fixture.path)
+        self.assertTrue(result['quota'])
+        for key, value in (('schema', 'codeskeptic-source-admission-review/v1'), ('admitted_source_count', True),
+                           ('candidate_path', profiles.GCC_SOURCE_CANDIDATE), ('verifier', '/root'),
+                           ('source_sha256', 'f' * 64), ('repository_head', 'HEAD')):
+            changed = {**review, key: value}
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                profiles.admission_review_metadata(changed, fixture.candidate, review['candidate_sha256'], fixture.path)
+        legacy = SourceAdmissionTests('test_admitting_review_matches_exact_candidate_projection')
+        legacy.setUp()
+        legacy.review['schema'] = 'codeskeptic-source-admission-review/v2'
+        with self.assertRaises(ValueError):
+            profiles.admission_review_metadata(legacy.review, legacy.candidate, legacy.candidate_sha)
+
+    def test_cli_explicit_generic_path_dispatch_and_redacted_failures(self):
+        fixture = self.fixture
+        script = Path(__file__).resolve().with_name('product_profiles.py')
+        argv = [sys.executable, '-B', str(script), 'source-candidate-check', '--root', str(fixture.repo),
+                '--candidate', fixture.path]
+        result = subprocess.run(argv, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)['independent_quota_examples'], 0)
+        for candidate in ('../escape.json', '/tmp/not-selected.json', 'tests/product_corpus/candidates/missing.json'):
+            result = subprocess.run([*argv[:-1], candidate], capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(result.stdout, '')
+            self.assertNotIn('SOURCE_SENTINEL', result.stderr)
+        result = subprocess.run([*argv[:3], 'limits', *argv[4:]], capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 2)
+        (fixture.repo / fixture.path).write_text('{"SOURCE_SENTINEL_PRIVATE":', encoding='utf-8')
+        result = subprocess.run(argv, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, '')
+        self.assertNotIn('SOURCE_SENTINEL', result.stderr)
+
+    def test_two_real_reader_paths_count_distinct_synthetic_sources_once_per_origin(self):
+        first = self.fixture
+        second = RetainedCandidateFixture(self, 'synthetic-retained-two', repo=first.repo)
+        first.git('add', '--', 'tests/product_corpus/candidates')
+        first.git('commit', '--no-gpg-sign', '-qm', 'synthetic source proposal integration')
+        head = first.git('rev-parse', 'HEAD')
+        index = {'schema': 'codeskeptic-product-reviewed-source-selection/v1',
+                 'state': 'PARTIAL_REVIEWED_SOURCE_SELECTION_NOT_FROZEN',
+                 'origins': {'synthetic-origin': 'https://github.com/example/project'},
+                 'admissions': [], 'boundary': 'Synthetic source-count test only; no real source admission.'}
+        for fixture in (first, second):
+            review = fixture.admission(head)
+            path = fixture.base / 'admission.json'
+            index['admissions'].append({'candidate': {'path': fixture.path, 'sha256': review['candidate_sha256']},
+                                       'review': {'path': str(path), 'sha256': fixture.write(path, review)}})
+        def check(value):
+            path = first.repo / profiles.SOURCE_SELECTION
+            return profiles.verify_source_selection(first.repo, {'path': profiles.SOURCE_SELECTION,
+                                                                  'sha256': first.write(path, value)})
+        result = check(index)
+        self.assertEqual(result['quota_examples'], 2)
+        self.assertEqual(result['source_admission_reviews_bound'], 2)
+        self.assertEqual(result['buckets']['memory-leak'], {'buggy': 2, 'safe': 0, 'origins': ['synthetic-origin']})
+        self.assertFalse(result['evaluation_frozen'])
+        for mutation in ('duplicate', 'origin-alias', 'later-source-drift'):
+            changed = copy.deepcopy(index)
+            if mutation == 'duplicate':
+                changed['admissions'].append(copy.deepcopy(changed['admissions'][0]))
+            elif mutation == 'origin-alias':
+                changed['origins']['another-origin'] = 'https://github.com/example/project'
+            else:
+                (second.source / 'case.c').write_bytes(b'Changed second source after synthetic review\n')
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                check(changed)
+
+
 class GccStagingTests(unittest.TestCase):
     @staticmethod
     def stat_fixture(**changes):

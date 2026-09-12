@@ -1208,3 +1208,77 @@ dispatch, nihai native tarifler, matching/bütçeler, all-rule/platform kararlar
 ve hak sınırları tamamlanmadı. Analyzer çalıştırılmadı; ikinci aday hâlâ
 **FULL_ADMISSION_HELD**, ek kota 0 ve toplam kabul edilmiş seçim **1/1020**.
 Yeni kodun hosted sonucu ayrıca doğrulanmalıdır; eski CI bu checkpoint'e taşınmaz.
+
+### Retained binding hosted kontrolü — Windows timeout, koşu başarısız
+
+`36c4f578ecf5e5e3fc6cd96071b7bd517013cf14` için
+[34689801293 koşusu](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34689801293)
+attempt 1 **failure** kaldı. Linux/macOS job'ları başarılıdır. Windows'ta 88
+identity ve 75 seçili profile testi geçti; sonraki native `capture-case`,
+`WINDOWS_OS_QUERY` PowerShell sorgusunun 30 saniyelik sınırında timeout oldu.
+Windows native-case artifact'i oluşmadı. Başarılı iki case eski mixed-storage
+kaynağına aittir; yeni parent/child kaynağını native-qualified yapmaz.
+
+Sonraki ayrı diagnostic 23016 ms sürdü; CIM modülü 22763 ms'de yüklendi ve
+kayıtlı query aralığı 41 ms idi. Effective execution policy Unrestricted,
+iki preference da absent'tı. Önceki başarılı koşudaki CIM load 17357 ms idi.
+Bu sonradan alınan gözlemler başarısız sorgunun iç zamanlamasını veya kalıcı
+kök nedenini kanıtlamaz. Budget/policy değiştirilmedi ve kör tekrar yapılmadı.
+
+31 hashli dosya ve altı API artifact ZIP digest'i U003
+`gcc-parent-child-binding-v1/hosted-34689801293` paketinde korunur; summary
+SHA-256 `e72241904a692c1badc9503d2c303eb326aa3ab99a095202134d845aba4858e0`.
+Bağımsız ham kanıt kararı `VERIFIED_FAILED_RUN_NOT_QUALIFICATION`:
+`gcc-parent-child-binding-v1/hosted-review-34689801293.json`, SHA-256
+`57e301257b5310d3865485592fbb9e95042a5f6b18dd86aa37cd94c230d3ffe6`.
+Başarısız koşu ve eksik Windows kapısı başarılı diye yeniden etiketlenmez.
+
+### İkinci aday — yeni Linux compiler ön kontrolü ve genel okuyucu
+
+Aynı 193 baytlık parent/child kaynağı için yerelde mevcut image, ağ ve pull
+kapalı, read-only girdiler ve sonlu container/compiler sınırlarıyla kullanıldı.
+Seçili C17 CDB ve SourceManager custom-adjuster sırasını simüle eden komut ayrı
+çalıştı. 20 komuttan 14'ü exit 0; iki komut biçiminin üçer yanlış width/malloc/
+free kontrolü amaçlanan assertion ile exit 1 verdi. Candidate/ABI bağımlılıkları
+önce/sonra ve iki biçim arasında aynı: candidate 19 input/18 header, ABI 26
+input/24 header. Ne aday program ne CodeSkeptic analyzer çalıştırıldı.
+
+U003 `native-gcc-parent-child-linux-v1/summary.json` SHA-256
+`6f07afd4c3b51662521bf37f75307abc1083452f94f9e552f2f6bb2d5b63ca1d`;
+ham observation summary SHA-256
+`3e5a205f2e2f6aa675b7523e6b68486c072282bb4fbd7fa70c9c6c28ecd2678b`.
+Bağımsız preflight kararı aynı dizindeki `independent-review.json`, SHA-256
+`c313acd3c60c52aba5bf9f18e4b1e871478e455a93dfd820f68a4f8fb8b874fa`;
+yalnız kayıtlı compiler ön kontrolüne `PASS_WITH_STATED_BOUNDARIES` verir.
+Calling ABI, allocator noninterposition, image signature, runtime closure,
+embedded frontend, üç-platform ürün ve kaynak kabulü bu PASS kapsamında değildir.
+
+Yeni [aday kaydı](../tests/product_corpus/candidates/gcc-parent-child-source-candidate.json)
+kendi kaynak/hak sınırı, Linux tarifi, desired occurrence ve değişmemiş LIMITS
+bağlarını taşır. Genel okuyucu gerçek paket üzerinde sıfır kota ile geçer.
+Eski GCC lisans/admission/native kararı yeni adaya devredilmez. Generic projection
+başlangıç RED'i ve ilk underscore ayrım hatası korunur. Git okumasının timeout
+istisnasının dışarı sızdığı ayrıca RED ile gösterildi; sabit, redacted rejection
+düzeltmesinden sonra aynı kontrol GREEN oldu.
+
+12 yeni sentetik test, geçici gerçek dosyalar ve Git nesneleriyle bu protokolü
+sınar; yerel dış kanıt paketine bağımlı değildir. Sonradan kaynak değişiminin
+gözden kaçması ve ortamın tanımsız alan/yeterlilik türünü kabul etmesi ayrı RED
+olarak kaydedildi. Kaynağın son sınırda yeniden okunması, tüm kaynak/stream
+kimliklerinin korunması ve exact environment alanları bu açıkları kapattı.
+160 profile, 88 identity ve 24 product-quality testi geçti. Yeni 12 test mevcut
+native workflow seçimine de eklendi; yerel GREEN hosted başarı iddiası değildir.
+Workflow selector'ını eski tam metne bağlayan test ilk değişiklikte RED oldu;
+aynı eski seçimleri ve yeni test sınıfını iki lane'de zorunlu tutan assertion
+güncellendi. Native collector, PowerShell query ve sonlu bütçeler değişmedi.
+
+Ek legacy korpus integrity kontrolü `missing/extra/unordered protected inputs`
+ile başarısızdır. Bu fark yeni okuyucudan önce de vardı: `36c4f57` üzerinde 127
+kayıtlı girdiye karşı 151 gerçek protected input; yeni dört aday metadata/CDB
+dosyasıyla gereksinim 155 oldu. Eski 127 input hash'i değişmemiştir. Bu RED'i
+kapatmak için kaynak farkına bağlı bağımsız sınıflandırılmış prospective
+inventory/catalog successor gerekir; kontrol veya collector gevşetilmez.
+
+Bu kayıt kaynak ADMIT değildir: ikinci aday için ayrı exact-source kabul ve
+selection entegrasyonu henüz yok; seçim **1/1020** kalır. Tam all-rule/platform
+ve hak yeterliliği, cohort freeze, U003 POP ve U004 ölçümü açık kapılardır.

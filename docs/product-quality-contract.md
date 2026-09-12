@@ -348,3 +348,33 @@ imza veya yalnız schema'dan çıkarılan gerçek hakemlik kanıtı değildir.
 Native tarif sayısı iki olsa da ek kota sıfırdır. Önceki başarısız koşular korunur;
 rolling hosted image tarihsel preflight'ı güncel native/product yeterlilik veya
 evaluation freeze değildir. Bu ekler U004'ü başlatmaz, U003'ü POP etmez.
+
+## U003 retained aday yolu — kaynak seçimi ve yeterlilik ayrı
+
+`source-candidate-check --candidate tests/product_corpus/candidates/<record>.json`
+explicit kayıt ve schema ile dispatch eder. Eski GCC `source-candidate/v1` yolu
+ve pinleri korunur. Yeni `retained-source-candidate/v1` yalnız ordinary C17
+kaynak önerileridir; dört yeni injection ailesinin gerekli security-fix/API
+kanıtının yerine geçmez. Okuyucu bir analiz veya kaynak kabul işlemi yapmaz.
+
+Kaynak/adjudication, yeni kaynağa bağlı hak sınırı, native tarif ve CDB ayrı
+hashli bağlantılardır. Retained GitHub metadata/extraction/source byte'ları,
+üç hak referansı, compiler preflight receipt'i, 20 komutun ham stream'leri ve
+producer girdileri yeniden okunur. Repo producer/CLI kaynakları gerçek ancestor
+Git blob'larına bağlıdır; tarihsel helper'ın bugünkü helper'la byte eşitliği
+iddia edilmez. Boş dosya istisnası yalnız açıkça boş tanımlı compiler stdout/
+stderr stream'i içindir; sıfır uzunlukta kaynak hâlâ reddedilir. Git okuma
+hatası da private command/path içermeyen sabit candidate rejection üretir.
+
+Bu bağlama source-specific rights clearance, header'ları bugünkü native ortamda
+yeniden açma, imzalı provenance veya semantik karar doğruluğu ispatı değildir.
+Desired occurrence, sabit LIMITS ve ölçüm-öncesi komutlar korunur; analyzer
+çalıştırılmaz. Öneri bütün qualification alanlarını false ve kotayı sıfır tutar.
+
+Yeni kayıt ancak ayrı bağımsız `source-admission-review/v2` kararıyla partial
+selection'a girebilir. Karar explicit candidate yolu/hash'i, gerçek reviewed
+Git head'i, beş bağlantı, distinct ajan kimlikleri, tek-source projection ve
+açık kalan kapıları bağlar. Bütün selection okunup doğrulanmadan kısmi sayı
+dönülmez; aynı hash/cluster veya farklı isimli aynı köken sayımı şişiremez.
+Bu prosedürel kaynak sayımı full cohort freeze, all-rule/platform yeterlilik,
+lisans/yayın onayı veya U003 POP değildir.

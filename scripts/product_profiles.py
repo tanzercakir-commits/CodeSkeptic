@@ -800,6 +800,11 @@ def verify_retained_source_candidate(repo, candidate_path):
                 and binding['adjudication_sha256'] == links['source_review']['sha256'], 'retained binding protocol')
         manifest, review, rights, recipe, cdb = (records[name] for name in
             ('source_binding', 'source_review', 'license_basis', 'analysis_profile', 'compiler_commands'))
+        source_root = Path(value['source']['snapshot_root'])
+        source_paths = {source_root / row['path'] for row in manifest['inputs']}
+        source_tree = external_tree(source_root, source_paths)
+        for path in source_paths:
+            observations[path] = path.lstat()
         require(manifest['id'] == review['id'] == value['id']
                 and manifest['adjudication'] == links['source_review']
                 and review['source']['sha256'] == projection['sha256']
@@ -956,7 +961,11 @@ def verify_retained_source_candidate(repo, candidate_path):
             'retained producer helper closure')
         verify_reviewed_files(repo, preflight['head'], producer_links)
         environment = recipe['environment']
+        fields(environment, 'platform kind image_id image_manifest_digest compiler resource_directory '
+               'observed_kernel os_release image_signature_authenticated compiler_runtime_closure_verified',
+               'retained environment')
         require(environment['platform'] == 'linux-x86_64'
+                and environment['kind'] == 'LOCAL_UBUNTU_USERSPACE_NOT_HOSTED_PRODUCT_QUALIFICATION'
                 and environment['image_id'] == wrapper['image']
                 and environment['image_manifest_digest'] == wrapper['image_manifest_digest']
                 and environment['compiler'] == native['initial_identities']['/usr/bin/clang-20']
@@ -965,6 +974,16 @@ def verify_retained_source_candidate(repo, candidate_path):
                 and environment['observed_kernel'] == native['observed_kernel']
                 and environment['image_signature_authenticated'] is False
                 and environment['compiler_runtime_closure_verified'] is False, 'retained environment identity')
+        for key, expected_path in (('compiler', '/usr/bin/clang-20'), ('os_release', '/etc/os-release')):
+            observed = environment[key]
+            fields(observed, 'path resolved_path sha256 bytes', 'retained observed identity')
+            external_digest(observed['sha256'])
+            require(observed['path'] == expected_path and type(observed['bytes']) is int and observed['bytes'] > 0
+                    and type(observed['resolved_path']) is str
+                    and PurePosixPath(observed['resolved_path']).is_absolute()
+                    and '..' not in PurePosixPath(observed['resolved_path']).parts
+                    and str(PurePosixPath(observed['resolved_path'])) == observed['resolved_path'],
+                    'retained observed identity fields')
         resource = native['resource_directory']
         compiler = environment['compiler']['path']
         arguments = [compiler, '--no-default-config', '-fno-modules', '--target=x86_64-pc-linux-gnu',
@@ -1016,6 +1035,13 @@ def verify_retained_source_candidate(repo, candidate_path):
         all_current[6] = '/output/all-current-rules.json'
         require(analyzer['selected_rule'] == common + ['--disable-rule', ','.join(name for name in families if name != value['family'])]
                 and analyzer['all_current_rules'] == all_current + ['--assumptions'], 'retained predeclared CLI')
+        # The source was checked before the rest of the packet. Reopen it at
+        # the completion boundary as well, then retain identity checks across
+        # this entire read. No filesystem snapshot/hostile-root claim is made.
+        require(verify_external_inputs(repo / links['source_binding']['path'], repo, source_root) == binding,
+                'retained source changed during candidate check')
+        require(external_tree(source_root, source_paths) == source_tree
+                and external_tree(directory, expected_tree) == initial_tree, 'retained final input tree changed')
         for path, before in observations.items():
             require(path.resolve(strict=True) == path and external_identity(path.lstat()) == external_identity(before),
                     'retained candidate final identity')
@@ -1023,7 +1049,8 @@ def verify_retained_source_candidate(repo, candidate_path):
                 'pre_result_recipe_bound': True, 'fresh_independent_admission_required': True,
                 'linked_evidence_files': len(observations), 'independent_quota_examples': 0,
                 'task_ready': False, 'product_qualified': False}
-    except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError, IndexError):
+    except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError, IndexError,
+            subprocess.SubprocessError):
         raise ValueError('retained source candidate binding rejected') from None
 
 
@@ -1040,7 +1067,7 @@ def verify_source_candidate(repo, candidate_path=GCC_SOURCE_CANDIDATE):
         require(relative == GCC_SOURCE_CANDIDATE
                 and value.get('schema') == 'codeskeptic-product-source-candidate/v1', 'source candidate schema')
         return verify_gcc_source_candidate(repo)
-    except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError):
+    except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError, subprocess.SubprocessError):
         raise ValueError('source candidate dispatch rejected') from None
 
 
