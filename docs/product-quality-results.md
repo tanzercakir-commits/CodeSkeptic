@@ -1339,3 +1339,32 @@ Fixture sayımı kendi tek girişine bağlandıktan sonra 161 test yeniden geçt
 Gerçek all-rule ve platform-label okuyucuları da eski kaynak kararlarını
 koruyarak geçti; iki-source toplamı ikinci kaynağa all-rule/platform kabulü
 vermez. Önceki başarısız test capture'ı RED olarak saklanır.
+
+### İkinci kaynak entegrasyonu ve korunan girdi kapanışı
+
+Selection entegrasyonu ve tek-source fixture düzeltmesi exact
+`847c38568a1f957f5dde4c5a7283fb3b5bf12c6e` üzerinde bağımsız PASS aldı:
+`retained-candidate-reader-v1/selection-integration-review-847c385.json`,
+SHA-256 `fb41a04fd5603e864fbdc65b19ee3b0da836edd9fd9c84033ae5323d43e0e9ad`.
+Bu karar yalnız dört dosyalık entegrasyona aittir; katalog kararının yerine geçmez.
+
+Ardından aynı exact source head ve `5db8970b199801bb7029007eb40a99cb309414a7`
+predecessor kaynağı için 28 ek girdi bağımsız olarak yeniden sınıflandırıldı.
+Onaylanan prospective katalog/inventory baytları aynen uygulandı: korunan girdi
+sayısı **127 → 155**. Eski 127 satır ve hash, 52 fixture sözleşmesi/kaynakları,
+15 capability, kalite floor'ları ve tarihsel snapshot'lar değişmedi. Eklemeler
+kaynak/evidence/recipe/model/index kapanışıdır; admission veya native yeterlilik
+değildir. Önceki eksik-input RED'i korunur.
+
+Prospective karar `retained-candidate-reader-v1/inventory-proposal-review-847c385.json`,
+SHA-256 `8bef8b9186ee0e1a949dc25d2d43a462ded6d0497f05950944a82f8bee05af60`;
+bu kararın tarihsel `applied: false` alanı sonradan değiştirilmez. Uygulanan
+inventory SHA-256 `9198353752f102a98711a53946743507153df5a421f88cae3324256f98bd5ed4`,
+katalog SHA-256 `79df3c5bcc81bc5cffb4624eec374970396b40bf6f16babb41dae8cbe5440cc7`,
+successor payload ID `72f7c04ed924c32577a0288e4091d7576d57f35f7598ff2cf848f3eac5cb734e`.
+Gerçek integrity kontrolü, 65 katalog testi ve eski/yeni input değiştirme,
+silme/çoğaltma, predecessor/source/reviewer/PENDING bağları dahil 12 in-memory
+geçiş negatifi geçti. Negatiflerin bir kısmı ek exact-transition assertion'larıdır;
+bunlar production validator'ın tek başına sağladığı garanti diye sunulmaz.
+Uygulanmış commit hâlâ yeni bağımsız exact-head denetim ister. Seçim **2/1020**,
+readiness exit 2, eski hosted Windows başarısızlığı ve tüm U003 açık kapıları aynıdır.
