@@ -1,0 +1,383 @@
+{
+  "schema": "codeskeptic-product-retained-source-all-rule-ground-truth/v1",
+  "state": "SOURCE_DERIVED_LABELS_FOR_INDEPENDENT_REVIEW",
+  "id": "gcc-parent-free-loses-child",
+  "candidate": {
+    "path": "tests/product_corpus/candidates/gcc-parent-child-source-candidate.json",
+    "sha256": "b9455b10f8c8b42d14c34cd4e9a429a476fca5cbd289d60b719ee7dc00236312"
+  },
+  "source": {
+    "path": "/input/case.c",
+    "sha256": "7e0b0494e9572d46eecce6049b968917044a677608f1f934f6c9ad6bbe85651c",
+    "language": "C17",
+    "line_count": 15
+  },
+  "reference_head": "05a5c1de2f9045814b7daa424afb4cdc67527391",
+  "references": [
+    {
+      "path": "src/core/RuleCapabilities.def",
+      "sha256": "17bd1d76e01534b6afd98ad04c105c656c8ed45a2778be8f4ed842716afcaadc"
+    },
+    {
+      "path": "src/core/Capabilities.cpp",
+      "sha256": "933cb3ebe6e7b3606903303029f8f8912d9d48086ab896732cdd92ca8a44180f"
+    },
+    {
+      "path": "src/rules/AssumptionRule.cpp",
+      "sha256": "98b82bf4d418137c72f3fd6b9c33bc05d672bea4e3ea7047bea4a478c957e2b8"
+    },
+    {
+      "path": "src/rules/ContractRule.cpp",
+      "sha256": "c0aab1979e70ebe128eaa23941f462efc0b37f7b5dc5536e90af14dc83346ec2"
+    },
+    {
+      "path": "src/rules/PolicyRule.cpp",
+      "sha256": "9b9a57d65b1520f388352c30e174595a6434060f0409a23adf0ebf8d4c9d00bd"
+    },
+    {
+      "path": "scripts/cwe_quality.py",
+      "sha256": "c888bef1c2ebe1535a771758c2db58e18e1bafb3f7f06404c652104a02741108"
+    },
+    {
+      "path": "scripts/product_quality.py",
+      "sha256": "e98ff3acddd7fb5b16b28acc15ef9c5cf79cce5424bb969e45e7156d86ceff69"
+    },
+    {
+      "path": "docs/product-quality-contract.md",
+      "sha256": "069ba48c30185f1bd792bb47094c7c7556b0dcd1cedcaf8f8223863e47f14eb4"
+    }
+  ],
+  "analysis_profile": {
+    "path": "tests/product_corpus/candidates/gcc-parent-child-linux.json",
+    "sha256": "7c5c129f4d52916b297be27a971797f4e595670c46f51a23472505acabc1e71c"
+  },
+  "data_model": {
+    "char_bit": 8,
+    "int_bits": 32,
+    "size_t_bits": 64,
+    "pointer_bits": 64
+  },
+  "assumptions": [
+    "Ordinary C17 malloc/free declarations and semantics: successful allocation supplies suitably aligned storage for the requested complete object; distinct simultaneously live allocations do not overlap; free releases exactly its argument allocation, not allocations whose pointers were stored in it.",
+    "The selected source is exactly the unchanged 15-line translation unit. No allocator replacement, interposition, undeclared sidecar, model, profile policy or hidden wrapper changes its behavior. This is a source-label condition, not independently proven runtime closure.",
+    "The bound Linux C17 recipe and char8/int32/size_t64/pointer64 model are conditional analysis inputs. Its compiler preflight does not establish embedded-analyzer behavior, native product qualification, runtime allocator identity or Windows/macOS applicability.",
+    "Labels precede any analyzer run. The desired child-leak occurrence test_1:15:1 is unimplemented and unobserved. Missing it in a normal valid report remains FN; crash/timeout/OOM or malformed/missing reports remain infrastructure RED.",
+    "Safe labels for other families are cross-rule expectations on this already counted source, never additional independent safe quota samples, origin credits, security-fix pairs or evidence that planned rules are installed."
+  ],
+  "families": [
+    {
+      "rule": "alloc-size-overflow",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        10,
+        13
+      ],
+      "rationale": "The parent allocation uses sizeof(struct s1), the exact size_t size of a complete object; the child request is the representable positive constant 1024. Neither allocation count is computed by potentially overflowing arithmetic. No undersized allocation followed by a larger write occurs."
+    },
+    {
+      "rule": "bounds",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        3,
+        4,
+        5,
+        6,
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "rationale": "After a successful malloc(sizeof(struct s1)), a points to suitably aligned storage large enough for that complete object under the stated ordinary allocator conditions. The null branch returns before the sole member store. No child buffer, array element, pointer offset, copy or read/write past an extent is used."
+    },
+    {
+      "rule": "command-injection",
+      "availability": "PLANNED_NOT_IMPLEMENTED",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "rationale": "The complete selected function calls only malloc and free. It has no process-launch or shell API, command string or command sink. This source-absence label is not an installed API model, security-fix pair or observed analysis result."
+    },
+    {
+      "rule": "div-by-zero",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        10,
+        11,
+        13,
+        14
+      ],
+      "rationale": "There is no division or remainder expression. sizeof and the constant allocation request perform no division."
+    },
+    {
+      "rule": "double-free",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "rationale": "The parent allocation is freed exactly once, only after its successful allocation. The separately allocated child is never freed. Ordinary successful live malloc allocations do not overlap; the single parent free is not a child free or repeated release."
+    },
+    {
+      "rule": "format-string",
+      "availability": "PLANNED_NOT_IMPLEMENTED",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "rationale": "There is no formatted-output function, variadic format API, format string or format sink. Calls to malloc and free are not such sinks. This is source absence, not implementation or model qualification."
+    },
+    {
+      "rule": "int-overflow",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        10,
+        13
+      ],
+      "rationale": "sizeof(struct s1) is a size_t value. The integer constant 1024 is representable as int32 and its conversion to size_t64 preserves the value. No signed addition, subtraction, multiplication, shift or narrowing arithmetic result is evaluated."
+    },
+    {
+      "rule": "memory-leak",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "buggy",
+      "expected": [
+        {
+          "rule": "memory-leak",
+          "function": "test_1",
+          "line": 15,
+          "column": 1,
+          "cwes": [
+            401
+          ],
+          "multiplicity": 1
+        }
+      ],
+      "source_lines": [
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "rationale": "If both ordinary malloc calls succeed, two distinct allocations exist. The only pointer to the child is stored in the parent's ptr field. free(a) releases only the parent, losing that child pointer without releasing the child. At function end exactly the child obligation remains; the parent contributes no expected leak. Failed parent allocation returns immediately; failed child allocation acquires no child obligation. The desired closing-brace occurrence is pre-result and presently unimplemented/unobserved; a later normal report missing it is a false negative, not a reason to relabel unsupported."
+    },
+    {
+      "rule": "null-deref",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "rationale": "a is initialized from malloc and the null branch returns before a->ptr is written. A possibly null child result is stored as a pointer value but never dereferenced. The parent's free is reached only with its successfully allocated pointer."
+    },
+    {
+      "rule": "path-traversal",
+      "availability": "PLANNED_NOT_IMPLEMENTED",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "rationale": "The selected function contains no path value, path construction, file/directory operation or filesystem sink. No attacker-controlled path is consumed. This absence is not a platform filesystem model or security-fix-pair qualification."
+    },
+    {
+      "rule": "resource-leak",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "rationale": "Only ordinary memory allocation/free operations occur. No FILE stream, file descriptor, directory stream, handle or other modeled non-memory resource is acquired. The child memory obligation belongs to memory-leak and does not create an extra resource-leak expectation."
+    },
+    {
+      "rule": "sign-conversion",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        10,
+        13
+      ],
+      "rationale": "sizeof yields size_t directly. The only integer-to-size_t allocation conversion is the positive representable constant 1024, preserving its value. No negative or range-unknown signed count, narrowing integer conversion or signedness-sensitive result occurs."
+    },
+    {
+      "rule": "sql-injection",
+      "availability": "PLANNED_NOT_IMPLEMENTED",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "rationale": "No database API, SQL text, query builder, bound parameter or SQL execution sink appears in this source. malloc/free are not SQLite APIs. This is only source absence and does not supply the required source-attributed SQLite security-fix evidence."
+    },
+    {
+      "rule": "uninit-ptr",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        5,
+        10,
+        11,
+        13,
+        14
+      ],
+      "rationale": "The local a is initialized by malloc before its null test or use. a->ptr is assigned the child allocation result without reading the prior uninitialized field; that field is never subsequently read. No uninitialized pointer value is dereferenced or used."
+    },
+    {
+      "rule": "uninit-scalar",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        8,
+        10,
+        11,
+        13,
+        14
+      ],
+      "rationale": "There is no uninitialized scalar local, parameter read, or read of indeterminate storage. The condition reads the initialized pointer a; sizeof does not evaluate or read a struct object, and the child field is assigned rather than read."
+    },
+    {
+      "rule": "use-after-free",
+      "availability": "INSTALLED_AT_REFERENCE_HEAD",
+      "role": "safe",
+      "expected": [],
+      "source_lines": [
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "rationale": "The only parent member store occurs before free(a). No parent or child pointer is dereferenced, read through, or released after that free. Reaching the C function's closing brace does not access the freed parent; loss of the separately allocated child is the memory-leak defect, not a use-after-free."
+    }
+  ],
+  "project_diagnostics": [
+    {
+      "rule": "assumption",
+      "role": "no-trigger",
+      "expected": [],
+      "source_lines": [
+        8,
+        10,
+        11,
+        12,
+        13
+      ],
+      "rationale": "test_1 has no parameters, hence no unchecked dereferenced pointer parameter for the opt-in assumption report. Its only local pointer dereference is guarded. System-library internals are not independent source function bodies."
+    },
+    {
+      "rule": "contract",
+      "role": "no-trigger",
+      "expected": [],
+      "source_lines": [
+        1,
+        3,
+        4,
+        5,
+        6,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "rationale": "The selected source has no contract annotations or contract comments. Under the explicit absence of a sidecar or injected model there are no source clauses or syntax errors for the contract report to evaluate. This does not prove a separately configured contract."
+    },
+    {
+      "rule": "policy",
+      "role": "no-trigger",
+      "expected": [],
+      "source_lines": [
+        1,
+        3,
+        4,
+        5,
+        6,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "rationale": "The source has no policy comment, AI-origin policy marker or path string literal; the standard-library include token is not a C string-literal expression. No undeclared profile policy is assumed. There is no source trigger for the current path policy."
+    }
+  ],
+  "boundary": "Proposed source-derived labels for one already admitted source. Independent semantic acceptance and reader/integration verification remain separate. No analyzer observation, additional quota, full evaluation freeze, native/platform qualification, legal clearance, redistribution permission or task/product completion is established. Historical records and the original source's labels/platform links remain unchanged.",
+  "additional_quota_examples": 0,
+  "qualification": {
+    "evaluation_frozen": false,
+    "native_product_qualified": false,
+    "license_qualified": false,
+    "redistribution_approved": false,
+    "analyzer_run": false,
+    "task_ready": false,
+    "product_qualified": false
+  }
+}
