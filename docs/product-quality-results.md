@@ -1103,3 +1103,43 @@ Altı yeni odaklı metadata/IO/Git/CLI testi `NativeRecipeTests` seçimine eklen
 native workflow aynı selector ile bunları da seçer. Yerel testler ve kaynak
 incelemesi yeni hosted başarı anlamına gelmez. Korpus 1/1020, ek kota 0;
 evaluation freeze, U004 çalışması, U003 POP ve ürün yeterliliği hâlâ yoktur.
+
+### Koşullu etiket entegrasyonu — yeni üç-platform hosted GREEN
+
+Entegrasyon commit'i `6dabb74334d45de48ae0c31cff62bbf1bdaf9d5c`, 251 yerel
+test ve 17 kayıtlı kontrolün ardından bağımsız exact-head checkpoint PASS aldı.
+`gcc-platform-recipes-v1/checkpoint-review-6dabb74.json` receipt SHA-256:
+`49716d43073206af4962eb13eaf7caab6c34bca12461bfa38422ad93d66be983`.
+Bu karar yalnız entegrasyonu kapsar; U003 tamamlanması değildir.
+
+[Yeni koşu 34686787454](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34686787454),
+aynı exact head'in feature push'ından attempt 1 olarak çalıştı ve başarılı oldu.
+Linux, Windows ve macOS job'larının her birinde gerçek loglara göre 88 identity
+ve 53 seçili external-input/staging/ground-truth/recipe testi geçti. Üç native
+case'te candidate/ABI syntax kontrolleri başarılı, yanlış genişlik ve yanlış
+imza negatif kontrolleri beklenen şekilde başarısızdır. Bunlar native derleyici
+ön kontrolleridir; CodeSkeptic analyzer veya embedded frontend çalışması değildir.
+
+Yedi metadata JSON'u, ZIP'leri, üç job log'u ve run/job/artifact API kayıtları
+checkout dışındaki U003 `gcc-platform-recipes-v1/hosted-34686787454` paketinde
+saklandı. Summary SHA-256:
+`c283663207e92d874789b195f19ce0f55a938597fd9afe68212e0ef47ae5029e`.
+Bağımsız ham kanıt denetimi bütün dosya hashlerini, ZIP/API/upload-log
+eşleşmelerini, JSON byte eşitliğini ve exact producer Git bağlarını doğruladı.
+Yalnız bu hosted kanıt için PASS receipt'i
+`gcc-platform-recipes-v1/hosted-review-34686787454.json`; SHA-256:
+`1d7e282b46760e27998461d2187ef466cbe3dfa1efe7718f67b9662a5755b72f`.
+Kaynak dosyası, SDK header'ı veya compiler binary'si artifact olarak yüklenmedi.
+
+Windows case sonrası ayrı staged sorgu bu kez 17594 ms'de tamamlandı;
+`CIM_LOADED` 17357 ms'de gözlendi. Collector, 30 saniyelik sorgu sınırı ve
+workflow bu checkpoint'te değiştirilmedi. Bu yeni başarı, önceki timeout'un
+kök nedenini veya kalıcı düzeltmesini kanıtlamaz: `34346981841` ve `34348054597`
+koşuları failure olarak korunur. Özgün prospective tariflerin eski native
+referansları yeni koşuya sessizce yeniden pinlenmedi.
+
+Sekiz kaynak-hakemi koşulu hâlâ koşulludur; `conditions_satisfied=false` ve
+dokuz qualification bayrağı false kalır. Güncel native byte reopening,
+adjusted header closure ve embedded frontend eşdeğerliği doğrulanmış değildir.
+Korpus 1/1020, ek kota 0; readiness exit 2, evaluation freeze yok, U003/ürün
+hedefi açık ve `main` değişmemiştir. Bu kayıt bir POP değildir.
