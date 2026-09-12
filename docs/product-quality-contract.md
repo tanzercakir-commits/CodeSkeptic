@@ -599,3 +599,20 @@ biçimi ve truncation bayraklarını taşır. Bu post-capture log sınırıdır,
 sınırı değildir. Başarılı stdout byte'ları ile OSError/TimeoutExpired davranışı
 değişmez; tekrar deneme, fallback veya başarısız clone'u skip sayma yoktur.
 Synthetic binary hata-transport testleri özgün Git'in ürettiği çıktı diye sunulmaz.
+
+Fiziksel byte-root testinin geçerli checkout önkoşulu ayrıca gözlenir: aynı kaynak,
+parent ve seçeneklerle normal adlı gerçek clone ve historical-byte kontrolü önce
+başarmalıdır. Sonra yalnız istenen byte-adlı dizinin tek `mkdir` çağrısından gelen
+gerçek `OSError.errno == EILSEQ`, yalnız Darwin'de bu fiziksel vakayı açık gerekçeyle
+skip yapabilir. Bu karar test konumundaki gözleme aittir; APFS tanısı veya bütün
+macOS dosya adlarına ilişkin bir iddia değildir. Başarılı mkdir'den sonra byte
+directory listing tam adı korumalı; gerçek clone, canonical root ve historical
+okuma yine çalışmalıdır. Başka errno, encoding/listing/round-trip, clone veya
+reader hatası atlanmaz. Normal kontrol başarısızsa capability probe'a ulaşılmaz.
+
+Ortak serializer-view regresyonu yalnız okuyucunun uzunluk ölçümü görünümüne
+surrogate ekler; gerçek Git argv ve başarılı subprocess yanıtları değiştirilmez.
+Bu fiziksel byte-filesystem kanıtı değildir. Portable ASCII probe üzerine açıkça
+sentetik errno/platform enjeksiyonları yalnız test-helper kontrol akışını sınar;
+gerçek POSIX testi aynı undecodable byte adını kullanır. Windows decorator'ı,
+önceki ortak testler, üretim okuyucusu ve başarısız hosted kayıtları korunur.

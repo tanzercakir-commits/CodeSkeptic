@@ -2,6 +2,7 @@
 """Synthetic manifest accounting checks; no sample or product quality claim."""
 import copy
 import base64
+import errno
 import hashlib
 import io
 import json
@@ -5233,11 +5234,29 @@ class ReviewedFilesTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='codeskeptic-reviewed-posix-') as temporary:
             repo = Path(temporary) / 'posix-\udcff-root'
             self.assertEqual(os.fsencode(repo.name), b'posix-\xff-root')
-            self.fixture.git('clone', '--quiet', '--shared', '--no-checkout', str(self.fixture.repo), str(repo))
-            repo = repo.resolve(strict=True)
-            paths = self.fixture.small_paths[:2]
-            self.assertEqual(profiles.verify_reviewed_files(repo, self.fixture.head, self.fixture.links(paths)),
-                             self.fixture.expected(paths))
+            self._check_surrogateescape_checkout(repo)
+
+    def _check_surrogateescape_checkout(self, repo):
+        # A valid checkout is the reader's contract. Establish the same-source
+        # ordinary-name control before probing this temporary directory's
+        # ability to represent the requested byte name. Git errors never skip.
+        paths = self.fixture.small_paths[:2]
+        control = repo.parent / 'ordinary-control'
+        self.fixture.git('clone', '--quiet', '--shared', '--no-checkout', str(self.fixture.repo), str(control))
+        self.assertEqual(profiles.verify_reviewed_files(control.resolve(strict=True), self.fixture.head,
+                                                       self.fixture.links(paths)), self.fixture.expected(paths))
+        try:
+            repo.mkdir()
+        except OSError as error:
+            if sys.platform == 'darwin' and error.errno == errno.EILSEQ:
+                self.skipTest('Darwin temporary-directory creation rejected this requested byte name with EILSEQ '
+                              'after the ordinary clone/reader control passed')
+            raise
+        self.assertIn(os.fsencode(repo.name), os.listdir(os.fsencode(repo.parent)))
+        self.fixture.git('clone', '--quiet', '--shared', '--no-checkout', str(self.fixture.repo), str(repo))
+        repo = repo.resolve(strict=True)
+        self.assertEqual(profiles.verify_reviewed_files(repo, self.fixture.head, self.fixture.links(paths)),
+                         self.fixture.expected(paths))
 
     def test_singleton_path_survives_soft_budget_even_when_serialized_root_is_large(self):
         # A physical >8K checkout path is not portable. Inflate only the
@@ -5593,6 +5612,232 @@ class ReviewedFilesTests(unittest.TestCase):
                 self.assertEqual(execute.call_count, 1)
                 self.assertIs(raised.exception, original)
                 self.assertIsNone(raised.exception.__cause__)
+
+    def run_surrogateescape_capability_probe(self, *, platform='darwin', mkdir_error=None, fault=None):
+        """Portable synthetic fault control around actual local Git/read calls.
+
+        The ASCII probe is deliberate: this helper tests exception boundaries,
+        not physical support for undecodable directory names on any platform.
+        """
+        temporary = tempfile.TemporaryDirectory(prefix='codeskeptic-capability-probe-')
+        self.addCleanup(temporary.cleanup)
+        parent = Path(temporary.name).resolve()
+        repo, control = parent / 'portable-probe', parent / 'ordinary-control'
+        events, clones, verified, mkdirs, listings, failures = [], [], [], [], [], []
+        original_git = self.fixture.git
+        original_read = profiles.verify_reviewed_files
+        original_mkdir, original_listdir = Path.mkdir, os.listdir
+        module = sys.modules[__name__]
+
+        def role(path):
+            self.assertIn(Path(path), (repo, control))
+            return 'control' if Path(path) == control else 'probe'
+
+        def clone(*args, **kwargs):
+            self.assertEqual(args[:-1], ('clone', '--quiet', '--shared', '--no-checkout', str(self.fixture.repo)))
+            destination = Path(args[-1])
+            which = role(destination)
+            events.append('clone:' + which)
+            clones.append((args, kwargs))
+            if fault == 'control-clone' and which == 'control':
+                destination.write_bytes(b'SYNTHETIC_EXISTING_CONTROL_TARGET\n')
+            elif fault == 'probe-clone' and which == 'probe':
+                # Make this exact clone genuinely fail, then replace only its
+                # stderr with a marked synthetic transport value below.
+                self.assertTrue(destination.is_dir())
+                (destination / 'synthetic-clone-blocker').write_bytes(b'NOT_EMPTY\n')
+            try:
+                return original_git(*args, **kwargs)
+            except subprocess.CalledProcessError as error:
+                if fault == 'probe-clone' and which == 'probe':
+                    self.assertEqual(error.returncode, 128)
+                    error.stderr = b'SYNTHETIC git clone stderr: Illegal byte sequence\n'
+                failures.append(error)
+                raise
+
+        def read(root, head, links, **kwargs):
+            which = role(root)
+            events.append('read:' + which)
+            self.assertEqual(head, self.fixture.head)
+            self.assertEqual(links, self.fixture.links(self.fixture.small_paths[:2]))
+            if fault == which + '-reader':
+                links = copy.deepcopy(links)
+                links[0]['sha256'] = 'e' * 64
+            try:
+                result = original_read(root, head, links, **kwargs)
+            except ValueError as error:
+                failures.append(error)
+                raise
+            self.assertEqual(result, self.fixture.expected(self.fixture.small_paths[:2]))
+            if fault == which + '-reader-eilseq':
+                error = OSError(errno.EILSEQ, 'SYNTHETIC_ADDRESSED_READER_EILSEQ')
+                failures.append(error)
+                raise error
+            verified.append(which)
+            return result
+
+        def mkdir(path, *args, **kwargs):
+            if path == repo:
+                events.append('mkdir')
+                mkdirs.append((args, kwargs))
+                if mkdir_error is not None:
+                    raise mkdir_error
+            return original_mkdir(path, *args, **kwargs)
+
+        def listdir(path):
+            if path == os.fsencode(parent):
+                events.append('listdir')
+                listings.append(path)
+                if fault == 'listing-error':
+                    error = OSError(errno.EILSEQ, 'SYNTHETIC_LISTING_EILSEQ')
+                    failures.append(error)
+                    raise error
+                result = original_listdir(path)
+                if fault == 'listing-mismatch':
+                    return [name for name in result if name != os.fsencode(repo.name)]
+                return result
+            return original_listdir(path)
+
+        error = None
+        # Only the test module sees this synthetic platform. pathlib, Git and
+        # subprocess retain their real platform behavior and successful bytes.
+        with mock.patch.object(module, 'sys', SimpleNamespace(platform=platform)), \
+             mock.patch.object(self.fixture, 'git', side_effect=clone), \
+             mock.patch.object(profiles, 'verify_reviewed_files', side_effect=read), \
+             mock.patch.object(Path, 'mkdir', mkdir), mock.patch.object(os, 'listdir', side_effect=listdir):
+            try:
+                self._check_surrogateescape_checkout(repo)
+            except Exception as caught:
+                error = caught
+        return SimpleNamespace(error=error, events=events, clones=clones, verified=verified,
+                               mkdirs=mkdirs, listings=listings, failures=failures, repo=repo)
+
+    def test_capability_darwin_eilseq_skips_only_after_real_ordinary_control(self):
+        injected = OSError(errno.EILSEQ, 'SYNTHETIC_ADDRESSED_MKDIR_EILSEQ')
+        result = self.run_surrogateescape_capability_probe(mkdir_error=injected)
+        self.assertIsInstance(result.error, unittest.SkipTest)
+        self.assertEqual(result.events, ['clone:control', 'read:control', 'mkdir'])
+        self.assertEqual(result.verified, ['control'])
+        self.assertEqual(len(result.clones), 1)
+        self.assertEqual(len(result.mkdirs), 1)
+        self.assertEqual(result.listings, [])
+        reason = str(result.error).lower()
+        for required in ('temporary', 'ordinary', 'clone', 'reader', 'passed'):
+            self.assertIn(required, reason)
+        self.assertNotIn('apfs', reason)
+
+    def test_capability_other_mkdir_errors_and_linux_eilseq_propagate_unchanged(self):
+        cases = [('darwin', OSError(errno.EACCES, 'SYNTHETIC_MKDIR_EACCES')),
+                 ('darwin', OSError(errno.EINVAL, 'SYNTHETIC_MKDIR_EINVAL')),
+                 ('darwin', OSError('SYNTHETIC_MKDIR_WITHOUT_ERRNO')),
+                 ('darwin', UnicodeEncodeError('utf-16-le', '\udcff', 0, 1, 'synthetic mkdir encoding failure')),
+                 ('linux', OSError(errno.EILSEQ, 'SYNTHETIC_LINUX_MKDIR_EILSEQ'))]
+        for platform, injected in cases:
+            with self.subTest(platform=platform, exception=type(injected).__name__, errno=getattr(injected, 'errno', None)):
+                result = self.run_surrogateescape_capability_probe(platform=platform, mkdir_error=injected)
+                self.assertIs(result.error, injected)
+                self.assertEqual(result.events, ['clone:control', 'read:control', 'mkdir'])
+                self.assertEqual(result.verified, ['control'])
+                self.assertEqual(len(result.mkdirs), 1)
+                self.assertEqual(result.listings, [])
+
+    def test_capability_failed_ordinary_clone_cannot_reach_mkdir_or_skip(self):
+        result = self.run_surrogateescape_capability_probe(
+            mkdir_error=OSError(errno.EILSEQ, 'UNREACHED_MKDIR_EILSEQ'), fault='control-clone')
+        self.assertIsInstance(result.error, subprocess.CalledProcessError)
+        self.assertEqual(result.error.returncode, 128)
+        self.assertEqual(result.failures, [result.error])
+        self.assertIs(result.error, result.failures[0])
+        self.assertEqual(result.events, ['clone:control'])
+        self.assertEqual(result.verified, [])
+        self.assertEqual(result.mkdirs, [])
+
+    def test_capability_reader_eilseq_and_post_setup_digest_failure_are_not_skips(self):
+        cases = [('control-reader-eilseq', 'control', OSError),
+                 ('probe-reader', 'probe', ValueError), ('probe-reader-eilseq', 'probe', OSError)]
+        for fault, which, expected_type in cases:
+            with self.subTest(fault=fault):
+                result = self.run_surrogateescape_capability_probe(fault=fault)
+                self.assertIsInstance(result.error, expected_type)
+                self.assertIs(result.error, result.failures[0])
+                events = ['clone:control', 'read:control']
+                if which == 'probe':
+                    events += ['mkdir', 'listdir', 'clone:probe', 'read:probe']
+                self.assertEqual(result.events, events)
+                self.assertEqual(result.verified, [] if which == 'control' else ['control'])
+                self.assertEqual(len(result.mkdirs), 0 if which == 'control' else 1)
+
+    def test_capability_failed_ordinary_reader_cannot_reach_mkdir_or_skip(self):
+        result = self.run_surrogateescape_capability_probe(
+            mkdir_error=OSError(errno.EILSEQ, 'UNREACHED_MKDIR_EILSEQ'), fault='control-reader')
+        self.assertIsInstance(result.error, ValueError)
+        self.assertEqual(result.failures, [result.error])
+        self.assertIs(result.error, result.failures[0])
+        self.assertEqual(result.events, ['clone:control', 'read:control'])
+        self.assertEqual(result.verified, [])
+        self.assertEqual(result.mkdirs, [])
+
+    def test_capability_clone128_after_mkdir_is_failure_even_with_eilseq_stderr(self):
+        result = self.run_surrogateescape_capability_probe(fault='probe-clone')
+        self.assertIsInstance(result.error, subprocess.CalledProcessError)
+        self.assertEqual(result.error.returncode, 128)
+        self.assertEqual(result.error.stderr, b'SYNTHETIC git clone stderr: Illegal byte sequence\n')
+        self.assertIs(result.error, result.failures[0])
+        self.assertEqual(result.events, ['clone:control', 'read:control', 'mkdir', 'listdir', 'clone:probe'])
+        self.assertEqual(result.verified, ['control'])
+        self.assertEqual(len(result.clones), 2)
+        self.assertEqual(len(result.mkdirs), 1)
+
+    def test_capability_supported_darwin_branch_runs_real_control_and_probe_reads(self):
+        result = self.run_surrogateescape_capability_probe()
+        self.assertIsNone(result.error)
+        self.assertEqual(result.events, ['clone:control', 'read:control', 'mkdir', 'listdir',
+                                         'clone:probe', 'read:probe'])
+        self.assertEqual(result.verified, ['control', 'probe'])
+        self.assertEqual(len(result.clones), 2)
+        self.assertEqual(len(result.mkdirs), 1)
+        self.assertEqual(result.listings, [os.fsencode(result.repo.parent)])
+        self.assertEqual(result.repo.resolve(strict=True), result.repo)
+
+    def test_capability_listing_errors_and_byte_membership_mismatch_are_failures(self):
+        for fault in ('listing-error', 'listing-mismatch'):
+            with self.subTest(fault=fault):
+                result = self.run_surrogateescape_capability_probe(fault=fault)
+                if fault == 'listing-error':
+                    self.assertIsInstance(result.error, OSError)
+                    self.assertIs(result.error, result.failures[0])
+                    self.assertEqual(result.error.errno, errno.EILSEQ)
+                else:
+                    self.assertIsInstance(result.error, (AssertionError, ValueError))
+                self.assertNotIsInstance(result.error, unittest.SkipTest)
+                self.assertEqual(result.events, ['clone:control', 'read:control', 'mkdir', 'listdir'])
+                self.assertEqual(result.verified, ['control'])
+                self.assertEqual(len(result.clones), 1)
+                self.assertEqual(len(result.mkdirs), 1)
+
+    def test_shared_serializer_view_handles_surrogate_without_changing_real_git_arguments(self):
+        serializer = subprocess.list2cmdline
+        observed = []
+
+        def measured(argv):
+            observed.append(list(argv))
+            self.assertFalse(any('\udcff' in str(arg) for arg in argv))
+            return serializer(argv) + '\udcff'
+
+        # This is an encoding regression on every platform, not a claim that
+        # the current filesystem can represent an undecodable checkout name.
+        with self.assertRaises(UnicodeEncodeError):
+            (serializer(['git']) + '\udcff').encode('utf-16-le')
+        transport = SimpleNamespace(run=subprocess.run, PIPE=subprocess.PIPE, DEVNULL=subprocess.DEVNULL,
+                                    list2cmdline=measured)
+        paths = self.fixture.small_paths[:22]
+        with mock.patch.object(profiles, 'subprocess', transport):
+            self.assertEqual(self.check(paths), self.fixture.expected(paths))
+        self.assertTrue(observed)
+        self.assertLessEqual(len(self.git_calls), 5)
+        self.require_batch()
+        for argv, kwargs in self.git_calls:
+            self.assertFalse(any('\udcff' in str(arg) for arg in argv))
 
 
 if __name__ == "__main__":

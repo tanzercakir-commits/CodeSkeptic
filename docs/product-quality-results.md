@@ -2050,3 +2050,82 @@ Bu diagnostic-only değişiklik macOS clone nedenini veya Windows timeout'unu
 henüz çözmez. Yeni exact-head bağımsız denetim ve gerçek hosted hata ayrıntısı
 gerekir. Production, selection 2/1020, LLVM HOLD, native/source/label/inventory
 ve ledger baytları korunur; yeni kota veya U003 POP yoktur.
+
+### 0b2f05e diagnostic checkpoint: gerçek clone hata baytları
+
+Diagnostic-only `0b2f05e7bb041fdce9574ecc908e26b5d44e1828`, bağımsız
+`PASS_IMPLEMENTATION_ONLY` sonrası feature'a fast-forward gönderildi; review
+SHA-256 `9f5a0cee433bf07d4e58e7917837d646a26b0baf47e991adabe17daa3242da55`.
+[Identity 34708661693](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34708661693)
+attempt 1 failure: Linux success, macOS ve Windows failure. Terminal packet
+`reviewed-fixture-diagnostics-v1/hosted-34708661693/summary.json`, SHA-256
+`0d48e409d100570ee44926e2579b7011b37ab4c4135e15e1276610046ebfcbbf`.
+Üç identity, yalnız Linux GCC native-case ve Windows diagnostic artifact'ı vardır;
+metadata doğrulaması native tool/header byte'larının bağımsız yeniden açılması
+veya LLVM/ürün yeterliliği değildir.
+
+macOS 88 identity testi geçti; 190 profile testinde tek error, 54.647 saniye.
+Yeni clone diagnostic stdout=0, stderr=161 byte ve truncated=false bildirir.
+Git istenen byte-adlı worktree dizinini oluşturamadığını, `Illegal byte sequence`
+hatasını bildirir. Decoded tam stderr SHA-256
+`10f58d333ba0e5780e093881056de8568b1e0831d54b1355804293ac76d141d4`.
+Hata hâlâ canonical root/production reader öncesindedir. Bu Git metni tek başına
+doğrudan syscall errno gözlemi veya APFS teşhisi değildir.
+
+Windows 190 profile testini 273.996 saniyede tamamladı, yalnız eski POSIX testi
+skipped=1; ardından native-case TIMEOUT ve artifact yokluğu devam etti. Sonraki
+ayrı staged query OK, elapsed 28219 ms; CIM_LOADED 27961, UTILITY_LOADED 27965,
+CIM_QUERY_DONE 28006, QUERY_DONE 28029 ms. Bu sonraki başarılı query ilk timeout'un
+iç dökümü veya düzeltmesi değildir; süre/policy/environment değiştirilmedi.
+
+Dar test-feasibility önerisi bağımsız
+`APPROVE_BOUNDED_PROPOSAL_WITH_REQUIRED_GATES` aldı; karar
+`reviewed-fixture-feasibility-v1/proposal-review-0b2f05e.json`, SHA-256
+`c0c9ec8ab0cbeee009e47374884ec8b3743fa096beaea7f1600bde6388d12709`.
+Bu implementation PASS değildir. Normal clone/reader pozitif kontrolü, yalnız
+Darwin mkdir EILSEQ sınırı, diğer bütün hataların korunması ve ortak serializer
+regresyonu gerekir. Gerçek hosted mkdir errno/skip sayısı henüz gözlenmemiştir;
+önceki başarısız kampanyalar başarılı diye yeniden etiketlenmez.
+
+Terminal 0b packet'ini `/root/parent_child_native_verifier` bağımsız doğruladı:
+`reviewed-fixture-diagnostics-v1/hosted-review-0b2f05e.json`, SHA-256
+`4ec986b6888a2556003bcb72236d135ff8be9f53081c1528210f14cdffb97570`,
+`OBSERVATIONS_VERIFIED_RUN_FAILED`. 28 kayıt hash'i, beş ZIP/JSON bağı, exact
+head/source/helper/workflow ve gerçek loglar tutarlı. Collection wrapper ayrı
+primary çalışma alanındaki extraction diff'ini kaydeder; temiz hosted checkout
+ve gerçek executed head onunla karıştırılmaz. Windows'un kendi TIMEOUT stack'i
+özgün `Win32_OperatingSystem` sorgusundaki 30 saniye sınırına bağlanır; case
+materialization/compiler probe'ları öncesidir. İç kök neden hâlâ kanıtlanmaz.
+
+Uygulama öncesi yalnız eski clone/read gövdesi helper'a çıkarıldı; eski 27 test
+GREEN kaldı. Test-only izole baseline'a eklenen dokuz regresyon 15 beklenen
+failure, sıfır error/skip üretti; RED capture SHA-256
+`ff884eb2953c9fc15f6f4a3876961b50b5a9472a289342ace4f60b709a419468`.
+ASCII probe'larda gerçek Git/historical byte'lar, yalnız hedeflenen noktada
+sentetik mkdir/listing/reader hataları kullanıldı. Ortak serializer testinin
+in-memory strict-encoding mutasyonu ayrıca tek `UnicodeEncodeError` RED verdi,
+SHA-256 `37574fa78152be3a65847302f30841d2a45294aa6ca5177321dded8830b5d2a0`;
+bu üretim dosyası veya gerçek subprocess argv değişikliği değildir.
+
+Dar helper düzenlemesiyle 36 focused test sıfır skip/error/failure geçti,
+GREEN SHA-256 `5ca465266cbfc57306ec2e5cb27518586c44d8e22885b98aac3adde58723a914`.
+Tam 273 profile, 88 identity ve 24 quality testi GREEN; full-profile capture
+SHA-256 `8ff89531dd06f30b73e95280bf5f7b3c6188663898a48a8e5f08ce128100080d`.
+Linux'ta gerçek undecodable byte checkout okundu; portable sentetik skip akışı
+gerçek macOS filesystem başarısı sayılmadı. Üretim okuyucusu, workflow/deadline,
+source/native/label/inventory ve ledger değişmedi; selection 2/1020 ve LLVM HOLD
+korunur. Bu kayıt tek başına yeni exact-head bağımsız PASS veya hosted onayı
+değildir; U003 hazır değildir ve POP yapılmaz.
+
+Ayrı [a4 genel CI 34707372190](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34707372190)
+da kendi loguyla bağımsız failure: 1583 CTest kaydından 1582 PASS, bir failure,
+exit 8. Aynı checkpoint snapshot testinin ilk reuse assertion'ında runtime-before
+proof, `module_read` noktasında beş saniye deadline verdi: wall 5020909 µs,
+thread CPU 738527 µs, iki modülde 170080952 byte read/hash. Hangi modül veya
+I/O/scheduler/contention kök nedeni çıkarılamaz. Sonraki test/smoke/corpus kapıları
+çalışmadı. Önceki 9900 failure'dan çıkarım yapılmadı; bu runtime/test/CI dosyaları
+0b test-feasibility kapsamına taşınmadı ve eski RED yerinde kalır.
+Retained karar SHA-256 `0beb790df2a161f4deceab6d026d7465fe4a7df554a469e2d1674d74eb197db3`;
+bu yeniden kaydedilmiş JSON'da `lines` alanı `decoded_stdout_lines` olarak
+adlandırılmıştır. Hakem yukarıdaki 0b hosted review'da bütün esas iddiaları
+doğruladı; kayıt byte/alan bazında özgün receipt kopyası diye sunulmaz.
