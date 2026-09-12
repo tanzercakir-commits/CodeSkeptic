@@ -684,6 +684,14 @@ boyut sınırı ihlalleri kabul edilmez. Driver'ın makro çıktısı bağımsı
 parser'ının built-in/preprocessing eşdeğerliği kanıtı değildir; gerçek bildirim,
 header closure ve syntax/CIndex hata denetimleri ayrıca korunur.
 
+Makro-dump grameri fiziksel LF/CRLF satır sonu, `#define ` öneki ve ASCII
+identifier kullanır. İsim sonrası ayırıcı/padding yalnız ASCII SP/HT'dir;
+function-like tanımların bitişik `(` ayrımı ayrıca korunur. Unicode-wide
+whitespace normalizasyonu yoktur: ASCII dışı ayırıcı ret alır; replacement içindeki
+ASCII dışı karakterler silinmeden kalır ve beklenen sabit değer yerine geçemez.
+Yalnız ASCII boş satır/padding atlanır; Unicode karakterlerden oluşan sahte boş
+satır kabul edilmez. Replacement metni hiçbir koşulda değerlendirilmez/yürütülmez.
+
 Başarısız sonraki önişleme önceki syntax RED'i silmez: ayrı failure türü, exit ve
 gerçekte gözlenen stream byte/hash'leri kalır; bu hash'ler tutulmayan tam failure
 metninin elde olduğu iddiası değildir. Başarıda tam metin, başarısızlıkta failure

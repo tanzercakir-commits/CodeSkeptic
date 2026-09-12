@@ -1583,17 +1583,20 @@ def declaration_macro_projection(stdout):
     selected, seen = dict.fromkeys(DECLARATION_MACROS), set()
     # Only physical LF (including CRLF) terminates a dumped directive. Unicode
     # splitlines() also splits FF/VT/NEL/LS/PS and can invent selected macros.
-    for line in stdout.split('\n'):
-        if not line.strip():
+    lines = stdout.split('\n')
+    for index, line in enumerate(lines):
+        if index < len(lines) - 1 and line.endswith('\r'):
+            line = line[:-1]
+        if not line.strip(' \t'):
             continue
         match = re.fullmatch(r'#define ([A-Za-z_][A-Za-z_0-9]*)(.*)', line)
         require(match is not None, 'declaration macro definition')
         name, suffix = match.groups()
-        require(not suffix or suffix[0].isspace() or suffix[0] == '(', 'declaration macro separator')
+        require(not suffix or suffix[0] in ' \t(', 'declaration macro separator')
         if name in selected:
             require(name not in seen and not suffix.startswith('('), 'ambiguous selected declaration macro')
             seen.add(name)
-            selected[name] = suffix.strip()
+            selected[name] = suffix.strip(' \t')
     return selected
 
 

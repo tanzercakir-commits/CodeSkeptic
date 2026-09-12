@@ -2026,6 +2026,41 @@ class PosixDeclarationProfileTests(unittest.TestCase):
                     self.assertFalse(result['visibility_pass'])
                     self.assertTrue(all('VISIBILITY_NOT_OBSERVED' in row['issues'] for row in result['requests']))
 
+    def test_macro_whitespace_is_ascii_and_unicode_replacements_are_not_normalized(self):
+        cases = [(' ', '', '', '\n', True), ('\t', '', '\t ', '\r\n', True),
+                 (' \t', '', '', '\n', True)]
+        for character in ('\xa0', '\x85', '\u2028', '\u2029', '\u2007', '\u202f'):
+            cases += [(character, '', '', '\n', False), (' ', character, '', '\n', False),
+                      (' ', '', character, '\n', False)]
+        for separator, prefix, suffix, ending, valid in cases:
+            with self.subTest(separator=repr(separator), prefix=repr(prefix), suffix=repr(suffix)):
+                value, sha = self.packet()
+                raw = ('#define __STRICT_ANSI__' + separator + prefix + '1' + suffix + ending +
+                       '#define _POSIX_C_SOURCE' + separator + prefix + '200809L' + suffix + ending)
+                value['probe']['preprocessor']['command']['stdout'] = raw
+                try:
+                    projection = identity.declaration_macro_projection(raw)
+                except ValueError:
+                    self.assertFalse(valid)
+                    with self.assertRaises(ValueError):
+                        self.check(value, sha)
+                    continue
+                self.assertEqual(projection['__STRICT_ANSI__'] == '1' and projection['_POSIX_C_SOURCE'] == '200809L', valid)
+                if valid:
+                    self.assertTrue(self.check(value, sha)['visibility_pass'])
+                else:
+                    with self.assertRaisesRegex(ValueError, 'projection mismatch'):
+                        self.check(value, sha)
+                    value['probe']['preprocessor']['selected_macros'] = projection
+                    self.assertFalse(self.check(value, sha)['visibility_pass'])
+
+    def test_empty_ascii_lines_and_definitions_do_not_discard_non_ascii_data(self):
+        result = identity.declaration_macro_projection('\t \r\n#define _POSIX_SOURCE \t\r\n#define FN(x) \n')
+        self.assertEqual(result['_POSIX_SOURCE'], '')
+        for nonascii in ('\xa0', '\x85', '\u2028'):
+            with self.subTest(character=repr(nonascii)), self.assertRaises(ValueError):
+                identity.declaration_macro_projection(nonascii + '\n')
+
     def test_later_preprocessor_timeout_retains_prior_syntax_red(self):
         value, sha = self.packet()
         probe = value['probe']['preprocessor']

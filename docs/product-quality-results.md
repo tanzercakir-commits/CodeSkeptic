@@ -2286,3 +2286,16 @@ tek CR dahil fiziksel olmayan ayraçlar yeni directive üretmez. Tutarlı yenide
 hesaplanmış eksik projection INCOMPLETE kalır; uydurulmuş olumlu projection ret alır.
 F1 sonrası temiz exact-head inceleme ayrıca gereklidir; eski BLOCKED kaydı ve
 native/task/productfalse sınırları değişmez.
+
+`23e73e6f1577be5fdba7822495da859a5dcb640c` incelemesi F1'i çözülmüş buldu ve445
+testi bağımsız çalıştırdı; fakat F2 nedeniyle BLOCKED_IMPLEMENTATION kaldı.
+Receipt SHA `1a462b4af48aa672165a37fecc7577507fcee99c15d14c1b4d0863dfefbf80a6`.
+isspace/strip'in Unicode kapsamı NBSP ayırıcıyı veya NEL/LS replacement suffix'ini
+silerek yine sahte olumlu visibility üretebiliyordu; denetçi gerçek yeni v2 pakette
+üç ayrı mutasyonu yeniden gösterdi. Yeni projection/full-packet regresyonları
+RED verdi: capture SHA
+`12259f74b096ff35b1dfe2aff662a61d7cf58dd9423e5a454d00954534e3996c`.
+Dar düzeltme SP/HT ve fiziksel LF/CRLF gramerini açıklar; ASCII dışı replacement
+karakterleri normalize edilmez, sahte Unicode boş satırlar atılmaz. Gerçek eski
+packet'ler ve iki BLOCKED inceleme korunur; F2 sonrası yeni exact-head PASS henüz
+bu paragrafın iddiası değildir. Ürün/U003 yeterliliği değişmez.
