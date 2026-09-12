@@ -1,0 +1,46 @@
+{
+  "assessment": {
+    "canonical_identity": "Recorded open, USR c:@F@open, mangling _open, language_kind=1, linkage_kind=4. All 2 target occurrences have equal complete canonical/type records. This identifies recorded declarations, not the runtime executable binding.",
+    "definitions_redirections": "Every captured target has no definition and no recomputed definition, linkage, canonical-identity or redirection issue. Canonical spelling/expansion locations agree. No favorable target is discarded. This is not proof against runtime interposition or a substitute for the later model/case semantic contract.",
+    "header_origin": "Canonical spelling/expansion location agrees at /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/fcntl.h:600:9 (offset 24963). Closure records physical file /Library/Developer/CommandLineTools/SDKs/MacOSX15.2.sdk/usr/include/sys/fcntl.h, 26353 bytes, SHA256 807bfdae1695967faf13532c1d0eb0d5eb08a67e0bef8bf529f732f6ce00176b. The packet binds the complete recorded closure, commands and selected native environment; this reader has not reopened that hosted header or established licensing/runtime provenance.",
+    "signature": "Captured canonical function type: int (const char *, int, ...); calling_convention=1; variadic=true. Canonical-cursor parameters: [#1 name=\"\", type=\"const char *\", canonical_type=\"const char *\", top-level qualifiers={\"const\": false, \"restrict\": false, \"volatile\": false}, canonical top-level qualifiers={\"const\": false, \"restrict\": false, \"volatile\": false}, spelling/expansion=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/fcntl.h:600:26 (offset 24980); #2 name=\"\", type=\"int\", canonical_type=\"int\", top-level qualifiers={\"const\": false, \"restrict\": false, \"volatile\": false}, canonical top-level qualifiers={\"const\": false, \"restrict\": false, \"volatile\": false}, spelling/expansion=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/fcntl.h:600:31 (offset 24985)]. Referenced-header declaration parameters: [#1 name=\"\", type=\"const char *\", canonical_type=\"const char *\", top-level qualifiers={\"const\": false, \"restrict\": false, \"volatile\": false}, canonical top-level qualifiers={\"const\": false, \"restrict\": false, \"volatile\": false}, spelling/expansion=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/fcntl.h:600:26 (offset 24980); #2 name=\"\", type=\"int\", canonical_type=\"int\", top-level qualifiers={\"const\": false, \"restrict\": false, \"volatile\": false}, canonical top-level qualifiers={\"const\": false, \"restrict\": false, \"volatile\": false}, spelling/expansion=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/fcntl.h:600:31 (offset 24985)]. Both target occurrences agree separately on each captured parameter view; the two views are equal. These are distinct recorded views, not a substitution of the canonical function signature for the referenced declaration. Complete recursive types, including nested qualifiers, remain in the unchanged raw projection. Empty recomputed signature/type issues establish compatibility for the fixed probe, not identical parameter views or a full runtime ABI/source/sink contract.",
+    "visibility": "Actual retained v2 packet uses c17-posix2008/v1, language c17 and explicit _POSIX_C_SOURCE=200809L. Recomputed syntax and fixed driver visibility checks pass. This does not establish complete driver/CIndex preprocessing equivalence."
+  },
+  "boundary": "Additive v2 assessment successor to posix-open-macos-arm64-8953056-v1.json at b73b52f03eecc54827c733f7c972d7722e8a21e4; the v1 file remains unchanged. Only the signature assessment now distinguishes canonical-cursor and referenced-header parameter views; original model, packet and projection bindings remain unchanged. Fresh independent exact-record review is required. No evaluation quota, qualified pair, model admission or task/product completion is added.",
+  "id": "posix-open-macos-arm64-8953056-v2",
+  "model": {
+    "path": "tests/product_corpus/native-api-models.json",
+    "sha256": "c2caba2a15fef514c81af282c7fd8e1667b141698829f9354cd14118415873f4"
+  },
+  "packet": {
+    "path": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/native-declaration-hosted-8953056-v1/hosted-34722436917/native-declarations-macos-14.json",
+    "sha256": "0a33ab29d7983f31af533fccab959fc9770ce76d07740878b4d0c785cf72a426"
+  },
+  "projection_sha256": "faec066fb4046b7bda8db7336bc3206264067c15e0a0902bfbc3fcee164c2199",
+  "qualification": {
+    "evaluation_frozen": false,
+    "model_admitted": false,
+    "native_qualified": false,
+    "product_qualified": false,
+    "task_ready": false
+  },
+  "remaining_gaps": [
+    "Only the selected declaration evidence is proposed for review; source/sink/transfer/sanitizer semantics are not admitted.",
+    "Runtime ABI, allocator/environment conditions and actual case assumptions require their relevant evidence.",
+    "Other required platform/API/entry slots, SQLite and transfer/C++ overload selection remain separate obligations.",
+    "Independent corpus/security-fix/safe-control admission and the complete global pre-measurement freeze remain incomplete."
+  ],
+  "schema": "codeskeptic-native-declaration-candidate/v1",
+  "selection": {
+    "api_id": "posix.open",
+    "platform": "macos-arm64",
+    "visibility_profile": {
+      "feature_macros": {
+        "_POSIX_C_SOURCE": "200809L"
+      },
+      "id": "c17-posix2008/v1",
+      "language": "c17"
+    }
+  },
+  "state": "DECLARATION_EVIDENCE_FOR_INDEPENDENT_REVIEW"
+}

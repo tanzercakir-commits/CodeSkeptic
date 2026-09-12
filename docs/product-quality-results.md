@@ -2513,3 +2513,31 @@ receipt olarak saklanmalı ve okuyucuda gerçek dosyalarıyla doğrulanmalıdır
 Model semantics/transfer/SQLite/Windows/entry ve bütüncül corpus/security-fix/
 safe-control freeze yükümlülükleri açıktır. Scope, eski model/packet anlamları,
 kalite eşikleri, completed kayıtlar ve FIFO değişmedi; U003 henüz tamamlanmadı.
+
+### Parameter-view ayrımı: eklemeli v2 assessment successor
+
+Exact `b73b52f03eecc54827c733f7c972d7722e8a21e4` üzerinde Darwin denetçisi,
+altı stdio API'sinin assessment metninde canonical-cursor parametrelerinin
+`Declared parameter types` diye sunulmasını HOLD bulgusu yaptı. Referenced
+header parametrelerindeki `restrict` ve gerçek konumlar bu özette ayrılmıyordu;
+ham packet/projection sağlamdı. Linux denetçisi aynı ayrımı açıkça not ederek
+kendi14 declaration kaydını dar kapsamda kabul etti. Bu iki tarihsel karar
+birbirinin yerine kullanılmadı ve ürün/native kabulüne yükseltilmedi.
+
+İncelenmiş28 v1 dosyası değiştirilmedi.28 eklemeli v2 successor yalnız id,
+boundary ve signature assessment metnini yeniler; canonical-cursor ve
+referenced-header ad/type/qualifier/konum görünümlerini ayrı açıklar. Her
+platformda altı stdio API'sinde bu görünümler farklıdır. Tam recursive type
+ağaçları aynı özgün projection'da kalır; eski model/packet/projection digest'leri,
+diğer assessment alanları ve false qualification bayrakları aynıdır.56 dosya
+56 farklı API çifti değildir; aktif v2 seçiminde28 aynı pair vardır.
+
+Korunmuş v1 metinleri üzerindeki ayrım regresyonu RED yakalama SHA:
+`610a3bc64b12fa31972d416096bbca25594b14d17f2f4f18bd5113ceeb270241`.
+V2 ayrım ve v1 byte-preservation GREEN:
+`a50525c0ecd13e235571eb0c3256760aa3fa694128d4292b6dd9277e9940de5a`.
+28 gerçek v2 source-bound candidate kontrolü GREEN:
+`ebc6f9d9db01b1b0de91ddc385af98a023b0f07ed162831c727db90c3f37d9ec`.
+Yeni kayıtlar için yeniden bağımsız exact-head inceleme gerekir; eski v1
+receipt'leri yeni kayıtların kabulü sayılamaz. Qualified50+3 payı ve quota
+katkısı sıfırdır; U003/global freeze, model semantics ve corpus kabulü açıktır.

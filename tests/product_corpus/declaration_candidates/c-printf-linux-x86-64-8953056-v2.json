@@ -1,0 +1,46 @@
+{
+  "assessment": {
+    "canonical_identity": "Recorded printf, USR c:@F@printf, mangling printf, language_kind=1, linkage_kind=4. All 2 target occurrences have equal complete canonical/type records. This identifies recorded declarations, not the runtime executable binding.",
+    "definitions_redirections": "Every captured target has no definition and no recomputed definition, linkage, canonical-identity or redirection issue. Canonical spelling/expansion locations agree. No favorable target is discarded. This is not proof against runtime interposition or a substitute for the later model/case semantic contract.",
+    "header_origin": "Canonical spelling/expansion location agrees at /usr/include/stdio.h:363:12 (offset 11370). Closure records physical file /usr/include/stdio.h, 34649 bytes, SHA256 b4f6709d12c8493e2a42f740845abe2994deb27fc78fb85fcaa6e27228a87d62. The packet binds the complete recorded closure, commands and selected native environment; this reader has not reopened that hosted header or established licensing/runtime provenance.",
+    "signature": "Captured canonical function type: int (const char *, ...); calling_convention=1; variadic=true. Canonical-cursor parameters: [#1 name=\"\", type=\"const char *\", canonical_type=\"const char *\", top-level qualifiers={\"const\": false, \"restrict\": false, \"volatile\": false}, canonical top-level qualifiers={\"const\": false, \"restrict\": false, \"volatile\": false}, spelling/expansion=unavailable (null file, zero line/column/offset)]. Referenced-header declaration parameters: [#1 name=\"__format\", type=\"const char *restrict\", canonical_type=\"const char *restrict\", top-level qualifiers={\"const\": false, \"restrict\": true, \"volatile\": false}, canonical top-level qualifiers={\"const\": false, \"restrict\": true, \"volatile\": false}, spelling/expansion=/usr/include/stdio.h:363:43 (offset 11401)]. Both target occurrences agree separately on each captured parameter view; the two views differ. These are distinct recorded views, not a substitution of the canonical function signature for the referenced declaration. Complete recursive types, including nested qualifiers, remain in the unchanged raw projection. Empty recomputed signature/type issues establish compatibility for the fixed probe, not identical parameter views or a full runtime ABI/source/sink contract.",
+    "visibility": "Actual retained v2 packet uses c17-posix2008/v1, language c17 and explicit _POSIX_C_SOURCE=200809L. Recomputed syntax and fixed driver visibility checks pass. This does not establish complete driver/CIndex preprocessing equivalence."
+  },
+  "boundary": "Additive v2 assessment successor to c-printf-linux-x86-64-8953056-v1.json at b73b52f03eecc54827c733f7c972d7722e8a21e4; the v1 file remains unchanged. Only the signature assessment now distinguishes canonical-cursor and referenced-header parameter views; original model, packet and projection bindings remain unchanged. Fresh independent exact-record review is required. No evaluation quota, qualified pair, model admission or task/product completion is added.",
+  "id": "c-printf-linux-x86-64-8953056-v2",
+  "model": {
+    "path": "tests/product_corpus/native-api-models.json",
+    "sha256": "c2caba2a15fef514c81af282c7fd8e1667b141698829f9354cd14118415873f4"
+  },
+  "packet": {
+    "path": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/native-declaration-hosted-8953056-v1/hosted-34722436917/native-declarations-ubuntu-24.04.json",
+    "sha256": "db310c6a273bec6356a96df7e347ca6e59ee93525e95b8b6d6e0932bfc015a59"
+  },
+  "projection_sha256": "197a9b6983e151b420f5923a4a8cef1c8d66f518fb1b1b0ec2eca15982e3221d",
+  "qualification": {
+    "evaluation_frozen": false,
+    "model_admitted": false,
+    "native_qualified": false,
+    "product_qualified": false,
+    "task_ready": false
+  },
+  "remaining_gaps": [
+    "Only the selected declaration evidence is proposed for review; source/sink/transfer/sanitizer semantics are not admitted.",
+    "Runtime ABI, allocator/environment conditions and actual case assumptions require their relevant evidence.",
+    "Other required platform/API/entry slots, SQLite and transfer/C++ overload selection remain separate obligations.",
+    "Independent corpus/security-fix/safe-control admission and the complete global pre-measurement freeze remain incomplete."
+  ],
+  "schema": "codeskeptic-native-declaration-candidate/v1",
+  "selection": {
+    "api_id": "c.printf",
+    "platform": "linux-x86_64",
+    "visibility_profile": {
+      "feature_macros": {
+        "_POSIX_C_SOURCE": "200809L"
+      },
+      "id": "c17-posix2008/v1",
+      "language": "c17"
+    }
+  },
+  "state": "DECLARATION_EVIDENCE_FOR_INDEPENDENT_REVIEW"
+}
