@@ -3316,9 +3316,115 @@ def verify_native_declarations(root, packet, expected_sha):
     return {**result, 'packet_sha256': expected_sha, 'producer_bytes_verified': True}
 
 
+DECLARATION_CANDIDATE_QUALIFICATION = 'model_admitted evaluation_frozen native_qualified task_ready product_qualified'
+DECLARATION_ASSESSMENT_TOPICS = 'canonical_identity signature header_origin visibility definitions_redirections'
+
+
+def native_declaration_projection(packet, model, model_sha, selection):
+    """Recompute one recorded declaration, without adjudicating model semantics."""
+    import product_identity as identity
+    result = identity.validate_declaration_document(packet, model, model_sha)
+    fields(selection, 'api_id platform visibility_profile', 'declaration selection')
+    system = packet['native_identity']['platform']['system']
+    require(selection['platform'] == identity.DECLARATION_PLATFORM[system]
+            and canonical(selection['visibility_profile']) == canonical(packet.get('profile')),
+            'declaration selection platform/profile')
+    rows = [row for row in identity.declaration_requests(model, system) if row['id'] == selection['api_id']]
+    require(len(rows) == 1, 'declaration selection must be an observed library API')
+    outcome = next(row for row in result['requests'] if row['id'] == selection['api_id'])
+    observed = packet['probe']['cindex']
+    request = (None if observed is None else
+               next(row for row in observed['requests'] if row['id'] == selection['api_id']))
+    # Preserve every target in the projection. An individually valid target is
+    # insufficient if another occurrence has a different canonical declaration
+    # or complete captured function type. Do not pick the favorable occurrence.
+    agreement = request is not None and len({canonical({'canonical': target['canonical'], 'type': target['type']})
+                                             for target in request['targets']}) == 1
+    return {'schema': 'codeskeptic-native-declaration-projection/v1', 'model_row': rows[0],
+            'selection': selection, 'packet_schema': packet['schema'], 'request': request,
+            'result': outcome, 'targets_agree': agreement}
+
+
+def verify_native_declaration_candidate(repo, record_path, *, review=None):
+    """Optional procedural declaration review; no model admission or native replay."""
+    try:
+        repo = Path(repo)
+        require(repo.is_absolute() and repo.resolve(strict=True) == repo, 'declaration candidate root')
+        guard = {}
+        relative = external_relative(record_path).as_posix()
+        require(relative.startswith('tests/product_corpus/declaration_candidates/'), 'declaration candidate scope')
+        info, value = _ground_truth_input(repo / relative, guard)
+        fields(value, 'schema state id model packet selection projection_sha256 assessment remaining_gaps '
+               'qualification boundary', 'declaration candidate')
+        require(value['schema'] == 'codeskeptic-native-declaration-candidate/v1'
+                and value['state'] == 'DECLARATION_EVIDENCE_FOR_INDEPENDENT_REVIEW'
+                and type(value['id']) is str and re.fullmatch(r'[a-z0-9][a-z0-9-]{0,127}', value['id'])
+                and nonempty(value['boundary']) and len(value['boundary']) <= 8192, 'declaration candidate identity')
+        fields(value['qualification'], DECLARATION_CANDIDATE_QUALIFICATION, 'declaration candidate qualification')
+        require(all(flag is False for flag in value['qualification'].values()), 'declaration cannot qualify')
+        fields(value['assessment'], DECLARATION_ASSESSMENT_TOPICS, 'declaration candidate assessment')
+        require(all(nonempty(text) and len(text) <= 8192 for text in value['assessment'].values()),
+                'declaration candidate assessment text')
+        require(type(value['remaining_gaps']) is list and 1 <= len(value['remaining_gaps']) <= 32
+                and all(nonempty(gap) and len(gap) <= 2048 for gap in value['remaining_gaps']),
+                'declaration candidate remaining gaps')
+        model_link, packet_link = value['model'], value['packet']
+        for link in (model_link, packet_link):
+            fields(link, 'path sha256', 'declaration candidate link')
+            external_digest(link['sha256'])
+        require(model_link['path'] == 'tests/product_corpus/native-api-models.json', 'declaration candidate model')
+        _, model = _ground_truth_input(repo / model_link['path'], guard, model_link['sha256'])
+        packet_path = Path(packet_link['path'])
+        require(packet_path.is_absolute() and str(packet_path) == packet_link['path']
+                and repo not in packet_path.parents, 'declaration external packet scope')
+        _, packet = _ground_truth_input(packet_path, guard, packet_link['sha256'], maximum=16 * 1024 * 1024)
+        native = verify_native_declarations(repo, packet_path, packet_link['sha256'])
+        projection = native_declaration_projection(packet, model, model_link['sha256'], value['selection'])
+        projection_sha = hashlib.sha256(canonical(projection).encode('utf-8')).hexdigest()
+        require(value['projection_sha256'] == projection_sha, 'declaration candidate projection')
+        eligible = (projection['result']['state'] == 'OBSERVED_UNADJUDICATED'
+                    and projection['result']['issues'] == [] and projection['targets_agree']
+                    and native['syntax_pass'] and native.get('visibility_pass', True))
+        reviewed_head = None
+        if review is not None:
+            fields(review, 'path sha256', 'declaration review link')
+            external_digest(review['sha256'])
+            review_path = Path(review['path'])
+            require(review_path.is_absolute() and str(review_path) == review['path']
+                    and repo not in review_path.parents, 'declaration external review scope')
+            _, receipt = _ground_truth_input(review_path, guard, review['sha256'])
+            fields(receipt, 'schema repository_head record model packet selection projection_sha256 implementer '
+                   'verifier verdict findings rationale remaining_gaps qualification', 'declaration review')
+            require(receipt['schema'] == 'codeskeptic-native-declaration-review/v1'
+                    and receipt['verdict'] == 'ACCEPT_RECORDED_DECLARATION_EVIDENCE'
+                    and receipt['findings'] == [] and eligible
+                    and receipt['record'] == {'path': relative, 'sha256': info['sha256']}, 'declaration review verdict')
+            for key in ('model', 'packet', 'selection', 'projection_sha256', 'remaining_gaps', 'qualification'):
+                require(canonical(receipt[key]) == canonical(value[key]), 'declaration review exact binding')
+            for key in ('implementer', 'verifier'):
+                require(type(receipt[key]) is str and len(receipt[key]) <= 128
+                        and re.fullmatch(r'/[a-z0-9_]+(?:/[a-z0-9_]+)*', receipt[key]), 'declaration review agent')
+            require(receipt['implementer'] != receipt['verifier'] and nonempty(receipt['rationale'])
+                    and len(receipt['rationale']) <= 8192, 'declaration review independence/rationale')
+            reviewed_head = receipt['repository_head']
+            require(type(reviewed_head) is str and re.fullmatch(r'[0-9a-f]{40}', reviewed_head)
+                    and reviewed_head != '0' * 40, 'declaration review head')
+            verify_reviewed_files(repo, reviewed_head, [receipt['record'], model_link])
+        verify_input_identities(guard)
+        return {'record_sha256': info['sha256'], 'packet_sha256': packet_link['sha256'],
+                'projection_sha256': projection_sha, 'selection': value['selection'],
+                'request_result': projection['result'], 'recorded_targets_agree': projection['targets_agree'],
+                'eligible_for_declaration_review': eligible, 'declaration_evidence_reviewed': review is not None,
+                'review_head': reviewed_head, 'reviewed_library_pairs': int(review is not None),
+                'coverage': native['coverage'], 'local_native_bytes_verified': False,
+                'additional_quota_examples': 0, **value['qualification']}
+    except (ValueError, OSError, TypeError, KeyError, StopIteration, RecursionError, RuntimeError, subprocess.SubprocessError):
+        raise ValueError('native declaration candidate rejected') from None
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check", "ground-truth-candidate-check", "ground-truth-check", "retained-ground-truth-check", "source-cohort-check", "cohort-native-check", "cohort-ground-truth-check", "platform-recipes-check", "platform-source-labels-check", "native-declarations-check"))
+    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check", "ground-truth-candidate-check", "ground-truth-check", "retained-ground-truth-check", "source-cohort-check", "cohort-native-check", "cohort-ground-truth-check", "platform-recipes-check", "platform-source-labels-check", "native-declarations-check", "native-declaration-candidate-check"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--historical-sources", type=Path, default=Path(
         "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S04-U001/corpus-diagnostic-comparison"))
@@ -3334,8 +3440,14 @@ def main():
     parser.add_argument("--evidence-root", type=Path, help="explicit external license-reference directory")
     parser.add_argument('--declarations', type=Path, help='absolute declaration observation; native-declarations-check only')
     parser.add_argument('--declarations-sha256', help='exact digest of the declaration observation')
+    parser.add_argument('--declaration-candidate', help='repository-relative declaration candidate; native-declaration-candidate-check only')
+    parser.add_argument('--declaration-review', help='optional absolute independent declaration review path')
+    parser.add_argument('--declaration-review-sha256', help='required digest with --declaration-review')
     args = parser.parse_args()
     try:
+        require(args.command == 'native-declaration-candidate-check' or all(item is None for item in
+                (args.declaration_candidate, args.declaration_review, args.declaration_review_sha256)),
+                'declaration candidate selectors are only valid for native-declaration-candidate-check')
         require(args.command == 'native-declarations-check' or
                 args.declarations is None and args.declarations_sha256 is None,
                 'declaration selectors are only valid for native-declarations-check')
@@ -3353,7 +3465,15 @@ def main():
         if args.command == "selection-check":
             require(args.binding is None and args.evidence_root is None and args.external_root is None,
                     "reviewed selection uses its explicit tracked roots")
-        if args.command == 'native-declarations-check':
+        if args.command == 'native-declaration-candidate-check':
+            require(args.declaration_candidate is not None and args.binding is None and args.evidence_root is None
+                    and args.external_root is None and args.historical_sources == parser.get_default('historical_sources')
+                    and (args.declaration_review is None) == (args.declaration_review_sha256 is None),
+                    'declaration candidate uses its explicit record and paired review selectors')
+            review = (None if args.declaration_review is None else
+                      {'path': args.declaration_review, 'sha256': args.declaration_review_sha256})
+            result = verify_native_declaration_candidate(args.root, args.declaration_candidate, review=review)
+        elif args.command == 'native-declarations-check':
             require(args.declarations is not None and args.declarations_sha256 is not None
                     and args.binding is None and args.evidence_root is None and args.external_root is None
                     and args.historical_sources == parser.get_default('historical_sources'),

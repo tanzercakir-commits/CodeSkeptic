@@ -738,3 +738,45 @@ yalnız `DECLARATION_FAILURE_KIND TIMEOUT|OS_ERROR|INVALID` sınıfını ayrıca
 davranışı korunur; özel exception/komut/stream metni dışarı verilmez. Başarı veya
 geçerli kaydedilmiş syntax RED bu exception marker'ını üretmez. Bu sınıfın
 görünürlüğü query/timeout/ortam değişikliği, retry veya kök neden teşhisi değildir.
+
+### Tek API/platform için bağımsız bildirim incelemesi
+
+`native-declaration-candidate-check --declaration-candidate <repo-relative>`
+eklemeli `codeskeptic-native-declaration-candidate/v1` kaydını okur. Kayıt yalnız
+`tests/product_corpus/declaration_candidates/` altındadır; mevcut değişmemiş
+native-api-models.json ve dışarıdaki gerçek declaration packet exact digest ile
+bağlanır. API, platform ve v2 visibility descriptor (v1 için null) birlikte
+seçilir. Entry-point ve henüz gözlenmeyen SQLite API'leri bu yolun dışındadır.
+
+Projection özeti yazanın değerlendirmesinden alınmaz: mevcut saf validator
+sonucu, seçilen model satırı ve bütün raw request/target kayıtlarından yeniden
+hesaplanır. Her target'ın tam canonical declaration ve function type kaydı
+birbiriyle aynı olmalıdır; farklı target'lardan yalnız olumlu olan seçilmez.
+Geçerli syntax/backend/visibility RED packet hâlâ incelenebilir bir candidate'dir,
+fakat `eligible_for_declaration_review=false` kalır. Candidate okumak veya CLI
+exit0 görmek kabul değildir. Eski packet/readers'ın anlamı değiştirilmez.
+
+İsteğe bağlı `--declaration-review` ve `--declaration-review-sha256` birlikte
+verilir. Dış review, `codeskeptic-native-declaration-review/v1` schema'sında
+exact candidate/model/packet/selection/projection/gap/qualification bağları,
+ayrı implementer/verifier kimlikleri, gerekçe ve boş findings içerir. Yalnız
+`ACCEPT_RECORDED_DECLARATION_EVIDENCE` kararı, yeniden hesaplanan temiz ve
+çelişkisiz satır için kabul edilir. Candidate/model bytes review commit'inin
+gerçek ancestor Git blob'larına; packet üreticileri ise özgün producer head/tree
+ve blob'larına ayrıca bağlanır. İnceleme ortak hesap altında prosedüreldir;
+review yazarını kriptografik doğrulama veya hosted attestation iddiası değildir.
+
+Assessment beş ayrı konuyu kaydeder: canonical kimlik, imza, header kökeni,
+visibility ve definition/redirection. Metin alanının varlığı semantik doğruluk
+kanıtı değildir; bağımsız hakem gerçek bağlı kanıtı incelemelidir. Sonuç yalnız
+`declaration_evidence_reviewed=true` ve `reviewed_library_pairs=1` olabilir.
+Model admission, evaluation freeze, native/task/product qualification false;
+quota katkısı ve qualified pair sayıları sıfır, gerekli payda50+3 kalır.
+
+Okuyucu canonical regular/single-link bounded dosyaları ve işlem sonu input
+kimliklerini kontrol eder; candidate/model/review için64KiB, packet için16MiB
+üst sınırı vardır. Native path/argv çalıştırılmaz, hosted header/library yeniden
+açılmaz; hata çıkışı özel kanıt/exception metnini içermez. Bunlar hard RSS,
+malicious-root isolation veya tam runtime/ABI kanıtı değildir. Bu dar bildirim
+incelemesi transfer/API seçimi, source/sink/sanitizer semantiği, SQLite, gerçek
+security-fix/safe kontrolleri veya U003'ün bütüncül freeze kapısının yerine geçmez.

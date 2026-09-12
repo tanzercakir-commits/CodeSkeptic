@@ -1569,6 +1569,277 @@ class NativeDeclarationReaderTests(unittest.TestCase):
                     profiles.verify_native_declarations(root, packet, hashlib.sha256(raw).hexdigest())
 
 
+class NativeDeclarationCandidateTests(unittest.TestCase):
+    """Synthetic declaration decisions; no actual native/model admission."""
+    QUALIFICATION = ('model_admitted evaluation_frozen native_qualified task_ready product_qualified').split()
+    TOPICS = ('canonical_identity signature header_origin visibility definitions_redirections').split()
+
+    def setUp(self):
+        import product_identity
+        from test_product_identity import DeclarationTests
+        self.identity = product_identity
+        helper = DeclarationTests()
+        helper.setUp()
+        self.model = helper.model
+        self.packet, self.model_sha, _ = helper.populated()
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.base = Path(self.directory.name).resolve()
+        self.repo = self.base / 'repo'
+        self.repo.mkdir()
+        self.model_path = 'tests/product_corpus/native-api-models.json'
+        self.record_path = 'tests/product_corpus/declaration_candidates/getenv-linux-v1.json'
+        original = Path(__file__).resolve().parents[1]
+        destination = self.repo / self.model_path
+        destination.parent.mkdir(parents=True)
+        destination.write_bytes((original / self.model_path).read_bytes())
+        self.packet_path = self.base / 'packet.json'
+        self.review_path = self.base / 'review.json'
+        self.selection = {'api_id': 'c.getenv', 'platform': 'linux-x86_64', 'visibility_profile': None}
+
+    def write(self, path, value):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        raw = profiles.canonical(value).encode()
+        path.write_bytes(raw)
+        return hashlib.sha256(raw).hexdigest()
+
+    def candidate(self):
+        observed = self.packet['probe']['cindex']
+        row = None if observed is None else next(r for r in observed['requests'] if r['id'] == 'c.getenv')
+        outcome = next(r for r in self.identity.validate_declaration_document(
+            self.packet, self.model, self.model_sha)['requests'] if r['id'] == 'c.getenv')
+        agreement = row is not None and len({profiles.canonical({'canonical': t['canonical'], 'type': t['type']})
+                                             for t in row['targets']}) == 1
+        projection = {'schema': 'codeskeptic-native-declaration-projection/v1',
+                      'model_row': next(r for r in self.model['sources'] if r['id'] == 'c.getenv'),
+                      'selection': self.selection, 'packet_schema': self.packet['schema'],
+                      'request': row, 'result': outcome, 'targets_agree': agreement}
+        self.record = {'schema': 'codeskeptic-native-declaration-candidate/v1',
+                       'state': 'DECLARATION_EVIDENCE_FOR_INDEPENDENT_REVIEW', 'id': 'getenv-linux-v1',
+                       'model': {'path': self.model_path, 'sha256': self.model_sha},
+                       'packet': {'path': str(self.packet_path), 'sha256': self.write(self.packet_path, self.packet)},
+                       'selection': copy.deepcopy(self.selection),
+                       'projection_sha256': hashlib.sha256(profiles.canonical(projection).encode()).hexdigest(),
+                       'assessment': {key: 'Synthetic bounded assessment, not a native attestation.' for key in self.TOPICS},
+                       'remaining_gaps': ['Runtime semantics and full model freeze remain unresolved.'],
+                       'qualification': dict.fromkeys(self.QUALIFICATION, False),
+                       'boundary': 'Synthetic declaration evidence only.'}
+        self.record_sha = self.write(self.repo / self.record_path, self.record)
+        self.review = {'schema': 'codeskeptic-native-declaration-review/v1', 'repository_head': 'd' * 40,
+                       'record': {'path': self.record_path, 'sha256': self.record_sha},
+                       **{key: copy.deepcopy(self.record[key]) for key in
+                          ('model', 'packet', 'selection', 'projection_sha256', 'remaining_gaps', 'qualification')},
+                       'implementer': '/root', 'verifier': '/root/synthetic_reviewer',
+                       'verdict': 'ACCEPT_RECORDED_DECLARATION_EVIDENCE', 'findings': [],
+                       'rationale': 'Synthetic review fixture, not an independent real-world decision.'}
+
+    def read(self, reviewed=False):
+        review = None if not reviewed else {'path': str(self.review_path),
+                                           'sha256': self.write(self.review_path, self.review)}
+        return profiles.verify_native_declaration_candidate(self.repo, self.record_path, review=review)
+
+    def test_candidate_and_review_are_narrow_facts_without_native_execution(self):
+        self.candidate()
+        with (mock.patch.object(profiles, 'verify_reviewed_files') as reviewed,
+              mock.patch.object(self.identity, 'declaration_backend', side_effect=AssertionError('load')),
+              mock.patch.object(self.identity.subprocess, 'run', side_effect=AssertionError('execute'))):
+            candidate = self.read()
+            accepted = self.read(True)
+        self.assertTrue(candidate['eligible_for_declaration_review'])
+        self.assertFalse(candidate['declaration_evidence_reviewed'])
+        self.assertTrue(accepted['declaration_evidence_reviewed'])
+        self.assertEqual(accepted['reviewed_library_pairs'], 1)
+        self.assertEqual(accepted['additional_quota_examples'], 0)
+        self.assertEqual(accepted['coverage'], self.identity.declaration_coverage(self.model))
+        self.assertTrue(all(accepted[key] is False for key in self.QUALIFICATION))
+        self.assertEqual(reviewed.call_args.args, (self.repo, 'd' * 40,
+                         [self.review['record'], self.record['model']]))
+
+    def test_valid_red_and_conflicting_targets_cannot_be_accepted(self):
+        for mutation in ('syntax', 'conflict', 'definition', 'missing', 'signature'):
+            packet = copy.deepcopy(self.packet)
+            row = next(r for r in self.packet['probe']['cindex']['requests'] if r['id'] == 'c.getenv')
+            if mutation == 'syntax':
+                self.packet['probe']['syntax']['exit_code'] = 1
+            elif mutation == 'conflict':
+                other = copy.deepcopy(row['targets'][0])
+                for key in ('reference', 'canonical'):
+                    other[key]['usr'] = 'c:@F@conflicting_getenv'
+                row['targets'].append(other)
+                self.assertEqual(next(r for r in self.identity.validate_declaration_document(
+                    self.packet, self.model, self.model_sha)['requests'] if r['id'] == 'c.getenv')['issues'], [])
+            elif mutation == 'definition':
+                row['targets'][0]['definition'] = copy.deepcopy(row['targets'][0]['canonical'])
+                row['targets'][0]['definition']['is_definition'] = True
+            elif mutation == 'missing':
+                row['targets'] = []
+            else:
+                row['targets'][0]['type']['detail']['variadic'] = True
+            self.candidate()
+            with self.subTest(mutation=mutation), mock.patch.object(profiles, 'verify_reviewed_files'):
+                self.assertFalse(self.read()['eligible_for_declaration_review'])
+                with self.assertRaisesRegex(ValueError, '^native declaration candidate rejected$'):
+                    self.read(True)
+            self.packet = packet
+
+    def test_record_selection_projection_and_qualification_cannot_be_forged(self):
+        self.candidate()
+        original = copy.deepcopy(self.record)
+        mutations = [('selection', {**self.selection, 'api_id': 'sqlite.prepare_v2'}),
+                     ('selection', {**self.selection, 'platform': 'windows-x64'}),
+                     ('selection', {**self.selection, 'visibility_profile': {'id': 'fake'}}),
+                     ('projection_sha256', 'f' * 64), ('additional_quota_examples', 1),
+                     ('qualification', dict.fromkeys(self.QUALIFICATION, True)),
+                     ('remaining_gaps', []), ('assessment', {'canonical_identity': 'only one topic'})]
+        for key, value in mutations:
+            self.record = copy.deepcopy(original)
+            self.record[key] = value
+            self.write(self.repo / self.record_path, self.record)
+            with self.subTest(key=key, value=value), mock.patch.object(profiles, 'verify_reviewed_files'):
+                with self.assertRaisesRegex(ValueError, '^native declaration candidate rejected$'):
+                    self.read()
+
+    def test_review_rejects_identity_findings_binding_and_qualification_changes(self):
+        self.candidate()
+        original = copy.deepcopy(self.review)
+        mutations = [('implementer', '/root/synthetic_reviewer'), ('verdict', 'HOLD'),
+                     ('findings', ['unresolved']), ('repository_head', 'HEAD'),
+                     ('record', {'path': self.record_path, 'sha256': 'f' * 64}),
+                     ('projection_sha256', 'f' * 64), ('remaining_gaps', []),
+                     ('qualification', dict.fromkeys(self.QUALIFICATION, True))]
+        for key, value in mutations:
+            self.review = copy.deepcopy(original)
+            self.review[key] = value
+            with self.subTest(key=key), mock.patch.object(profiles, 'verify_reviewed_files'):
+                with self.assertRaisesRegex(ValueError, '^native declaration candidate rejected$'):
+                    self.read(True)
+
+    def test_input_drift_and_private_failures_do_not_produce_acceptance(self):
+        self.candidate()
+        def drift(*args, **kwargs):
+            self.packet_path.write_bytes(self.packet_path.read_bytes() + b' ')
+        for failure in (ValueError('PRIVATE_SENTINEL'), drift):
+            self.candidate()
+            with mock.patch.object(profiles, 'verify_reviewed_files', side_effect=failure):
+                with self.assertRaisesRegex(ValueError, '^native declaration candidate rejected$'):
+                    self.read(True)
+
+    def test_selector_pairs_and_cross_command_use_fail_closed(self):
+        executable = [sys.executable, '-B', str(Path(profiles.__file__))]
+        for args in (['limits', '--declaration-candidate', self.record_path],
+                     ['native-declaration-candidate-check'],
+                     ['native-declaration-candidate-check', '--declaration-candidate', self.record_path,
+                      '--declaration-review', '/not-read'],
+                     ['native-declarations-check', '--declaration-review-sha256', 'a' * 64]):
+            with self.subTest(args=args):
+                result = subprocess.run(executable + args, capture_output=True, timeout=15)
+                self.assertEqual(result.returncode, 2)
+                self.assertIn(b'PRODUCT_PROFILE_FAIL:', result.stderr)
+
+    def test_v2_visibility_and_retained_backend_failure_stay_ineligible(self):
+        from test_product_identity import PosixDeclarationProfileTests
+        helper = PosixDeclarationProfileTests()
+        helper.setUp()
+        self.packet, _ = helper.packet()
+        self.selection['visibility_profile'] = copy.deepcopy(self.packet['profile'])
+        self.candidate()
+        with mock.patch.object(profiles, 'verify_reviewed_files'):
+            self.assertTrue(self.read(True)['declaration_evidence_reviewed'])
+            for failure in ('visibility', 'backend'):
+                self.packet, _ = helper.packet()
+                if failure == 'visibility':
+                    preprocessor = self.packet['probe']['preprocessor']
+                    preprocessor['command']['stdout'] = ''
+                    preprocessor['selected_macros'] = dict.fromkeys(preprocessor['selected_macros'])
+                else:
+                    empty = {'bytes': 0, 'sha256': hashlib.sha256(b'').hexdigest()}
+                    self.packet['probe'].update(cindex=None, backend_failure={
+                        'kind': 'TIMEOUT', 'exit_code': None, 'stdout': empty, 'stderr': copy.deepcopy(empty)})
+                self.candidate()
+                with self.subTest(failure=failure):
+                    self.assertFalse(self.read()['eligible_for_declaration_review'])
+                    with self.assertRaisesRegex(ValueError, '^native declaration candidate rejected$'):
+                        self.read(True)
+
+    def test_repeated_equal_targets_are_not_a_conflict_and_projection_keeps_them(self):
+        row = next(r for r in self.packet['probe']['cindex']['requests'] if r['id'] == 'c.getenv')
+        row['targets'].append(copy.deepcopy(row['targets'][0]))
+        self.candidate()
+        with mock.patch.object(profiles, 'verify_reviewed_files'):
+            self.assertTrue(self.read(True)['declaration_evidence_reviewed'])
+        projection = profiles.native_declaration_projection(self.packet, self.model, self.model_sha, self.selection)
+        self.assertEqual(len(projection['request']['targets']), 2)
+
+    def test_changed_duplicate_and_oversized_inputs_are_rejected(self):
+        self.candidate()
+        path = self.repo / self.record_path
+        original = path.read_bytes()
+        for content in (original.replace(b'{', b'{"schema":"duplicate",', 1), b' ' * 65537):
+            path.write_bytes(content)
+            with self.subTest(size=len(content)), self.assertRaisesRegex(
+                    ValueError, '^native declaration candidate rejected$'):
+                self.read()
+        path.write_bytes(original)
+        self.packet_path.write_bytes(self.packet_path.read_bytes() + b' ')
+        with self.assertRaisesRegex(ValueError, '^native declaration candidate rejected$'):
+            self.read()
+        self.candidate()
+        (self.repo / self.model_path).write_bytes(b'{}\n')
+        with self.assertRaisesRegex(ValueError, '^native declaration candidate rejected$'):
+            self.read()
+
+    def test_real_git_source_review_binding_and_positive_cli(self):
+        original = Path(__file__).resolve().parents[1]
+        def git(*args):
+            result = subprocess.run(['git', '-C', str(self.repo), '-c', 'user.name=Synthetic Test',
+                                     '-c', 'user.email=synthetic@example.invalid',
+                                     '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=' + str(self.base / 'nohooks'),
+                                     *args], capture_output=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            return result.stdout.decode().strip()
+        paths = list(self.identity.SOURCE_FILES.values()) + list(self.identity.DECLARATION_PRODUCERS)
+        for relative in paths:
+            path = self.repo / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes((original / relative).read_bytes())
+        git('init', '-b', 'synthetic-declaration-test')
+        git('add', '--', *paths)
+        git('commit', '-m', 'Synthetic producer fixture')
+        source = self.packet['native_identity']['source']
+        source.update(head=git('rev-parse', 'HEAD'), tree=git('rev-parse', 'HEAD^{tree}'))
+        for key, relative in self.identity.SOURCE_FILES.items():
+            source[key] = profiles.file_sha(self.repo / relative)
+        self.packet['producer_files'] = {relative: profiles.file_sha(self.repo / relative)
+                                         for relative in self.identity.DECLARATION_PRODUCERS}
+        for environment in (self.packet['environment'], self.packet['native_identity']['platform']['environment']):
+            if 'GITHUB_SHA' in environment:
+                environment['GITHUB_SHA'] = source['head']
+        self.candidate()
+        git('add', '--', self.record_path)
+        git('commit', '-m', 'Synthetic declaration candidate')
+        self.review['repository_head'] = git('rev-parse', 'HEAD')
+        result = self.read(True)
+        self.assertTrue(result['declaration_evidence_reviewed'])
+        cli = subprocess.run([sys.executable, '-B', str(Path(profiles.__file__)),
+                              'native-declaration-candidate-check', '--root', str(self.repo),
+                              '--declaration-candidate', self.record_path,
+                              '--declaration-review', str(self.review_path),
+                              '--declaration-review-sha256', profiles.file_sha(self.review_path)],
+                             capture_output=True, timeout=30)
+        self.assertEqual(cli.returncode, 0, cli.stderr)
+        self.assertEqual(json.loads(cli.stdout), result)
+        # Review commit and producer commit are distinct, and neither binding
+        # can be replaced by a plausible nonexistent SHA or changed source.
+        self.review['repository_head'] = 'e' * 40
+        with self.assertRaisesRegex(ValueError, '^native declaration candidate rejected$'):
+            self.read(True)
+        self.review['repository_head'] = git('rev-parse', 'HEAD')
+        self.packet['producer_files']['scripts/product_profiles.py'] = 'f' * 64
+        self.candidate()
+        with self.assertRaisesRegex(ValueError, '^native declaration candidate rejected$'):
+            self.read()
+
+
 class NativeApiProfileTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

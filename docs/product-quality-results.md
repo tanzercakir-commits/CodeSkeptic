@@ -2447,3 +2447,44 @@ gerçek writer-orchestration success/retained-RED stderr kontrolleri GREEN verdi
 Özgün OS query argv/30s bütçesi, ortam, tek invocation, syntax/JSON şekilleri ve
 eski case marker'ı değişmedi. Yeni exact-head uygulama PASS'i ve marker'ın taze
 hosted gözlemi ayrıca gereklidir; bu eski8953056 failure sınıfını tamamlamaz.
+
+### bcec66f checkpoint'i ve eklemeli declaration review okuyucusu
+
+Önceki marker değişikliği exact bcec66f üzerinde bağımsız454 test/queue/guard/CLI
+PASS aldı ve yalnız feature ref'e normal fast-forward gönderildi. Receipt SHA
+`134d088969d7393475da444410f5c7999aba7a4ac5e76447418a2220831a17e0`.
+Gerçek yeni identity34724198593/attempt1, Declare Windows103635345122 logunda
+`DECLARATION_FAILURE_KIND TIMEOUT` kaydetti; ilk OS metadata sorgusu declaration
+JSON oluşmadan durdu. Bu yeni denemeyi sınıflandırır, iç nedenini veya eski895
+denemesinin sınıfını kanıtlamaz. Taze API'de identity failure ve FIFO success;
+CI/Windows o gözlemde in_progress. Tam yeni artifact audit'i yapılmış değildir.
+
+Kalıcı checkpoint:
+`/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/native-declaration-failure-kind-bcec66f-v1`
+Manifest SHA `8d9279e840089339be8734b6409fe14796f8361aaa163da952f875446715004b`.
+Bağımsız kopya audit'i23 manifest girdisi+manifest olmak üzere24 dosyanın gerçek
+bytes/hash eşitliğini, eksik/ek/symlink bulunmadığını doğruladı. Önceki sealed
+895 paketi değişmedi; main hâlâ7dfd37596414c9512316093ff4fb6b039673f55f.
+
+U003'ün bir sonraki dar uygulaması tek API/platform declaration candidate'ini
+özgün packet/model/producer kaynaklarına ve isteğe bağlı bağımsız incelemeye
+bağlar. Yeni okuyucu/CLI bulunmadığı için test-first RED alındı:
+`c8f01a9b335ab29498ea1f816db20f565d90eefd9f963ef06a633254444b6693`.
+İlk genişletilmiş focused GREEN32 test:
+`cce84068fc3bf2e2e660a1238c7d1367381e301ecb710ef8f673418ea794de58`.
+
+Sentetik karşı örnekler syntax/backend/visibility/definition/imza/reference
+eksiklerini kabulden ayırır. İki ayrı target eski saf okuyucuda tek tek temiz
+olsa bile canonical kimlikleri çelişiyorsa review reddedilir; aynı target'ın
+tekrarı korunur. Stale/aynı-agent/findings içeren review, projection/model/packet
+drift, yinelenen JSON key, fazla alan, sahte qualification, aşırı boyut ve geç
+input değişikliği ret alır. Gerçek geçici Git producer/candidate commit'leri ve
+olumlu CLI fixture'ı iki ayrı kaynak bağını doğrular; native araç çalıştırmaz.
+
+Bu test fixture'ları gerçek API incelemesi değildir. Henüz yeni gerçek candidate
+ve kabul receipt'i yoktur; declaration reviewed sayısı bu uygulamayla kendiliğinden
+artmaz. Windows/SQLite ve model-semantic/corpus/security-pair/freeze yükümlülükleri
+açıktır. T1 bütün test kümesi464 test/30.519s ile yerelde PASS verdi (skip yok):
+`164000f528ba94e626a4642772f96dc4c666815bf1c3882ecfed33534b997945`.
+Yeni exact-head bağımsız uygulama denetimi ayrıca gerekir; task_ready,
+native/model/product qualification ve POP iddiası yoktur.
