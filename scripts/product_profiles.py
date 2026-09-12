@@ -2569,9 +2569,10 @@ def _cohort_native_commands(records, resource):
 
 
 def _cohort_native_identity(path, value):
+    import product_identity as identity
     fields(value, 'path resolved_path sha256 bytes', 'cohort native recorded file identity')
     external_digest(value['sha256'])
-    require(value['path'] == path and type(value['bytes']) is int and 0 < value['bytes'] <= 2 ** 32,
+    require(value['path'] == path and type(value['bytes']) is int and 0 < value['bytes'] <= identity.MAX_FILE,
             'cohort native recorded file content')
     for name in (path, value['resolved_path']):
         require(type(name) is str and 0 < len(name) <= 4096 and not any(ord(char) < 32 for char in name)
@@ -2735,7 +2736,8 @@ bytes; historical checkout helpers instead bind actual producer-head blobs.
         _, inspection = _ground_truth_input(root / 'image-inspect.json', guard, wrapper['image_inspection_sha256'],
                                             maximum=16 * 1024 * 1024)
         require(type(inspection) is list and len(inspection) == 1 and type(inspection[0]) is dict
-                and inspection[0]['Id'] == wrapper['image'] and inspection[0]['Digest'] == wrapper['image_manifest_digest'],
+                and inspection[0]['Id'] == wrapper['image'] and inspection[0]['Digest'] == wrapper['image_manifest_digest']
+                and inspection[0].get('Os') == 'linux' and inspection[0].get('Architecture') == 'amd64',
                 'cohort native recorded image inspection')
         argv = ['podman', 'run', '--rm', '--pull=never', '--network=none', '--read-only', '--timeout=150',
                 '--cap-drop=ALL', '--security-opt=no-new-privileges', '--security-opt=label=disable',
@@ -2847,7 +2849,8 @@ bytes; historical checkout helpers instead bind actual producer-head blobs.
         for path, row in native['initial_identities'].items():
             _cohort_native_identity(path, row)
             if path in mapped:
-                require({'sha256': row['sha256'], 'size_bytes': row['bytes']} == producer_contents[mapped[path]],
+                require(row['resolved_path'] == path
+                        and {'sha256': row['sha256'], 'size_bytes': row['bytes']} == producer_contents[mapped[path]],
                         'cohort native logical-to-producer identity')
             if path in inputs['input_identities']:
                 require(row == inputs['input_identities'][path], 'cohort native overlapping identity drift')

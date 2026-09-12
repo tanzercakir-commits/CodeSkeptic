@@ -469,7 +469,12 @@ native stdlib header'ını, birleşik probe iki kaynağı da içermelidir. Önce
 ve iki komut biçimi arasındaki yollar ile tüm input-identity sözlükleri eşleşir;
 birleşim tamdır ve örtüşen başlangıç kimlikleriyle de eşittir. Compiler/OS
 metadata'sı raw stdout/userspace baytlarına, materialized kaynak/probe/helper
-kimlikleri kaydedilen producer içeriğine bağlanır.
+kimlikleri kaydedilen producer içeriğine bağlanır. Sabit mount'ların regular
+kaynak/probe/helper dosyaları kaydedilen logical yola çözülmelidir; compiler ve
+OS dosyalarının meşru symlink çözümü ayrı korunur. Kayıtlı her dosya kimliği
+producer'ın 512 MiB üst sınırına tabidir. Image inspection'da Linux/amd64
+metadata'sı bu açık x86-64 profiliyle eşleşmelidir; imaj veya platform
+kimliğinin kriptografik doğrulanması anlamına gelmez.
 
 Tarihsel producer head'i sonraki uygulama veya etiket head'ine çevrilmez.
 Repository yardımcıları gerçek ancestor Git blob SHA-256 ve boyutuyla okunur;

@@ -3732,7 +3732,7 @@ class SourceCohortNativeFixture(SourceCohortFixture):
         self.refresh_streams()
         self.image = '1' * 64
         self.image_digest = 'sha256:' + '2' * 64
-        self.inspection = [{'Id': self.image, 'Digest': self.image_digest}]
+        self.inspection = [{'Id': self.image, 'Digest': self.image_digest, 'Os': 'linux', 'Architecture': 'amd64'}]
         self.write(self.native_root / 'image-inspect.json', self.inspection)
         (self.native_root / 'container.stderr').write_bytes(b'')
         self.projections = [self.project(row) for row in self.value['records']]
@@ -4080,6 +4080,60 @@ class SourceCohortNativeTests(unittest.TestCase):
                 fixture.observation['native_inputs']['frontend-adjusted'] = copy.deepcopy(native)
             fixture.sync()
             with self.subTest(mutation=mutation):
+                self.assert_rejected(read, fixture)
+
+    def test_review_findings_mapped_paths_cannot_consistently_resolve_outside_fixed_mounts(self):
+        read = profiles.verify_cohort_native
+        initial = self.fixture.observation['initial_identities']
+        for path in sorted(set(initial) - {self.fixture.compiler, '/etc/os-release'}):
+            fixture = SourceCohortNativeFixture(self)
+            fixture.observation['initial_identities'][path]['resolved_path'] = '/PRIVATE_FOREIGN_RESOLVED_SOURCE'
+            for form in fixture.forms:
+                identities = fixture.observation['native_inputs'][form]['input_identities']
+                if path in identities:
+                    identities[path]['resolved_path'] = '/PRIVATE_FOREIGN_RESOLVED_SOURCE'
+            fixture.sync()
+            with self.subTest(path=path):
+                self.assert_rejected(read, fixture)
+        # The profile's ordinary compiler and OS symlinks remain valid.
+        self.assertNotEqual(initial[self.fixture.compiler]['resolved_path'], self.fixture.compiler)
+        self.assertNotEqual(initial['/etc/os-release']['resolved_path'], '/etc/os-release')
+        self.assert_uncredited(read(self.fixture.repo, self.fixture.evidence_path))
+
+    def test_review_findings_recorded_sizes_obey_the_producers_512_mib_limit(self):
+        import product_identity as identity
+        self.assertEqual(identity.MAX_FILE, 512 * 1024 * 1024)
+        read = profiles.verify_cohort_native
+        for path in (self.fixture.compiler, '/usr/include/stdlib.h'):
+            for size in (identity.MAX_FILE, identity.MAX_FILE + 1, 2 ** 32):
+                fixture = SourceCohortNativeFixture(self)
+                if path in fixture.observation['initial_identities']:
+                    fixture.observation['initial_identities'][path]['bytes'] = size
+                for form in fixture.forms:
+                    identities = fixture.observation['native_inputs'][form]['input_identities']
+                    if path in identities:
+                        identities[path]['bytes'] = size
+                fixture.sync()
+                with self.subTest(path=path, size=size):
+                    if size == identity.MAX_FILE:
+                        # Metadata boundary only, not a claim of matching extracted bytes.
+                        self.assert_uncredited(read(fixture.repo, fixture.evidence_path))
+                    else:
+                        self.assert_rejected(read, fixture)
+
+    def test_review_findings_image_platform_must_match_the_explicit_linux_x86_64_profile(self):
+        read = profiles.verify_cohort_native
+        for key, replacement in (('Os', 'windows'), ('Architecture', 'arm64'), ('Os', None),
+                                  ('Architecture', None), ('Os', True), ('Architecture', ['amd64'])):
+            fixture = SourceCohortNativeFixture(self)
+            if replacement is None:
+                del fixture.inspection[0][key]
+            else:
+                fixture.inspection[0][key] = replacement
+            fixture.wrapper['image_inspection_sha256'] = fixture.write(
+                fixture.native_root / 'image-inspect.json', fixture.inspection)
+            fixture.sync()
+            with self.subTest(key=key, replacement=replacement):
                 self.assert_rejected(read, fixture)
 
     def test_consistently_rehashed_dependencies_cannot_omit_native_stdlib_or_probe_peer(self):

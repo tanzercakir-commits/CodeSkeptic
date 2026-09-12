@@ -1655,3 +1655,27 @@ SHA-256 `e3cbf66d09b444cca0a0fc6fa7b9f8fdfdeb2bbbe16ea82198eae0bc5841e14f`.
 Ham GH capture wrapper'ları o sırada düzenlenen primary checkout'u bildirir;
 hosted head ve kaynak bağları ayrıca temiz exact `67e131f` klonuyla doğrulandı.
 Identity başarısı genel CI veya U003/ürün başarı iddiasına dönüştürülmez.
+
+### Compiler packet okuyucusu — bağımsız inceleme düzeltmeleri
+
+Bağımsız denetçi `ea5c1ac27e131926a565a43ba5b6417042b4bf90` için PASS
+vermedi: mapped kaynakların her kayıtlı formda aynı yabancı absolute yola
+çözülmesi ve compiler kimliğinin producer'ın 512 MiB sınırını aşması kabul
+ediliyordu. Ayrıca açık Linux/x86-64 profiliyle çelişen image Os/Architecture
+metadata'sı reddedilmiyordu. Gerçek retained packet bu çelişkileri taşımıyordu.
+
+Üç odaklı regresyon, dış hashleri ve tekrarlanan iç iddiaları birlikte
+yenileyerek eski kodda 18 ayrı beklenen-ret başarısızlığını üretti; yalnız
+hash uyuşmazlığına dayalı test değildir. RED capture SHA-256
+`b25fdcc0b569b7885d5198e1b8255bbeb65eacd06db879d4ac30a3320c26143b`.
+Dar düzeltme sonrasında aynı testler GREEN verdi; capture SHA-256
+`5a1376e8c16e275d6de97b436f1b768bfd4d0669c588cce29e93382f36577961`.
+Meşru compiler/OS symlink'leri ve 512 MiB metadata sınırının kendisi kabul
+edilir; sınırın bir bayt üstü ve 4 GiB hem compiler hem header kaydında ret alır.
+Sabit mount'ların tüm sekiz kaynak/probe/helper logical kimliği ayrıca sınanır.
+
+214 profile, 88 identity ve 24 quality testi ile gerçek 26-komut/53-stream
+packet CLI okuması geçti. Yeni compiler/analyzer çalıştırılmadı; eski native
+baytlar, source shard, seçim 2/1020, sıfır ek kota ve qualification false
+korundu. Bu düzeltme için yeni exact-head bağımsız inceleme gerekir; eski
+inceleme PASS'e çevrilmez ve pending inventory önerisi uygulanmış sayılmaz.
