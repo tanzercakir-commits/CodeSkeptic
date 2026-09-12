@@ -431,6 +431,10 @@
       "sha256": "1e26a356e06361e88324109a7f7949e1e9960fcb29dc08cdbc000b71f86b9bbf"
     },
     {
+      "path": "tests/product_corpus/candidates/gcc-parent-child-ground-truth.json",
+      "sha256": "b7b470b5b3ccbc7abb09de53ad04e9e4b083a4de72fc6c1504526a7a2294daca"
+    },
+    {
       "path": "tests/product_corpus/candidates/gcc-parent-child-linux.json",
       "sha256": "7c5c129f4d52916b297be27a971797f4e595670c46f51a23472505acabc1e71c"
     },
@@ -489,6 +493,10 @@
     {
       "path": "tests/product_corpus/platform_source_labels.json",
       "sha256": "3f3d8ea6e7af5b31130da58deab2bc5945cb8cd0bfb2d5913a2aee3a5491925f"
+    },
+    {
+      "path": "tests/product_corpus/retained_ground_truth.json",
+      "sha256": "051d8b9a11b2581ff17585901e7232c9dc099c478a94876a14d9582c94db32ab"
     },
     {
       "path": "tests/product_corpus/selection.json",

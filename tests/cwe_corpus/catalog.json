@@ -2,7 +2,7 @@
   "schema": "codeskeptic-cwe-catalog/v2",
   "selection_base": "005b1264618dcf84aa20a5685efd9c03a26bd67f",
   "profile": "linux-x86_64-clang20-cxx17-isolated-rule",
-  "inventory_sha256": "9198353752f102a98711a53946743507153df5a421f88cae3324256f98bd5ed4",
+  "inventory_sha256": "40dfedb3ebe09f3b7575fe8e8e3b5063719fab184467504283c4ba98237713c9",
   "rules": {
     "alloc-size-overflow": {
       "tier_at_selection": "experimental",
@@ -1021,10 +1021,10 @@
   ],
   "evidence_version": {
     "schema": "codeskeptic-cwe-evidence-version/v1",
-    "sequence": 2,
-    "previous_catalog_sha256": "7aa69dceb431aed0e417b233a58345dc6f5e124bcdd9801119800f672dbcf064",
-    "previous_inventory_sha256": "7ef844ca9da63898b405c254dea8339f2251789c11ba89ee071352a367ea214f",
-    "previous_version_id": "44cf52e322a7d344fc4809c5451d2aa2815f8ffae9d07a8aabf47662bbdeb64b",
+    "sequence": 3,
+    "previous_catalog_sha256": "79df3c5bcc81bc5cffb4624eec374970396b40bf6f16babb41dae8cbe5440cc7",
+    "previous_inventory_sha256": "9198353752f102a98711a53946743507153df5a421f88cae3324256f98bd5ed4",
+    "previous_version_id": "72f7c04ed924c32577a0288e4091d7576d57f35f7598ff2cf848f3eac5cb734e",
     "registry_sha256": "17bd1d76e01534b6afd98ad04c105c656c8ed45a2778be8f4ed842716afcaadc",
     "capabilities": {
       "uninit-ptr": {
@@ -1307,6 +1307,7 @@
       "tests/product_corpus/candidates/gcc-mixed-storage-windows.json",
       "tests/product_corpus/candidates/gcc-mixed-storage-windows/compile_commands.json",
       "tests/product_corpus/candidates/gcc-parent-child-binding.json",
+      "tests/product_corpus/candidates/gcc-parent-child-ground-truth.json",
       "tests/product_corpus/candidates/gcc-parent-child-linux.json",
       "tests/product_corpus/candidates/gcc-parent-child-linux/compile_commands.json",
       "tests/product_corpus/candidates/gcc-parent-child-rights-basis.json",
@@ -1322,6 +1323,7 @@
       "tests/product_corpus/licenses/LLVM.txt",
       "tests/product_corpus/native-api-models.json",
       "tests/product_corpus/platform_source_labels.json",
+      "tests/product_corpus/retained_ground_truth.json",
       "tests/product_corpus/selection.json",
       "tests/stress_corpus/README.md",
       "tests/stress_corpus/high_cfg.cpp",
@@ -1410,17 +1412,17 @@
       "alloc-size-overflow-unknown-addend",
       "int-overflow-unknown-operands"
     ],
-    "id": "72f7c04ed924c32577a0288e4091d7576d57f35f7598ff2cf848f3eac5cb734e",
+    "id": "fc3e0986568a0574ac42035ed8f6f708dcb070d69ed72b2c0ece71c5058499ef",
     "review": {
       "schema": "codeskeptic-cwe-successor-review/v1",
-      "source_base": "5db8970b199801bb7029007eb40a99cb309414a7",
-      "source_head": "847c38568a1f957f5dde4c5a7283fb3b5bf12c6e",
+      "source_base": "05a5c1de2f9045814b7daa424afb4cdc67527391",
+      "source_head": "8c28e275d662d222fc30e655c6aae80b73ca521f",
       "implementer": "/root",
-      "verifier": "/root/retained_binding_exact_verifier",
+      "verifier": "/root/parent_child_native_verifier",
       "verdict": "PASS",
       "findings": [],
-      "reason": "Independently classified all 28 product-corpus source, evidence, recipe, model and index additions across the exact source base/head. They exactly complete the unchanged collector closure of 155 protected inputs while preserving all 127 predecessor rows and hashes, all 52 fixture contracts and source bytes, 15 capability descriptors, quality floors, selection_base and three historical snapshots. Since the prior 810cae2 classification, only selection.json changed in this closure, appending the separately reviewed parent-child admission without replacing the old admission or changing nonqualification boundaries. Approval is limited to this exact additive successor proposal; application requires a fresh exact-head audit. This is not semantic admission, frozen-cohort approval, native qualification, U003 completion or POP.",
-      "payload_sha256": "72f7c04ed924c32577a0288e4091d7576d57f35f7598ff2cf848f3eac5cb734e"
+      "reason": "Source-derived classification of the complete U003 delta: tests/product_corpus/candidates/gcc-parent-child-ground-truth.json is the independently accepted conditional 16-family/3-project-diagnostic source-label sidecar for one already admitted source; tests/product_corpus/retained_ground_truth.json is separate metadata linking that exact record to its external semantic-review receipt. Neither is executable detector logic, an additional quota sample, a native observation or a changed historical fixture. This prospective sequence-3 successor adds exactly these two current protected inputs, from 155 to 157; all previous row hashes, 52 fixture contracts, 15 installed capabilities, selection/profile, quality floors and immutable snapshots are preserved. Approval is prospective input classification only. Application requires fresh exact-head review and grants no cohort freeze, analyzer execution, native/rights/product qualification or U003 POP.",
+      "payload_sha256": "fc3e0986568a0574ac42035ed8f6f708dcb070d69ed72b2c0ece71c5058499ef"
     }
   }
 }

@@ -1435,3 +1435,38 @@ etmek reddedilir. Kaynak/rights/stream girdileri hâlâ gerçek dosyalardan okun
 ve ortak kimlik kontrolünde kalır; historical referanslar yeniden yazılmaz.
 Dar RED/GREEN, tam **170 profile testi** ve gerçek retained index yeniden geçti.
 Bu düzeltme yeni exact-head bağımsız inceleme ister; U003 açık kapıları aynıdır.
+
+### Retained etiket checkpoint'i ve iki girdilik successor
+
+Düzeltilmiş `8c28e275d662d222fc30e655c6aae80b73ca521f` bağımsız implementation
+PASS aldı. Aynı kararın ayrı prospective sınıflandırması yalnız yeni etiket
+sidecar'ı ve ayrı review-link index'ini onayladı. Karar:
+`retained-source-labels-v1/label-review-8c28e27.json`, SHA-256
+`f651c3b5121db20784d6fbeb8ca6a1998c4159432f5dfd91ae59226931fc9aaf`.
+Onaylanan sequence 3 baytları uygulandı: **155 → 157** korunan girdi; eski
+155 satır/hash, 52 fixture, 15 capability ve bütün floor/snapshot'lar değişmez.
+Inventory SHA-256 `40dfedb3ebe09f3b7575fe8e8e3b5063719fab184467504283c4ba98237713c9`,
+katalog SHA-256 `31384b65ee813ca82d6825fd222b4f8986afe1b56218d55150c5c6b943801dc2`.
+Gerçek integrity, 65 katalog testi ve 12 in-memory exact-transition negatifi
+geçti; ek transition assertion'ları production validator garantisi diye sunulmaz.
+Uygulanmış commit yeni bağımsız exact-head denetim ister. Seçim **2/1020**,
+readiness exit 2, ek kota sıfır ve yedi qualification alanı false kalır.
+
+### Ayrı genel Linux CI — runtime kimlik süresi nedeniyle RED
+
+`05a5c1d` için genel [CI 34693664328](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/34693664328)
+başarısızdır: 1583 testten biri, checkpoint snapshot testinin ilk reusable-response
+assertion'ında düştü. `runtime_before` gözlemi sabit 5 saniyelik wall sınırını
+`module_read` ön kontrolünde gördü; iki modül ve 185023160 byte okunup hashlenmişti.
+Fresh snapshot coverage tamam olsa da runtime digest/witness verilmediği için
+reuse fail-closed kaldı. Resume/header/sidecar kontrollerine ulaşılamadı; sonraki
+single-process/smoke/dogfood/real-world/thesis adımları skipped kaldı.
+
+5.000717 s wall ve 0.801927 s thread CPU, I/O veya scheduling gecikmesiyle
+uyumludur fakat host contention/kök neden kanıtı değildir. İlgili runtime/test/
+workflow kaynakları `36c4f57` ile byte eşittir. Salt-okunur bağımsız teşhis
+`retained-candidate-reader-v1/general-ci-diagnosis-05a5c1d.md` altında korunur.
+Başarılı kimlik workflow'u ayrı kalır; bütün CI veya ürün yeterliliği iddia edilmez.
+U004 bu çözülmemiş RED'i kaydeder, CH12-S01-U003 ilgili dayanıklılık kapısını
+ele alır. Burada cache kodu, süre bütçesi veya warmup değiştirilmedi/çalıştırılmadı;
+FIFO atlanmadı ve kör tekrar yapılmadı.
