@@ -2592,3 +2592,58 @@ Ayrı completion-plan14 test0.285s GREEN (toplam474, yerelde skip yok):
 Yeni exact-head bağımsız implementation incelemesi ve taze hosted gözlem ayrıca
 gerekir. Windows kök nedeni/fix'i, U003/global freeze ve bütün ürün kabulü açık;
 bu tanı checkpoint'i için POP veya task_ready iddiası yoktur.
+
+### Exact-5a Windows kanıtı ve sınırlı TU seçimi
+
+Gerçek5a0273c producer Windows denemesi run34729029339/attempt1,
+job103648291085, artifact10309131832 üzerinde terminal failure'dır.
+54930-byte ZIP SHA
+`8b7d17c0499c8e68152d7e389c4c3ad2259ed2ce4935ea063472df4a05cc3a57`;
+323735-byte packet SHA
+`ff7aaed16b983564aff478fb38f0adf824968d3030ce823aa6d195fa152eee86`.
+Gerçek20 dosya, metadata/ZIP/CRC/packet ve tam günlük bağımsız incelendi.
+37 dosyalık `native-declaration-worker-packet-5a0273c-v1` kalıcı paketi ve
+ayrı byte-for-byte kopya denetimi korundu; manifest SHA
+`47b37f68f77fee5752f09d84af69e7788c7fa06b917d09c9813b62aab5f085c5`.
+
+Actual PROCESS_FAILED/exit2, stdout0, stderr185-byte/hash kaydıyla eşleşen
+tek tanı CHILD_REPORTED/INVALID'dir. Kaynağa bağlı
+2093→1964→1514→1435→1427→58 zinciri doğrudan TU çocuklarını toplarken
+16.384 cursor guard'ının reddini gösterir; parent timeout değildir.
+Günlükteki ayrı-11 mock-test marker'ı gerçek native crash sayılmaz. Toplam/unique
+native cursor sayısı, kökenleri ve guard aşımının alt nedeni gözlenmedi.
+13 istek BACKEND_FAILED/INCOMPLETE kalır; raw syntax/dependency exit0 backend
+başarısı değildir. Önceki Windows denemeleri geriye dönük sınıflandırılmadı.
+
+Fake-CDLL regresyonu mevcut5a collector'da gerçek ctypes callback yoluyla
+aynı child-bound reddini yeniden üretti; native DLL/SDK çalıştırılmadı.
+Test-first RED capture SHA
+`84d36216fbfedb412ff67a3f5027f2061bb92d3779e7313365e8f26da05aef28`.
+Dar değişiklik bütün doğrudan TU ziyaretlerini sonlu65.536 sınırına sayar,
+yalnız gerekli exact kind/ad eşleşmelerini saklar ve son düğüme kadar sürer.
+Bu yeni private kaynak politikasıdır; eski16.384 all-child sınırına eşdeğerlik,
+native başarı veya dondurulmuş değerlendirme bütçesi değişikliği değildir.
+16.384 stored/recursive sınırları,30s timeout, validator ve bütün model/kalite
+kapıları korunur. Fail-closed callback/interruption ve kaynak cleanup eklenir.
+
+14 odaklı adapter testi GREEN capture SHA
+`78f0e0d18fed5f75ce17512316945e53019134bbab4606d01986da37d78b252f`.
+17.000 ilgisiz prefix/suffix sonrası tam gözlem eşitliği, geç duplicate
+typedef/variable/main, exact kind/ad ve eksik probe,65.536/65.537 ziyaret,
+16.384/16.385 stored/recursive sınırları, nested/tekrarlı/çelişen referanslar,
+UTF-8/string/getter hatası, traversal interruption, Break sonrası durma ve
+CXString/TU/index cleanup sınandı. children/observe taklit edilmedi; sahte
+CDLL gerçek adapter callback'ini çağırır. Bu offline test native callback
+ömür güvenliği, süre/RSS veya Windows tamamlanması kanıtı değildir.
+
+Yeni exact-head bağımsız implementation incelemesi ve gerçek native hosted
+qualification ayrıca gerekir. U003 FRONT kalır; model/native/product kabulü,
+global evaluation freeze veya POP yoktur. Eski kaynak/packet/receipt anlamları,
+corpus/model byte'ları, FIFO ve main korunur.
+
+T1 identity/profiles/quality/completion-plan toplam488 test32.600s GREEN,
+yerelde skip yok; capture SHA
+`a2dab2b475c15f30aeee547e4354b4fcace6745ecfeaa75c297136b41538c609`.
+Gerçek5a Windows packet'inin saf `check-declarations` CLI'si exit0 verdi,
+13 BACKEND_FAILED sonucunu korudu; metadata geçerliliği native PASS değildir:
+`59cc4d08729c04b150a3922dc8dd120ac28d70cc1376a9f40e8026630c7e5de9`.

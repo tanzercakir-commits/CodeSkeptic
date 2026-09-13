@@ -654,6 +654,34 @@ yazıcıya ulaşmaz. Bağımsız capture envelope, kaynak ve header identity den
 bu yakalama sınırının dışındadır; onların başarısızlığı fatal kalır ve packet yazılmaz.
 Timeout ve çıktı sayımı hard RSS/streaming/descendant bütçesi değildir.
 
+TU doğrudan-child toplayıcısı için ayrı, prospective kaynak politikası vardır:
+en fazla65.536 düğüm ziyaret edilir; ilgisiz kind/adlar da filtre öncesi bu
+sayıma girer. Yalnız istenen sembollerin exact `TypedefDecl/cs_expected_*`,
+`VarDecl/cs_native_*` çiftleri ve `FunctionDecl/main` saklanır. İlk tam probe
+setinde durulmaz; bütün doğrudan çocuklar bitene kadar taranır ve aynı cursor
+dahil bütün eşleşme occurrence'ları korunur. Atlanan düğümde Continue kullanılır,
+altına inilmez. Yinelenen typedef/variable reddi ve bütün main kayıtlarının
+sonraki denetime aktarılması korunur; canonical cursor ile dedup yapılmaz.
+
+65.536, önceki16.384 all-child saklama sınırına göre açıkça yeni bir ziyaret
+tavanıdır; eski bütçe değişmemiş veya native SDK'nın sığacağı kanıtlanmış gibi
+sunulmaz. Amaç header genişliğini bütün header cursor'larını saklamadan işlemek,
+yine sonlu bir tarama tavanı tutmaktır. Saklanan cursor sayısı hâlâ en fazla16.384;
+variable altındaki filtresiz recursive tarama ve nested/tekrarlı/çelişen
+DeclRefExpr kayıtları aynı16.384 sınırını korur. Seçimli filtre recursive
+kullanılamaz. Callback hatası Break ile durdurulup aslıyla yükseltilir; hata
+kaydı olmadan libclang'ın interrupted dönüşü de kısmi liste olarak kabul edilmez.
+CXString ve TU/index cleanup başarısız yolda da sürer.
+
+Bu özel collector kaynak politikası modeldeki flow-transfer veya dondurulmuş
+değerlendirme bütçesi değildir. Validator'ın toplam16.384 type-record/depth<12
+sınırları,30s parent timeout, tam-TU diagnostic/include kayıtları, packet şeması
+ve bütün yeterlilik kapıları değişmez. Ziyaret tavanı CPU/RSS oranı garantisi
+veya hard native bellek sınırı değildir. Offline fake-CDLL testleri gerçek
+ctypes callback yolunu sınar, native davranış/ömür/performance kanıtlamaz;
+bu kaynak için taze native hosted gözlem ayrıca gerekir. Başarısız native
+sonuç yeni bir sınırsız artışa veya önceki RED'i PASS saymaya izin vermez.
+
 Yeni gözlemlerde yalnız `PROCESS_FAILED` için ayrı stderr log satırı
 `DECLARATION_WORKER_DIAGNOSTIC` yazılır; packet schema ve `backend_failure`
 alanları değişmez. Sabit child handler exit2/boş stdout, bütünüyle eşleşen iki

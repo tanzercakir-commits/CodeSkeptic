@@ -1419,20 +1419,32 @@ def declaration_backend(library):
             finally:
                 lib.disposeString(value)
 
-        def children(self, cursor, recursive=False):
+        def children(self, cursor, recursive=False, *, selected=None):
+            # TU-only selection changes the finite visit policy, not the stored
+            # cursor or recursive-reference bound. Scan to exhaustion to retain
+            # late duplicates; never recurse into a discarded TU declaration.
+            require(selected is None or not recursive, 'CIndex selection must be direct')
             children, errors = [], []
+            visited = 0
             @visitor
             def visit(child, parent, data):
+                nonlocal visited
                 try:
+                    if selected is not None:
+                        require(visited < 65536, 'CIndex TU visit bound')
+                        visited += 1
+                        if child.kind not in selected or self.text(lib.getCursorSpelling(child)) not in selected[child.kind]:
+                            return 1  # CXChildVisit_Continue: do not visit descendants.
                     require(len(children) < 16384, 'CIndex child bound')
                     children.append(child)
                     return 2 if recursive else 1
                 except BaseException as error:
                     errors.append(error)
                     return 0
-            lib.visitChildren(cursor, visit, None)
+            interrupted = lib.visitChildren(cursor, visit, None)
             if errors:
                 raise errors[0]
+            require(interrupted == 0, 'CIndex traversal interrupted')
             return children
 
         def location(self, cursor):
@@ -1511,7 +1523,10 @@ def declaration_backend(library):
                                             'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
                     finally:
                         lib.disposeDiagnostic(diagnostic)
-                nodes = self.children(lib.getTranslationUnitCursor(unit))
+                selected = {20: frozenset('cs_expected_' + r['symbol'] for r in requests),
+                            9: frozenset('cs_native_' + r['symbol'] for r in requests),
+                            8: frozenset({'main'})}
+                nodes = self.children(lib.getTranslationUnitCursor(unit), selected=selected)
                 rows = []
                 for request in requests:
                     symbol = request['symbol']

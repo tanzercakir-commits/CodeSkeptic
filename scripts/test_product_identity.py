@@ -2612,5 +2612,360 @@ class HostedDeclarationWorkflowTests(unittest.TestCase):
                 self.assertEqual(result.stderr, '')
 
 
+class FakeCIndexLibrary:
+    """Explicit fake CDLL driving the real adapter's ctypes callbacks, not native I/O."""
+
+    def __init__(self):
+        self.functions, self.handlers, self.nodes, self.strings = {}, {}, {}, {}
+        self.next_string = 1
+        self.visits, self.disposed_strings, self.disposed = [], [], []
+        self.references, self.canonical, self.definitions = {}, {}, {}
+        self.diagnostics = [(2, b'whole TU warning'), (3, b'whole TU error')]
+        self.files = {901: b'/fixture/probe.c', 902: b'/fixture/sdk.h'}
+        self.inclusions = [902, 901, 902]
+        self.forced_visit_result = 0
+        self.tu = self.node(300, 'translation unit')
+        self.handlers.update({
+            'getCString': lambda value: self.strings[value.data],
+            'disposeString': self.dispose_string,
+            'getCursorSpelling': lambda cursor: self.string(self.nodes[cursor.xdata]['name']),
+            'visitChildren': self.visit_children,
+            'createIndex': lambda *args: 222,
+            'parseTranslationUnit2FullArgv': self.parse,
+            'getTranslationUnitCursor': lambda unit: self.cursor(self.tu),
+            'disposeTranslationUnit': lambda unit: self.disposed.append(('unit', unit.value)),
+            'disposeIndex': lambda index: self.disposed.append(('index', index)),
+            'getNumDiagnostics': lambda unit: len(self.diagnostics),
+            'getDiagnostic': lambda unit, index: index,
+            'getDiagnosticSeverity': lambda index: self.diagnostics[index][0],
+            'getDiagnosticSpelling': lambda index: self.string(self.diagnostics[index][1]),
+            'disposeDiagnostic': lambda index: self.disposed.append(('diagnostic', index)),
+            'getInclusions': self.get_inclusions,
+            'getFileName': lambda file: self.string(self.files[file.value if hasattr(file, 'value') else file]),
+            'getClangVersion': lambda: self.string(b'clang version 20.1.8 (synthetic adapter fixture)'),
+            'getCursorReferenced': lambda cursor: self.cursor(self.references[cursor.xdata]),
+            'getCanonicalCursor': lambda cursor: self.cursor(self.canonical.get(cursor.xdata, cursor.xdata)),
+            'getCursorDefinition': lambda cursor: self.cursor(self.definitions.get(cursor.xdata, 0)),
+            'Cursor_isNull': lambda cursor: int(cursor.xdata == 0),
+            'getCursorKindSpelling': lambda kind: self.string({8: 'FunctionDecl', 20: 'TypedefDecl'}.get(kind, 'Other')),
+            'getCursorUSR': lambda cursor: self.string('fixture:' + str(cursor.xdata)),
+            'getCursorLinkage': lambda cursor: 4,
+            'getCursorLanguage': lambda cursor: 1,
+            'Cursor_getMangling': lambda cursor: self.string('fixture_mangling_' + str(cursor.xdata)),
+            'isCursorDefinition': lambda cursor: int(cursor.xdata in self.definitions.values()),
+            'Cursor_getNumArguments': lambda cursor: 0,
+            'getCursorLocation': self.location,
+            'getSpellingLocation': self.position,
+            'getExpansionLocation': self.position,
+            'getCursorType': lambda cursor: self.functions['getCursorType'].restype(17),
+            'getCanonicalType': lambda value: value,
+            'getTypeKindSpelling': lambda kind: self.string('Int'),
+            'getTypeSpelling': lambda value: self.string('int'),
+            'isConstQualifiedType': lambda value: 0,
+            'isVolatileQualifiedType': lambda value: 0,
+            'isRestrictQualifiedType': lambda value: 0,
+            'Type_getSizeOf': lambda value: 4,
+            'Type_getAlignOf': lambda value: 4,
+        })
+
+    def __getattr__(self, name):
+        if not name.startswith('clang_'):
+            raise AttributeError(name)
+        key = name[6:]
+        if key not in self.functions:
+            def function(*args):
+                if key not in self.handlers:
+                    raise AssertionError('unimplemented fake CIndex call: ' + key)
+                return self.handlers[key](*args)
+            self.functions[key] = function
+        return self.functions[key]
+
+    def node(self, kind, name, children=()):
+        number = len(self.nodes) + 1
+        self.nodes[number] = {'kind': kind, 'name': name, 'children': list(children)}
+        return number
+
+    def cursor(self, number):
+        type_ = self.functions['visitChildren'].argtypes[0]
+        return type_(self.nodes[number]['kind'] if number else 0, number)
+
+    def string(self, raw):
+        number = self.next_string
+        self.next_string += 1
+        self.strings[number] = raw.encode() if isinstance(raw, str) else raw
+        return self.functions['getCursorSpelling'].restype(number, 0)
+
+    def dispose_string(self, value):
+        self.disposed_strings.append(value.data)
+        del self.strings[value.data]
+
+    def visit_children(self, parent, callback, data):
+        import ctypes
+        assert isinstance(callback, ctypes._CFuncPtr)
+        assert type(parent) is self.functions['visitChildren'].argtypes[0]
+
+        def walk(cursor):
+            for number in self.nodes[cursor.xdata]['children']:
+                child = self.cursor(number)
+                code = callback(child, cursor, data)
+                self.visits.append((number, code))
+                if code == 0:
+                    return 1
+                if code == 2:
+                    if walk(child):
+                        return 1
+                elif code != 1:
+                    raise AssertionError('invalid visitor result')
+            return 0
+        return walk(parent) or self.forced_visit_result
+
+    def parse(self, *args):
+        args[-1]._obj.value = 111
+        return 0
+
+    def location(self, cursor):
+        result = self.functions['getCursorLocation'].restype()
+        result.offset_data = cursor.xdata
+        return result
+
+    def position(self, location, file, line, column, offset):
+        file._obj.value = 901
+        line._obj.value = 1
+        column._obj.value = location.offset_data + 1
+        offset._obj.value = location.offset_data
+
+    def get_inclusions(self, unit, callback, data):
+        for file in self.inclusions:
+            callback(file, None, 0, data)
+
+    def backend(self):
+        # An existing regular file satisfies path checks but is NEVER loaded.
+        path = Path(identity.__file__).resolve()
+        with mock.patch('ctypes.CDLL', return_value=self) as load:
+            result = identity.declaration_backend(path)
+        load.assert_called_once_with(str(path))
+        return result
+
+
+class DeclarationTraversalTests(unittest.TestCase):
+    selected = {20: frozenset({'cs_expected_probe'}),
+                9: frozenset({'cs_native_probe'}), 8: frozenset({'main'})}
+    requests = [{'id': 'fixture.probe', 'symbol': 'probe'}]
+
+    def fixture(self):
+        library = FakeCIndexLibrary()
+        typedef = library.node(20, 'cs_expected_probe')
+        target = library.node(8, 'probe')
+        reference = library.node(101, 'probe')
+        library.references[reference] = target
+        variable = library.node(9, 'cs_native_probe', [reference])
+        main = library.node(8, 'main')
+        library.nodes[library.tu]['children'] = [typedef, variable, main]
+        return library, library.backend(), typedef, variable, main
+
+    def observe(self, backend):
+        return backend.observe(['fixture-clang', '-fsyntax-only', '/fixture/probe.c'], self.requests)
+
+    def test_large_unrelated_prefix_preserves_complete_observation(self):
+        library, backend, typedef, variable, main = self.fixture()
+        baseline = self.observe(backend)
+        prefix = [library.node(8 if n % 2 else 20, 'unrelated_' + str(n)) for n in range(17000)]
+        library.nodes[library.tu]['children'] = prefix + [typedef, variable, main] + prefix
+        library.visits.clear()
+        observed = self.observe(backend)
+        self.assertEqual(observed, baseline)
+        self.assertEqual(len(library.visits), 34004)  # 34003 TU siblings, one recursive reference.
+        self.assertEqual(observed['inclusions'], ['/fixture/probe.c', '/fixture/sdk.h'])
+        self.assertEqual(observed['diagnostics'], [
+            {'severity': severity, 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}
+            for severity, raw in library.diagnostics])
+        self.assertEqual([row['reference']['name'] for row in observed['requests'][0]['targets']], ['probe'])
+        self.assertEqual([row['name'] for row in observed['entry']], ['main'])
+        self.assertFalse(library.strings)
+        self.assertEqual(library.disposed[-2:], [('unit', 111), ('index', 222)])
+
+    def test_exact_kind_and_name_selection_never_recurses_into_discarded_nodes(self):
+        library, backend, typedef, variable, main = self.fixture()
+        wrong = [library.node(kind, name, [typedef]) for kind, name in (
+            (8, 'cs_expected_probe'), (20, 'cs_native_probe'), (9, 'main'),
+            (20, 'cs_expected_probe_suffix'), (9, 'cs_native_other'), (8, 'main_extra'))]
+        library.nodes[library.tu]['children'] = wrong + [typedef, variable, main]
+        nodes = backend.children(library.cursor(library.tu), selected=self.selected)
+        self.assertEqual([node.xdata for node in nodes], [typedef, variable, main])
+        self.assertEqual(library.visits, [(number, 1) for number in wrong + [typedef, variable, main]])
+        self.assertFalse(library.strings)
+
+    def test_missing_probes_remain_missing_after_selection(self):
+        library, backend, typedef, variable, main = self.fixture()
+        library.nodes[library.tu]['children'] = [library.node(20, 'cs_expected_other'), main]
+        row = self.observe(backend)['requests'][0]
+        self.assertIsNone(row['expected_type'])
+        self.assertIsNone(row['variable_location'])
+        self.assertEqual(row['targets'], [])
+
+    def test_late_duplicate_typedef_or_variable_is_not_deduplicated(self):
+        for kind, name in ((20, 'cs_expected_probe'), (9, 'cs_native_probe')):
+            for same_identity in (False, True):
+                with self.subTest(kind=kind, same_identity=same_identity):
+                    library, backend, typedef, variable, main = self.fixture()
+                    duplicate = (typedef if kind == 20 else variable) if same_identity else library.node(kind, name)
+                    other = library.node(8, 'unrelated')
+                    library.nodes[library.tu]['children'] = [typedef, variable, main] + [other] * 17000 + [duplicate] + [other] * 17000
+                    with self.assertRaisesRegex(identity.IdentityError, 'duplicate CIndex request declaration'):
+                        self.observe(backend)
+                    self.assertEqual(len(library.visits), 34004)
+                    self.assertEqual(library.visits[-1], (other, 1))
+                    self.assertEqual(library.disposed[-2:], [('unit', 111), ('index', 222)])
+
+    def test_all_main_occurrences_survive_large_prefix_and_suffix(self):
+        library, backend, typedef, variable, main = self.fixture()
+        other = library.node(8, 'unrelated')
+        second = library.node(8, 'main')
+        library.nodes[library.tu]['children'] = [other] * 17000 + [typedef, variable, main, second, main] + [other] * 17000
+        entries = self.observe(backend)['entry']
+        self.assertEqual([row['usr'] for row in entries], ['fixture:' + str(n) for n in (main, second, main)])
+
+    def test_direct_visit_bound_counts_discarded_kinds_and_names_even_after_probes(self):
+        for probes_first in (False, True):
+            for count in (65536, 65537):
+                with self.subTest(probes_first=probes_first, count=count):
+                    library, backend, typedef, variable, main = self.fixture()
+                    discard = [library.node(101, 'main'), library.node(8, 'unrequested')]
+                    prefix = [typedef, variable, main] if probes_first else []
+                    library.nodes[library.tu]['children'] = prefix + [discard[n % 2] for n in range(count - len(prefix))]
+                    if count == 65536:
+                        nodes = backend.children(library.cursor(library.tu), selected=self.selected)
+                        self.assertEqual([node.xdata for node in nodes], prefix)
+                        self.assertTrue(all(code == 1 for _, code in library.visits))
+                    else:
+                        with self.assertRaisesRegex(identity.IdentityError, 'CIndex TU visit bound'):
+                            backend.children(library.cursor(library.tu), selected=self.selected)
+                        self.assertEqual(library.visits[-1][1], 0)
+                    self.assertEqual(len(library.visits), count)
+                    self.assertFalse(library.strings)
+
+    def test_stored_and_unfiltered_recursive_cursor_bounds_remain_16384(self):
+        for mode in ('selected', 'recursive', 'direct'):
+            for count in (16384, 16385):
+                with self.subTest(mode=mode, count=count):
+                    library, backend, typedef, variable, main = self.fixture()
+                    leaf = typedef if mode == 'selected' else library.node(101, 'reference')
+                    parent = library.node(9, 'parent', [leaf] * count)
+                    kwargs = {'selected': self.selected} if mode == 'selected' else {'recursive': mode == 'recursive'}
+                    if count == 16384:
+                        result = backend.children(library.cursor(parent), **kwargs)
+                        self.assertEqual(len(result), count)
+                        self.assertTrue(all(code == (2 if mode == 'recursive' else 1) for _, code in library.visits))
+                    else:
+                        with self.assertRaisesRegex(identity.IdentityError, 'CIndex child bound'):
+                            backend.children(library.cursor(parent), **kwargs)
+                        self.assertEqual(library.visits[-1][1], 0)
+                    self.assertEqual(len(library.visits), count)
+
+    def test_recursive_nested_repeated_and_conflicting_targets_keep_order(self):
+        library, backend, typedef, variable, main = self.fixture()
+        original = library.nodes[variable]['children'][0]
+        other_target = library.node(8, 'conflicting_target')
+        canonical = library.node(8, 'canonical_other')
+        definition = library.node(8, 'definition_other')
+        library.canonical[other_target] = canonical
+        library.definitions[other_target] = definition
+        other_ref = library.node(101, 'conflicting_target')
+        library.references[other_ref] = other_target
+        wrapper = library.node(100, 'wrapper', [original, other_ref, original])
+        library.nodes[variable]['children'] = [original, wrapper, other_ref]
+        targets = self.observe(backend)['requests'][0]['targets']
+        self.assertEqual([row['reference']['name'] for row in targets],
+                         ['probe', 'probe', 'conflicting_target', 'probe', 'conflicting_target'])
+        self.assertEqual(targets[2]['canonical']['name'], 'canonical_other')
+        self.assertEqual(targets[2]['definition']['name'], 'definition_other')
+        self.assertEqual(targets[0], targets[1])
+        self.assertEqual([number for number, code in library.visits if code == 2],
+                         [original, wrapper, original, other_ref, original, other_ref])
+
+    def test_recursive_selection_is_rejected_before_any_callback(self):
+        library, backend, *_ = self.fixture()
+        with self.assertRaisesRegex(identity.IdentityError, 'CIndex selection must be direct'):
+            backend.children(library.cursor(library.tu), recursive=True, selected=self.selected)
+        self.assertEqual(library.visits, [])
+
+    def test_callback_spelling_failures_break_dispose_and_propagate_original_error(self):
+        for failure in ('oversize', 'utf8', 'getter', 'spelling'):
+            with self.subTest(failure=failure):
+                library, backend, typedef, variable, main = self.fixture()
+                sentinel = RuntimeError('fake getter sentinel')
+                if failure == 'oversize':
+                    library.nodes[typedef]['name'] = b'x' * 8193
+                    expected = identity.IdentityError
+                elif failure == 'utf8':
+                    library.nodes[typedef]['name'] = b'\xff'
+                    expected = UnicodeDecodeError
+                else:
+                    expected = RuntimeError
+                    library.diagnostics = []
+                    def fail(*args):
+                        raise sentinel
+                    library.handlers['getCString' if failure == 'getter' else 'getCursorSpelling'] = fail
+                with self.assertRaises(expected) as raised:
+                    self.observe(backend)
+                if failure in ('getter', 'spelling'):
+                    self.assertIs(raised.exception, sentinel)
+                    self.assertEqual(len(library.disposed_strings), 1 if failure == 'getter' else 0)
+                self.assertEqual(library.visits, [(typedef, 0)])
+                self.assertFalse(library.strings)
+                self.assertEqual(library.disposed[-2:], [('unit', 111), ('index', 222)])
+
+    def test_unexpected_traversal_interruption_fails_closed(self):
+        library, backend, *_ = self.fixture()
+        library.forced_visit_result = 1
+        with self.assertRaisesRegex(identity.IdentityError, 'CIndex traversal interrupted'):
+            self.observe(backend)
+        self.assertEqual(library.disposed[-2:], [('unit', 111), ('index', 222)])
+
+    def test_traversal_binding_exception_still_disposes_unit_and_index(self):
+        library, backend, *_ = self.fixture()
+        sentinel = RuntimeError('fake traversal sentinel')
+        def fail(*args):
+            raise sentinel
+        library.handlers['visitChildren'] = fail
+        with self.assertRaises(RuntimeError) as raised:
+            self.observe(backend)
+        self.assertIs(raised.exception, sentinel)
+        self.assertEqual(library.visits, [])
+        self.assertEqual(library.disposed[-2:], [('unit', 111), ('index', 222)])
+
+    def test_observation_bounds_break_before_tail_and_dispose_resources(self):
+        for mode, limit in (('visited', 65536), ('stored', 16384), ('recursive', 16384)):
+            with self.subTest(mode=mode):
+                library, backend, typedef, variable, main = self.fixture()
+                leaf = library.node(101, 'irrelevant') if mode != 'stored' else typedef
+                if mode == 'recursive':
+                    wrapper = library.node(100, 'wrapper', [leaf] * (limit + 5))
+                    library.nodes[variable]['children'] = [wrapper]
+                    visited_before = 3  # TU siblings precede unfiltered DFS.
+                else:
+                    library.nodes[library.tu]['children'] = [leaf] * (limit + 5)
+                    visited_before = 0
+                message = 'CIndex TU visit bound' if mode == 'visited' else 'CIndex child bound'
+                with self.assertRaisesRegex(identity.IdentityError, message):
+                    self.observe(backend)
+                self.assertEqual(len(library.visits), visited_before + limit + 1)
+                self.assertEqual(library.visits[-1][1], 0)
+                self.assertFalse(library.strings)
+                self.assertEqual(library.disposed[-2:], [('unit', 111), ('index', 222)])
+
+    def test_exact_string_bound_and_unselected_kind_do_not_lose_disposal(self):
+        library, backend, *_ = self.fixture()
+        names = ['', 'x' * 8192]
+        nodes = [library.node(8, name) for name in names]
+        # This invalid spelling must not be read for a kind outside the filter.
+        nodes.append(library.node(101, b'\xff'))
+        library.nodes[library.tu]['children'] = nodes
+        self.assertEqual(backend.children(library.cursor(library.tu), selected=self.selected), [])
+        self.assertEqual(library.visits, [(number, 1) for number in nodes])
+        self.assertEqual(len(library.disposed_strings), 2)
+        self.assertFalse(library.strings)
+
+
 if __name__ == '__main__':
     unittest.main()
