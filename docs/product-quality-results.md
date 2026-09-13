@@ -2922,3 +2922,70 @@ Dar/legacy testler GREEN capture SHA
 `76c773ff58ab3fe7ce7921d603d15dac67eb241ceaebfe70fe21be2fb3daaf55`.
 Bu simulated path testi gerçek Windows çalışması değildir; ilk NOT_APPROVED
 kararı korunur ve düzeltilen yeni head ayrıca bağımsız denetlenmelidir.
+
+## U003 — c170 devamı: bounded selected-path akışı ve gerçek hosted RED
+
+`c170b1509447a2ca8d1edbf8379201cef119b4b8` Windows fixture düzeltmesi önceki
+bağımsız implementation checkpoint PASS'inden sonra feature dalına FF gönderildi;
+main değişmedi. O checkpoint'in555 yerel testi Windows/native qualification
+değildi. Gerçek identity run34743270265 attempt1 beş successful job ve yalnız
+Declare Windows103686487249 failure ile bitti. Actual209+5 test geçtikten sonra
+30s OS/CIM identity query timeout oldu; entered-header trace/CIndex aşamasına
+ulaşılmadı. Başka runner'daki successful Observe Windows bunu ikame etmez.
+Dokuz artifact'lık katalogda Windows declaration packet yoktu; packet indirilmedi.
+Delay'in altında yatan OS/provider/scheduler nedeni bilinmiyor. Önceki başarısız
+run veya packet'ler yeni v3 başarısı diye yeniden etiketlenmedi.
+
+Bu failure'ın bağımsız denetlenmiş durable dizini
+`native-declaration-hosted-observation-c170b15-v1`, manifest SHA
+`9c14c9bfefbe74478b5184c126a32d0743ba0de26ad2cd44525b5bb427da5100`'dır;
+U003 user-state evidence kökü altındadır.22 file/21 manifest entry/148970 byte,
+ayrı PASS_HOSTED_EVIDENCE_ONLY ve PASS_COPY_EVIDENCE_ONLY sınırları korunur.
+
+Yeni actual genel CI run34743270225/job103686486934 de failure oldu:
+1583 testten yalnız
+`AnalysisCacheTest.CheckpointSnapshotBindsPendingHeaderAndSidecarWithoutPublishingFindings`
+başarısız. Initial reusable snapshot kontrolü test:205'te runtime proof yokluğu
+ile durdu. Retained log SHA
+`97babbcb1304fd2db3cf93e1f4e67953102e93cc60dcd7ee7c85cccc340842b3`;
+metadata SHA `bd5a0f9ea001b51b110ee1084615610f095af477c639692958f54bdf867e42e6`.
+`runtime_before:deadline;observe_stage=module_read`, wall5002339us,
+thread_cpu724548us,2 completed module ve166017720 read/hashed byte gözlendi.
+Bu cumulative5s deadline'ın o check'te saptanmasıdır; tek read'in beş saniye
+bloklandığını veya storage/contention nedenini kanıtlamaz. Sonraki replay/header/
+sidecar mutation assertion'ları çalışmadı; bu run onları ayrıca çürütmez.
+Runtime/coordinator/test dosyaları U003 scope'u dışındadır. RED saklandı;
+timeout waiver, ilgisiz fix veya manuel rerun yapılmadı.
+
+Yeni kapsam içi uygulama tek snprintf effect'ini bounded graph'a bağlar:
+caller-owned pointer assignment, shared object mutation, branch joins,
+version-bound validation invalidation, direct helper params/output/returned
+alias ve actual consumed-region observation. Frame depth4, function genelinde
+state256/step65536 uygulanır; unknown/unsupported/exhaustion safe olmaz.
+Genel sink/sanitizer sınıflandırması veya C++/SQLite modeli eklendi denmez.
+
+Yeni reference tests öncesi eksik interpreter RED SHA
+`396fbd327f5d084641d14cac7711133b9970c2cc2c2729c45ade5209cda804ca`.
+İlk GREEN denemesi bir graph-budget fixture hatasıyla başarısızdı:
+65536 noop'a kullanılmayan helper node'ları da eklenince declared-node sınırı
+aşılıyordu. Bu ayrı capture saklandı; gerçek ürün regresyonu diye sunulmadı.
+Düzeltilmiş14 test GREEN SHA
+`0b24399a49fae341fa3064c0accba2fca4dde760c0116067ac6868e1db83971a`.
+Source reader, composition, late identity drift, region/origin ve path context
+kontrolleri ayrıca genişletildi; tamamlanma için temiz exact-head bağımsız
+implementation review ayrıca gereklidir.
+
+Kendi C örneği SHA
+`43441e4cacbedd8900768a422bbf87c8bbe13779cebbd01d0172b7d5fb17b810`,
+selected-path record SHA
+`b0dd22aba0e30ffcaac63f6a07c0f302f327ebb9d94c8e07513c70c7fd34ba71`.
+İlk gerçek dependency/source bağlı CLI capture SHA
+`ed0637e6a879f3679f90fa601058d9cb80cf739a416263140684d26891f91c6e`.
+`cc` wrapper'ı salt-okunur ccache nedeniyle durdu; bu source syntax RED'i değildir.
+Doğrudan `/usr/bin/cc -std=c17 -fsyntax-only` kontrolü PASS SHA
+`7dffda3286b8a5648eb8fc35dfcd023e95852f7bf6005bd91325a76cc3dd966c`.
+Bu native runtime execution/packet qualification değildir. Örnek yalnız seçilmiş
+başarılı path'te bir input byte'ını caller buffer ve iki helper üzerinden
+gerçek byte okumasına bağlar; security sink/fix veya independent safe örnek değildir.
+Kaynak-semantiği qualification ve bütün model/native/product flag'leri false,
+ek quota0'dır. Recorded selection2/1020, safe0 ve U003 FRONT değişmedi; POP yok.

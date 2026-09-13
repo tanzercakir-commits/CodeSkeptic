@@ -1895,6 +1895,424 @@ class NativeDeclarationCandidateTests(unittest.TestCase):
             profiles.verify_input_identities(guard)
 
 
+class ReferenceFlowTests(unittest.TestCase):
+    """Abstract graph tests: no native or corpus qualification."""
+
+    @staticmethod
+    def at():
+        return {'start': 1, 'end': 2, 'sha256': 'a' * 64}
+
+    def node(self, operation, **arguments):
+        self.serial += 1
+        return {'id': 'n' + str(self.serial), 'op': operation, 'at': self.at(), **arguments}
+
+    def fixture(self):
+        self.serial = 0
+        origin = lambda state, label: {'state': state, 'label': label}
+        consume = self.node('observe', argument='text', length=4,
+                            category='format-string', context='posix', sink='consumer')
+        render = self.node('snprintf', destination='out', source='text', capacity=8,
+                           format='%s', returned=4)
+        main = [self.node('assign', target='alias', source='out'),
+                self.node('call', callee='render', arguments=['alias', 'input'], result='formatted'),
+                self.node('call', callee='consume', arguments=['formatted'], result=None)]
+        def function(name, params, operations, returned=None):
+            return {'id': name, 'parameters': params, 'declaration': self.at(),
+                    'body': {'start': 0, 'end': 100, 'sha256': 'b' * 64},
+                    'operations': operations, 'return_view': returned}
+        return {'schema': 'codeskeptic-reference-flow/v1', 'source_sha256': 'c' * 64,
+                'entry': 'main', 'objects': [
+                    {'id': 'dst', 'size': 16, 'version': 7, 'regions': [
+                        {'start': 0, 'end': 16, 'origins': [origin('UNKNOWN', 'uninitialized')]}]},
+                    {'id': 'src', 'size': 8, 'version': 2, 'regions': [
+                        {'start': 0, 'end': 8, 'origins': [origin('UNTRUSTED', 'input')]}]}],
+                'bindings': {'out': {'object': 'dst', 'offset': 0},
+                             'input': {'object': 'src', 'offset': 0}},
+                'strings': [{'object': 'src', 'offset': 0, 'version': 2, 'length': 4}],
+                'functions': [function('main', ['out', 'input'], main),
+                              function('render', ['out', 'text'], [render], 'out'),
+                              function('consume', ['text'], [consume])]}
+
+    def run_flow(self, value):
+        return profiles.reference_flow(value)
+
+    def observe(self, argument='out', **changes):
+        return self.node('observe', argument=argument, length=4, category='format-string',
+                         context='posix', sink='consumer') | changes
+
+    def validate(self, argument='out', **changes):
+        return self.node('validate', argument=argument, length=4, category='format-string',
+                         context='posix', sink='consumer', success=True) | changes
+
+    def test_helper_output_return_alias_and_actual_consumer(self):
+        value = self.fixture()
+        original = copy.deepcopy(value)
+        result = self.run_flow(value)
+        self.assertEqual(value, original)
+        self.assertEqual(result['status'], 'MODELED_REFERENCE_FLOW')
+        self.assertEqual(result['observations'][0]['origins'],
+                         [{'state': 'UNTRUSTED', 'label': 'input'}])
+        self.assertEqual(result['observations'][0]['view'], {'object': 'dst', 'offset': 0})
+        self.assertEqual(result['observations'][0]['function'], 'consume')
+        self.assertEqual(result['objects'][0]['regions'][-1]['start'], 5)
+        self.assertFalse(any(result['qualification'].values()))
+        self.assertEqual(result['additional_quota_examples'], 0)
+        self.assertEqual(self.run_flow(value), result)
+
+    def test_parameter_rebinding_does_not_rebind_caller(self):
+        value = self.fixture()
+        value['functions'][1]['operations'].append(self.node('assign', target='out', source='text'))
+        value['functions'][0]['operations'].append(self.observe('alias'))
+        result = self.run_flow(value)
+        self.assertEqual(result['bindings']['alias'], [{'object': 'dst', 'offset': 0}])
+        self.assertEqual(result['bindings']['formatted'], [{'object': 'src', 'offset': 0}])
+        self.assertEqual([x['view']['object'] for x in result['observations']], ['src', 'dst'])
+
+    def test_validation_binds_version_category_context_sink_and_success(self):
+        for change in ({}, {'category': 'command-injection'}, {'context': 'windows'},
+                       {'sink': 'other'}, {'success': False}, {'success': None}):
+            value = self.fixture()
+            value['functions'][0]['operations'] = [self.validate('input', **change), self.observe('input')]
+            result = self.run_flow(value)
+            with self.subTest(change=change):
+                self.assertEqual(result['observations'][0]['matching_assumed_validation'], not change)
+                self.assertEqual(result['observations'][0]['origin_state'], 'UNTRUSTED_PRESENT')
+
+    def test_alias_mutation_kills_validation_and_string_facts(self):
+        value = self.fixture()
+        value['functions'][0]['operations'] = [self.validate('input'),
+            self.node('assign', target='alias', source='input'),
+            self.node('write', target='alias', length=1, origins=[{'state': 'CONSTANT', 'label': 'x'}]),
+            self.observe('input'), self.node('snprintf', destination='out', source='input',
+                                           capacity=8, format='%s', returned=4)]
+        result = self.run_flow(value)
+        self.assertFalse(result['observations'][0]['matching_assumed_validation'])
+        self.assertEqual(result['status'], 'INCOMPLETE_NOT_SAFE')
+        self.assertIn('SOURCE_STRING_PRECONDITION_UNPROVEN', result['reasons'])
+        self.assertEqual(result['strings'], [])
+
+    def test_branch_only_validation_does_not_escape_join(self):
+        for both in (False, True):
+            value = self.fixture()
+            validation = self.validate('input')
+            other = self.validate('input') if both else self.node('noop')
+            value['functions'][0]['operations'] = [
+                self.node('branch', condition=None, then=[validation], otherwise=[other]), self.observe('input')]
+            result = self.run_flow(value)
+            # Different success sites are not one common proven validation.
+            self.assertFalse(result['observations'][0]['matching_assumed_validation'])
+
+    def test_prebranch_validation_survives_unmodified_predecessors(self):
+        value = self.fixture()
+        value['functions'][0]['operations'] = [self.validate('input'),
+            self.node('branch', condition=None, then=[self.node('noop')], otherwise=[]), self.observe('input')]
+        self.assertTrue(self.run_flow(value)['observations'][0]['matching_assumed_validation'])
+
+    def test_branch_mutations_get_distinct_versions_and_union_origins(self):
+        value = self.fixture()
+        def write(label):
+            return self.node('write', target='out', length=4,
+                             origins=[{'state': 'CONSTANT', 'label': label}])
+        value['functions'][0]['operations'] = [self.node('branch', condition=None,
+            then=[write('left'), self.validate()], otherwise=[write('right'), self.validate()]), self.observe()]
+        result = self.run_flow(value)
+        self.assertEqual(result['observations'][0]['origins'], [
+            {'state': 'CONSTANT', 'label': 'left'}, {'state': 'CONSTANT', 'label': 'right'}])
+        self.assertFalse(result['observations'][0]['matching_assumed_validation'])
+        versions = [x['objects']['dst'] for x in result['trace'] if x['op'] == 'write']
+        self.assertEqual(len(set(versions)), 2)
+        self.assertGreater(result['objects'][0]['version'], max(versions))
+        paths = [x['execution_context'] for x in result['trace'] if x['op'] == 'write']
+        self.assertNotEqual(paths[0], paths[1])
+
+    def test_joined_aliases_are_not_silently_chosen(self):
+        value = self.fixture()
+        value['functions'][0]['operations'] = [self.node('branch', condition=None,
+            then=[self.node('assign', target='alias', source='out')],
+            otherwise=[self.node('assign', target='alias', source='input')]), self.observe('alias')]
+        result = self.run_flow(value)
+        self.assertEqual(result['status'], 'INCOMPLETE_NOT_SAFE')
+        self.assertIn('AMBIGUOUS_OR_MISSING_VIEW', result['reasons'])
+
+    def test_unsupported_feasible_branch_cannot_disappear(self):
+        value = self.fixture()
+        value['functions'][0]['operations'] = [self.node('branch', condition=None,
+            then=[self.node('unsupported', reason='INDIRECT_CALL')], otherwise=[]), self.observe('input')]
+        result = self.run_flow(value)
+        self.assertEqual(result['status'], 'INCOMPLETE_NOT_SAFE')
+        self.assertEqual(result['observations'], [])
+        self.assertTrue(result['effects_outside_state_unknown'])
+
+    def test_every_budget_boundary_is_enforced_without_reset(self):
+        value = self.fixture()
+        main = value['functions'][0]
+        value['functions'] = [main]
+        main['operations'] = [self.node('noop') for _ in range(65536)]
+        self.assertEqual(self.run_flow(value)['status'], 'MODELED_REFERENCE_FLOW')
+        main['operations'].append(self.node('noop'))
+        self.assertIn('TRANSFER_STEP_BUDGET', self.run_flow(value)['reasons'])
+        value = self.fixture()
+        main = value['functions'][0]
+        # Entry + 127 forks * 2 = 255 states; the next fork cannot fit.
+        main['operations'] = [self.node('branch', condition=None, then=[], otherwise=[]) for _ in range(127)]
+        self.assertEqual(self.run_flow(value)['counters']['main']['states'], 255)
+        main['operations'].append(self.node('branch', condition=None, then=[], otherwise=[]))
+        self.assertIn('STATE_BUDGET', self.run_flow(value)['reasons'])
+        value = self.fixture()
+        base = value['functions'][0]
+        value['functions'] = []
+        for index in range(5):
+            fn = copy.deepcopy(base)
+            fn.update(id='f' + str(index), parameters=[], operations=[], return_view=None)
+            if index < 4:
+                fn['operations'] = [self.node('call', callee='f' + str(index + 1), arguments=[], result=None)]
+            value['functions'].append(fn)
+        value.update(entry='f0', bindings={})
+        self.assertIn('CALL_DEPTH_BUDGET', self.run_flow(value)['reasons'])
+        value['functions'][3]['operations'] = []
+        self.assertEqual(self.run_flow(value)['status'], 'MODELED_REFERENCE_FLOW')
+
+    def test_repeated_helper_calls_share_state_and_step_budgets(self):
+        value = self.fixture()
+        helper = value['functions'][1]
+        helper.update(parameters=[], return_view=None, operations=[self.node('noop') for _ in range(256)])
+        main = value['functions'][0]
+        main['operations'] = [self.node('call', callee='render', arguments=[], result=None) for _ in range(256)]
+        result = self.run_flow(value)
+        self.assertEqual(result['counters']['render'], {'states': 256, 'steps': 65536})
+        self.assertEqual(result['status'], 'MODELED_REFERENCE_FLOW')
+        main['operations'].append(self.node('call', callee='render', arguments=[], result=None))
+        self.assertIn('STATE_BUDGET', self.run_flow(value)['reasons'])
+
+    def test_recursive_external_and_missing_returns_are_incomplete(self):
+        for callee in ('main', 'not-modeled', 'consume'):
+            value = self.fixture()
+            arguments = ['out', 'input'] if callee == 'main' else ['input']
+            value['functions'][0]['operations'] = [self.node('call', callee=callee, arguments=arguments, result='r')]
+            self.assertEqual(self.run_flow(value)['status'], 'INCOMPLETE_NOT_SAFE')
+
+    def test_failed_or_unsupported_snprintf_never_becomes_complete(self):
+        for returned, format_value in ((None, '%s'), (-1, '%s'), (4, '%n')):
+            value = self.fixture()
+            value['functions'][1]['operations'][0].update(returned=returned, format=format_value)
+            result = self.run_flow(value)
+            self.assertEqual(result['status'], 'INCOMPLETE_NOT_SAFE')
+            self.assertEqual(result['strings'], [])
+            self.assertEqual(result['validations'], [])
+
+    def test_two_format_calls_use_current_derived_length_not_original_assumption(self):
+        value = self.fixture()
+        value['objects'].append({'id': 'third', 'size': 16, 'version': 0,
+            'regions': [{'start': 0, 'end': 16, 'origins': [{'state': 'UNKNOWN', 'label': 'old'}]}]})
+        value['bindings']['third'] = {'object': 'third', 'offset': 0}
+        value['functions'][0]['parameters'].append('third')
+        value['functions'][1]['operations'][0]['capacity'] = 3
+        value['functions'][0]['operations'] = value['functions'][0]['operations'][:2] + [
+            self.node('snprintf', destination='third', source='formatted', capacity=8, format='%s', returned=2),
+            self.observe('third', length=2)]
+        result = self.run_flow(value)
+        self.assertEqual(result['status'], 'MODELED_REFERENCE_FLOW')
+        self.assertEqual(result['strings'][-1]['length'], 2)
+        self.assertEqual(result['observations'][0]['origins'], [{'state': 'UNTRUSTED', 'label': 'input'}])
+
+    def test_repeated_overwrites_coalesce_intervals_and_never_keep_old_trust(self):
+        value = self.fixture()
+        value['functions'][0]['operations'] = [self.node('write', target='out', length=16,
+            origins=[{'state': 'UNTRUSTED', 'label': 'new'}]) for _ in range(32)] + [self.observe()]
+        result = self.run_flow(value)
+        self.assertEqual(len(result['objects'][0]['regions']), 1)
+        self.assertEqual(result['objects'][0]['version'], 39)
+        self.assertEqual(result['observations'][0]['origin_state'], 'UNTRUSTED_PRESENT')
+
+    def test_region_or_origin_overflow_is_incomplete_not_silent_trimming(self):
+        value = self.fixture()
+        obj = value['objects'][0]
+        obj['size'] = 64
+        obj['regions'] = [{'start': n * 2, 'end': n * 2 + 2,
+                          'origins': [{'state': 'CONSTANT', 'label': 'r' + str(n)}]} for n in range(32)]
+        value['functions'][0]['operations'] = [self.node('write', target='out', length=1,
+            origins=[{'state': 'UNTRUSTED', 'label': 'split'}])]
+        self.assertIn('REGION_OR_ORIGIN_BUDGET', self.run_flow(value)['reasons'])
+        value = self.fixture()
+        value['objects'][0]['regions'][0]['origins'] = [
+            {'state': 'CONSTANT', 'label': 'r' + str(n)} for n in range(8)]
+        value['functions'][0]['operations'] = [self.node('branch', condition=None,
+            then=[self.node('write', target='out', length=16,
+                            origins=[{'state': 'UNTRUSTED', 'label': 'ninth'}])], otherwise=[])]
+        self.assertIn('REGION_OR_ORIGIN_BUDGET', self.run_flow(value)['reasons'])
+
+    def test_unknown_consumption_never_becomes_trusted(self):
+        value = self.fixture()
+        value['functions'][0]['operations'] = [self.validate(), self.observe()]
+        result = self.run_flow(value)
+        self.assertEqual(result['status'], 'INCOMPLETE_NOT_SAFE')
+        self.assertEqual(result['observations'][0]['origin_state'], 'UNKNOWN_PRESENT')
+        self.assertTrue(result['observations_are_partial'])
+
+    def test_unsupported_unselected_path_is_not_executed_but_schema_is_checked(self):
+        value = self.fixture()
+        value['functions'][0]['operations'] = [self.node('branch', condition=True,
+            then=[], otherwise=[self.node('unsupported', reason='INDIRECT_CALL')])]
+        self.assertEqual(self.run_flow(value)['status'], 'MODELED_REFERENCE_FLOW')
+        value['functions'][0]['operations'][0]['otherwise'][0]['op'] = 'python'
+        with self.assertRaises(ValueError):
+            self.run_flow(value)
+
+    def test_lexical_depth_and_generation_exhaustion_are_bounded(self):
+        value = self.fixture()
+        value['objects'][0]['version'] = 2 ** 63 - 2
+        value['functions'][0]['operations'] = [self.node('write', target='out', length=1,
+            origins=[{'state': 'CONSTANT', 'label': 'new'}])]
+        self.assertIn('GENERATION_BUDGET', self.run_flow(value)['reasons'])
+        value = self.fixture()
+        nested = []
+        for _ in range(34):
+            nested = [self.node('branch', condition=True, then=nested, otherwise=[])]
+        value['functions'][0]['operations'] = nested
+        with self.assertRaises(ValueError):
+            self.run_flow(value)
+
+    def test_trace_observation_and_binding_limits_discard_partial_guarantees(self):
+        for kind in ('trace', 'observations', 'bindings', 'validations'):
+            value = self.fixture()
+            if kind == 'trace':
+                nodes = [self.node('assign', target='alias', source='input') for _ in range(4097)]
+                reason = 'TRACE_BUDGET'
+            elif kind == 'observations':
+                nodes = [self.observe('input') for _ in range(257)]
+                reason = 'OBSERVATION_BUDGET'
+            elif kind == 'bindings':
+                nodes = [self.node('assign', target='alias' + str(n), source='input') for n in range(32)]
+                reason = 'FACT_OR_BINDING_BUDGET'
+            else:
+                nodes = [self.validate('input') for _ in range(33)]
+                reason = 'FACT_OR_BINDING_BUDGET'
+            value['functions'][0]['operations'] = nodes
+            result = self.run_flow(value)
+            with self.subTest(kind=kind):
+                self.assertIn(reason, result['reasons'])
+                self.assertEqual(result['bindings'], {})
+                self.assertEqual(result['validations'], [])
+                self.assertTrue(result['observations_are_partial'])
+
+    def test_malformed_or_out_of_body_graph_is_rejected(self):
+        for change in ('duplicate', 'location', 'bool-size', 'foreign-field', 'stale-string'):
+            value = self.fixture()
+            if change == 'duplicate':
+                value['functions'][0]['operations'].append(value['functions'][0]['operations'][0])
+            elif change == 'location':
+                value['functions'][0]['operations'][0]['at']['end'] = 101
+            elif change == 'bool-size':
+                value['objects'][0]['size'] = True
+            elif change == 'foreign-field':
+                value['functions'][0]['operations'][0]['python'] = 'ignored?'
+            else:
+                value['strings'][0]['version'] = 1
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                self.run_flow(value)
+
+
+class ReferenceFlowReaderTests(unittest.TestCase):
+    """Synthetic dependency substitution is not a native evidence review."""
+
+    def fixture(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name).resolve()
+        real = Path(__file__).resolve().parents[1]
+        record = 'tests/product_corpus/reference_flows/caller-output.json'
+        value = json.loads((real / record).read_text())
+        for relative in (record, value['source']['path'], value['effect']['path']):
+            target = root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes((real / relative).read_bytes())
+        return root, record, value
+
+    def write_record(self, root, record, value):
+        (root / record).write_text(profiles.canonical(value))
+
+    def test_actual_own_source_mapping_is_linked_but_not_self_qualified(self):
+        root, record, value = self.fixture()
+        with mock.patch.object(profiles, 'verify_native_api_effect', return_value={'synthetic_dependency': True}) as dependency:
+            result = profiles.verify_reference_flow(root, record)
+        self.assertTrue(result['source_anchors_verified'])
+        self.assertFalse(result['source_mapping_semantics_verified'])
+        self.assertFalse(result['whole_source_control_flow_modeled'])
+        self.assertEqual(result['flow']['observations'][0]['origins'],
+                         [{'state': 'UNTRUSTED', 'label': 'argv-first-byte'}])
+        self.assertFalse(any(result['qualification'].values()))
+        self.assertIn(root / value['source']['path'], dependency.call_args.kwargs['_input_guard'])
+
+    def test_wrong_source_anchor_links_or_self_qualification_rejected(self):
+        for mutation in ('source', 'anchor', 'effect', 'qualify', 'escape', 'command', 'body', 'overlap'):
+            root, record, value = self.fixture()
+            if mutation == 'source':
+                (root / value['source']['path']).write_bytes(b'changed source')
+            elif mutation == 'anchor':
+                value['program']['functions'][0]['operations'][0]['at']['sha256'] = 'e' * 64
+            elif mutation == 'effect':
+                value['effect']['sha256'] = 'e' * 64
+            elif mutation == 'qualify':
+                value['qualification']['model_admitted'] = True
+            elif mutation == 'escape':
+                value['source']['path'] = '../source.c'
+            elif mutation == 'command':
+                value['compile_argv'].append('--run-arbitrary')
+            elif mutation == 'overlap':
+                raw = (root / value['source']['path']).read_bytes()
+                body = value['program']['functions'][1]['body']
+                body['end'] = len(raw)
+                body['sha256'] = hashlib.sha256(raw[body['start']:]).hexdigest()
+            else:
+                value['program']['functions'][0]['body'] = value['program']['functions'][1]['body']
+            self.write_record(root, record, value)
+            with self.subTest(mutation=mutation), mock.patch.object(profiles, 'verify_native_api_effect'), self.assertRaises(ValueError):
+                profiles.verify_reference_flow(root, record)
+
+    def test_symlink_and_duplicate_json_fields_fail_closed(self):
+        root, record, value = self.fixture()
+        source = root / value['source']['path']
+        moved = source.with_suffix('.retained')
+        source.rename(moved)
+        source.symlink_to(moved)
+        with self.assertRaises(ValueError):
+            profiles.verify_reference_flow(root, record)
+        root, record, value = self.fixture()
+        (root / record).write_text('{"schema":"x","schema":"y"}')
+        with self.assertRaises(ValueError):
+            profiles.verify_reference_flow(root, record)
+
+    def test_late_source_and_transitive_dependency_drift_rejected(self):
+        for transitive in (False, True):
+            root, record, value = self.fixture()
+            extra = root / 'synthetic-manual.txt'
+            extra.write_text('original')
+            def dependency(repo, effect, *, _input_guard):
+                if transitive:
+                    profiles._ground_truth_input(extra, _input_guard, json_value=False)
+                    extra.write_text('changed')
+                else:
+                    (root / value['source']['path']).write_text('changed')
+                return {'synthetic_dependency': True}
+            with mock.patch.object(profiles, 'verify_native_api_effect', side_effect=dependency), self.assertRaises(ValueError):
+                profiles.verify_reference_flow(root, record)
+
+    def test_cli_requires_explicit_own_selector_and_returns_incomplete_exit(self):
+        root, record, value = self.fixture()
+        args = ['product_profiles.py', 'reference-flow-check', '--root', str(root), '--reference-flow', record]
+        with mock.patch.object(profiles, 'verify_native_api_effect', return_value={}), mock.patch.object(sys, 'argv', args), mock.patch('sys.stdout', new_callable=io.StringIO):
+            self.assertEqual(profiles.main(), 0)
+        value['program']['functions'][1]['operations'][0]['returned'] = None
+        self.write_record(root, record, value)
+        with mock.patch.object(profiles, 'verify_native_api_effect', return_value={}), mock.patch.object(sys, 'argv', args), mock.patch('sys.stdout', new_callable=io.StringIO):
+            self.assertEqual(profiles.main(), 2)
+        for invalid in (['product_profiles.py', 'reference-flow-check'],
+                        ['product_profiles.py', 'limits', '--reference-flow', record],
+                        args + ['--api-effect', value['effect']['path']]):
+            with mock.patch.object(sys, 'argv', invalid), mock.patch('sys.stderr', new_callable=io.StringIO):
+                self.assertEqual(profiles.main(), 2)
+
+
 class SnprintfEffectTests(unittest.TestCase):
     """Reference transitions, not analyzer/native executions or corpus examples."""
     @staticmethod

@@ -10,6 +10,7 @@ external directory. No execution, rebaseline or pin refresh is performed here.
 import argparse
 import base64
 from collections import Counter
+import copy
 import hashlib
 import json
 import math
@@ -3608,6 +3609,372 @@ def snprintf_percent_s_effect(value):
         raise ValueError('snprintf reference input rejected') from None
 
 
+class _ReferenceFlowIncomplete(Exception):
+    """A feasible reference path could not be modeled; never a safe result."""
+
+
+FLOW_QUALIFICATION = ('source_semantics_qualified', 'native_qualified', 'model_admitted',
+                      'evaluation_frozen', 'task_ready', 'product_qualified')
+
+
+def reference_flow(value):
+    """Execute a closed, source-attributed abstract graph, not C/C++ code.
+
+    Objects are caller-owned allocations; parameters/returns are pointer views
+    by value. No local allocation, scalar control-flow inference, source API or
+    native sink/sanitizer classification is implied. Initial origins, string
+    lengths, chosen branches and call results are explicit assumptions. A
+    validation operation records a *supplied* successful predicate, not proof
+    that a C predicate implements it. No result from this function is SAFE.
+    """
+    try:
+        fields(value, 'schema source_sha256 entry objects bindings strings functions', 'reference flow')
+        require(value['schema'] == 'codeskeptic-reference-flow/v1'
+                and type(value['source_sha256']) is str and SHA.fullmatch(value['source_sha256']), 'flow schema')
+
+        def token(item):
+            return type(item) is str and re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}', item)
+
+        def number(item, maximum=2 ** 64 - 1):
+            return type(item) is int and 0 <= item <= maximum
+
+        def anchor(item):
+            fields(item, 'start end sha256', 'flow source anchor')
+            require(number(item['start'], 65536) and number(item['end'], 65536)
+                    and item['start'] < item['end'] and type(item['sha256']) is str
+                    and SHA.fullmatch(item['sha256']), 'flow source span')
+
+        def origins(rows):
+            require(type(rows) is list and 1 <= len(rows) <= 8, 'flow origins')
+            for row in rows:
+                fields(row, 'state label', 'flow origin')
+                require(type(row['state']) is str and row['state'] in
+                        ('CONSTANT', 'EXPLICITLY_TRUSTED', 'UNTRUSTED', 'UNKNOWN')
+                        and token(row['label']), 'flow origin identity')
+            require(len({canonical(row) for row in rows}) == len(rows), 'flow duplicate origin')
+            return sorted(copy.deepcopy(rows), key=canonical)
+
+        def normalized(rows):
+            answer = []
+            for row in rows:
+                row = copy.deepcopy(row)
+                row['origins'] = sorted(row['origins'], key=canonical)
+                if answer and answer[-1]['end'] == row['start'] and answer[-1]['origins'] == row['origins']:
+                    answer[-1]['end'] = row['end']
+                else:
+                    answer.append(row)
+            if len(answer) > 32 or any(len(row['origins']) > 8 for row in answer):
+                raise _ReferenceFlowIncomplete('REGION_OR_ORIGIN_BUDGET')
+            return answer
+
+        require(type(value['objects']) is list and 1 <= len(value['objects']) <= 8, 'flow objects')
+        objects = {}
+        for obj in value['objects']:
+            fields(obj, 'id size version regions', 'flow object')
+            require(token(obj['id']) and obj['id'] not in objects and number(obj['size'])
+                    and number(obj['version'], 2 ** 63 - 2), 'flow object identity')
+            require(type(obj['regions']) is list and len(obj['regions']) <= 32, 'flow region limit')
+            position, rows = 0, []
+            for row in obj['regions']:
+                fields(row, 'start end origins', 'flow region')
+                require(number(row['start']) and number(row['end'])
+                        and row['start'] == position < row['end'] <= obj['size'], 'flow partition')
+                rows.append({**row, 'origins': origins(row['origins'])})
+                position = row['end']
+            require(position == obj['size'], 'flow complete partition')
+            objects[obj['id']] = {**obj, 'regions': normalized(rows)}
+
+        def check_view(view):
+            fields(view, 'object offset', 'flow view')
+            require(token(view['object']) and view['object'] in objects and number(view['offset'])
+                    and view['offset'] <= objects[view['object']]['size'], 'flow view allocation')
+
+        require(type(value['bindings']) is dict and len(value['bindings']) <= 32, 'flow bindings')
+        for name, view in value['bindings'].items():
+            require(token(name), 'flow binding name')
+            check_view(view)
+        require(type(value['strings']) is list and len(value['strings']) <= 32, 'flow string assumptions')
+        string_keys = set()
+        for fact in value['strings']:
+            fields(fact, 'object offset version length', 'flow string assumption')
+            check_view({key: fact[key] for key in ('object', 'offset')})
+            require(number(fact['version'], 2 ** 63 - 2)
+                    and fact['version'] == objects[fact['object']]['version'] and number(fact['length'])
+                    and fact['offset'] + fact['length'] < objects[fact['object']]['size'], 'flow current string extent')
+            key = (fact['object'], fact['offset'])
+            require(key not in string_keys, 'flow duplicate string fact')
+            string_keys.add(key)
+
+        signatures = {
+            'noop': '', 'assign': 'target source', 'write': 'target length origins',
+            'branch': 'condition then otherwise', 'call': 'callee arguments result',
+            'snprintf': 'destination source capacity format returned',
+            'observe': 'argument length category context sink',
+            'validate': 'argument length category context sink success', 'unsupported': 'reason',
+        }
+        require(type(value['functions']) is list and 1 <= len(value['functions']) <= 16, 'flow functions')
+        functions, operation_ids, graph_size = {}, set(), 0
+        for fn in value['functions']:
+            fields(fn, 'id parameters declaration body operations return_view', 'flow function')
+            require(token(fn['id']) and fn['id'] not in functions, 'flow function identity')
+            anchor(fn['declaration'])
+            anchor(fn['body'])
+            require(type(fn['parameters']) is list and len(fn['parameters']) <= 32
+                    and all(token(x) for x in fn['parameters'])
+                    and len(set(fn['parameters'])) == len(fn['parameters'])
+                    and (fn['return_view'] is None or token(fn['return_view'])), 'flow parameters/return')
+            pending = [(fn['operations'], 0)]
+            while pending:
+                nodes, nesting = pending.pop()
+                require(type(nodes) is list and len(nodes) <= 65537 and nesting <= 32, 'flow graph bound')
+                for node in nodes:
+                    require(type(node) is dict and type(node.get('op')) is str
+                            and node['op'] in signatures, 'flow closed operation vocabulary')
+                    fields(node, 'id op at ' + signatures[node['op']], 'flow operation')
+                    graph_size += 1
+                    require(graph_size <= 65537 and token(node['id']) and node['id'] not in operation_ids,
+                            'flow operation identity/count')
+                    operation_ids.add(node['id'])
+                    anchor(node['at'])
+                    require(fn['body']['start'] <= node['at']['start'] < node['at']['end'] <= fn['body']['end'],
+                            'flow operation outside function body')
+                    op = node['op']
+                    for name in ('target', 'source', 'destination', 'argument', 'callee', 'category', 'context', 'sink', 'reason'):
+                        if name in node:
+                            require(token(node[name]), 'flow operand identity')
+                    if op == 'branch':
+                        require(node['condition'] is None or type(node['condition']) is bool, 'flow branch assumption')
+                        pending.extend([(node['then'], nesting + 1), (node['otherwise'], nesting + 1)])
+                    if op == 'call':
+                        require(type(node['arguments']) is list and len(node['arguments']) <= 32
+                                and all(token(x) for x in node['arguments'])
+                                and (node['result'] is None or token(node['result'])), 'flow call operands')
+                    if 'length' in node:
+                        require(number(node['length']), 'flow byte extent')
+                    if op == 'write':
+                        origins(node['origins'])
+                    if op == 'validate':
+                        require(node['success'] is None or type(node['success']) is bool, 'flow validation outcome')
+                    if op == 'snprintf':
+                        require(number(node['capacity']) and (node['format'] is None or
+                                type(node['format']) is str and len(node['format']) <= 512)
+                                and (node['returned'] is None or type(node['returned']) is int
+                                     and -(2 ** 31) <= node['returned'] < 2 ** 31), 'flow snprintf assumptions')
+            functions[fn['id']] = fn
+        require(token(value['entry']) and value['entry'] in functions
+                and set(value['bindings']) == set(functions[value['entry']]['parameters']), 'flow entry binding')
+        # All input graphs/partitions are bounded before copying or execution.
+        state = {'objects': copy.deepcopy(objects), 'slots': {k: [copy.deepcopy(v)] for k, v in value['bindings'].items()},
+                 'strings': copy.deepcopy(value['strings']), 'validations': []}
+        generations = {key: obj['version'] for key, obj in objects.items()}
+        counters = {key: {'states': 0, 'steps': 0} for key in functions}
+        trace, observations, reasons = [], [], []
+
+        def charge(name, counter, amount=1):
+            limit = LIMITS['string_flow_' + ('states_per_function_max' if counter == 'states'
+                                           else 'transfer_steps_per_function_max')]
+            if counters[name][counter] + amount > limit:
+                raise _ReferenceFlowIncomplete('STATE_BUDGET' if counter == 'states' else 'TRANSFER_STEP_BUDGET')
+            counters[name][counter] += amount
+
+        def generation(key):
+            if generations[key] >= 2 ** 63 - 2:
+                raise _ReferenceFlowIncomplete('GENERATION_BUDGET')
+            generations[key] += 1
+            return generations[key]
+
+        def emit(name, node, context, current):
+            if len(trace) >= 4096:
+                raise _ReferenceFlowIncomplete('TRACE_BUDGET')
+            trace.append({'function': name, 'operation': node['id'], 'op': node['op'],
+                          'at': copy.deepcopy(node['at']), 'execution_context': list(context),
+                          'objects': {key: obj['version'] for key, obj in current['objects'].items()}})
+
+        def view_of(current, slot):
+            choices = current['slots'].get(slot, [None])
+            if len(choices) != 1 or choices[0] is None:
+                raise _ReferenceFlowIncomplete('AMBIGUOUS_OR_MISSING_VIEW')
+            return choices[0]
+
+        def extent(current, slot, length):
+            view = view_of(current, slot)
+            if length > current['objects'][view['object']]['size'] - view['offset']:
+                raise _ReferenceFlowIncomplete('BYTE_EXTENT_UNPROVEN')
+            return view, view['offset'], view['offset'] + length
+
+        def union(rows):
+            return sorted({canonical(row): row for row in rows}.values(), key=canonical)
+
+        def sliced(rows, start, end):
+            return [{**row, 'start': max(start, row['start']), 'end': min(end, row['end'])}
+                    for row in rows if start < end and start < row['end'] and row['start'] < end]
+
+        def kill_facts(current, key):
+            for group in ('strings', 'validations'):
+                current[group] = [row for row in current[group] if row['object'] != key]
+
+        def join(left, right):
+            joined = copy.deepcopy(left)
+            for key, obj in joined['objects'].items():
+                other = right['objects'][key]
+                if obj != other:
+                    # Fresh global generations prevent equal branch-local
+                    # increments from authenticating different contents.
+                    points = sorted({x for row in obj['regions'] + other['regions'] for x in (row['start'], row['end'])})
+                    rows = []
+                    for start, end in zip(points, points[1:]):
+                        alternatives = union([origin for row in obj['regions'] + other['regions']
+                                              if row['start'] <= start < row['end'] for origin in row['origins']])
+                        rows.append({'start': start, 'end': end, 'origins': alternatives})
+                    obj['regions'] = normalized(rows)
+                    obj['version'] = generation(key)
+            joined['slots'] = {key: union(left['slots'].get(key, [None]) + right['slots'].get(key, [None]))
+                               for key in sorted(left['slots'].keys() | right['slots'].keys())}
+            if len(joined['slots']) > 32:
+                raise _ReferenceFlowIncomplete('BINDING_BUDGET')
+            for group in ('strings', 'validations'):
+                joined[group] = [row for row in left[group] if row in right[group]
+                                 and row['version'] == joined['objects'][row['object']]['version']]
+            return joined
+
+        def execute(name, current, context, active):
+            if name not in functions:
+                raise _ReferenceFlowIncomplete('UNMODELED_CALLEE')
+            if name in active:
+                raise _ReferenceFlowIncomplete('RECURSION_NOT_MODELED')
+            if len(active) >= LIMITS['string_flow_call_depth_max']:
+                raise _ReferenceFlowIncomplete('CALL_DEPTH_BUDGET')
+            charge(name, 'states')
+            fn = functions[name]
+
+            def run(nodes, current, path):
+                for node in nodes:
+                    charge(name, 'steps')
+                    op = node['op']
+                    if op == 'noop':
+                        continue
+                    if op == 'unsupported':
+                        raise _ReferenceFlowIncomplete('UNSUPPORTED_' + node['reason'])
+                    if op == 'assign':
+                        current['slots'][node['target']] = copy.deepcopy(current['slots'].get(node['source'], [None]))
+                    elif op == 'write':
+                        view, start, end = extent(current, node['target'], node['length'])
+                        if start < end:
+                            obj = current['objects'][view['object']]
+                            obj['regions'] = normalized(sliced(obj['regions'], 0, start)
+                                + [{'start': start, 'end': end, 'origins': origins(node['origins'])}]
+                                + sliced(obj['regions'], end, obj['size']))
+                            obj['version'] = generation(obj['id'])
+                            kill_facts(current, obj['id'])
+                    elif op == 'branch':
+                        if node['condition'] is None:
+                            charge(name, 'states', 2)  # before either copy or path execution
+                            left = run(node['then'], copy.deepcopy(current), path + ['branch:' + node['id'] + ':then'])
+                            right = run(node['otherwise'], copy.deepcopy(current), path + ['branch:' + node['id'] + ':otherwise'])
+                            charge(name, 'steps')  # join work is an explicit transfer
+                            current = join(left, right)
+                        else:
+                            arm = 'then' if node['condition'] else 'otherwise'
+                            current = run(node[arm], current, path + ['branch:' + node['id'] + ':' + arm])
+                    elif op == 'call':
+                        callee = functions.get(node['callee'])
+                        if callee is None:
+                            raise _ReferenceFlowIncomplete('UNMODELED_CALLEE')
+                        if len(node['arguments']) != len(callee['parameters']):
+                            raise _ReferenceFlowIncomplete('CALL_ARGUMENT_BINDING_UNPROVEN')
+                        caller_slots = current['slots']
+                        current['slots'] = {param: copy.deepcopy(caller_slots.get(arg, [None]))
+                                            for param, arg in zip(callee['parameters'], node['arguments'])}
+                        current, returned = execute(node['callee'], current, path + [node['id']], active + [name])
+                        current['slots'] = caller_slots
+                        charge(name, 'steps')
+                        if node['result'] is not None:
+                            if returned is None:
+                                raise _ReferenceFlowIncomplete('RETURN_VIEW_UNPROVEN')
+                            current['slots'][node['result']] = returned
+                    elif op == 'snprintf':
+                        src, dst = view_of(current, node['source']), view_of(current, node['destination'])
+                        fact = next((row for row in current['strings'] if row['object'] == src['object']
+                                     and row['offset'] == src['offset']
+                                     and row['version'] == current['objects'][src['object']]['version']), None)
+                        effect = snprintf_percent_s_effect({
+                            'schema': 'codeskeptic-snprintf-percent-s-input/v1', 'objects': list(current['objects'].values()),
+                            'source': {**src, 'version': current['objects'][src['object']]['version'],
+                                       'length': None if fact is None else fact['length'],
+                                       'nul_terminated': None if fact is None else True},
+                            'destination': dst, 'format': node['format'], 'capacity': node['capacity'],
+                            'returned': node['returned'], 'alias_relation': 'SAME_OBJECT' if src['object'] == dst['object']
+                            else 'DISJOINT_OBJECTS', 'validations': []})
+                        if effect['status'] != 'MODELED_REFERENCE_EFFECT':
+                            raise _ReferenceFlowIncomplete(*effect['reasons'])
+                        for obj in effect['objects']:
+                            key = obj['id']
+                            if obj['version'] != current['objects'][key]['version']:
+                                obj['regions'] = normalized(obj['regions'])
+                                obj['version'] = generation(key)
+                                kill_facts(current, key)
+                                current['objects'][key] = obj
+                        if effect['formatted_output_write']['state'] == 'EXACT':
+                            current['strings'].append({**dst, 'version': current['objects'][dst['object']]['version'],
+                                'length': effect['formatted_output_write']['content_bytes']})
+                    elif op in ('validate', 'observe'):
+                        view, start, end = extent(current, node['argument'], node['length'])
+                        obj = current['objects'][view['object']]
+                        binding = {'object': obj['id'], 'version': obj['version'], 'start': start, 'end': end,
+                                   'category': node['category'], 'context': node['context'], 'sink': node['sink']}
+                        if op == 'validate':
+                            if node['success'] is True:
+                                current['validations'].append({**binding, 'operation': node['id'],
+                                                               'execution_context': list(path)})
+                        else:
+                            if len(observations) >= 256:
+                                raise _ReferenceFlowIncomplete('OBSERVATION_BUDGET')
+                            alternatives = union([origin for row in sliced(obj['regions'], start, end)
+                                                  for origin in row['origins']])
+                            states = {row['state'] for row in alternatives}
+                            observations.append({**binding, 'view': copy.deepcopy(view), 'function': name,
+                                'operation': node['id'], 'at': copy.deepcopy(node['at']), 'execution_context': list(path),
+                                'origins': alternatives, 'matching_assumed_validation': any(
+                                    all(row[k] == v for k, v in binding.items()) for row in current['validations']),
+                                'origin_state': 'UNKNOWN_PRESENT' if 'UNKNOWN' in states else
+                                    'UNTRUSTED_PRESENT' if 'UNTRUSTED' in states else
+                                    'CONSTANT_OR_EXPLICITLY_TRUSTED' if states else 'EMPTY_RANGE',
+                                'native_sink_classified': False})
+                            if 'UNKNOWN' in states:
+                                raise _ReferenceFlowIncomplete('CONSUMED_ORIGIN_UNKNOWN')
+                    if len(current['slots']) > 32 or len(current['validations']) > 32 or len(current['strings']) > 32:
+                        raise _ReferenceFlowIncomplete('FACT_OR_BINDING_BUDGET')
+                    emit(name, node, path, current)
+                return current
+
+            current = run(fn['operations'], current, context)
+            returned = None if fn['return_view'] is None else copy.deepcopy(current['slots'].get(fn['return_view'], [None]))
+            if returned is not None and (len(returned) != 1 or returned[0] is None):
+                raise _ReferenceFlowIncomplete('RETURN_VIEW_UNPROVEN')
+            return current, returned
+
+        try:
+            state, _ = execute(value['entry'], state, [value['entry']], [])
+        except _ReferenceFlowIncomplete as error:
+            reasons = list(error.args)
+            # A partially explored path is never published as the final memory
+            # state. Keep diagnostic observations, but discard every guarantee.
+            state = {'slots': {}, 'strings': [], 'validations': [], 'objects': copy.deepcopy(objects)}
+            for key, obj in state['objects'].items():
+                obj['version'] = min(generations[key] + 1, 2 ** 63 - 1)
+                obj['regions'] = [] if obj['size'] == 0 else [{'start': 0, 'end': obj['size'],
+                    'origins': [{'state': 'UNKNOWN', 'label': 'incomplete-flow'}]}]
+        return {'schema': 'codeskeptic-reference-flow-result/v1', 'source_sha256': value['source_sha256'],
+                'status': 'INCOMPLETE_NOT_SAFE' if reasons else 'MODELED_REFERENCE_FLOW', 'reasons': reasons,
+                'objects': list(state['objects'].values()), 'bindings': state['slots'], 'strings': state['strings'],
+                'validations': state['validations'], 'observations': observations, 'trace': trace,
+                'counters': counters, 'effects_outside_state_unknown': bool(reasons),
+                'observations_are_partial': bool(reasons), 'qualification': {key: False for key in FLOW_QUALIFICATION},
+                'additional_quota_examples': 0}
+    except (ValueError, TypeError, KeyError, OverflowError, RecursionError):
+        raise ValueError('reference flow input rejected') from None
+
+
 SNPRINTF_MANUAL_PINS = {
     'manifest': '72338396b48cbd9fc807ed6d0739fd7ba9624b99295a7f0a383326b18164d910',
     'review': '1746af065c2f66e63268bb24a1eb900205e8834b53ba70576e73fa631d11bd75',
@@ -3619,7 +3986,7 @@ SNPRINTF_SELECTION = {'api_id': 'c.snprintf', 'platform': 'linux-x86_64',
                                              'feature_macros': {'_POSIX_C_SOURCE': '200809L'}}}
 
 
-def verify_native_api_effect(repo, record_path):
+def verify_native_api_effect(repo, record_path, *, _input_guard=None):
     """One proposed reference effect, bound to actual reviewed declaration/docs.
 
     Pinned source-review text is procedural evidence, not an authenticated
@@ -3629,7 +3996,7 @@ def verify_native_api_effect(repo, record_path):
     try:
         repo = Path(repo)
         require(repo.is_absolute() and repo.resolve(strict=True) == repo, 'effect checkout')
-        guard = {}
+        guard = {} if _input_guard is None else _input_guard
         relative = external_relative(record_path).as_posix()
         require(relative.startswith('tests/product_corpus/api_effects/'), 'effect record scope')
         info, value = _ground_truth_input(repo / relative, guard)
@@ -3711,9 +4078,81 @@ def verify_native_api_effect(repo, record_path):
         raise ValueError('native API effect candidate rejected') from None
 
 
+def verify_reference_flow(repo, record_path):
+    """Reopen exact bytes and reviewed API dependencies, not certify C mapping."""
+    try:
+        repo = Path(repo)
+        require(repo.is_absolute() and repo.resolve(strict=True) == repo, 'flow checkout')
+        guard = {}
+        relative = external_relative(record_path).as_posix()
+        require(relative.startswith('tests/product_corpus/reference_flows/'), 'flow record scope')
+        info, value = _ground_truth_input(repo / relative, guard, maximum=8 * 1024 * 1024)
+        fields(value, 'schema state source effect program assumptions compile_argv qualification boundary', 'flow record')
+        require(value['schema'] == 'codeskeptic-source-reference-flow/v1'
+                and value['state'] == 'SELECTED_PATH_REFERENCE_NOT_QUALIFIED', 'flow record state')
+        fields(value['qualification'], ' '.join(FLOW_QUALIFICATION), 'flow qualification')
+        require(all(item is False for item in value['qualification'].values()), 'flow cannot self-qualify')
+        require(type(value['boundary']) is str and 1 <= len(value['boundary']) <= 4096, 'flow boundary')
+        for link in (value['source'], value['effect']):
+            fields(link, 'path sha256', 'flow linked input')
+            require(type(link['sha256']) is str and SHA.fullmatch(link['sha256']), 'flow linked digest')
+        source_path = external_relative(value['source']['path']).as_posix()
+        require(source_path.startswith('tests/product_corpus/reference_flows/') and source_path.endswith('.c'),
+                'flow source scope')
+        _, source = _ground_truth_input(repo / source_path, guard, value['source']['sha256'],
+                                        json_value=False, maximum=65536)
+        require(value['program']['source_sha256'] == value['source']['sha256'], 'flow program source identity')
+        require(value['compile_argv'] == ['cc', '-std=c17', '-fsyntax-only', source_path], 'flow nonexecuted compile recipe')
+        result = reference_flow(value['program'])
+
+        def check_anchor(item):
+            fields(item, 'start end sha256', 'flow byte anchor')
+            require(type(item['start']) is int and type(item['end']) is int
+                    and 0 <= item['start'] < item['end'] <= len(source)
+                    and hashlib.sha256(source[item['start']:item['end']]).hexdigest() == item['sha256'],
+                    'flow source byte anchor differs')
+
+        require(type(value['assumptions']) is list and 1 <= len(value['assumptions']) <= 16,
+                'flow explicit assumptions')
+        for assumption in value['assumptions']:
+            fields(assumption, 'at text', 'flow assumption')
+            require(type(assumption['text']) is str and 1 <= len(assumption['text']) <= 2048, 'flow assumption text')
+            check_anchor(assumption['at'])
+        function_ranges = []
+        for fn in value['program']['functions']:
+            check_anchor(fn['declaration'])
+            check_anchor(fn['body'])
+            require(fn['declaration']['end'] <= fn['body']['start'], 'flow declaration/body order')
+            function_ranges.append((fn['declaration']['start'], fn['body']['end']))
+            pending = list(fn['operations'])
+            while pending:
+                node = pending.pop()
+                check_anchor(node['at'])
+                if node['op'] == 'branch':
+                    pending.extend(node['then'] + node['otherwise'])
+        function_ranges.sort()
+        require(all(left[1] <= right[0] for left, right in zip(function_ranges, function_ranges[1:])),
+                'flow overlapping function ranges')
+        effect_path = external_relative(value['effect']['path']).as_posix()
+        require(effect_path.startswith('tests/product_corpus/api_effects/'), 'flow effect scope')
+        _ground_truth_input(repo / effect_path, guard, value['effect']['sha256'])
+        # The final ordinary-race check spans the whole dependency graph,
+        # including inputs read inside the historical reference-effect reader.
+        effect_result = verify_native_api_effect(repo, effect_path, _input_guard=guard)
+        verify_input_identities(guard)
+        return {'schema': 'codeskeptic-source-reference-flow-check/v1', 'record_sha256': info['sha256'],
+                'source_sha256': value['source']['sha256'], 'source_bytes_verified': True,
+                'source_anchors_verified': True, 'source_mapping_semantics_verified': False,
+                'whole_source_control_flow_modeled': False, 'compile_recipe_executed': False,
+                'effect_dependency': effect_result, 'flow': result,
+                'qualification': {key: False for key in FLOW_QUALIFICATION}, 'additional_quota_examples': 0}
+    except (ValueError, OSError, TypeError, KeyError, RecursionError, RuntimeError, subprocess.SubprocessError):
+        raise ValueError('source reference flow rejected') from None
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check", "ground-truth-candidate-check", "ground-truth-check", "retained-ground-truth-check", "source-cohort-check", "cohort-native-check", "cohort-ground-truth-check", "platform-recipes-check", "platform-source-labels-check", "native-declarations-check", "native-declaration-candidate-check", "native-api-effect-check"))
+    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check", "ground-truth-candidate-check", "ground-truth-check", "retained-ground-truth-check", "source-cohort-check", "cohort-native-check", "cohort-ground-truth-check", "platform-recipes-check", "platform-source-labels-check", "native-declarations-check", "native-declaration-candidate-check", "native-api-effect-check", "reference-flow-check"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--historical-sources", type=Path, default=Path(
         "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S04-U001/corpus-diagnostic-comparison"))
@@ -3733,8 +4172,11 @@ def main():
     parser.add_argument('--declaration-review', help='optional absolute independent declaration review path')
     parser.add_argument('--declaration-review-sha256', help='required digest with --declaration-review')
     parser.add_argument('--api-effect', help='repository-relative reference effect; native-api-effect-check only')
+    parser.add_argument('--reference-flow', help='repository-relative selected-path graph; reference-flow-check only')
     args = parser.parse_args()
     try:
+        require(args.command == 'reference-flow-check' or args.reference_flow is None,
+                'flow selector is only valid for reference-flow-check')
         require(args.command == 'native-api-effect-check' or args.api_effect is None,
                 'effect selector is only valid for native-api-effect-check')
         require(args.command == 'native-declaration-candidate-check' or all(item is None for item in
@@ -3757,7 +4199,12 @@ def main():
         if args.command == "selection-check":
             require(args.binding is None and args.evidence_root is None and args.external_root is None,
                     "reviewed selection uses its explicit tracked roots")
-        if args.command == 'native-api-effect-check':
+        if args.command == 'reference-flow-check':
+            require(args.reference_flow is not None and args.binding is None and args.evidence_root is None
+                    and args.external_root is None and args.historical_sources == parser.get_default('historical_sources'),
+                    'flow candidate uses its explicit linked record')
+            result = verify_reference_flow(args.root, args.reference_flow)
+        elif args.command == 'native-api-effect-check':
             require(args.api_effect is not None and args.binding is None and args.evidence_root is None
                     and args.external_root is None and args.historical_sources == parser.get_default('historical_sources'),
                     'effect candidate uses its explicit linked record')
@@ -3842,6 +4289,8 @@ def main():
                     require(manifest["schema"] == "codeskeptic-product-profiles/v2", "selection check requires profiles v2")
                     result = result["source_selection"]
         print(canonical(result), end="")
+        if args.command == 'reference-flow-check' and result['flow']['status'] == 'INCOMPLETE_NOT_SAFE':
+            return 2
         if args.command == "readiness" and not result["task_ready"]:
             return 2
     except (ValueError, OSError, TypeError, KeyError, RecursionError) as error:

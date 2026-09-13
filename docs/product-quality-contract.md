@@ -1018,3 +1018,82 @@ model_admitted/evaluation_frozen/native_qualified/task_ready/product_qualified
 false kalır. Full format grammar, diğer API/source/sink/transfer/sanitizer'lar,
 SQLite/C++/TU-local flow, Windows, security-fix/safe kontrolleri ve tüm U003
 acceptance/global-freeze kapıları ayrı ve açık kalır.
+
+### Eklemeli selected-path referans akışı — henüz native model değil
+
+`reference_flow` ve `reference-flow-check --reference-flow <record>` ayrı v1
+şemalarıdır. Önceki native-api-models, declaration/manual seçimleri ve tek
+snprintf effect case/output anlamları değişmez. Eski effect okuyucusunun optional
+private input guard'ı yeni okuyucunun bütün bağımlılıklardaki son identity
+kontrolünü paylaşmasını sağlar; bu bir yeni native admission yolu değildir.
+
+Akış yalnız açık bir abstract graph çalıştırır, C/C++ parser veya CH11 detector
+değildir. Başlangıç object/byte-origin/string bilgileri, branch outcome ve
+snprintf return değeri varsayımdır. Objects ayrı, caller-owned allocation
+kimlikleridir. Pointer assignment/parametre geçişi view kopyalar; aynı object'e
+yazma bütün alias'ları etkiler. Callee parametresinin yeniden bağlanması caller
+slot'unu değiştirmez; yalnız caller-owned view dönebilir. Local allocation,
+pointer arithmetic, scalar inference, erken return, loop, recursion, indirect/
+virtual/external-TU calls ve başka API etkileri bu vocabulary'de yoktur.
+Eksik callee/return/view veya feasible unsupported yol incomplete'dir.
+
+Byte write tam belirtilen region'u değiştirir; dokunulmayan interval korunur.
+Adjacent eşit origin kümeleri canonical olarak birleşir. Unknown branch iki
+yolu da çalıştırır; join tüm byte-origin ve pointer-view alternatiflerini
+korur. İki branch'in farklı mutation'ları aynı generation'ı alamaz: object
+generation'ları bütün yürütme boyunca monoton tahsis edilir, farklı predecessor
+state birleşiminde yeni join generation'ı gerekir. Alias alternatifi tekil
+olarak çözülemiyorsa bir tanesi keyfi seçilmez. Her mutation object'in önceki
+string ve validation fact'lerini düşürür; partial write sonrası aynı text
+length kendiliğinden yeniden varsayılmaz.
+
+Snprintf adapter yalnız önceki `%s` operation'ını kullanır. Source length/NUL
+fact'i mevcut object/version/offset state'inden gelir; successful output'un
+gerçek kopyalanan uzunluğu sonraki çağrıya taşınır. Input limitine sığmayan
+composed interval/origin sonucu kesilmez, incomplete olur. Başarısız veya
+desteklenmeyen effect bütün akışın completeness'ını bozar; sonradan yapılan
+yazı eski unknown/outside-state durumunu aklayamaz.
+
+`validate` yalnız supplied success=true predicate varsayımını kaydeder. Fact
+object/version, tam byte aralığı, category, grammar/platform context, tüketim
+kimliği ve check site/execution path'e bağlıdır. Join yalnız iki predecessor'da
+aynı kalan fact'i korur; ayrı site'lerdeki predicate'lerin eşdeğerliği
+çıkarılmaz. Category etiketi veya başarılı kontrol varsayımı native sanitizer
+kanıtı değildir. `observe` gerçek mevcut view'ın belirtilen byte aralığındaki
+origin alternatiflerini ve matching assumed validation'ı ayrı raporlar;
+SAFE/vulnerability kararı üretmez. UNKNOWN içeren tüketim incomplete'dir.
+Trace gerçek operation byte range, function ve branch/call execution context
+taşır. Side-effect-free noop trace'e eklenmez fakat step sayılır.
+
+Sabit4 call depth entry frame'i içerir.256 states ve65536 transfer steps her
+function için bütün çağrılar boyunca birikir, çağrı başına resetlenmez.
+Function entry bir state, unknown fork iki ek state, her operation bir step,
+join ve helper-return propagation ayrıca birer step'tir. Kontrol expansion'dan
+önce yapılır; state257/depth5/step65537 successful prefix olamaz. Representation
+sınırları:16 function,65537 toplam declared node,32 lexical branch nesting,
+8 object, object başına32 interval, interval başına8 origin,32 slot/string/
+validation,4096 trace ve256 observation. Source64KiB, record8MiB üst sınırındadır.
+Byte extent büyüklüğü kadar storage ayrılmaz. Limit aşımı son state/fact
+garantilerini siler; önceki diagnostic observation'lar açık partial olarak
+kalır. Bu ek representation sınırları değerlendirme paydasından örnek atma
+veya frozen bütçeleri gevşetme yetkisi değildir.
+
+`tests/product_corpus/reference_flows/caller-output.c` kendi sentetik örneğimizdir:
+seçilmiş path'te bir argv byte'ı + NUL, caller buffer/alias, direct render helper,
+snprintf çıktısının returned alias'ı ve ikinci helper'da tek byte okuma.
+Record entry snapshot'ı local initialization SONRASIDIR; abstract entry
+parameters C main'in argc/argv formal listesi olduğu iddiası taşımaz. Hata ve
+erken-return yolları seçilmiş başarılı graph'ın dışında kalır, güvenli diye
+etiketlenmez. İkinci helper security sink değildir; scalar return dönüşümü
+pointer/region graph'ında modellenmez. Record varsayımları exact byte anchor'lıdır.
+
+Okuyucu source/effect digest'lerini, declaration/body/operation byte range'lerini,
+disjoint function range'lerini ve eski reviewed effect dependency graph'ını
+yeniden açar. Matching byte'lar handwritten source-to-graph semantiğini ispatlamaz;
+source_mapping_semantics_verified ve whole_source_control_flow_modeled false
+kalır. Compile recipe yalnız veri olarak kontrol edilir, okuyucu çalıştırmaz.
+CLI exit0 yalnız complete abstract selected-path reference kontrolüdür;
+INCOMPLETE_NOT_SAFE çıktısı exit2'dir. Bütün qualification flag'leri false,
+ek quota0'dır. Bu örnek actual security-fix/safe corpus veya yeni bir köken
+değildir. Source/sink/sanitizer/C++/SQLite/native platform model qualification,
+gerçek >=1020 bağımsız kaynak, tüm U003 acceptance ve global freeze hâlâ açıktır.

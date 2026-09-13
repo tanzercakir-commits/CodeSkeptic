@@ -1,0 +1,259 @@
+{
+  "assumptions": [
+    {
+      "at": {
+        "end": 563,
+        "sha256": "5eaf4c63df3a7d18dc46d4c117408486af4db51471192cf38a986d7d81ba54f3",
+        "start": 528
+      },
+      "text": "Select only the path with argc >= 2 and nonzero first argv[1] byte. Valid argv/input readability is assumed; this graph is not a source API evaluator."
+    },
+    {
+      "at": {
+        "end": 644,
+        "sha256": "d9c6efd67c651e04b0fc398de9e7e68016c4257dc0e193c20f0f9202473fd8e7",
+        "start": 586
+      },
+      "text": "The entry environment is a snapshot immediately AFTER these initializations, not the C main formal parameter list. out/input are live views. Objects remain caller-owned throughout both helpers; no callee allocation or escaped local lifetime is modeled."
+    },
+    {
+      "at": {
+        "end": 403,
+        "sha256": "c806cb798c50a9ae5ae186946705cd3a760ee1fd83847e5d974da614606ec81a",
+        "start": 304
+      },
+      "text": "Select returned == 1. Readable source text is exactly one non-NUL byte plus NUL; destination capacity is four; allocations are distinct. Pointer return is out only on that selected success path. Null/error returns and scalar result semantics are not silently certified; unsupported effect cases are tested separately."
+    },
+    {
+      "at": {
+        "end": 486,
+        "sha256": "7cf4865656c101f907064288ea94a1a94c7c2aff7c3375a9cff4e7c0a9c379c7",
+        "start": 456
+      },
+      "text": "Observe exactly one current byte via the direct helper parameter. This is a generic consuming read, NOT a security sink, sanitizer proof or vulnerability finding. Scalar return conversion/result is outside this pointer/region graph."
+    }
+  ],
+  "boundary": "Own synthetic selected-path reference specimen, zero corpus credit and no security-fix provenance. Exact byte anchors bind attribution but do not prove handwritten C-to-graph semantics. Linked reviewed snprintf evidence does not establish this specimen native environment. Whole-source control flow, source/sink/sanitizer models, SQLite/C++ support and U003 global freeze remain open.",
+  "compile_argv": [
+    "cc",
+    "-std=c17",
+    "-fsyntax-only",
+    "tests/product_corpus/reference_flows/caller-output.c"
+  ],
+  "effect": {
+    "path": "tests/product_corpus/api_effects/c-snprintf-linux-glibc239-v1.json",
+    "sha256": "457bbc3c2c97fd8a345cb4c394b4c2e574fffc4470d1b3d0d8305c38842d019c"
+  },
+  "program": {
+    "bindings": {
+      "input": {
+        "object": "input",
+        "offset": 0
+      },
+      "out": {
+        "object": "out",
+        "offset": 0
+      }
+    },
+    "entry": "main",
+    "functions": [
+      {
+        "body": {
+          "end": 795,
+          "sha256": "b7aecb4806214765870c47486dcd27e351f495ea09ce3f2c1a4f40d4e7bc5daf",
+          "start": 522
+        },
+        "declaration": {
+          "end": 521,
+          "sha256": "44de64d638d1c5f9f45a6c806486ea45bae32e1142834e7f51dd2529dfe6b3a4",
+          "start": 490
+        },
+        "id": "main",
+        "operations": [
+          {
+            "at": {
+              "end": 667,
+              "sha256": "5a6101b12c0f41cf14c8aba3467e721292b0811f6c2d097eb589a44a64862a8a",
+              "start": 649
+            },
+            "id": "alias-assignment",
+            "op": "assign",
+            "source": "out",
+            "target": "alias"
+          },
+          {
+            "arguments": [
+              "alias",
+              "input"
+            ],
+            "at": {
+              "end": 711,
+              "sha256": "07dde5e723d91414380b1835dc43216a36eecd757708b3f4b741aa68eec07bed",
+              "start": 672
+            },
+            "callee": "render",
+            "id": "call-render",
+            "op": "call",
+            "result": "formatted"
+          },
+          {
+            "arguments": [
+              "formatted"
+            ],
+            "at": {
+              "end": 793,
+              "sha256": "e60862c3bb85bdcd995ba7807ed679a12b29ffe934789b6d6b2155f8a51bc613",
+              "start": 761
+            },
+            "callee": "inspect_first",
+            "id": "call-inspect",
+            "op": "call",
+            "result": null
+          }
+        ],
+        "parameters": [
+          "out",
+          "input"
+        ],
+        "return_view": null
+      },
+      {
+        "body": {
+          "end": 405,
+          "sha256": "cbc99083a416c4db788ea7d6ba8b0d464125f5eca30c9dd75997034e3e00b565",
+          "start": 298
+        },
+        "declaration": {
+          "end": 297,
+          "sha256": "8f07ba6c19aeed1589dafdea74340e55ed1425ff029d8e09c7084250379741ce",
+          "start": 248
+        },
+        "id": "render",
+        "operations": [
+          {
+            "at": {
+              "end": 346,
+              "sha256": "d915e875caad0d8082ae9c973bc43d9522b5f7510a128e1dad9e2d6a68d53160",
+              "start": 304
+            },
+            "capacity": 4,
+            "destination": "out",
+            "format": "%s",
+            "id": "format-output",
+            "op": "snprintf",
+            "returned": 1,
+            "source": "input"
+          }
+        ],
+        "parameters": [
+          "out",
+          "input"
+        ],
+        "return_view": "out"
+      },
+      {
+        "body": {
+          "end": 488,
+          "sha256": "ef51e27e3f56b1ff3f9cd40f4885144b075921ff71147b9da07bdb84a9a3b2e5",
+          "start": 450
+        },
+        "declaration": {
+          "end": 449,
+          "sha256": "66022a4425d701c745bbb0663def494debb48d8f8905a595787bd96f0b786949",
+          "start": 407
+        },
+        "id": "inspect_first",
+        "operations": [
+          {
+            "argument": "text",
+            "at": {
+              "end": 486,
+              "sha256": "7cf4865656c101f907064288ea94a1a94c7c2aff7c3375a9cff4e7c0a9c379c7",
+              "start": 456
+            },
+            "category": "generic-byte-read",
+            "context": "c17-linux",
+            "id": "consume-byte",
+            "length": 1,
+            "op": "observe",
+            "sink": "inspect-first-byte"
+          }
+        ],
+        "parameters": [
+          "text"
+        ],
+        "return_view": null
+      }
+    ],
+    "objects": [
+      {
+        "id": "out",
+        "regions": [
+          {
+            "end": 4,
+            "origins": [
+              {
+                "label": "zero-initialized",
+                "state": "CONSTANT"
+              }
+            ],
+            "start": 0
+          }
+        ],
+        "size": 4,
+        "version": 0
+      },
+      {
+        "id": "input",
+        "regions": [
+          {
+            "end": 1,
+            "origins": [
+              {
+                "label": "argv-first-byte",
+                "state": "UNTRUSTED"
+              }
+            ],
+            "start": 0
+          },
+          {
+            "end": 2,
+            "origins": [
+              {
+                "label": "literal-nul",
+                "state": "CONSTANT"
+              }
+            ],
+            "start": 1
+          }
+        ],
+        "size": 2,
+        "version": 0
+      }
+    ],
+    "schema": "codeskeptic-reference-flow/v1",
+    "source_sha256": "43441e4cacbedd8900768a422bbf87c8bbe13779cebbd01d0172b7d5fb17b810",
+    "strings": [
+      {
+        "length": 1,
+        "object": "input",
+        "offset": 0,
+        "version": 0
+      }
+    ]
+  },
+  "qualification": {
+    "evaluation_frozen": false,
+    "model_admitted": false,
+    "native_qualified": false,
+    "product_qualified": false,
+    "source_semantics_qualified": false,
+    "task_ready": false
+  },
+  "schema": "codeskeptic-source-reference-flow/v1",
+  "source": {
+    "path": "tests/product_corpus/reference_flows/caller-output.c",
+    "sha256": "43441e4cacbedd8900768a422bbf87c8bbe13779cebbd01d0172b7d5fb17b810"
+  },
+  "state": "SELECTED_PATH_REFERENCE_NOT_QUALIFIED"
+}
