@@ -1967,6 +1967,26 @@ def declaration_worker(config):
     return result
 
 
+def declaration_worker_diagnostic(stderr, failure):
+    """Allowlisted child-reported provenance, never raw text or backend proof."""
+    value = {'schema': 'codeskeptic-declaration-worker-diagnostic/v1',
+             'origin': 'UNRECOGNIZED', 'child_failure_kind': None, 'checks': [],
+             'parent_failure': failure}
+    # Match the entire bounded original byte stream, not a favorable substring.
+    # An exit/stream combination unlike our handler cannot claim its provenance.
+    if (failure['kind'] == 'PROCESS_FAILED' and failure['exit_code'] == 2
+            and failure['stdout']['bytes'] == 0 and len(stderr) <= 1024):
+        match = re.fullmatch(
+            rb'DECLARATION_WORKER_INVALID case observation rejected; checks='
+            rb'(unknown|(?:identity|profile):[1-9][0-9]{0,5}'
+            rb'(?:,(?:identity|profile):[1-9][0-9]{0,5}){0,23})\r?\n'
+            rb'DECLARATION_WORKER_FAILURE_KIND (TIMEOUT|OS_ERROR|INVALID)\r?\n', stderr)
+        if match:
+            value.update(origin='CHILD_REPORTED', child_failure_kind=match[2].decode('ascii'),
+                         checks=[] if match[1] == b'unknown' else match[1].decode('ascii').split(','))
+    return value
+
+
 def run_declaration_worker(config, validate_result):
     """Retain a later extraction failure without discarding earlier syntax RED."""
     from product_profiles import parse_json
@@ -1994,9 +2014,18 @@ def run_declaration_worker(config, validate_result):
         failure, stdout, stderr, code = 'TIMEOUT', error.stdout or b'', error.stderr or b'', None
     except OSError:
         failure, stdout, stderr, code = 'START_FAILED', b'', b'', None
-    return None, {'kind': failure, 'exit_code': code,
-                  'stdout': {'bytes': len(stdout), 'sha256': hashlib.sha256(stdout).hexdigest()},
-                  'stderr': {'bytes': len(stderr), 'sha256': hashlib.sha256(stderr).hexdigest()}}
+    retained_failure = {'kind': failure, 'exit_code': code,
+                        'stdout': {'bytes': len(stdout), 'sha256': hashlib.sha256(stdout).hexdigest()},
+                        'stderr': {'bytes': len(stderr), 'sha256': hashlib.sha256(stderr).hexdigest()}}
+    if failure == 'PROCESS_FAILED':
+        # This is a separate best-effort log, not a packet field or a new native
+        # attempt. A broken log stream must not discard or reclassify the RED.
+        try:
+            print('DECLARATION_WORKER_DIAGNOSTIC ' + canonical(declaration_worker_diagnostic(stderr, retained_failure)),
+                  end='', file=sys.stderr)
+        except (OSError, ValueError):
+            pass
+    return None, retained_failure
 
 
 def capture_declarations(args):
@@ -2067,6 +2096,10 @@ def main(argv=None):
             return 0
         except (ValueError, OSError, KeyError, TypeError, RuntimeError, AttributeError) as error:
             print('DECLARATION_WORKER_INVALID ' + case_observation_failure(error), file=sys.stderr)
+            try:
+                print('DECLARATION_WORKER_FAILURE_KIND ' + case_failure_kind(error), file=sys.stderr)
+            except (OSError, ValueError):
+                pass  # Optional category output cannot replace the original exit 2.
             return 2
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)

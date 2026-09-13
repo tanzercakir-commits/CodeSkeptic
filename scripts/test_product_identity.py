@@ -1672,7 +1672,7 @@ class DeclarationTests(unittest.TestCase):
 
     @contextmanager
     def mocked_declaration_capture(self, output, worker_stdout, changed=None, after_serialization=None,
-                                   syntax_exit=1, preprocessor_response=None):
+                                   syntax_exit=1, preprocessor_response=None, worker_result=None):
         """Real capture/writer orchestration; synthetic native I/O, never native execution."""
         value, sha = self.packet()
         native = value['native_identity']
@@ -1718,6 +1718,9 @@ class DeclarationTests(unittest.TestCase):
                     returncode=0, stdout=b'#define _POSIX_C_SOURCE 200809L\n#define __STRICT_ANSI__ 1\n', stderr=b''))
             worker_finished = True
             emitted['config'] = json.loads(kwargs['input'])
+            if worker_result is not None:
+                emitted['stdout'] = worker_result.stdout
+                return worker_result
             path = emitted['config']['input']['path']
             emitted['stdout'] = worker_stdout.replace(json.dumps('/probe/declarations.c').encode(), json.dumps(path).encode())
             observed = json.loads(emitted['stdout'])
@@ -1923,6 +1926,208 @@ class DeclarationTests(unittest.TestCase):
         self.assertEqual(identity.declaration_type_key(left), identity.declaration_type_key(right))
         right['detail']['pointee']['canonical_qualifiers']['const'] = False
         self.assertNotEqual(identity.declaration_type_key(left), identity.declaration_type_key(right))
+
+
+class DeclarationWorkerDiagnosticTests(unittest.TestCase):
+    MARKER = b'DECLARATION_WORKER_INVALID case observation rejected; checks='
+    KIND = b'DECLARATION_WORKER_FAILURE_KIND '
+    LOG = 'DECLARATION_WORKER_DIAGNOSTIC '
+
+    def child_stderr(self, checks=b'identity:123,profile:456', kind=b'INVALID', newline=b'\n'):
+        return self.MARKER + checks + newline + self.KIND + kind + newline
+
+    def run_worker(self, result):
+        options = {'side_effect': result} if isinstance(result, Exception) else {'return_value': result}
+        captured, callback = io.StringIO(), mock.Mock()
+        with mock.patch.object(identity.subprocess, 'run', **options) as execute, \
+                mock.patch.object(identity.sys, 'stderr', captured):
+            observed, failure = identity.run_declaration_worker({}, callback)
+        execute.assert_called_once()
+        self.assertEqual(execute.call_args.args[0],
+                         [sys.executable, '-B', str(Path(identity.__file__).resolve()), '_declaration-worker'])
+        self.assertEqual(execute.call_args.kwargs, {'input': identity.canonical({}).encode(),
+                         'env': identity.checked_environment(identity.os.environ), 'capture_output': True,
+                         'timeout': 30, 'check': False})
+        return observed, failure, captured.getvalue(), callback
+
+    def diagnostic(self, log):
+        self.assertTrue(log.startswith(self.LOG), 'missing sanitized parent worker diagnostic')
+        self.assertEqual(len(log.splitlines()), 1)
+        value = json.loads(log[len(self.LOG):])
+        self.assertEqual(set(value), {'schema', 'origin', 'child_failure_kind', 'checks', 'parent_failure'})
+        self.assertEqual(value['schema'], 'codeskeptic-declaration-worker-diagnostic/v1')
+        return value
+
+    def test_child_reported_provenance_and_category_keep_exact_parent_failure(self):
+        for newline in (b'\n', b'\r\n'):
+            for kind in (b'TIMEOUT', b'OS_ERROR', b'INVALID'):
+                stderr = self.child_stderr(kind=kind, newline=newline)
+                with self.subTest(kind=kind, newline=newline):
+                    observed, failure, log, callback = self.run_worker(SimpleNamespace(
+                        returncode=2, stdout=b'', stderr=stderr))
+                    callback.assert_not_called()
+                    self.assertIsNone(observed)
+                    self.assertEqual(failure, {'kind': 'PROCESS_FAILED', 'exit_code': 2,
+                        'stdout': {'bytes': 0, 'sha256': hashlib.sha256(b'').hexdigest()},
+                        'stderr': {'bytes': len(stderr), 'sha256': hashlib.sha256(stderr).hexdigest()}})
+                    diagnostic = self.diagnostic(log)
+                    self.assertEqual(diagnostic['parent_failure'], failure)
+                    self.assertEqual(diagnostic['origin'], 'CHILD_REPORTED')
+                    self.assertEqual(diagnostic['checks'], ['identity:123', 'profile:456'])
+                    self.assertEqual(diagnostic['child_failure_kind'], kind.decode())
+
+    def test_unknown_and_maximum_allowed_check_count(self):
+        for raw, checks in ((b'unknown', []), (b','.join([b'identity:999999'] * 24), ['identity:999999'] * 24)):
+            observed, failure, log, callback = self.run_worker(SimpleNamespace(
+                returncode=2, stdout=b'', stderr=self.child_stderr(checks=raw)))
+            callback.assert_not_called()
+            diagnostic = self.diagnostic(log)
+            self.assertEqual(diagnostic['origin'], 'CHILD_REPORTED')
+            self.assertEqual(diagnostic['checks'], checks)
+
+    def test_private_malformed_conflicting_and_oversized_child_text_is_not_echoed(self):
+        good = self.child_stderr()
+        cases = [b'', b'PRIVATE_SENTINEL', b'\xef\xbb\xbf' + good, good + b'PRIVATE_SENTINEL\n',
+                 b'PRIVATE_SENTINEL\n' + good, good + good, good.replace(b'identity:', b'private:'),
+                 good.replace(b'123', b'0'), good.replace(b'123', b'000123'),
+                 good.replace(b'123', b'1234567'), good.replace(b'INVALID', b'\x1b[31mINVALID', 1),
+                 good.replace(b'profile', b'pr\xc3\xb6file'), good.replace(b'checks=', b'checks= '),
+                 self.child_stderr(kind=b'PRIVATE_SENTINEL'), self.child_stderr(checks=b'unknown,identity:1'),
+                 self.child_stderr(checks=b','.join([b'identity:1'] * 25)),
+                 self.child_stderr(checks=b'x' * 4096), self.MARKER + b'identity:1\n', good[:-1],
+                 good.replace(b'\n', b'\r'), good.replace(b'checks=', b'checks=\x00')]
+        for stderr in cases:
+            with self.subTest(stderr=stderr[:32]):
+                _, failure, log, callback = self.run_worker(SimpleNamespace(returncode=2, stdout=b'', stderr=stderr))
+                callback.assert_not_called()
+                diagnostic = self.diagnostic(log)
+                self.assertEqual(diagnostic['parent_failure'], failure)
+                self.assertEqual(diagnostic['origin'], 'UNRECOGNIZED')
+                self.assertEqual(diagnostic['checks'], [])
+                self.assertIsNone(diagnostic['child_failure_kind'])
+                self.assertNotIn('PRIVATE_SENTINEL', log)
+                self.assertNotIn('\x1b', log)
+                self.assertTrue(log.isascii())
+
+    def test_marker_cannot_claim_child_handler_with_wrong_exit_or_partial_stdout(self):
+        for code, stdout in ((-11, b''), (1, b''), (2, b'PRIVATE_SENTINEL')):
+            with self.subTest(code=code):
+                _, failure, log, callback = self.run_worker(SimpleNamespace(
+                    returncode=code, stdout=stdout, stderr=self.child_stderr()))
+                callback.assert_not_called()
+                diagnostic = self.diagnostic(log)
+                self.assertEqual(diagnostic['origin'], 'UNRECOGNIZED')
+                self.assertIsNone(diagnostic['child_failure_kind'])
+                self.assertEqual(diagnostic['checks'], [])
+                self.assertEqual(diagnostic['parent_failure'], failure)
+                self.assertNotIn('PRIVATE_SENTINEL', log)
+
+    def test_other_classifications_and_success_do_not_emit_child_diagnostics(self):
+        for result, kind in ((subprocess.TimeoutExpired('PRIVATE_SENTINEL', 30, stderr=self.child_stderr()), 'TIMEOUT'),
+                             (OSError('PRIVATE_SENTINEL'), 'START_FAILED'),
+                             (SimpleNamespace(returncode=0, stdout=b'{}', stderr=self.child_stderr()), 'INVALID_RESULT'),
+                             (SimpleNamespace(returncode=0, stdout=b'not-json', stderr=b''), 'INVALID_RESULT'),
+                             (SimpleNamespace(returncode=2, stdout=b'x' * (identity.MAX_OUTPUT + 1),
+                                              stderr=self.child_stderr()), 'OUTPUT_LIMIT')):
+            with self.subTest(kind=kind):
+                observed, failure, log, callback = self.run_worker(result)
+                callback.assert_not_called()
+                self.assertEqual(failure['kind'], kind)
+                self.assertIsNone(observed)
+                self.assertEqual(log, '')
+        observed, failure, log, callback = self.run_worker(SimpleNamespace(returncode=0, stdout=b'{}', stderr=b''))
+        callback.assert_called_once_with({})
+        self.assertEqual((observed, failure, log), ({}, None, ''))
+
+    def test_child_handler_emits_only_fixed_categories_and_allowlisted_provenance(self):
+        for cause, kind in ((subprocess.TimeoutExpired('PRIVATE_SENTINEL', 30), 'TIMEOUT'),
+                            (OSError('PRIVATE_SENTINEL'), 'OS_ERROR'), (ValueError('PRIVATE_SENTINEL'), 'INVALID')):
+            error = identity.IdentityError('PRIVATE_SENTINEL')
+            error.__context__ = cause
+            stdin, stdout, stderr = SimpleNamespace(buffer=io.BytesIO(b'{}')), io.StringIO(), io.StringIO()
+            with self.subTest(kind=kind), mock.patch.object(identity, 'declaration_worker', side_effect=error), \
+                    mock.patch.object(identity.sys, 'stdin', stdin), mock.patch.object(identity.sys, 'stdout', stdout), \
+                    mock.patch.object(identity.sys, 'stderr', stderr), mock.patch.object(identity.subprocess, 'run') as execute:
+                self.assertEqual(identity.main(['_declaration-worker']), 2)
+            execute.assert_not_called()
+            self.assertEqual(stdout.getvalue(), '')
+            self.assertNotIn('PRIVATE_SENTINEL', stderr.getvalue())
+            self.assertEqual(len(stderr.getvalue().splitlines()), 2)
+            self.assertIn('DECLARATION_WORKER_FAILURE_KIND ' + kind + '\n', stderr.getvalue())
+            _, failure, log, callback = self.run_worker(SimpleNamespace(returncode=2, stdout=b'',
+                                                                       stderr=stderr.getvalue().encode()))
+            callback.assert_not_called()
+            self.assertEqual(self.diagnostic(log)['child_failure_kind'], kind)
+            self.assertEqual(failure['kind'], 'PROCESS_FAILED')
+
+    def test_parent_diagnostic_write_failure_cannot_replace_process_failure(self):
+        raw = self.child_stderr()
+        for error in (OSError('PRIVATE_SENTINEL'), ValueError('PRIVATE_SENTINEL')):
+            broken = mock.Mock()
+            broken.write.side_effect = error
+            callback = mock.Mock()
+            with self.subTest(error=type(error).__name__), mock.patch.object(identity.sys, 'stderr', broken), \
+                    mock.patch.object(identity.subprocess, 'run', return_value=SimpleNamespace(
+                        returncode=2, stdout=b'', stderr=raw)) as execute:
+                observed, failure = identity.run_declaration_worker({}, callback)
+            execute.assert_called_once()
+            callback.assert_not_called()
+            broken.write.assert_called()
+            self.assertIsNone(observed)
+            self.assertEqual((failure['kind'], failure['exit_code']), ('PROCESS_FAILED', 2))
+            self.assertEqual(failure['stderr'], {'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
+
+    def test_optional_child_kind_write_failure_keeps_original_exit_two(self):
+        error = identity.IdentityError('PRIVATE_SENTINEL')
+        for write_error in (OSError('PRIVATE_SENTINEL'), ValueError('PRIVATE_SENTINEL')):
+            with self.subTest(error=type(write_error).__name__), \
+                    mock.patch.object(identity.sys, 'stdin', SimpleNamespace(buffer=io.BytesIO(b'{}'))), \
+                    mock.patch.object(identity, 'declaration_worker', side_effect=error), \
+                    mock.patch('builtins.print', side_effect=[None, write_error]) as output:
+                self.assertEqual(identity.main(['_declaration-worker']), 2)
+            self.assertEqual(output.call_count, 2)
+            self.assertTrue(output.call_args_list[0].args[0].startswith('DECLARATION_WORKER_INVALID '))
+            self.assertEqual(output.call_args_list[1].args[0], 'DECLARATION_WORKER_FAILURE_KIND INVALID')
+
+    @unittest.skipIf(sys.platform == 'win32', 'Synthetic Linux writer fixture requires POSIX paths, not native Windows evidence.')
+    def test_diagnostic_does_not_change_written_packet_or_syntax_red(self):
+        fixture = DeclarationTests()
+        fixture.setUp()
+        for syntax_exit in (0, 1):
+            for raw_stderr in (self.child_stderr(kind=b'TIMEOUT'), b'PRIVATE_SENTINEL'):
+                with self.subTest(syntax_exit=syntax_exit), tempfile.TemporaryDirectory() as directory:
+                    output = Path(directory).resolve() / 'failed.json'
+                    worker = SimpleNamespace(returncode=2, stdout=b'', stderr=raw_stderr)
+                    with fixture.mocked_declaration_capture(output, b'', syntax_exit=syntax_exit,
+                                                            worker_result=worker) as (argv, stderr, emitted):
+                        self.assertEqual(identity.main(argv), 2)
+                        diagnostic = self.diagnostic(stderr.getvalue())
+                    retained = json.loads(output.read_bytes())
+                    self.assertNotIn('diagnostic', retained)
+                    self.assertEqual(set(retained['probe']), {'input', 'dependency', 'headers', 'syntax', 'cindex', 'backend_failure'})
+                    self.assertEqual(retained['probe']['backend_failure'], diagnostic['parent_failure'])
+                    self.assertEqual(retained['probe']['syntax']['exit_code'], syntax_exit)
+                    self.assertIsNone(retained['probe']['cindex'])
+                    checked = fixture.summary(retained, identity.declaration_model(Path(identity.__file__).resolve().parents[1])[1])
+                    self.assertTrue(all(row['issues'] == ['BACKEND_FAILED'] + (['SYNTAX_FAILED'] if syntax_exit else [])
+                                        for row in checked['requests']))
+                    self.assertTrue(all(checked[key] is False for key in ('syntax_pass', 'native_qualified', 'task_ready', 'product_qualified')))
+                    self.assertNotIn('PRIVATE_SENTINEL', output.read_text())
+
+    @unittest.skipIf(sys.platform == 'win32', 'Synthetic Linux writer fixture requires POSIX paths, not native Windows evidence.')
+    def test_diagnostic_cannot_mask_independent_parent_identity_drift(self):
+        fixture = DeclarationTests()
+        fixture.setUp()
+        for changed in ('/sdk/stdlib.h', 'source'):
+            with self.subTest(changed=changed), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory).resolve() / 'must-not-exist.json'
+                worker = SimpleNamespace(returncode=2, stdout=b'', stderr=self.child_stderr())
+                with fixture.mocked_declaration_capture(output, b'', changed=changed,
+                                                        worker_result=worker) as (argv, stderr, emitted):
+                    self.assertEqual(identity.main(argv), 2)
+                    self.assertIn(self.LOG, stderr.getvalue())
+                    self.assertIn('IDENTITY_INVALID ', stderr.getvalue())
+                self.assertFalse(output.exists())
 
 
 class PosixDeclarationProfileTests(unittest.TestCase):

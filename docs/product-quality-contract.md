@@ -653,6 +653,28 @@ sonucu korunur. Sürüm alanı UTF-8 byte sınırına, bütün çocuk sonucu da 
 yazıcıya ulaşmaz. Bağımsız capture envelope, kaynak ve header identity denetimleri
 bu yakalama sınırının dışındadır; onların başarısızlığı fatal kalır ve packet yazılmaz.
 Timeout ve çıktı sayımı hard RSS/streaming/descendant bütçesi değildir.
+
+Yeni gözlemlerde yalnız `PROCESS_FAILED` için ayrı stderr log satırı
+`DECLARATION_WORKER_DIAGNOSTIC` yazılır; packet schema ve `backend_failure`
+alanları değişmez. Sabit child handler exit2/boş stdout, bütünüyle eşleşen iki
+sonlandırılmış ASCII satır ve en fazla24 allowlisted `identity:<line>` /
+`profile:<line>` token'ı (veya `unknown`) gerektirir. Kaynak satırları pozitif ve
+en fazla altı basamaklıdır; toplam ham diagnostic girdisi en fazla1024 byte'tır.
+LF/CRLF desteklenir; ek/eksik/özel/bozuk satırlar ve bilinmeyen category/modül
+`UNRECOGNIZED` olur, ham içerik echo edilmez. Geçerli sabit category yalnız
+`TIMEOUT`, `OS_ERROR` veya `INVALID`; `CHILD_REPORTED` kökeni doğrulanmış native
+aşama veya kimlik doğrulaması değildir. `unknown` için check listesi boştur.
+
+Log, önce hesaplanmış özgün parent failure kind/exit/stdout-stderr boyut ve
+SHA256 bilgisine bağlanır. Child-reported TIMEOUT parent `PROCESS_FAILED`'ı
+yeniden adlandırmaz; diğer failure sınıfları ve başarılı çıktı yolu değişmez.
+Child category mevcut en fazla sekiz context-link incelemesinin sınırlı ipucudur.
+Native yükleme hiç başlamamış olabilir. Özel exception/native metni, path, argv,
+config veya environment basılmaz. Ek log/category yazımının OSError/ValueError
+başarısızlığı asıl process failure'ı değiştirmez ve packet'i iptal etmez; bu tanı
+best-effort'tur. Komut, environment, tek deneme ve30s timeout aynı kalır. Geçmişte
+yalnız hash'i saklanan stderr geri çıkarılamaz veya bu yeni tanıyla yorumlanamaz.
+
 `check-declarations` saf metadata denetimidir; `native-declarations-check` ayrıca
 packet digest'ini, seçili model byte'larını ve gerçek producer Git bloblarını
 doğrular. Hiçbiri kayıt içindeki native yolları açmaz, library yüklemez veya argv'yi

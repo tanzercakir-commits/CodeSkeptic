@@ -2541,3 +2541,54 @@ V2 ayrım ve v1 byte-preservation GREEN:
 Yeni kayıtlar için yeniden bağımsız exact-head inceleme gerekir; eski v1
 receipt'leri yeni kayıtların kabulü sayılamaz. Qualified50+3 payı ve quota
 katkısı sıfırdır; U003/global freeze, model semantics ve corpus kabulü açıktır.
+
+### Declaration worker için sınırlı failure provenance
+
+V2 declaration kayıtları exact `d005d4cce36dcad00ff2331d7c911714ab44b44e`
+üzerinde iki platform için ayrı bağımsız inceleme ve58 dosyalık integration
+PASS aldı; yalnız feature dalı fast-forward gönderildi.28 gerçek API/platform
+pair'in declaration review'u vardır, ancak native/model qualification hâlâ0'dır.
+101 dosyalık kalıcı kanıt paketi `native-api-declaration-assessments-d005d4c-v1`
+manifest SHA `13050d000899076e3597d40718cf61b7ba897761e2e3b14b987bceb23d7b9c5b`
+ve ayrı bağımsız byte-for-byte copy audit'i ile korunur. Main değişmedi.
+
+Bu pakette saklanan gerçek3cd producer Windows declaration denemesi
+run34725540585/attempt1, job103638902285, artifact10307742295'tir. Packet SHA
+`68df8fc7e8b57a328c640e7186612753b498d46ebe264cb36877e0ae423e47ba`:
+backend PROCESS_FAILED/exit2, stdout0, stderr144 byte ve13 BACKEND_FAILED kayıt.
+Raw syntax exit0 ve dependency exit0, native backend başarısı değildir; syntax
+stderr'i de boş değildir. Saklanan stderr hash'i mesajın içeriğini, kök nedeni
+veya library yüklemeye ulaşıldığını göstermez. Eski başarısızlık başarısız kalır.
+
+Yeni dar değişiklik yalnız sonraki PROCESS_FAILED gözlemlerinde ayrı, sınırlı
+stderr JSON tanısı üretir. İki tam allowlisted child satırı, exit2 ve boş stdout
+eşleşirse CHILD_REPORTED category/check satırları; aksi hâlde UNRECOGNIZED
+yazılır. Bu kimlik doğrulaması veya native aşama kanıtı değildir. Parent failure,
+ham stream boyut/hash değerleri, packet schema, komut/ortam/tek deneme/30s bütçesi
+değişmez. Child-reported TIMEOUT parent PROCESS_FAILED olarak kalır; log yazma
+hatası asıl RED'i değiştirmez. Özel exception metni/argv/path/environment basılmaz.
+
+Test-first genişletilmiş RED yakalama SHA:
+`a8df6d8fff7831118d43fc87a60dd24b9b1524db2445c7adc5e2c7a32f21333b`.
+10 odaklı testin son GREEN'i:
+`30e130a4f79f3f7fe9a3d2bde70a99c94162131fb117de9bac31ab69694e41c3`.
+Kategori/LF/CRLF/sınırlar, özel veya bozuk girdiler, farklı exit/stdout,
+success/diğer failure sınıfları, log-write failure, korunmuş syntax RED ve fatal
+parent identity drift denetlendi. Gerçek writer orchestration testleri sentetik
+Linux native I/O kullanır; iki POSIX fixture Windows'ta açıkça skip edilir.
+
+Gerçek sabit Python child CLI smoke SHA
+`c8ad6ffa27ac46b88eeff66f6693dbdf87aa3845172ac73105c9edce8e2c6691`:
+özel sentinel sızmadan INVALID/CHILD_REPORTED verdi. Geçersiz config native
+komutlardan önce reddedildi; bu Windows/native yeniden üretimi değildir.
+Eski gerçek Windows packet'inin saf CLI kontrolü aynı13 BACKEND_FAILED sonucunu
+korudu; exit0 metadata geçerliliğidir, native PASS değildir:
+`e66ace5ee0ab75c21bde26b2f9d258029b99ff82725e95b68ab3c0e19b7abb3a`.
+
+T1 identity/profiles/quality460 test30.702s GREEN:
+`cbc87e2d1653835eb42b80ea1839f1386f427d7954deeb65b5f8182baa1aea83`.
+Ayrı completion-plan14 test0.285s GREEN (toplam474, yerelde skip yok):
+`aa9e3ea5d91c8a69c1acbb3565eafe395b3f37a0fc5fbeef09129b2499054aab`.
+Yeni exact-head bağımsız implementation incelemesi ve taze hosted gözlem ayrıca
+gerekir. Windows kök nedeni/fix'i, U003/global freeze ve bütün ürün kabulü açık;
+bu tanı checkpoint'i için POP veya task_ready iddiası yoktur.
