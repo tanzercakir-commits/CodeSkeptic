@@ -2708,3 +2708,63 @@ gerekir; U003/global freeze/model/product kabulü açıktır, POP yoktur.
 T1 identity/profiles/quality/completion-plan toplam501 test32.736s GREEN,
 yerelde skip yok; capture SHA
 `ce478f7057ea5ddea385082e57023d6e92ad1cadb1659ab4d595498d4592743f`.
+
+### Exact-be05adf Windows include-closure RED ve sınırlı fark tanısı
+
+be05adf215ba6910e5cbbd2a8c02a472d0160a0c producer'ın gerçek
+run34734183301/attempt1 Windows declaration job103662472503 sonucu failure'dır;
+altı job terminaldir. Artifact10310169756 ZIP54.934 byte SHA
+`9c7dd8b213bdd4cc35bec2fccb94d0c69496977796c7ba4bccf2a4c6849cf192`,
+packet323.738 byte SHA
+`7116da55a43c33b8ab1a556d1abee1706d7f8045e813671b1011eb26664c34f1`.
+Gerçek acquisition ve kalıcı kopyanın ayrı bağımsız incelemeleri korunmuştur:
+`native-declaration-worker-packet-be05adf-v1` manifest SHA
+`364865a76c5153ba28ef79c0dc334e5f57b9ba115f685392de97eb6c9ac3f315`.
+
+Gerçek packet failure'ıyla birebir eşleşen tek parent marker VALIDATE ve
+exact-be kaynak ipuçları2047→2135→1792→58 gösterir. Kaynaktan çıkarım, include
+guard'ının false olduğudur; hangi conjunct veya header farkı olduğu değildir.
+Mock test marker'ları gerçek capture marker'ından ayrılmıştır. Backend hâlâ
+INVALID_RESULT/exit0, stdout230.099 byte, stderr0; özgün stdout tutulmamıştır.
+Raw syntax/dependency exit0 ve188 header kaydı native kabulü değildir;
+cindex null,13 istek BACKEND_FAILED/INCOMPLETE ve yeterlilik alanları false.
+Bu bulgu önceki250 RED'inin bilinmeyen ret aşamasını geriye dönük belirlemez.
+
+Prospective tanı yalnız özgün include guard reddine bağlı private annotation
+üzerinden, aynı hata nesnesi/type/args ve predicate sırasını koruyarak eklenir.
+Sıralı header-array SHA256'sı, eksik header indeksleri ve beklenmeyen normalize
+path hash'leriyle sınırlı ilişkilendirme yapılır; ham yollar basılmaz. Tam fark
+sayıları ile kesilmiş32 indeks/8 hash listeleri ayrıdır. Windows PurePath lower
+ile Unicode casefold farkı, POSIX case duyarlılığı, drive-relative/device-prefix
+ve `..` sınırları test edilir. Bu offline gözlemler native filesystem eşdeğerliği
+veya Windows düzeltmesi kanıtı değildir; kabul koşulları değiştirilmemiştir.
+
+İlk test-first guard RED capture SHA
+`12f8fb5678bf3c2670aceba5f018174b767e12fc2fa63b9892944198a26bc252`.
+12 yeni testin exact eski be05adf producer blob'u altında düzeltilmiş tam RED'i:
+`cf46bffcfcdd3d7dd336f5fe23eda16f65f99c00c62f14a3b7b95436ff528b94`.
+Genişletilen header fixture'ında alias kaynaklı bir test hatası düzeltildi;
+ilk başarısız81-test capture da saklandı. Düzeltilmiş81 odaklı test1.175s GREEN:
+`0c7be4631630dbd251816b57f6f19222c0d041d74cd34cfb41fe6b28f10bea54`.
+Annotation/extraction/serialization/log yazma hataları, byte ve rapor sınırları,
+ilk/sonraki guard ve predicate hatası ayrımı, değişmiş referanslar ve gerçek
+writer orkestrasyonunda syntax RED/packet koruması sınandı. Native araçlar bu
+synthetic testlerde çalıştırılmadı. Linux writer testi Windows'ta açık skip'tir.
+Yeni temiz exact-head bağımsız inceleme ve fresh hosted gözlem ayrıca gerekir;
+U003 FRONT, global freeze/model/native/product kabulü açık ve main değişmemiştir.
+POP veya sonraki task'a geçiş yoktur.
+
+Son direct-call hardening, yanlış exception nesnesini getattr'dan önce ve header
+key'lerini set karşılaştırmasından önce primitive type ile reddeder. Son12-test
+eski-source RED capture SHA
+`21d3a3067c2836f92eaeb85d7ae2b84bd7af6f270dcc9f01fabfb172bef082e6`;
+son81 odaklı test1.164s GREEN capture SHA
+`5bfb8d08107434a283e8b0d739dd9dcfd1021115541cb9434f0171e328e28b55`.
+Bu iki hardening öncesindeki513-test T1 koşusu32.617s GREEN idi:
+`f329b6188af3ad228934371ca76633cf9085f49b47655be12fcbc8640672b718`.
+Son temiz commit'in T1 tekrarı bağımsız exact-head incelemenin parçasıdır.
+Gerçek sabit Python child CLI native yüklemeden önce yanlış config'i reddetti:
+`0670d10e51bd654117812aed0cc8fe9131b9e09a5c2658ec30becc2daac67d48`.
+Actual-be packet digest/producer Git blob bağlı CLI aynı13 BACKEND_FAILED
+sonucunu korudu, capture SHA
+`a918e908d28300bad65429b785d622da3e0ae0ec1ad533aef74e397261e941b9`.

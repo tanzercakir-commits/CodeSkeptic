@@ -26,6 +26,7 @@ MAX_OUTPUT = 2 * 1024 * 1024
 MAX_FILE = 512 * 1024 * 1024
 MAX_HEADERS = 4096
 MAX_HEADER_BYTES = 256 * 1024 * 1024
+_INCLUSION_REJECTION = object()
 TOOL_ROLES = ('cc', 'cxx', 'clang', 'clangxx')
 SOURCE_FILES = {'collector_sha256': 'scripts/product_identity.py',
                 'workflow_sha256': '.github/workflows/product-identity.yml',
@@ -1789,8 +1790,19 @@ def validate_declaration_observation(observed, model, native, probe):
     require(type(observed['parse_status']) is int and observed['parse_status'] == 0
             and nonempty(observed['library_version']) and len(observed['library_version'].encode('utf-8')) <= 8192,
             'CIndex parser observation')
-    require(type(observed['inclusions']) is list and observed['inclusions'] == sorted(set(observed['inclusions']))
-            and {path_type(path) for path in observed['inclusions']} == set(by_path), 'CIndex include closure')
+    # Preserve callable lookup, the predicate and its short-circuit order. Only
+    # the guard's own rejection is tagged, never an error evaluating its input.
+    inclusion_require = require
+    inclusion_ok = (type(observed['inclusions']) is list and observed['inclusions'] == sorted(set(observed['inclusions']))
+                    and {path_type(path) for path in observed['inclusions']} == set(by_path))
+    try:
+        inclusion_require(inclusion_ok, 'CIndex include closure')
+    except IdentityError as error:
+        try:
+            error._inclusion_rejection = (_INCLUSION_REJECTION, system, observed['inclusions'], probe['headers'])
+        except Exception:
+            pass
+        raise
     diagnostics = observed['diagnostics']
     require(type(diagnostics) is list and len(diagnostics) <= 128, 'CIndex diagnostic count')
     for diagnostic in diagnostics:
@@ -2020,6 +2032,83 @@ def declaration_result_checks(error):
     return checks
 
 
+def declaration_inclusion_diagnostic(error, failure):
+    """Bounded private guard association; no exception text or filesystem reads.
+
+    Digests permit comparison with known candidate paths, not anonymization or
+    recovery of unknown names. Header indices bind to the ordered packet array.
+    """
+    if type(error) is not IdentityError:
+        return None
+    context = getattr(error, '_inclusion_rejection', None)
+    if (type(context) is not tuple or len(context) != 4
+            or context[0] is not _INCLUSION_REJECTION):
+        return None
+    _, system, included, headers = context
+    if type(system) is not str or system not in ('Linux', 'Darwin', 'Windows'):
+        return None
+    value = {'schema': 'codeskeptic-declaration-inclusion-diagnostic/v1', 'origin': 'PARENT_REPORTED',
+             'guard': 'CINDEX_INCLUDE_CLOSURE', 'system': system, 'status': 'UNAVAILABLE',
+             'reason': 'INPUT_BUDGET_OR_SHAPE', 'header_array_sha256': None,
+             'details': None, 'parent_failure': failure}
+    # Inspect only primitive, bounded metadata. Stream the canonical header array
+    # into its digest so a large direct-call input cannot allocate one huge JSON.
+    try:
+        require(type(headers) is list and len(headers) <= MAX_HEADERS, 'inclusion diagnostic headers')
+        header_hash, header_bytes = hashlib.sha256(b'['), 3  # brackets and final LF
+        for index, header in enumerate(headers):
+            require(type(header) is dict and len(header) == 4 and all(type(key) is str for key in header),
+                    'inclusion diagnostic header shape')
+            fields(header, 'path resolved_path bytes sha256', 'inclusion diagnostic header')
+            require(type(header['bytes']) is int and 0 <= header['bytes'] <= MAX_HEADER_BYTES
+                    and digest(header['sha256']), 'inclusion diagnostic header values')
+            for key in ('path', 'resolved_path'):
+                path = header[key]
+                require(type(path) is str and len(path) <= 8192 and len(path.encode('utf-8')) <= 8192,
+                        'inclusion diagnostic header path')
+            encoded = canonical(header).encode('utf-8')[:-1]
+            header_bytes += len(encoded) + bool(index)
+            require(header_bytes <= MAX_OUTPUT, 'inclusion diagnostic header bytes')
+            header_hash.update((b',' if index else b'') + encoded)
+        header_hash.update(b']\n')
+        value['header_array_sha256'] = header_hash.hexdigest()
+        if type(included) is not list:
+            value.update(status='AVAILABLE', reason='NOT_LIST')
+            return value
+        require(len(included) <= MAX_HEADERS, 'inclusion diagnostic count')
+        total = 0
+        for path in included:
+            require(type(path) is str and len(path) <= 8192, 'inclusion diagnostic path')
+            length = len(path.encode('utf-8'))
+            total += length
+            require(length <= 8192 and total <= MAX_OUTPUT, 'inclusion diagnostic path bytes')
+        if included != sorted(set(included)):
+            value.update(status='AVAILABLE', reason='NOT_SORTED_UNIQUE')
+            return value
+        path_type = PureWindowsPath if system == 'Windows' else PurePosixPath
+        expected = [path_type(header['path']) for header in headers]
+        actual = {path_type(path) for path in included}
+        missing, unexpected = set(expected) - actual, actual - set(expected)
+        if not missing and not unexpected:
+            # Trusted callbacks may mutate an annotated exception's references;
+            # do not invent a rejected conjunct if it cannot be reproduced.
+            value['reason'] = 'NO_REPRODUCIBLE_REJECTION'
+            return value
+        indices = [index for index, path in enumerate(expected) if path in missing]
+        key_schema = 'codeskeptic-purepath-key/v1'
+        keys = sorted(hashlib.sha256(canonical([key_schema, system,
+            str(path).lower() if system == 'Windows' else str(path)]).encode('utf-8')).hexdigest()
+            for path in unexpected)
+        value.update(status='AVAILABLE', reason='PATH_SET_MISMATCH', details={
+            'path_key_schema': key_schema, 'expected_paths': len(set(expected)), 'observed_paths': len(actual),
+            'missing_paths': len(missing), 'missing_header_indices': indices[:32],
+            'missing_indices_truncated': len(indices) > 32, 'unexpected_paths': len(unexpected),
+            'unexpected_path_sha256': keys[:8], 'unexpected_hashes_truncated': len(keys) > 8})
+    except (ValueError, TypeError, KeyError, RecursionError):
+        pass
+    return value
+
+
 def run_declaration_worker(config, validate_result):
     """Retain a later extraction failure without discarding earlier syntax RED."""
     from product_profiles import parse_json
@@ -2087,6 +2176,15 @@ def run_declaration_worker(config, validate_result):
         except Exception:
             # Deliberately only the optional diagnostic, not result validation.
             pass
+        if result_phase == 'VALIDATE':
+            try:
+                diagnostic = declaration_inclusion_diagnostic(result_error, retained_failure)
+                if diagnostic is not None:
+                    line = 'DECLARATION_INCLUSION_DIAGNOSTIC ' + canonical(diagnostic)
+                    if line.isascii() and len(line) <= 4096:
+                        print(line, end='', file=sys.stderr)
+            except Exception:
+                pass
     return None, retained_failure
 
 

@@ -2410,6 +2410,309 @@ class DeclarationResultDiagnosticTests(unittest.TestCase):
             self.run_result(validator=mock.Mock(side_effect=RuntimeError('PRIVATE_SENTINEL')))
 
 
+class DeclarationInclusionDiagnosticTests(unittest.TestCase):
+    LOG = 'DECLARATION_INCLUSION_DIAGNOSTIC '
+
+    def setUp(self):
+        self.fixture = DeclarationTests()
+        self.fixture.setUp()
+
+    def packet(self, inclusions, paths=None, system='Linux'):
+        value, _ = self.fixture.packet()
+        value['native_identity']['platform']['system'] = system
+        value['probe']['cindex']['inclusions'] = inclusions
+        if paths is not None:
+            value['probe']['headers'] = [{'path': path, 'resolved_path': path,
+                'bytes': 1, 'sha256': 'b' * 64} for path in paths]
+        return value
+
+    def validate(self, value, observed):
+        return identity.validate_declaration_observation(observed, self.fixture.model,
+                                                        value['native_identity'], value['probe'])
+
+    def run_packet(self, value):
+        raw = identity.canonical(value['probe']['cindex']).encode()
+        result = DeclarationResultDiagnosticTests().run_result(stdout=raw,
+            validator=lambda observed: self.validate(value, observed))
+        return result[:3]
+
+    def diagnostic(self, log, failure, reason, headers):
+        lines = log.splitlines(keepends=True)
+        self.assertEqual(len(lines), 2, 'missing bounded inclusion diagnostic')
+        DeclarationResultDiagnosticTests().diagnostic(lines[0], failure, 'VALIDATE')
+        self.assertTrue(lines[1].startswith(self.LOG))
+        self.assertTrue(lines[1].isascii())
+        self.assertLessEqual(len(lines[1]), 4096)
+        value = json.loads(lines[1][len(self.LOG):])
+        self.assertEqual(set(value), {'schema', 'origin', 'guard', 'system', 'status',
+            'reason', 'header_array_sha256', 'details', 'parent_failure'})
+        self.assertEqual(value['schema'], 'codeskeptic-declaration-inclusion-diagnostic/v1')
+        self.assertEqual(value['origin'], 'PARENT_REPORTED')
+        self.assertEqual(value['guard'], 'CINDEX_INCLUDE_CLOSURE')
+        self.assertEqual(value['parent_failure'], failure)
+        self.assertEqual(value['reason'], reason)
+        self.assertEqual(value['status'], 'UNAVAILABLE' if reason == 'INPUT_BUDGET_OR_SHAPE' else 'AVAILABLE')
+        if headers is not None:
+            self.assertEqual(value['header_array_sha256'],
+                hashlib.sha256(identity.canonical(headers).encode()).hexdigest())
+        return value
+
+    def test_each_guard_conjunct_reports_only_its_first_failure(self):
+        for inclusions, reason in ((None, 'NOT_LIST'),
+                (['/sdk/stdlib.h', '/probe/declarations.c'], 'NOT_SORTED_UNIQUE'),
+                (['/probe/declarations.c', '/probe/declarations.c', '/sdk/stdlib.h'], 'NOT_SORTED_UNIQUE'),
+                (['/probe/declarations.c'], 'PATH_SET_MISMATCH')):
+            with self.subTest(reason=reason, inclusions=inclusions):
+                value = self.packet(inclusions)
+                observed, failure, log = self.run_packet(value)
+                self.assertIsNone(observed)
+                self.assertEqual(failure['kind'], 'INVALID_RESULT')
+                self.assertEqual(failure['exit_code'], 0)
+                raw = identity.canonical(value['probe']['cindex']).encode()
+                self.assertEqual(failure['stdout'], {'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
+                report = self.diagnostic(log, failure, reason, value['probe']['headers'])
+                if reason != 'PATH_SET_MISMATCH':
+                    self.assertIsNone(report['details'])
+
+    def test_mismatch_indices_are_bound_to_ordered_headers_without_raw_paths(self):
+        paths = ['/PRIVATE_SENTINEL/z.h', '/PRIVATE_SENTINEL/a.h', '/PRIVATE_SENTINEL/b.h']
+        value = self.packet(['/PRIVATE_SENTINEL/a.h', '/PRIVATE_SENTINEL/extra.h'], paths)
+        _, failure, log = self.run_packet(value)
+        report = self.diagnostic(log, failure, 'PATH_SET_MISMATCH', value['probe']['headers'])
+        details = report['details']
+        expected_hash = hashlib.sha256(identity.canonical(
+            ['codeskeptic-purepath-key/v1', 'Linux', '/PRIVATE_SENTINEL/extra.h']).encode()).hexdigest()
+        self.assertEqual(details, {'path_key_schema': 'codeskeptic-purepath-key/v1',
+            'expected_paths': 3, 'observed_paths': 2, 'missing_paths': 2,
+            'missing_header_indices': [0, 2], 'missing_indices_truncated': False,
+            'unexpected_paths': 1, 'unexpected_path_sha256': [expected_hash], 'unexpected_hashes_truncated': False})
+        self.assertNotIn('PRIVATE_SENTINEL', log)
+        before = report['header_array_sha256']
+        value['probe']['headers'].reverse()
+        _, failure, log = self.run_packet(value)
+        report = self.diagnostic(log, failure, 'PATH_SET_MISMATCH', value['probe']['headers'])
+        self.assertNotEqual(report['header_array_sha256'], before)
+        self.assertEqual(report['details']['missing_header_indices'], [0, 2])
+
+    def test_missing_extra_and_duplicate_normalized_headers_have_exact_counts(self):
+        for included, expected in (([], (1, 0, [0, 1])),
+                (['C:/SDK/a.h', 'C:/SDK/extra.h'], (0, 1, [])),
+                (['C:/SDK/extra.h'], (1, 1, [0, 1]))):
+            value = self.packet(included, ['C:/SDK/a.h', 'c:\\sdk\\a.h'], 'Windows')
+            _, failure, log = self.run_packet(value)
+            details = self.diagnostic(log, failure, 'PATH_SET_MISMATCH', value['probe']['headers'])['details']
+            self.assertEqual(details['expected_paths'], 1)
+            self.assertEqual((details['missing_paths'], details['unexpected_paths'],
+                              details['missing_header_indices']), expected)
+
+    def test_path_keys_follow_purepath_not_filesystem_or_casefold(self):
+        pairs = (('Windows', 'C:/SDK/./A.h', 'c:\\sdk\\a.h', True),
+                 ('Windows', 'C:/SDK/ß.h', 'c:/sdk/ss.h', False),
+                 ('Windows', 'C:/SDK/a/../b.h', 'C:/SDK/b.h', False),
+                 ('Windows', 'C:SDK/a.h', 'C:/SDK/a.h', False),
+                 ('Windows', '\\\\?\\C:\\SDK\\a.h', 'C:/SDK/a.h', False),
+                 ('Linux', '/sdk/./a.h', '/sdk/a.h', True),
+                 ('Linux', '/sdk/A.h', '/sdk/a.h', False),
+                 ('Darwin', '/sdk/A.h', '/sdk/a.h', False))
+        for system, expected, observed, equal in pairs:
+            with self.subTest(system=system, expected=expected, observed=observed):
+                value = self.packet(sorted([observed, '/always-extra']), [expected], system)
+                _, failure, log = self.run_packet(value)
+                details = self.diagnostic(log, failure, 'PATH_SET_MISMATCH', value['probe']['headers'])['details']
+                self.assertEqual(details['missing_paths'], int(not equal))
+                self.assertEqual(details['unexpected_paths'], 1 if equal else 2)
+                rendered = str(identity.PureWindowsPath(observed)).lower() if system == 'Windows' else str(identity.PurePosixPath(observed))
+                hashed = hashlib.sha256(identity.canonical(['codeskeptic-purepath-key/v1', system, rendered]).encode()).hexdigest()
+                self.assertEqual(hashed in details['unexpected_path_sha256'], not equal)
+
+    def test_report_caps_do_not_truncate_counts(self):
+        value = self.packet(['/extra/' + str(n) for n in range(10)],
+                            ['/expected/' + str(n) for n in range(40)])
+        value['probe']['cindex']['inclusions'].sort()
+        _, failure, log = self.run_packet(value)
+        details = self.diagnostic(log, failure, 'PATH_SET_MISMATCH', value['probe']['headers'])['details']
+        self.assertEqual(details['missing_paths'], 40)
+        self.assertEqual(details['missing_header_indices'], list(range(32)))
+        self.assertTrue(details['missing_indices_truncated'])
+        self.assertEqual(details['unexpected_paths'], 10)
+        self.assertEqual(len(details['unexpected_path_sha256']), 8)
+        self.assertEqual(details['unexpected_path_sha256'], sorted(details['unexpected_path_sha256']))
+        self.assertTrue(details['unexpected_hashes_truncated'])
+
+    def test_budget_or_shape_is_unavailable_not_a_guessed_difference(self):
+        for inclusions in ([str(n) for n in range(4097)], ['x' * 8193], ['\udcff'],
+                           ['x' * 8192] * 257):
+            value = self.packet(inclusions)
+            with self.assertRaises(identity.IdentityError) as caught:
+                self.validate(value, value['probe']['cindex'])
+            report = identity.declaration_inclusion_diagnostic(caught.exception, {})
+            self.assertEqual(report['status'], 'UNAVAILABLE')
+            self.assertEqual(report['reason'], 'INPUT_BUDGET_OR_SHAPE')
+            self.assertIsNone(report['details'])
+
+    def test_only_actual_guard_rejection_is_annotated(self):
+        value = self.packet([])
+        original_require = identity.require
+        raised = []
+        def require(condition, message):
+            if not condition and message == 'CIndex include closure':
+                error = identity.IdentityError(message)
+                raised.append(error)
+                raise error
+            return original_require(condition, message)
+        with mock.patch.object(identity, 'require', side_effect=require), self.assertRaises(identity.IdentityError) as caught:
+            self.validate(value, value['probe']['cindex'])
+        self.assertIs(caught.exception, raised[0])
+        self.assertIs(type(caught.exception), identity.IdentityError)
+        self.assertEqual(caught.exception.args, ('CIndex include closure',))
+        self.assertIsNotNone(identity.declaration_inclusion_diagnostic(caught.exception, {}))
+        for error in (identity.IdentityError('CIndex include closure'), TypeError('CIndex include closure')):
+            error.__context__ = caught.exception
+            self.assertIsNone(identity.declaration_inclusion_diagnostic(error, {}))
+        forged = identity.IdentityError('CIndex include closure')
+        forged._inclusion_rejection = (object(), 'Linux', [], [])
+        self.assertIsNone(identity.declaration_inclusion_diagnostic(forged, {}))
+        class ForeignError:
+            def __getattribute__(self, key):
+                raise AssertionError('foreign attribute access')
+        self.assertIsNone(identity.declaration_inclusion_diagnostic(ForeignError(), {}))
+
+    def test_header_digest_budget_shape_and_changed_context_fail_closed(self):
+        value = self.packet([])
+        with self.assertRaises(identity.IdentityError) as caught:
+            self.validate(value, value['probe']['cindex'])
+        error = caught.exception
+        original = copy.deepcopy(value['probe']['headers'])
+        for mutate in (lambda headers: headers.extend([headers[0]] * 4096),
+                       lambda headers: headers[0].update(extra='PRIVATE_SENTINEL'),
+                       lambda headers: headers[0].update(resolved_path='x' * 8193),
+                       lambda headers: headers[0].update(resolved_path='\udcff'),
+                       lambda headers: headers[0].update(bytes=True),
+                       lambda headers: headers[0].update(sha256='PRIVATE_SENTINEL')):
+            headers = value['probe']['headers']
+            headers[:] = copy.deepcopy(original)
+            mutate(headers)
+            report = identity.declaration_inclusion_diagnostic(error, {})
+            self.assertEqual(report['status'], 'UNAVAILABLE')
+            self.assertEqual(report['reason'], 'INPUT_BUDGET_OR_SHAPE')
+            self.assertIsNone(report['header_array_sha256'])
+            self.assertIsNone(report['details'])
+            self.assertNotIn('PRIVATE_SENTINEL', identity.canonical(report))
+        headers[:] = copy.deepcopy(original)
+        class ForeignKey(str):
+            pass
+        headers[0] = {ForeignKey(key): item for key, item in headers[0].items()}
+        with mock.patch.object(identity, 'fields', wraps=identity.fields) as fields:
+            report = identity.declaration_inclusion_diagnostic(error, {})
+        fields.assert_not_called()
+        self.assertEqual(report['status'], 'UNAVAILABLE')
+        headers[:] = copy.deepcopy(original)
+        size = len(identity.canonical(headers).encode())
+        for limit, available in ((size, True), (size - 1, False)):
+            with mock.patch.object(identity, 'MAX_OUTPUT', limit):
+                report = identity.declaration_inclusion_diagnostic(error, {})
+            self.assertEqual(report['status'], 'AVAILABLE' if available else 'UNAVAILABLE')
+        # Header/path inspection itself is allowed at exactly 8192 UTF-8 bytes.
+        headers[0]['resolved_path'] = 'é' * 4096
+        self.assertEqual(identity.declaration_inclusion_diagnostic(error, {})['status'], 'AVAILABLE')
+        headers[0]['resolved_path'] += 'x'
+        self.assertEqual(identity.declaration_inclusion_diagnostic(error, {})['status'], 'UNAVAILABLE')
+        headers[:] = copy.deepcopy(original)
+        value['probe']['cindex']['inclusions'][:] = sorted(header['path'] for header in headers)
+        report = identity.declaration_inclusion_diagnostic(error, {})
+        self.assertEqual((report['status'], report['reason']), ('UNAVAILABLE', 'NO_REPRODUCIBLE_REJECTION'))
+        self.assertIsNone(report['details'])
+
+    def test_final_log_has_exact_ascii_byte_limit(self):
+        original = identity.canonical
+        value = self.packet([])
+        for suffix, size, printed in (('', 4096, True), ('', 4097, False), ('é', 4096, False)):
+            def canonical(item):
+                if type(item) is dict and item.get('schema') == 'codeskeptic-declaration-inclusion-diagnostic/v1':
+                    return 'x' * (size - len(self.LOG) - len(suffix) - 1) + suffix + '\n'
+                return original(item)
+            with mock.patch.object(identity, 'canonical', side_effect=canonical):
+                observed, failure, log = self.run_packet(value)
+            self.assertIsNone(observed)
+            self.assertEqual(failure['kind'], 'INVALID_RESULT')
+            self.assertEqual(self.LOG in log, printed)
+            if printed:
+                self.assertEqual(len(log.splitlines(keepends=True)[1]), 4096)
+
+    def test_predicate_errors_and_other_guards_remain_unmarked(self):
+        calls = []
+        path_error = identity.IdentityError('CIndex include closure')
+        class ExplodingPath:
+            def __fspath__(self):
+                calls.append('path')
+                raise path_error
+        for inclusions, expected_type in (([[]], TypeError), ([1, 'x'], TypeError),
+                ([None], TypeError), ([ExplodingPath()], identity.IdentityError)):
+            value = self.packet(inclusions)
+            with self.assertRaises(expected_type) as caught:
+                self.validate(value, value['probe']['cindex'])
+            self.assertIsNone(identity.declaration_inclusion_diagnostic(caught.exception, {}))
+        self.assertEqual(calls, ['path'])
+        for field, invalid in (('parse_status', 1), ('diagnostics', None)):
+            value, _ = self.fixture.packet()
+            value['probe']['cindex'][field] = invalid
+            with self.assertRaises(identity.IdentityError) as caught:
+                self.validate(value, value['probe']['cindex'])
+            self.assertIsNone(identity.declaration_inclusion_diagnostic(caught.exception, {}))
+
+    def test_optional_annotation_extraction_serialization_and_write_failures_keep_red(self):
+        value = self.packet([])
+        _, expected, _ = self.run_packet(value)
+        original = identity.canonical
+        def broken_serialization(item):
+            if type(item) is dict and item.get('schema') == 'codeskeptic-declaration-inclusion-diagnostic/v1':
+                raise OSError('PRIVATE_SENTINEL')
+            return original(item)
+        for patch in (mock.patch.object(identity.IdentityError, '__setattr__', side_effect=OSError('PRIVATE_SENTINEL')),
+                      mock.patch.object(identity, 'declaration_inclusion_diagnostic', side_effect=RuntimeError('PRIVATE_SENTINEL')),
+                      mock.patch.object(identity, 'canonical', side_effect=broken_serialization)):
+            with patch:
+                observed, failure, log = self.run_packet(value)
+            self.assertIsNone(observed)
+            self.assertEqual(failure, expected)
+            self.assertNotIn(self.LOG, log)
+            self.assertNotIn('PRIVATE_SENTINEL', log)
+        class BrokenLog(io.StringIO):
+            def write(self, text):
+                if text.startswith(DeclarationInclusionDiagnosticTests.LOG):
+                    raise OSError('PRIVATE_SENTINEL')
+                return super().write(text)
+        raw = original(value['probe']['cindex']).encode()
+        with mock.patch.object(identity.subprocess, 'run', return_value=SimpleNamespace(returncode=0, stdout=raw, stderr=b'')) as execute, \
+                mock.patch.object(identity.sys, 'stderr', BrokenLog()):
+            observed, failure = identity.run_declaration_worker({}, lambda observed: self.validate(value, observed))
+        execute.assert_called_once()
+        self.assertIsNone(observed)
+        self.assertEqual(failure, expected)
+        # No marker can leak to a later invocation or a non-VALIDATE phase.
+        observed, failure, log, _ = DeclarationResultDiagnosticTests().run_result()
+        self.assertIsNone(failure)
+        self.assertEqual(log, '')
+
+    @unittest.skipIf(sys.platform == 'win32', 'Synthetic Linux writer paths; not native Windows evidence.')
+    def test_actual_writer_keeps_packet_schema_and_syntax_red(self):
+        value = self.packet(['/sdk/stdlib.h'])
+        raw = identity.canonical(value['probe']['cindex']).encode()
+        for syntax_exit in (0, 1):
+            with tempfile.TemporaryDirectory() as directory:
+                output = Path(directory).resolve() / 'failed.json'
+                with self.fixture.mocked_declaration_capture(output, raw, syntax_exit=syntax_exit) as (argv, log, emitted):
+                    self.assertEqual(identity.main(argv), 2)
+                retained = json.loads(output.read_bytes())
+                self.diagnostic(log.getvalue(), retained['probe']['backend_failure'], 'PATH_SET_MISMATCH', retained['probe']['headers'])
+                self.assertEqual(set(retained['probe']), {'input', 'dependency', 'headers', 'syntax', 'cindex', 'backend_failure'})
+                self.assertIsNone(retained['probe']['cindex'])
+                self.assertEqual(retained['probe']['syntax']['exit_code'], syntax_exit)
+                summary = self.fixture.summary(retained, identity.declaration_model(Path(identity.__file__).resolve().parents[1])[1])
+                self.assertTrue(all(row['issues'] == ['BACKEND_FAILED'] + (['SYNTAX_FAILED'] if syntax_exit else []) for row in summary['requests']))
+                self.assertTrue(all(summary[key] is False for key in ('syntax_pass', 'native_qualified', 'task_ready', 'product_qualified')))
+
+
 class PosixDeclarationProfileTests(unittest.TestCase):
     PROFILE = 'c17-posix2008/v1'
     PREFIX = '#define _POSIX_C_SOURCE 200809L\n'

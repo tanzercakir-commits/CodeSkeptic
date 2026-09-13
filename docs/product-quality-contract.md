@@ -729,6 +729,46 @@ Var olan sonuç kabulü, yakalanan exception sınıfları, komut/ortam/tek denem
 sınıfları yeni marker üretmez; eski child diagnostic şeması aynen korunur.
 Geçmişte yalnız hash'i saklanan stdout'un ret aşaması geriye dönük belirlenemez.
 
+Include-closure guard'ının kendi reddinde, ayrı best-effort
+`DECLARATION_INCLUSION_DIAGNOSTIC` satırı kullanılabilir. Şema
+`codeskeptic-declaration-inclusion-diagnostic/v1`, origin `PARENT_REPORTED`,
+guard `CINDEX_INCLUDE_CLOSURE` olur. Değişmeyen kısa-devre predicate önce bir kez
+hesaplanır; yalnız guard çağrısının özgün `IdentityError` nesnesi private
+object-sentinel ile işaretlenip bare raise edilir. Predicate hesaplanırken
+oluşan hatalar, başka guard'lar, aynı mesajı taşıyan hatalar ve context zinciri
+bu ilişkiyi kurmaz. Bu iç ilişkilendirme, güvenilen Python callback'ine karşı
+kimlik doğrulaması değildir. Annotation başarısızlığı da özgün reddi korur.
+
+Özgün failure hesaplandıktan sonra yalnız VALIDATE aşamasında, sınırlı primitive
+girdilerden ilk başarısız koşul yeniden belirlenir: `NOT_LIST`,
+`NOT_SORTED_UNIQUE` veya `PATH_SET_MISMATCH`. İlk iki koşulda sonraki path-set
+farkı raporlanmaz. Bütçe/şekil/UTF-8 engeli `UNAVAILABLE/INPUT_BUDGET_OR_SHAPE`,
+değişmiş private referanslarda ret yeniden üretilemiyorsa
+`UNAVAILABLE/NO_REPRODUCIBLE_REJECTION` olur; fark tahmin edilmez. Predicate'in
+kendi TypeError reddi işaretlenmediğinden yalnız mevcut parent-result tanısı
+kalabilir. Kaynak kabulü ve yakalanan hata sınıfları değişmez.
+
+Header dizisi ve inclusion listesi ayrı ayrı en fazla4096 kayıt; her path en
+fazla8192 UTF-8 byte, inclusion path toplamı ve canonical header dizisi ayrı
+ayrı en fazla2MiB'tır. Header SHA256, sıralı packet `probe.headers` dizisinin
+canonical UTF-8 JSON + LF baytlarını streaming olarak bağlar; bu bağ elde
+edilemezse digest null kalır. Set farkında tam unique-path sayıları korunur;
+eksik path'lere ait en fazla32 sıfır-tabanlı header indeksi ve beklenmeyen
+path'lerin en fazla8 sıralı SHA256'sı, ayrı kesilme bayraklarıyla gösterilir.
+Normalize edilmiş aynı path birden çok header kaydında varsa her indeks
+listelenebilir; eksik unique-path sayısıyla indeks sayısı aynı olmak zorunda değildir.
+
+Path karşılaştırması özgün platformun PureWindowsPath/PurePosixPath eşitliğidir.
+Beklenmeyen path anahtarı `codeskeptic-purepath-key/v1`, sistem ve render edilmiş
+PurePath string'inin canonical JSON dizisine bağlıdır; yalnız Windows string'i
+`lower()` alır. Unicode casefold, filesystem resolve veya ek `..` indirgeme
+yoktur. Bu hash bilinen adayla karşılaştırma içindir; bilinmeyen ismi geri
+getirmez ve anonimleştirme garantisi değildir. Ham path/exception/child içeriği
+yazılmaz. Marker ve LF dahil satır en fazla4096 ASCII byte'tır. Çıkarma,
+serialization veya yazma hataları yalnız bu tanıyı düşürür; mevcut iki tanı
+şeması, packet, özgün stream hash'leri, syntax RED, tek deneme ve30s timeout
+korunur. Bu metadata tanısı native tamir veya yeterlilik PASS'i değildir.
+
 `check-declarations` saf metadata denetimidir; `native-declarations-check` ayrıca
 packet digest'ini, seçili model byte'larını ve gerçek producer Git bloblarını
 doğrular. Hiçbiri kayıt içindeki native yolları açmaz, library yüklemez veya argv'yi
