@@ -2195,6 +2195,62 @@ class ReferenceFlowTests(unittest.TestCase):
                 self.assertEqual(result['validations'], [])
                 self.assertTrue(result['observations_are_partial'])
 
+    def test_contradictory_first_nul_assumptions_are_rejected_before_execution(self):
+        for first, second in (((0, 4), (1, 4)), ((0, 4), (4, 1)), ((4, 1), (0, 4)),
+                              ((0, 0), (0, 1))):
+            value = self.fixture()
+            value['bindings']['suffix'] = {'object': 'src', 'offset': second[0]}
+            value['bindings']['input']['offset'] = first[0]
+            value['functions'][0]['parameters'].append('suffix')
+            value['strings'] = [{'object': 'src', 'version': 2, 'offset': offset, 'length': length}
+                                for offset, length in (first, second)]
+            value['functions'][0]['operations'] = [
+                self.node('snprintf', source=slot, destination='out', format='%s', capacity=8, returned=length)
+                for slot, length in (('input', first[1]), ('suffix', second[1]))]
+            with self.subTest(first=first, second=second), self.assertRaises(ValueError):
+                self.run_flow(value)
+
+    def test_consistent_suffix_and_separate_string_facts_compose(self):
+        for first, second in (((0, 4), (1, 3)), ((0, 4), (4, 0)), ((0, 2), (4, 2)),
+                              ((0, 0), (1, 0))):
+            value = self.fixture()
+            value['bindings']['suffix'] = {'object': 'src', 'offset': second[0]}
+            value['bindings']['input']['offset'] = first[0]
+            value['functions'][0]['parameters'].append('suffix')
+            value['strings'] = [{'object': 'src', 'version': 2, 'offset': offset, 'length': length}
+                                for offset, length in (first, second)]
+            value['functions'][0]['operations'] = [
+                self.node('snprintf', source=slot, destination='out', format='%s', capacity=8, returned=length)
+                for slot, length in (('input', first[1]), ('suffix', second[1]))]
+            with self.subTest(first=first, second=second):
+                self.assertEqual(self.run_flow(value)['status'], 'MODELED_REFERENCE_FLOW')
+
+    def test_unused_or_replaced_missing_operands_are_still_incomplete(self):
+        for kind in ('assign-unused', 'assign-replaced', 'call-unused', 'call-rebound'):
+            value = self.fixture()
+            if kind.startswith('assign'):
+                operations = [self.node('assign', target='alias', source='missing')]
+                if kind == 'assign-replaced':
+                    operations.append(self.node('assign', target='alias', source='input'))
+            else:
+                value['functions'][2]['operations'] = ([] if kind == 'call-unused' else [
+                    self.node('assign', target='text', source='other')])
+                value['functions'][2]['parameters'].append('other')
+                operations = [self.node('call', callee='consume', arguments=['missing', 'input'], result=None)]
+            value['functions'][0]['operations'] = operations
+            result = self.run_flow(value)
+            with self.subTest(kind=kind):
+                self.assertEqual(result['status'], 'INCOMPLETE_NOT_SAFE')
+                self.assertIn('AMBIGUOUS_OR_MISSING_VIEW', result['reasons'])
+                self.assertEqual(result['bindings'], {})
+
+    def test_joined_missing_alternative_cannot_be_assigned_away(self):
+        value = self.fixture()
+        value['functions'][0]['operations'] = [self.node('branch', condition=None,
+            then=[self.node('assign', target='conditional', source='input')], otherwise=[]),
+            self.node('assign', target='unused', source='conditional')]
+        self.assertEqual(self.run_flow(value)['status'], 'INCOMPLETE_NOT_SAFE')
+
     def test_malformed_or_out_of_body_graph_is_rejected(self):
         for change in ('duplicate', 'location', 'bool-size', 'foreign-field', 'stale-string'):
             value = self.fixture()

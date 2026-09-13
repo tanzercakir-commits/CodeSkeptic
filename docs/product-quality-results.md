@@ -2989,3 +2989,22 @@ başarılı path'te bir input byte'ını caller buffer ve iki helper üzerinden
 gerçek byte okumasına bağlar; security sink/fix veya independent safe örnek değildir.
 Kaynak-semantiği qualification ve bütün model/native/product flag'leri false,
 ek quota0'dır. Recorded selection2/1020, safe0 ve U003 FRONT değişmedi; POP yok.
+
+İlk temiz `dc2ecb6bddb75f0819a07be7bc9001cae07ccfb6` checkpoint'i581 test,
+source/dependency CLI, queue ve own C syntax geçmesine rağmen bağımsız
+NOT_APPROVED aldı; gönderilmedi. Denetçi39 dar testi ayrıca çalıştırdı ve iki
+material açık buldu: aynı object/version için offset0/length4 ile offset1/length4
+çelişik first-NUL vaatleri kabul ediliyordu; assignment veya empty helper'a
+aktarılan eksik operand kullanılmazsa complete kalabiliyordu. Kendi C örneğinin
+seçilmiş path eşlemesi varsayımlarıyla uyumluydu, fakat bu bulguları kapatmaz.
+
+Dört yeni regresyon yöntemi (uyumlu suffix/ayrı string pozitifleri dahil)
+dc2 implementation üzerinde RED: capture SHA
+`f2db8bf74a4efa1f1fbadbdf6c39ba5267bca48ecffe11a5b67e91a3639feab9`.
+Düzeltme bounded first-NUL aralık tutarlılığı kontrolünü ve assignment/call
+operand çözümlemesinde eksik alternatifi hemen incomplete yapan ortak helper'ı
+ekler. Sonradan overwrite veya kullanılmayan parametre unresolved operation'ı
+aklayamaz. Aynı regresyon GREEN SHA
+`b41c82456752f1f53473be2a0a5e7fb0e3e568909d72750d22bce008bcee3502`.
+İlk NOT_APPROVED/581-test kanıtı korunur; yeni temiz head ayrıca bağımsız
+denetlenecek, bu metin sonraki review'u peşinen PASS saymaz.

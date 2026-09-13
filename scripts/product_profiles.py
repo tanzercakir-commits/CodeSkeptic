@@ -3704,6 +3704,17 @@ def reference_flow(value):
             key = (fact['object'], fact['offset'])
             require(key not in string_keys, 'flow duplicate string fact')
             string_keys.add(key)
+        # Each fact promises NON-NUL throughout [offset, offset+length)
+        # and NUL exactly at its end. Distinct views of one allocation must
+        # not promise opposite byte values. Shared terminators (suffixes) and
+        # disjoint strings remain valid; no byte-sized allocation is needed.
+        for index, left in enumerate(value['strings']):
+            for right in value['strings'][index + 1:]:
+                if left['object'] == right['object']:
+                    left_nul = left['offset'] + left['length']
+                    right_nul = right['offset'] + right['length']
+                    require(not (left['offset'] <= right_nul < left_nul
+                                 or right['offset'] <= left_nul < right_nul), 'flow contradictory first NUL facts')
 
         signatures = {
             'noop': '', 'assign': 'target source', 'write': 'target length origins',
@@ -3790,9 +3801,15 @@ def reference_flow(value):
                           'at': copy.deepcopy(node['at']), 'execution_context': list(context),
                           'objects': {key: obj['version'] for key, obj in current['objects'].items()}})
 
-        def view_of(current, slot):
+        def choices_of(current, slot):
             choices = current['slots'].get(slot, [None])
-            if len(choices) != 1 or choices[0] is None:
+            if not choices or any(view is None for view in choices):
+                raise _ReferenceFlowIncomplete('AMBIGUOUS_OR_MISSING_VIEW')
+            return choices
+
+        def view_of(current, slot):
+            choices = choices_of(current, slot)
+            if len(choices) != 1:
                 raise _ReferenceFlowIncomplete('AMBIGUOUS_OR_MISSING_VIEW')
             return choices[0]
 
@@ -3856,7 +3873,7 @@ def reference_flow(value):
                     if op == 'unsupported':
                         raise _ReferenceFlowIncomplete('UNSUPPORTED_' + node['reason'])
                     if op == 'assign':
-                        current['slots'][node['target']] = copy.deepcopy(current['slots'].get(node['source'], [None]))
+                        current['slots'][node['target']] = copy.deepcopy(choices_of(current, node['source']))
                     elif op == 'write':
                         view, start, end = extent(current, node['target'], node['length'])
                         if start < end:
@@ -3883,7 +3900,7 @@ def reference_flow(value):
                         if len(node['arguments']) != len(callee['parameters']):
                             raise _ReferenceFlowIncomplete('CALL_ARGUMENT_BINDING_UNPROVEN')
                         caller_slots = current['slots']
-                        current['slots'] = {param: copy.deepcopy(caller_slots.get(arg, [None]))
+                        current['slots'] = {param: copy.deepcopy(choices_of(current, arg))
                                             for param, arg in zip(callee['parameters'], node['arguments'])}
                         current, returned = execute(node['callee'], current, path + [node['id']], active + [name])
                         current['slots'] = caller_slots

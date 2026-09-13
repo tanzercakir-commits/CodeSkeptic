@@ -1036,6 +1036,12 @@ slot'unu değiştirmez; yalnız caller-owned view dönebilir. Local allocation,
 pointer arithmetic, scalar inference, erken return, loop, recursion, indirect/
 virtual/external-TU calls ve başka API etkileri bu vocabulary'de yoktur.
 Eksik callee/return/view veya feasible unsupported yol incomplete'dir.
+Eksik operand assignment veya parametre geçişinde hemen saptanır; kullanılmayan
+veya sonra yeniden bağlanan slot bu unresolved operation'ı gizleyemez.
+Başlangıçta aynı object/version üzerindeki bütün first-NUL fact'leri birbiriyle
+tutarlı olmalıdır: birinin NUL byte'ı diğerinin non-NUL aralığında olamaz.
+Aynı terminator'a ulaşan suffix'ler ve ayrı string aralıkları geçerlidir;
+kontrol byte büyüklüğünde storage ayırmadan bounded interval karşılaştırmasıdır.
 
 Byte write tam belirtilen region'u değiştirir; dokunulmayan interval korunur.
 Adjacent eşit origin kümeleri canonical olarak birleşir. Unknown branch iki
