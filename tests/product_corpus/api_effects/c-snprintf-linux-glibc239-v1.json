@@ -1,0 +1,975 @@
+{
+  "schema": "codeskeptic-native-api-effect-candidate/v1",
+  "state": "REFERENCE_EFFECT_FOR_INDEPENDENT_REVIEW",
+  "id": "c-snprintf-linux-glibc239-v1",
+  "selection": {
+    "api_id": "c.snprintf",
+    "platform": "linux-x86_64",
+    "visibility_profile": {
+      "id": "c17-posix2008/v1",
+      "language": "c17",
+      "feature_macros": {
+        "_POSIX_C_SOURCE": "200809L"
+      }
+    }
+  },
+  "model": {
+    "path": "tests/product_corpus/native-api-models.json",
+    "sha256": "c2caba2a15fef514c81af282c7fd8e1667b141698829f9354cd14118415873f4"
+  },
+  "declaration": {
+    "candidate": {
+      "path": "tests/product_corpus/declaration_candidates/c-snprintf-linux-x86-64-8953056-v2.json",
+      "sha256": "bc792d90bd1e342df88f74e9c0f14f8665d0482c271f4889b93066868c645092"
+    },
+    "review": {
+      "path": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/native-api-declaration-assessments-d005d4c-v1/reviews/c-snprintf-linux-x86-64-8953056-v2-review.json",
+      "sha256": "f9491ff77226bb3c9ac69ed1fd512652e5e5db8b33816dd31e0f921086cb155f"
+    }
+  },
+  "manual": {
+    "root": "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/native-api-snprintf-manual-glibc239-v1",
+    "manifest_sha256": "72338396b48cbd9fc807ed6d0739fd7ba9624b99295a7f0a383326b18164d910",
+    "source_review_sha256": "1746af065c2f66e63268bb24a1eb900205e8834b53ba70576e73fa631d11bd75",
+    "patched_runtime_equivalence_proven": false
+  },
+  "operation": "snprintf-constant-percent-s-regions/v1",
+  "cases": [
+    {
+      "id": "full-untrusted",
+      "input": {
+        "schema": "codeskeptic-snprintf-percent-s-input/v1",
+        "format": "%s",
+        "objects": [
+          {
+            "id": "dst",
+            "size": 16,
+            "version": 7,
+            "regions": [
+              {
+                "start": 0,
+                "end": 16,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "old-dst"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "src",
+            "size": 8,
+            "version": 2,
+            "regions": [
+              {
+                "start": 0,
+                "end": 8,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "input"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "destination": {
+          "object": "dst",
+          "offset": 0
+        },
+        "source": {
+          "object": "src",
+          "offset": 0,
+          "version": 2,
+          "length": 4,
+          "nul_terminated": true
+        },
+        "capacity": 8,
+        "returned": 4,
+        "alias_relation": "DISJOINT_OBJECTS",
+        "validations": [
+          {
+            "id": "checked-dst-alias",
+            "object": "dst",
+            "version": 7,
+            "category": "path"
+          },
+          {
+            "id": "checked-source",
+            "object": "src",
+            "version": 2,
+            "category": "shell"
+          }
+        ]
+      },
+      "expected": {
+        "schema": "codeskeptic-snprintf-percent-s-effect/v1",
+        "status": "MODELED_REFERENCE_EFFECT",
+        "reasons": [],
+        "format_origin": "CONSTANT",
+        "source_read": {
+          "state": "READ_THROUGH_NUL_ON_SUCCESS",
+          "object": "src",
+          "start": 0,
+          "end": 5,
+          "argument_index": 3
+        },
+        "formatted_output_write": {
+          "state": "EXACT",
+          "content_bytes": 4,
+          "nul_offset": 4
+        },
+        "additional_argument_effects": "NONE_FOR_SUPPORTED_FORMAT",
+        "output_content_origins": [
+          {
+            "state": "UNTRUSTED",
+            "label": "input"
+          }
+        ],
+        "objects": [
+          {
+            "id": "dst",
+            "size": 16,
+            "version": 8,
+            "regions": [
+              {
+                "start": 0,
+                "end": 4,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "input"
+                  }
+                ]
+              },
+              {
+                "start": 4,
+                "end": 5,
+                "origins": [
+                  {
+                    "state": "CONSTANT",
+                    "label": "snprintf-nul"
+                  }
+                ]
+              },
+              {
+                "start": 5,
+                "end": 16,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "old-dst"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "src",
+            "size": 8,
+            "version": 2,
+            "regions": [
+              {
+                "start": 0,
+                "end": 8,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "input"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "validations": [
+          {
+            "id": "checked-source",
+            "object": "src",
+            "version": 2,
+            "category": "shell"
+          }
+        ],
+        "invalidated_validations": [
+          "checked-dst-alias"
+        ],
+        "effects_outside_state_unknown": false,
+        "model_admitted": false,
+        "native_qualified": false
+      }
+    },
+    {
+      "id": "truncated-prefix",
+      "input": {
+        "schema": "codeskeptic-snprintf-percent-s-input/v1",
+        "format": "%s",
+        "objects": [
+          {
+            "id": "dst",
+            "size": 16,
+            "version": 7,
+            "regions": [
+              {
+                "start": 0,
+                "end": 16,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "old-dst"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "src",
+            "size": 8,
+            "version": 2,
+            "regions": [
+              {
+                "start": 0,
+                "end": 2,
+                "origins": [
+                  {
+                    "state": "CONSTANT",
+                    "label": "prefix"
+                  }
+                ]
+              },
+              {
+                "start": 2,
+                "end": 8,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "suffix"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "destination": {
+          "object": "dst",
+          "offset": 0
+        },
+        "source": {
+          "object": "src",
+          "offset": 0,
+          "version": 2,
+          "length": 4,
+          "nul_terminated": true
+        },
+        "capacity": 3,
+        "returned": 4,
+        "alias_relation": "DISJOINT_OBJECTS",
+        "validations": [
+          {
+            "id": "checked-dst-alias",
+            "object": "dst",
+            "version": 7,
+            "category": "path"
+          },
+          {
+            "id": "checked-source",
+            "object": "src",
+            "version": 2,
+            "category": "shell"
+          }
+        ]
+      },
+      "expected": {
+        "schema": "codeskeptic-snprintf-percent-s-effect/v1",
+        "status": "MODELED_REFERENCE_EFFECT",
+        "reasons": [],
+        "format_origin": "CONSTANT",
+        "source_read": {
+          "state": "READ_THROUGH_NUL_ON_SUCCESS",
+          "object": "src",
+          "start": 0,
+          "end": 5,
+          "argument_index": 3
+        },
+        "formatted_output_write": {
+          "state": "EXACT",
+          "content_bytes": 2,
+          "nul_offset": 2
+        },
+        "additional_argument_effects": "NONE_FOR_SUPPORTED_FORMAT",
+        "output_content_origins": [
+          {
+            "state": "CONSTANT",
+            "label": "prefix"
+          }
+        ],
+        "objects": [
+          {
+            "id": "dst",
+            "size": 16,
+            "version": 8,
+            "regions": [
+              {
+                "start": 0,
+                "end": 2,
+                "origins": [
+                  {
+                    "state": "CONSTANT",
+                    "label": "prefix"
+                  }
+                ]
+              },
+              {
+                "start": 2,
+                "end": 3,
+                "origins": [
+                  {
+                    "state": "CONSTANT",
+                    "label": "snprintf-nul"
+                  }
+                ]
+              },
+              {
+                "start": 3,
+                "end": 16,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "old-dst"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "src",
+            "size": 8,
+            "version": 2,
+            "regions": [
+              {
+                "start": 0,
+                "end": 2,
+                "origins": [
+                  {
+                    "state": "CONSTANT",
+                    "label": "prefix"
+                  }
+                ]
+              },
+              {
+                "start": 2,
+                "end": 8,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "suffix"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "validations": [
+          {
+            "id": "checked-source",
+            "object": "src",
+            "version": 2,
+            "category": "shell"
+          }
+        ],
+        "invalidated_validations": [
+          "checked-dst-alias"
+        ],
+        "effects_outside_state_unknown": false,
+        "model_admitted": false,
+        "native_qualified": false
+      }
+    },
+    {
+      "id": "zero-capacity",
+      "input": {
+        "schema": "codeskeptic-snprintf-percent-s-input/v1",
+        "format": "%s",
+        "objects": [
+          {
+            "id": "dst",
+            "size": 16,
+            "version": 7,
+            "regions": [
+              {
+                "start": 0,
+                "end": 16,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "old-dst"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "src",
+            "size": 8,
+            "version": 2,
+            "regions": [
+              {
+                "start": 0,
+                "end": 8,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "input"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "destination": null,
+        "source": {
+          "object": "src",
+          "offset": 0,
+          "version": 2,
+          "length": 4,
+          "nul_terminated": true
+        },
+        "capacity": 0,
+        "returned": 4,
+        "alias_relation": "DISJOINT_OBJECTS",
+        "validations": [
+          {
+            "id": "checked-dst-alias",
+            "object": "dst",
+            "version": 7,
+            "category": "path"
+          },
+          {
+            "id": "checked-source",
+            "object": "src",
+            "version": 2,
+            "category": "shell"
+          }
+        ]
+      },
+      "expected": {
+        "schema": "codeskeptic-snprintf-percent-s-effect/v1",
+        "status": "MODELED_REFERENCE_EFFECT",
+        "reasons": [],
+        "format_origin": "CONSTANT",
+        "source_read": {
+          "state": "READ_THROUGH_NUL_ON_SUCCESS",
+          "object": "src",
+          "start": 0,
+          "end": 5,
+          "argument_index": 3
+        },
+        "formatted_output_write": {
+          "state": "NONE",
+          "content_bytes": 0,
+          "nul_offset": null
+        },
+        "additional_argument_effects": "NONE_FOR_SUPPORTED_FORMAT",
+        "output_content_origins": [],
+        "objects": [
+          {
+            "id": "dst",
+            "size": 16,
+            "version": 7,
+            "regions": [
+              {
+                "start": 0,
+                "end": 16,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "old-dst"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "src",
+            "size": 8,
+            "version": 2,
+            "regions": [
+              {
+                "start": 0,
+                "end": 8,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "input"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "validations": [
+          {
+            "id": "checked-dst-alias",
+            "object": "dst",
+            "version": 7,
+            "category": "path"
+          },
+          {
+            "id": "checked-source",
+            "object": "src",
+            "version": 2,
+            "category": "shell"
+          }
+        ],
+        "invalidated_validations": [],
+        "effects_outside_state_unknown": false,
+        "model_admitted": false,
+        "native_qualified": false
+      }
+    },
+    {
+      "id": "one-capacity",
+      "input": {
+        "schema": "codeskeptic-snprintf-percent-s-input/v1",
+        "format": "%s",
+        "objects": [
+          {
+            "id": "dst",
+            "size": 16,
+            "version": 7,
+            "regions": [
+              {
+                "start": 0,
+                "end": 16,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "old-dst"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "src",
+            "size": 8,
+            "version": 2,
+            "regions": [
+              {
+                "start": 0,
+                "end": 8,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "input"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "destination": {
+          "object": "dst",
+          "offset": 0
+        },
+        "source": {
+          "object": "src",
+          "offset": 0,
+          "version": 2,
+          "length": 4,
+          "nul_terminated": true
+        },
+        "capacity": 1,
+        "returned": 4,
+        "alias_relation": "DISJOINT_OBJECTS",
+        "validations": [
+          {
+            "id": "checked-dst-alias",
+            "object": "dst",
+            "version": 7,
+            "category": "path"
+          },
+          {
+            "id": "checked-source",
+            "object": "src",
+            "version": 2,
+            "category": "shell"
+          }
+        ]
+      },
+      "expected": {
+        "schema": "codeskeptic-snprintf-percent-s-effect/v1",
+        "status": "MODELED_REFERENCE_EFFECT",
+        "reasons": [],
+        "format_origin": "CONSTANT",
+        "source_read": {
+          "state": "READ_THROUGH_NUL_ON_SUCCESS",
+          "object": "src",
+          "start": 0,
+          "end": 5,
+          "argument_index": 3
+        },
+        "formatted_output_write": {
+          "state": "EXACT",
+          "content_bytes": 0,
+          "nul_offset": 0
+        },
+        "additional_argument_effects": "NONE_FOR_SUPPORTED_FORMAT",
+        "output_content_origins": [],
+        "objects": [
+          {
+            "id": "dst",
+            "size": 16,
+            "version": 8,
+            "regions": [
+              {
+                "start": 0,
+                "end": 1,
+                "origins": [
+                  {
+                    "state": "CONSTANT",
+                    "label": "snprintf-nul"
+                  }
+                ]
+              },
+              {
+                "start": 1,
+                "end": 16,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "old-dst"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "src",
+            "size": 8,
+            "version": 2,
+            "regions": [
+              {
+                "start": 0,
+                "end": 8,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "input"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "validations": [
+          {
+            "id": "checked-source",
+            "object": "src",
+            "version": 2,
+            "category": "shell"
+          }
+        ],
+        "invalidated_validations": [
+          "checked-dst-alias"
+        ],
+        "effects_outside_state_unknown": false,
+        "model_admitted": false,
+        "native_qualified": false
+      }
+    },
+    {
+      "id": "negative-return",
+      "input": {
+        "schema": "codeskeptic-snprintf-percent-s-input/v1",
+        "format": "%s",
+        "objects": [
+          {
+            "id": "dst",
+            "size": 16,
+            "version": 7,
+            "regions": [
+              {
+                "start": 0,
+                "end": 16,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "old-dst"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "src",
+            "size": 8,
+            "version": 2,
+            "regions": [
+              {
+                "start": 0,
+                "end": 8,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "input"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "destination": {
+          "object": "dst",
+          "offset": 0
+        },
+        "source": {
+          "object": "src",
+          "offset": 0,
+          "version": 2,
+          "length": 4,
+          "nul_terminated": true
+        },
+        "capacity": 8,
+        "returned": -1,
+        "alias_relation": "DISJOINT_OBJECTS",
+        "validations": [
+          {
+            "id": "checked-dst-alias",
+            "object": "dst",
+            "version": 7,
+            "category": "path"
+          },
+          {
+            "id": "checked-source",
+            "object": "src",
+            "version": 2,
+            "category": "shell"
+          }
+        ]
+      },
+      "expected": {
+        "schema": "codeskeptic-snprintf-percent-s-effect/v1",
+        "status": "INCOMPLETE_NOT_SAFE",
+        "reasons": [
+          "RETURN_EFFECT_NOT_MODELED"
+        ],
+        "format_origin": "CONSTANT",
+        "source_read": {
+          "state": "MAY_READ_TO_NUL",
+          "object": "src",
+          "start": 0,
+          "end": 5,
+          "argument_index": 3
+        },
+        "formatted_output_write": {
+          "state": "MAY_WRITE",
+          "content_bytes": null,
+          "nul_offset": null
+        },
+        "additional_argument_effects": "NONE_FOR_SUPPORTED_FORMAT",
+        "output_content_origins": [],
+        "objects": [
+          {
+            "id": "dst",
+            "size": 16,
+            "version": 8,
+            "regions": [
+              {
+                "start": 0,
+                "end": 16,
+                "origins": [
+                  {
+                    "state": "UNKNOWN",
+                    "label": "unresolved-mutation"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "src",
+            "size": 8,
+            "version": 2,
+            "regions": [
+              {
+                "start": 0,
+                "end": 8,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "input"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "validations": [
+          {
+            "id": "checked-source",
+            "object": "src",
+            "version": 2,
+            "category": "shell"
+          }
+        ],
+        "invalidated_validations": [
+          "checked-dst-alias"
+        ],
+        "effects_outside_state_unknown": false,
+        "model_admitted": false,
+        "native_qualified": false
+      }
+    },
+    {
+      "id": "unsupported-percent-n-at-zero",
+      "input": {
+        "schema": "codeskeptic-snprintf-percent-s-input/v1",
+        "format": "%n",
+        "objects": [
+          {
+            "id": "dst",
+            "size": 16,
+            "version": 7,
+            "regions": [
+              {
+                "start": 0,
+                "end": 16,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "old-dst"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "src",
+            "size": 8,
+            "version": 2,
+            "regions": [
+              {
+                "start": 0,
+                "end": 8,
+                "origins": [
+                  {
+                    "state": "UNTRUSTED",
+                    "label": "input"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "destination": {
+          "object": "dst",
+          "offset": 0
+        },
+        "source": {
+          "object": "src",
+          "offset": 0,
+          "version": 2,
+          "length": 4,
+          "nul_terminated": true
+        },
+        "capacity": 0,
+        "returned": 4,
+        "alias_relation": "DISJOINT_OBJECTS",
+        "validations": [
+          {
+            "id": "checked-dst-alias",
+            "object": "dst",
+            "version": 7,
+            "category": "path"
+          },
+          {
+            "id": "checked-source",
+            "object": "src",
+            "version": 2,
+            "category": "shell"
+          }
+        ]
+      },
+      "expected": {
+        "schema": "codeskeptic-snprintf-percent-s-effect/v1",
+        "status": "INCOMPLETE_NOT_SAFE",
+        "reasons": [
+          "FORMAT_ARGUMENT_EFFECTS_NOT_MODELED"
+        ],
+        "format_origin": "CONSTANT",
+        "source_read": {
+          "state": "UNRESOLVED",
+          "argument_index": 3
+        },
+        "formatted_output_write": {
+          "state": "UNRESOLVED",
+          "content_bytes": null,
+          "nul_offset": null
+        },
+        "additional_argument_effects": "UNKNOWN",
+        "output_content_origins": [],
+        "objects": [
+          {
+            "id": "dst",
+            "size": 16,
+            "version": 8,
+            "regions": [
+              {
+                "start": 0,
+                "end": 16,
+                "origins": [
+                  {
+                    "state": "UNKNOWN",
+                    "label": "unresolved-mutation"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "src",
+            "size": 8,
+            "version": 3,
+            "regions": [
+              {
+                "start": 0,
+                "end": 8,
+                "origins": [
+                  {
+                    "state": "UNKNOWN",
+                    "label": "unresolved-mutation"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "validations": [],
+        "invalidated_validations": [
+          "checked-dst-alias",
+          "checked-source"
+        ],
+        "effects_outside_state_unknown": true,
+        "model_admitted": false,
+        "native_qualified": false
+      }
+    }
+  ],
+  "qualification": {
+    "model_admitted": false,
+    "evaluation_frozen": false,
+    "native_qualified": false,
+    "task_ready": false,
+    "product_qualified": false
+  },
+  "remaining_gaps": [
+    "This is one executable reference operation for a constant exact %s, under explicit valid-string/extent/alias/version/return assumptions. Source code evidence for those assumptions, analyzer integration, full format grammar and every other required API/flow operator remain separate obligations.",
+    "Manual version 2.39 matches the retained libc6/libc6-dev package series, but does not prove the patched Ubuntu runtime or actual call behavior, ABI binding or absence of interposition.",
+    "Negative/unknown returns, unknown aliases/source extents, overlapping accesses, GNU null-%s and unsupported formats remain explicit incomplete outcomes, not sanitizers or safe labels.",
+    "Required Windows declaration/native qualification, SQLite, C++ overloads, bounded TU-local joins/helper summaries, independent evaluation/security-fix/safe-control inputs and the global premeasurement freeze remain incomplete."
+  ],
+  "boundary": "Additive reference effect proposal, not a rewrite or admission of native-api-models.json. Six abstract transition examples do not enter any evaluation or quality denominator. A current-version length/termination fact asserts a readable non-NUL prefix and its first NUL, not a property discovered by this operation. Byte-region origins and validation generations are abstract reference state, not recorded native bytes. Manual/declaration evidence is reviewed separately from prospective implementation review; all qualification flags remain false."
+}

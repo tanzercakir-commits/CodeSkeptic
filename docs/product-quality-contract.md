@@ -896,3 +896,75 @@ açılmaz; hata çıkışı özel kanıt/exception metnini içermez. Bunlar hard
 malicious-root isolation veya tam runtime/ABI kanıtı değildir. Bu dar bildirim
 incelemesi transfer/API seçimi, source/sink/sanitizer semantiği, SQLite, gerçek
 security-fix/safe kontrolleri veya U003'ün bütüncül freeze kapısının yerine geçmez.
+
+### Somut referans etki: Linux glibc2.39 snprintf sabit `%s`
+
+`native-api-effect-check --api-effect <repo-relative>` yalnız
+`tests/product_corpus/api_effects/` altındaki eklemeli aday kaydını okur.
+İlk operation `snprintf-constant-percent-s-regions/v1`'dir. Mevcut model ve
+declaration v2 candidate hash'leri, gerçek bağımsız declaration review,
+özgün packet/producer Git blob'ları ve Linux c17-posix2008 seçim bağı birlikte
+doğrulanır. Packet'ta libc6 ve libc6-dev tam2.39-0ubuntu8.8 installed satırları
+aranır; başka Linux veya libc sürümüne sessiz genelleme yapılmaz.
+
+İki GNU glibc2.39 kılavuz sayfası, source manifest ve gerçek bağımsız kaynak
+incelemesi kalıcı dış dizinde exact SHA ile sabittir. İlk helper incelemesinin
+eksik title kontrolü RED'i ve düzeltilmiş GREEN'i korunur. Helper'ın
+in_document_version_verified=false kaydı değişmez; sonraki gerçek kaynak
+incelemesi her iki HTML yorumundaki2.39 sürüm bildirimini ayrıca gözlemledi.
+Bu belge sürümü, patched Ubuntu runtime eşdeğerliği veya imzalı yayın kanıtı
+değildir. Copyright/GFDL notice'ları korunur; HTML repoya kopyalanmaz.
+
+Operation genel JSON programı çalıştırmaz; sabit saf Python dönüşümüdür.
+Input bir C çağrısından keşfedilmiş kanıt değil, açık soyut varsayımlardır:
+backing object/analysis generation, offset, bütün allocation'ı kaplayan origin
+interval'leri, source'un güncel sürümüne bağlı length/termination fact'i,
+alias ilişkisi, capacity, return ve nesne/sürüm bağlı validation'lar. Bilinen
+string length, okunabilir non-NUL prefix'in ardından ilk NUL'un tam o offset'te
+olduğunu varsayar. Bu varsayımı gerçek kaynakta ispatlamak ayrı yükümlülüktür;
+`call_assumptions_source_verified=false` hiçbir sonuçta değişmez.
+
+Desteklenen literal yalnız tam `%s`'dir. Başarılı dönüş length ile çelişemez.
+Pozitif capacity için content=min(length,capacity-1), ayrıca bir NUL yazılır;
+dönüş değeri gerçekten yazılmış byte sayısı sayılmaz. Source tüketimi ilk NUL'a
+kadar kaydedilir; truncation yalnız kopyalanan prefix'in origin'lerini taşır.
+Format CONSTANT kalırken çıktı UNTRUSTED olabilir. Allocation'ın dokunulmayan
+ön/arka bölgeleri korunur; resulting C string'in tam overwrite'ı backing
+allocation'ın tamamını temizlemek değildir. NUL-only yazma da generation'ı
+ilerletir ve bütün eski object/version validation'larını alias isminden bağımsız
+geçersiz kılar. Generation bir analysis fact kimliğidir, runtime write counter
+değildir; belirsiz mutation'da da eski fact'i korumamak için ilerler.
+
+Diğer precondition'lar geçerliyken capacity=0 destination'a yazmaz; null
+destination mümkündür ve negative/unknown return bile bu no-write bilgisini
+silmez. Bu source'un okunmadığı veya genel çağrının saf olduğu iddiası değildir.
+Desteklenmeyen format/%n önce ele alınır: bilinmeyen pointer argument etkileri
+sıfır capacity'de de görünür kalır ve mevcut state'in bütün validation'ları
+geçersizleşir. Null `%s` GNU extension'ı bu ilk operation'da desteklenmez;
+glibc için evrensel UB diye etiketlenmez.
+
+Bilinen aynı allocation'ın disjoint gerçek read/write interval'leri
+modellenebilir; yalnız capacity interval'inin source ile kesişmesi overlap
+kanıtı değildir. Gerçek read/write overlap (iki NUL dahil), belirsiz alias,
+string/read extent ve destination capacity precondition'ı açık
+INCOMPLETE_NOT_SAFE'dir. Capacity'nin allocation'dan büyük olması bu dar
+operation'ın destek sınırıdır, tek başına kanıtlanmış taşma değildir.
+Pozitif capacity'de negative/unknown return için kesin mutation/termination
+uydurulmaz; destination fact'leri konservatif bilinmez olur. Bu kılavuzlardan
+detaylı restrict veya error-path runtime davranışı çıkarıldığı iddia edilmez.
+
+Input en çok8 object, object başına32 origin interval, interval başına8 origin,
+32 validation ve512 karakter format içerir. Byte/offset/capacity uint64,
+return int32, input generation en çok2^63-2'dir; bool sayı değildir. Storage
+capacity ile orantılı ayrılmaz. Bunlar tek-operation representation sınırlarıdır;
+TU-local state/step/call-depth bütçe uygulaması veya genel join/helper engine'i
+değildir. Çok adımlı canonical interval birleştirme/budget handling ayrıdır.
+
+Adaydaki en çok32 reference case'in tam beklenen çıktısı operation tarafından
+yeniden hesaplanır. Candidate/model/packet/review/manual ve case kontrolü tek
+transitive ordinary-race guard'ına bağlıdır; sonradan değişen input reddedilir.
+Bu örnekler corpus paydasına girmez. CLI exit0 yalnız bağlı referans kontrolüdür:
+model_admitted/evaluation_frozen/native_qualified/task_ready/product_qualified
+false kalır. Full format grammar, diğer API/source/sink/transfer/sanitizer'lar,
+SQLite/C++/TU-local flow, Windows, security-fix/safe kontrolleri ve tüm U003
+acceptance/global-freeze kapıları ayrı ve açık kalır.

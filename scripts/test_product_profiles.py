@@ -1840,6 +1840,371 @@ class NativeDeclarationCandidateTests(unittest.TestCase):
             self.read()
 
 
+    def test_enclosing_reader_keeps_transitive_declaration_input_identities(self):
+        self.candidate()
+        review = {'path': str(self.review_path), 'sha256': self.write(self.review_path, self.review)}
+        guard = {}
+        with mock.patch.object(profiles, 'verify_reviewed_files'):
+            profiles.verify_native_declaration_candidate(self.repo, self.record_path,
+                                                         review=review, _input_guard=guard)
+        for path in (self.repo / self.record_path, self.repo / self.model_path, self.packet_path, self.review_path):
+            self.assertIn(path, guard)
+        profiles.verify_input_identities(guard)
+        self.packet_path.write_bytes(self.packet_path.read_bytes() + b' ')
+        with self.assertRaisesRegex(ValueError, 'transitive input identity changed'):
+            profiles.verify_input_identities(guard)
+
+
+class SnprintfEffectTests(unittest.TestCase):
+    """Reference transitions, not analyzer/native executions or corpus examples."""
+    @staticmethod
+    def origin(state, label):
+        return {'state': state, 'label': label}
+
+    def fixture(self):
+        return {
+            'schema': 'codeskeptic-snprintf-percent-s-input/v1', 'format': '%s',
+            'objects': [
+                {'id': 'dst', 'size': 16, 'version': 7, 'regions': [
+                    {'start': 0, 'end': 16, 'origins': [self.origin('UNTRUSTED', 'old-dst')]}]},
+                {'id': 'src', 'size': 8, 'version': 2, 'regions': [
+                    {'start': 0, 'end': 8, 'origins': [self.origin('UNTRUSTED', 'input')]}]},
+            ],
+            'destination': {'object': 'dst', 'offset': 0},
+            'source': {'object': 'src', 'offset': 0, 'version': 2, 'length': 4, 'nul_terminated': True},
+            'capacity': 8, 'returned': 4, 'alias_relation': 'DISJOINT_OBJECTS',
+            'validations': [
+                {'id': 'checked-dst-alias', 'object': 'dst', 'version': 7, 'category': 'path'},
+                {'id': 'checked-source', 'object': 'src', 'version': 2, 'category': 'shell'},
+            ],
+        }
+
+    def effect(self, value=None):
+        return profiles.snprintf_percent_s_effect(self.fixture() if value is None else value)
+
+    def test_constant_format_transfers_untrusted_content_not_format_taint(self):
+        value = self.fixture()
+        original = copy.deepcopy(value)
+        result = self.effect(value)
+        self.assertEqual(value, original)
+        self.assertEqual(result['status'], 'MODELED_REFERENCE_EFFECT')
+        self.assertEqual(result['format_origin'], 'CONSTANT')
+        self.assertEqual(result['source_read'], {'state': 'READ_THROUGH_NUL_ON_SUCCESS',
+                         'object': 'src', 'start': 0, 'end': 5, 'argument_index': 3})
+        self.assertEqual(result['formatted_output_write'],
+                         {'state': 'EXACT', 'content_bytes': 4, 'nul_offset': 4})
+        self.assertEqual(result['output_content_origins'], [self.origin('UNTRUSTED', 'input')])
+        self.assertEqual(result['objects'][0]['version'], 8)
+        self.assertEqual(result['objects'][0]['regions'], [
+            {'start': 0, 'end': 4, 'origins': [self.origin('UNTRUSTED', 'input')]},
+            {'start': 4, 'end': 5, 'origins': [self.origin('CONSTANT', 'snprintf-nul')]},
+            {'start': 5, 'end': 16, 'origins': [self.origin('UNTRUSTED', 'old-dst')]},
+        ])
+        self.assertEqual(result['invalidated_validations'], ['checked-dst-alias'])
+        self.assertEqual(result['validations'], [value['validations'][1]])
+        self.assertFalse(result['native_qualified'])
+        self.assertFalse(result['model_admitted'])
+
+    def test_truncation_copies_only_prefix_but_consumes_full_source(self):
+        value = self.fixture()
+        value['capacity'] = 3
+        value['objects'][1]['regions'] = [
+            {'start': 0, 'end': 2, 'origins': [self.origin('CONSTANT', 'prefix')]},
+            {'start': 2, 'end': 8, 'origins': [self.origin('UNTRUSTED', 'suffix')]},
+        ]
+        result = self.effect(value)
+        self.assertEqual(result['formatted_output_write']['content_bytes'], 2)
+        self.assertEqual(result['formatted_output_write']['nul_offset'], 2)
+        self.assertEqual(result['source_read']['end'], 5)
+        self.assertEqual(result['output_content_origins'], [self.origin('CONSTANT', 'prefix')])
+        self.assertEqual(result['objects'][0]['regions'][-1]['start'], 3)
+
+    def test_zero_capacity_is_no_destination_write_not_no_source_read(self):
+        for destination in (None, {'object': 'dst', 'offset': 0}):
+            for returned in (4, -1, None):
+                value = self.fixture()
+                value.update(capacity=0, destination=destination, returned=returned)
+                with self.subTest(destination=destination, returned=returned):
+                    result = self.effect(value)
+                    self.assertEqual(result['formatted_output_write']['state'], 'NONE')
+                    self.assertEqual(result['objects'], value['objects'])
+                    self.assertEqual(result['validations'], value['validations'])
+                    self.assertEqual(result['invalidated_validations'], [])
+                    self.assertEqual(result['status'], 'MODELED_REFERENCE_EFFECT' if returned == 4
+                                     else 'INCOMPLETE_NOT_SAFE')
+                    self.assertNotEqual(result['source_read']['state'], 'NONE')
+
+    def test_one_capacity_and_empty_string_still_mutate_terminator(self):
+        for capacity, length in ((1, 4), (8, 0)):
+            value = self.fixture()
+            value['capacity'] = capacity
+            value['source']['length'] = value['returned'] = length
+            result = self.effect(value)
+            self.assertEqual(result['formatted_output_write'],
+                             {'state': 'EXACT', 'content_bytes': 0, 'nul_offset': 0})
+            self.assertEqual(result['output_content_origins'], [])
+            self.assertEqual(result['objects'][0]['version'], 8)
+            self.assertEqual(result['invalidated_validations'], ['checked-dst-alias'])
+
+    def test_nonzero_offsets_preserve_both_untouched_destination_sides(self):
+        value = self.fixture()
+        value['destination']['offset'] = 3
+        value['source']['offset'] = 2
+        result = self.effect(value)
+        self.assertEqual(result['source_read']['start'], 2)
+        self.assertEqual(result['source_read']['end'], 7)
+        self.assertEqual(result['formatted_output_write']['nul_offset'], 7)
+        self.assertEqual(result['objects'][0]['regions'][0]['end'], 3)
+        self.assertEqual(result['objects'][0]['regions'][-1]['start'], 8)
+
+    def test_same_allocation_disjoint_access_is_not_overlap_by_capacity(self):
+        value = self.fixture()
+        value['source'].update(object='dst', offset=12, version=7, length=3)
+        value.update(capacity=16, returned=3, alias_relation='SAME_OBJECT')
+        result = self.effect(value)
+        self.assertEqual(result['status'], 'MODELED_REFERENCE_EFFECT')
+        self.assertEqual(result['formatted_output_write']['content_bytes'], 3)
+        self.assertEqual(result['source_read']['end'], 16)
+        self.assertEqual(result['objects'][0]['regions'][-1]['origins'],
+                         [self.origin('UNTRUSTED', 'old-dst')])
+
+    def test_overlap_including_source_nul_is_explicitly_unmodeled(self):
+        for offset in (0, 4):
+            value = self.fixture()
+            value['source']['object'] = 'dst'
+            value['source']['version'] = 7
+            value['destination']['offset'] = offset
+            value['alias_relation'] = 'SAME_OBJECT'
+            result = self.effect(value)
+            self.assertEqual(result['status'], 'INCOMPLETE_NOT_SAFE')
+            self.assertIn('OVERLAPPING_ACCESSES_NOT_MODELED', result['reasons'])
+            self.assertEqual(result['formatted_output_write']['state'], 'UNRESOLVED')
+
+    def test_negative_and_unknown_return_do_not_invent_success_or_clean_noop(self):
+        for returned in (-1, None):
+            value = self.fixture()
+            value['returned'] = returned
+            result = self.effect(value)
+            self.assertEqual(result['status'], 'INCOMPLETE_NOT_SAFE')
+            self.assertEqual(result['formatted_output_write'],
+                             {'state': 'MAY_WRITE', 'content_bytes': None, 'nul_offset': None})
+            self.assertEqual(result['objects'][0]['version'], 8)
+            self.assertEqual(result['objects'][1], value['objects'][1])
+            self.assertEqual(result['invalidated_validations'], ['checked-dst-alias'])
+
+    def test_unknown_alias_or_source_access_cannot_preserve_safe_facts(self):
+        for mutation in ('alias', 'length', 'termination', 'null', 'extent', 'capacity', 'destination'):
+            value = self.fixture()
+            if mutation == 'alias':
+                value['alias_relation'] = 'UNKNOWN'
+            elif mutation == 'length':
+                value['source']['length'] = None
+            elif mutation == 'termination':
+                value['source'].update(length=None, nul_terminated=False)
+            elif mutation == 'null':
+                value['source'] = None
+            elif mutation == 'extent':
+                value['source']['offset'] = 6
+            elif mutation == 'capacity':
+                value['capacity'] = 17
+            else:
+                value['destination'] = None
+            with self.subTest(mutation=mutation):
+                result = self.effect(value)
+                self.assertEqual(result['status'], 'INCOMPLETE_NOT_SAFE')
+                self.assertTrue(result['effects_outside_state_unknown'])
+                self.assertEqual(result['validations'], [])
+                self.assertEqual(result['formatted_output_write']['state'], 'UNRESOLVED')
+
+    def test_unsupported_percent_n_at_zero_does_not_erase_argument_side_effects(self):
+        for format_value in ('%n', '%s%n', '%.*s', None):
+            value = self.fixture()
+            value.update(format=format_value, capacity=0)
+            result = self.effect(value)
+            self.assertEqual(result['status'], 'INCOMPLETE_NOT_SAFE')
+            self.assertEqual(result['additional_argument_effects'], 'UNKNOWN')
+            self.assertEqual(result['validations'], [])
+            self.assertTrue(result['effects_outside_state_unknown'])
+
+    def test_bad_types_conflicting_views_stale_validations_and_counts_reject(self):
+        mutations = [
+            lambda v: v.update(capacity=True), lambda v: v.update(returned=True),
+            lambda v: v.update(returned=3), lambda v: v.update(returned=2 ** 31),
+            lambda v: v.update(capacity=2 ** 64), lambda v: v.update(alias_relation='SAME_OBJECT'),
+            lambda v: v['objects'][0].update(version=True),
+            lambda v: v['objects'].append(copy.deepcopy(v['objects'][0])),
+            lambda v: v['objects'][0]['regions'][0].update(start=1),
+            lambda v: v['objects'][0]['regions'][0].update(end=17),
+            lambda v: v['objects'][0]['regions'][0]['origins'][0].update(state='SAFE'),
+            lambda v: v['validations'][0].update(version=6),
+            lambda v: v['destination'].update(object='missing'),
+            lambda v: v['source'].update(length=True),
+            lambda v: v['source'].update(version=1),
+            lambda v: v['source'].update(nul_terminated=False),
+        ]
+        for index, mutate in enumerate(mutations):
+            value = self.fixture()
+            mutate(value)
+            with self.subTest(index=index), self.assertRaisesRegex(ValueError, '^snprintf reference input rejected$'):
+                self.effect(value)
+
+    def test_interval_representation_does_not_allocate_capacity_sized_storage(self):
+        value = self.fixture()
+        value['capacity'] = value['objects'][0]['size'] = 2 ** 64 - 1
+        value['objects'][0]['regions'][0]['end'] = 2 ** 64 - 1
+        result = self.effect(value)
+        self.assertEqual(len(result['objects'][0]['regions']), 3)
+        self.assertEqual(result['objects'][0]['regions'][-1]['end'], 2 ** 64 - 1)
+        self.assertEqual(result['formatted_output_write']['content_bytes'], 4)
+
+
+class NativeApiEffectReaderTests(unittest.TestCase):
+    """Synthetic reader negatives. Real declaration/HTML binding has a separate CLI smoke."""
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.base = Path(self.directory.name).resolve()
+        self.repo = self.base / 'repo'
+        self.repo.mkdir()
+        self.relative = 'tests/product_corpus/api_effects/c-snprintf-linux-glibc239-v1.json'
+        original = Path(profiles.__file__).resolve().parents[1]
+        self.record = json.loads((original / self.relative).read_text())
+        self.model = {'synthetic': 'model binding only'}
+        self.record['model']['sha256'] = self.write(self.repo / self.record['model']['path'], self.model)
+        self.packet_path = self.base / 'packet.json'
+        self.packet = {'native_identity': {'platform': {'metadata': {'package_query': {'exit_code': 0,
+                       'stdout': 'libc6:amd64\t2.39-0ubuntu8.8\tinstalled\n'
+                                 'libc6-dev:amd64\t2.39-0ubuntu8.8\tinstalled\n'}}}}}
+        self.candidate = {'model': copy.deepcopy(self.record['model']),
+                          'selection': copy.deepcopy(self.record['selection']),
+                          'packet': {'path': str(self.packet_path),
+                                     'sha256': self.write(self.packet_path, self.packet)}}
+        self.candidate_path = self.repo / self.record['declaration']['candidate']['path']
+        self.record['declaration']['candidate']['sha256'] = self.write(self.candidate_path, self.candidate)
+        self.review_path = self.base / 'declaration-review.json'
+        self.record['declaration']['review'] = {'path': str(self.review_path),
+                                               'sha256': self.write(self.review_path, {'synthetic': True})}
+        self.manual_root = self.base / 'manual'
+        self.manual_root.mkdir()
+        self.pins = {}
+        pages = []
+        for name in ('Formatted-Output-Functions.html', 'Other-Output-Conversions.html'):
+            raw = ('Synthetic, non-authoritative page: ' + name).encode()
+            path = self.manual_root / 'manual-2.39' / name
+            path.parent.mkdir(exist_ok=True)
+            path.write_bytes(raw)
+            self.pins[name] = hashlib.sha256(raw).hexdigest()
+            pages.append({'path': name, 'url': 'https://sourceware.org/glibc/manual/2.39/html_node/' + name,
+                          'sha256': self.pins[name], 'status': 200, 'bytes': len(raw)})
+        self.pins['manifest'] = self.write(self.manual_root / 'manual-2.39/source-manifest.json',
+                                            {'requested_manual_version': '2.39', 'pages': pages})
+        self.pins['review'] = self.write(self.manual_root / 'actual-source-review.json', {'synthetic': True})
+        self.record['manual'] = {'root': str(self.manual_root), 'manifest_sha256': self.pins['manifest'],
+                                'source_review_sha256': self.pins['review'],
+                                'patched_runtime_equivalence_proven': False}
+        self.persist()
+
+    @staticmethod
+    def write(path, value):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        raw = profiles.canonical(value).encode()
+        path.write_bytes(raw)
+        return hashlib.sha256(raw).hexdigest()
+
+    def persist(self):
+        return self.write(self.repo / self.relative, self.record)
+
+    def declaration_stub(self, repo, relative, *, review, _input_guard):
+        self.assertEqual(repo, self.repo)
+        self.assertEqual(relative, self.record['declaration']['candidate']['path'])
+        profiles._ground_truth_input(Path(review['path']), _input_guard, review['sha256'])
+        profiles._ground_truth_input(self.packet_path, _input_guard, self.candidate['packet']['sha256'])
+        return {'record_sha256': self.record['declaration']['candidate']['sha256'],
+                'eligible_for_declaration_review': True, 'declaration_evidence_reviewed': True,
+                'selection': copy.deepcopy(self.record['selection'])}
+
+    def read(self):
+        with (mock.patch.object(profiles, 'SNPRINTF_MANUAL_PINS', self.pins),
+              mock.patch.object(profiles, 'verify_native_declaration_candidate', side_effect=self.declaration_stub)):
+            return profiles.verify_native_api_effect(self.repo, self.relative)
+
+    def test_all_reference_cases_compute_without_qualification_or_execution(self):
+        with (mock.patch.object(profiles.subprocess, 'run', side_effect=AssertionError('execute')),
+              mock.patch.object(profiles.urllib.request, 'urlopen', side_effect=AssertionError('download'))):
+            result = self.read()
+        self.assertEqual(result['reference_cases_checked'], 6)
+        self.assertEqual(result['case_outcomes'], {'MODELED_REFERENCE_EFFECT': 4, 'INCOMPLETE_NOT_SAFE': 2})
+        self.assertTrue(result['manual_bytes_verified'])
+        self.assertFalse(result['call_assumptions_source_verified'])
+        self.assertEqual(result['additional_quota_examples'], 0)
+        for key in profiles.DECLARATION_CANDIDATE_QUALIFICATION.split():
+            self.assertIs(result[key], False)
+
+    def test_mismatched_model_candidate_review_manual_hashes_reject(self):
+        for path in (self.repo / self.record['model']['path'], self.candidate_path, self.review_path,
+                     self.packet_path, self.manual_root / 'manual-2.39/source-manifest.json',
+                     self.manual_root / 'actual-source-review.json',
+                     self.manual_root / 'manual-2.39/Formatted-Output-Functions.html',
+                     self.manual_root / 'manual-2.39/Other-Output-Conversions.html'):
+            raw = path.read_bytes()
+            path.write_bytes(raw + b' ')
+            with self.subTest(path=path.name), self.assertRaisesRegex(ValueError, '^native API effect candidate rejected$'):
+                self.read()
+            path.write_bytes(raw)
+
+    def test_wrong_api_platform_operation_false_promotion_and_expected_output_reject(self):
+        mutations = [lambda v: v['selection'].update(api_id='c.sprintf'),
+                     lambda v: v['selection'].update(platform='windows-x86_64'),
+                     lambda v: v.update(operation='arbitrary-json-program'),
+                     lambda v: v['manual'].update(patched_runtime_equivalence_proven=True),
+                     lambda v: v['manual'].update(manifest_sha256='f' * 64),
+                     lambda v: v['cases'][0]['expected']['formatted_output_write'].update(content_bytes=16),
+                     lambda v: v['cases'][1].update(id=v['cases'][0]['id'])]
+        mutations += [lambda v, key=key: v['qualification'].update({key: True})
+                      for key in profiles.DECLARATION_CANDIDATE_QUALIFICATION.split()]
+        original = copy.deepcopy(self.record)
+        for index, mutate in enumerate(mutations):
+            self.record = copy.deepcopy(original)
+            mutate(self.record)
+            self.persist()
+            with self.subTest(index=index), self.assertRaisesRegex(ValueError, '^native API effect candidate rejected$'):
+                self.read()
+
+    def test_packet_series_mapping_is_checked_not_inferred_from_platform(self):
+        for text in ('libc6:amd64\t2.42\tinstalled\n',
+                     self.packet['native_identity']['platform']['metadata']['package_query']['stdout']
+                     + 'libc6:amd64\t2.39-0ubuntu8.8\tinstalled\n'):
+            self.packet['native_identity']['platform']['metadata']['package_query']['stdout'] = text
+            self.candidate['packet']['sha256'] = self.write(self.packet_path, self.packet)
+            self.record['declaration']['candidate']['sha256'] = self.write(self.candidate_path, self.candidate)
+            self.persist()
+            with self.assertRaisesRegex(ValueError, '^native API effect candidate rejected$'):
+                self.read()
+
+    def test_late_transitive_input_changes_are_rejected_after_reference_computation(self):
+        actual = profiles.snprintf_percent_s_effect
+        for path in (self.repo / self.relative, self.repo / self.record['model']['path'], self.candidate_path,
+                     self.review_path, self.packet_path, self.manual_root / 'manual-2.39/Other-Output-Conversions.html'):
+            raw = path.read_bytes()
+            def changed(value):
+                result = actual(value)
+                path.write_bytes(raw + b' ')
+                return result
+            with (self.subTest(path=path.name), mock.patch.object(profiles, 'snprintf_percent_s_effect', side_effect=changed),
+                  self.assertRaisesRegex(ValueError, '^native API effect candidate rejected$')):
+                self.read()
+            path.write_bytes(raw)
+
+    def test_cli_selectors_fail_closed(self):
+        for argv in (['native-api-effect-check'], ['api-check', '--api-effect', self.relative],
+                     ['native-api-effect-check', '--api-effect', self.relative, '--declarations', '/tmp/not-used'],
+                     ['native-api-effect-check', '--api-effect', self.relative, '--candidate', 'not-used']):
+            result = subprocess.run([sys.executable, '-B', profiles.__file__, *argv],
+                                    capture_output=True, timeout=30)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn(b'Traceback', result.stderr)
+
+
 class NativeApiProfileTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

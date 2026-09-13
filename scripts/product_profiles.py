@@ -3345,12 +3345,12 @@ def native_declaration_projection(packet, model, model_sha, selection):
             'result': outcome, 'targets_agree': agreement}
 
 
-def verify_native_declaration_candidate(repo, record_path, *, review=None):
+def verify_native_declaration_candidate(repo, record_path, *, review=None, _input_guard=None):
     """Optional procedural declaration review; no model admission or native replay."""
     try:
         repo = Path(repo)
         require(repo.is_absolute() and repo.resolve(strict=True) == repo, 'declaration candidate root')
-        guard = {}
+        guard = {} if _input_guard is None else _input_guard
         relative = external_relative(record_path).as_posix()
         require(relative.startswith('tests/product_corpus/declaration_candidates/'), 'declaration candidate scope')
         info, value = _ground_truth_input(repo / relative, guard)
@@ -3422,9 +3422,295 @@ def verify_native_declaration_candidate(repo, record_path, *, review=None):
         raise ValueError('native declaration candidate rejected') from None
 
 
+def snprintf_percent_s_effect(value):
+    """Pure, bounded reference effect under explicit abstract-input assumptions.
+
+    This does not discover a declaration, source length, alias relationship or
+    valid call from C code. A current-version length/termination fact means the
+    first NUL is exactly at offset+length and all preceding bytes are readable
+    non-NUL characters. Caller evidence for those assumptions is a separate
+    obligation. Versions are analysis generations, not runtime write counts.
+    Unsupported effects invalidate facts rather than certify a safe result.
+    """
+    try:
+        fields(value, 'schema format objects destination source capacity returned alias_relation validations',
+               'snprintf reference input')
+        require(value['schema'] == 'codeskeptic-snprintf-percent-s-input/v1', 'effect schema')
+
+        def token(text):
+            return type(text) is str and re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}', text)
+
+        def integer(number, maximum=2 ** 64 - 1):
+            return type(number) is int and 0 <= number <= maximum
+
+        def origin_list(origins):
+            require(type(origins) is list and 1 <= len(origins) <= 8, 'effect origin count')
+            seen = set()
+            for origin in origins:
+                fields(origin, 'state label', 'effect origin')
+                require(type(origin['state']) is str and origin['state'] in (
+                        'CONSTANT', 'EXPLICITLY_TRUSTED', 'UNTRUSTED', 'UNKNOWN')
+                        and token(origin['label']), 'effect origin identity')
+                key = canonical(origin)
+                require(key not in seen, 'effect duplicate origin')
+                seen.add(key)
+
+        objects = value['objects']
+        require(type(objects) is list and 1 <= len(objects) <= 8, 'effect object count')
+        by_id = {}
+        for obj in objects:
+            fields(obj, 'id size version regions', 'effect object')
+            require(token(obj['id']) and obj['id'] not in by_id and integer(obj['size'])
+                    and integer(obj['version'], 2 ** 63 - 2), 'effect object identity')
+            require(type(obj['regions']) is list and len(obj['regions']) <= 32, 'effect region count')
+            position = 0
+            for region in obj['regions']:
+                fields(region, 'start end origins', 'effect region')
+                require(integer(region['start']) and integer(region['end'])
+                        and region['start'] == position < region['end'] <= obj['size'], 'effect region partition')
+                origin_list(region['origins'])
+                position = region['end']
+            require(position == obj['size'], 'effect complete region partition')
+            by_id[obj['id']] = obj
+
+        destination, source = value['destination'], value['source']
+        for view, names in ((destination, 'object offset'),
+                            (source, 'object offset version length nul_terminated')):
+            if view is None:
+                continue
+            fields(view, names, 'effect pointer view')
+            require(token(view['object']) and view['object'] in by_id and integer(view['offset'])
+                    and view['offset'] <= by_id[view['object']]['size'], 'effect pointer object/range')
+        if source is not None:
+            require(integer(source['version'], 2 ** 63 - 2)
+                    and source['version'] == by_id[source['object']]['version'], 'effect source fact version')
+            require(source['nul_terminated'] is None or type(source['nul_terminated']) is bool,
+                    'effect termination fact')
+            require(source['length'] is None or integer(source['length']), 'effect source length')
+            require(source['length'] is None or source['nul_terminated'] is True,
+                    'effect contradictory string fact')
+        capacity, returned, format_value = value['capacity'], value['returned'], value['format']
+        require(integer(capacity) and (returned is None or type(returned) is int
+                and -(2 ** 31) <= returned < 2 ** 31), 'effect count')
+        require(format_value is None or type(format_value) is str and len(format_value) <= 512,
+                'effect literal format')
+        relation = value['alias_relation']
+        require(type(relation) is str and relation in ('SAME_OBJECT', 'DISJOINT_OBJECTS', 'UNKNOWN'),
+                'effect alias relation')
+        if source is not None and destination is not None and relation != 'UNKNOWN':
+            require((source['object'] == destination['object']) == (relation == 'SAME_OBJECT'),
+                    'effect conflicting alias identity')
+        validations = value['validations']
+        require(type(validations) is list and len(validations) <= 32, 'effect validation count')
+        seen = set()
+        for fact in validations:
+            fields(fact, 'id object version category', 'effect validation')
+            require(token(fact['id']) and fact['id'] not in seen and token(fact['object'])
+                    and fact['object'] in by_id and integer(fact['version'], 2 ** 63 - 2)
+                    and fact['version'] == by_id[fact['object']]['version'] and token(fact['category']),
+                    'effect current validation binding')
+            seen.add(fact['id'])
+        # Rebuild only after bounded primitive validation. Never mutate the
+        # caller's graph or allocate storage proportional to any byte count.
+        result = {
+            'schema': 'codeskeptic-snprintf-percent-s-effect/v1', 'status': 'MODELED_REFERENCE_EFFECT',
+            'reasons': [], 'format_origin': 'UNKNOWN' if format_value is None else 'CONSTANT',
+            'source_read': {'state': 'UNRESOLVED', 'argument_index': 3},
+            'formatted_output_write': {'state': 'UNRESOLVED', 'content_bytes': None, 'nul_offset': None},
+            'additional_argument_effects': 'NONE_FOR_SUPPORTED_FORMAT' if format_value == '%s' else 'UNKNOWN',
+            'output_content_origins': [], 'objects': parse_json(canonical(objects)),
+            'validations': parse_json(canonical(validations)), 'invalidated_validations': [],
+            'effects_outside_state_unknown': False, 'model_admitted': False, 'native_qualified': False,
+        }
+
+        def invalidate(ids):
+            for obj in result['objects']:
+                if obj['id'] in ids:
+                    obj['version'] += 1
+                    obj['regions'] = ([] if obj['size'] == 0 else [{'start': 0, 'end': obj['size'],
+                                      'origins': [{'state': 'UNKNOWN', 'label': 'unresolved-mutation'}]}])
+            result['invalidated_validations'] = [fact['id'] for fact in validations if fact['object'] in ids]
+            result['validations'] = [fact for fact in result['validations'] if fact['object'] not in ids]
+
+        def unresolved(reason):
+            result['status'] = 'INCOMPLETE_NOT_SAFE'
+            result['reasons'].append(reason)
+            result['effects_outside_state_unknown'] = True
+            invalidate(set(by_id))
+            return result
+
+        # Unsupported formats can contain %n and unknown pointer effects even
+        # with n=0. This boundary precedes the supported no-output-write path.
+        if format_value != '%s':
+            return unresolved('FORMAT_ARGUMENT_EFFECTS_NOT_MODELED')
+        if source is None:
+            return unresolved('GNU_NULL_SOURCE_EXTENSION_NOT_MODELED')
+        length, start = source['length'], source['offset']
+        if length is None or source['nul_terminated'] is not True:
+            return unresolved('SOURCE_STRING_PRECONDITION_UNPROVEN')
+        if start + length >= by_id[source['object']]['size']:
+            return unresolved('SOURCE_READ_EXTENT_UNPROVEN')
+        if returned is not None and returned >= 0:
+            require(returned == length, 'effect return contradicts exact source length')
+        if capacity and (destination is None or
+                         capacity > by_id[destination['object']]['size'] - destination['offset']):
+            # Conservative modeled precondition, not a proven overflow claim:
+            # a large supplied limit does not itself imply a large write.
+            return unresolved('DESTINATION_CAPACITY_PRECONDITION_UNPROVEN')
+        if capacity and relation == 'UNKNOWN':
+            return unresolved('ALIAS_RELATION_UNPROVEN')
+        successful = returned is not None and returned >= 0
+        result['source_read'] = {'state': 'READ_THROUGH_NUL_ON_SUCCESS' if successful else 'MAY_READ_TO_NUL',
+                                 'object': source['object'], 'start': start, 'end': start + length + 1,
+                                 'argument_index': 3}
+        if not successful:
+            result['status'] = 'INCOMPLETE_NOT_SAFE'
+            result['reasons'] = ['RETURN_EFFECT_NOT_MODELED']
+        if capacity == 0:
+            result['formatted_output_write'] = {'state': 'NONE', 'content_bytes': 0, 'nul_offset': None}
+            return result
+        dst_id, offset = destination['object'], destination['offset']
+        if not successful:
+            result['formatted_output_write']['state'] = 'MAY_WRITE'
+            # Same-object possible mutation invalidates its source facts too;
+            # it does not promise well-defined overlap or termination.
+            invalidate({dst_id})
+            return result
+        copied = min(length, capacity - 1)
+        write_end = offset + copied + 1
+        if relation == 'SAME_OBJECT' and offset < start + length + 1 and start < write_end:
+            return unresolved('OVERLAPPING_ACCESSES_NOT_MODELED')
+
+        def sliced(regions, begin, end, shift=0):
+            return [{'start': max(row['start'], begin) + shift, 'end': min(row['end'], end) + shift,
+                     'origins': parse_json(canonical(row['origins']))} for row in regions
+                    if row['start'] < end and begin < row['end'] and begin < end]
+
+        old = by_id[dst_id]
+        transferred = sliced(by_id[source['object']]['regions'], start, start + copied, offset - start)
+        replacement = transferred + [{'start': offset + copied, 'end': write_end,
+                                     'origins': [{'state': 'CONSTANT', 'label': 'snprintf-nul'}]}]
+        for obj in result['objects']:
+            if obj['id'] == dst_id:
+                obj['version'] += 1
+                obj['regions'] = (sliced(old['regions'], 0, offset) + replacement
+                                  + sliced(old['regions'], write_end, old['size']))
+        result['invalidated_validations'] = [fact['id'] for fact in validations if fact['object'] == dst_id]
+        result['validations'] = [fact for fact in result['validations'] if fact['object'] != dst_id]
+        origins = {canonical(origin): origin for row in transferred for origin in row['origins']}
+        result['output_content_origins'] = [origins[key] for key in sorted(origins)]
+        result['formatted_output_write'] = {'state': 'EXACT', 'content_bytes': copied, 'nul_offset': offset + copied}
+        return result
+    except (ValueError, TypeError, KeyError, OverflowError, RecursionError):
+        raise ValueError('snprintf reference input rejected') from None
+
+
+SNPRINTF_MANUAL_PINS = {
+    'manifest': '72338396b48cbd9fc807ed6d0739fd7ba9624b99295a7f0a383326b18164d910',
+    'review': '1746af065c2f66e63268bb24a1eb900205e8834b53ba70576e73fa631d11bd75',
+    'Formatted-Output-Functions.html': '32f864f7f1b01a5cae74a2ada88af4fc516a2654c3540124563a5ee16fcc5f00',
+    'Other-Output-Conversions.html': '0cd33ffff54bf3964563e22e4ac53021e606f65bca5572f2e39a0e03bf640296',
+}
+SNPRINTF_SELECTION = {'api_id': 'c.snprintf', 'platform': 'linux-x86_64',
+                      'visibility_profile': {'id': 'c17-posix2008/v1', 'language': 'c17',
+                                             'feature_macros': {'_POSIX_C_SOURCE': '200809L'}}}
+
+
+def verify_native_api_effect(repo, record_path):
+    """One proposed reference effect, bound to actual reviewed declaration/docs.
+
+    Pinned source-review text is procedural evidence, not an authenticated
+    attestation. Passing case computations neither admits a native model nor
+    proves any abstract call assumption from source code.
+    """
+    try:
+        repo = Path(repo)
+        require(repo.is_absolute() and repo.resolve(strict=True) == repo, 'effect checkout')
+        guard = {}
+        relative = external_relative(record_path).as_posix()
+        require(relative.startswith('tests/product_corpus/api_effects/'), 'effect record scope')
+        info, value = _ground_truth_input(repo / relative, guard)
+        fields(value, 'schema state id selection model declaration manual operation cases qualification '
+               'remaining_gaps boundary', 'effect record')
+        require(value['schema'] == 'codeskeptic-native-api-effect-candidate/v1'
+                and value['state'] == 'REFERENCE_EFFECT_FOR_INDEPENDENT_REVIEW'
+                and value['operation'] == 'snprintf-constant-percent-s-regions/v1'
+                and type(value['id']) is str and re.fullmatch(r'[a-z0-9][a-z0-9-]{0,127}', value['id'])
+                and canonical(value['selection']) == canonical(SNPRINTF_SELECTION), 'effect identity')
+        fields(value['qualification'], DECLARATION_CANDIDATE_QUALIFICATION, 'effect qualification')
+        require(all(flag is False for flag in value['qualification'].values()), 'effect cannot qualify')
+        require(nonempty(value['boundary']) and len(value['boundary']) <= 8192
+                and type(value['remaining_gaps']) is list and 1 <= len(value['remaining_gaps']) <= 32
+                and all(nonempty(gap) and len(gap) <= 2048 for gap in value['remaining_gaps']), 'effect boundaries')
+        fields(value['model'], 'path sha256', 'effect model')
+        require(value['model']['path'] == 'tests/product_corpus/native-api-models.json', 'effect model path')
+        external_digest(value['model']['sha256'])
+        _ground_truth_input(repo / value['model']['path'], guard, value['model']['sha256'])
+        fields(value['declaration'], 'candidate review', 'effect declaration')
+        candidate_link = value['declaration']['candidate']
+        fields(candidate_link, 'path sha256', 'effect candidate link')
+        external_digest(candidate_link['sha256'])
+        candidate_path = external_relative(candidate_link['path']).as_posix()
+        _, candidate = _ground_truth_input(repo / candidate_path, guard, candidate_link['sha256'])
+        require(canonical(candidate['model']) == canonical(value['model'])
+                and canonical(candidate['selection']) == canonical(value['selection']), 'effect declaration binding')
+        declared = verify_native_declaration_candidate(repo, candidate_path,
+                    review=value['declaration']['review'], _input_guard=guard)
+        require(declared['record_sha256'] == candidate_link['sha256']
+                and declared['eligible_for_declaration_review'] and declared['declaration_evidence_reviewed']
+                and canonical(declared['selection']) == canonical(value['selection']), 'effect reviewed declaration')
+        _, packet = _ground_truth_input(Path(candidate['packet']['path']), guard,
+                                       candidate['packet']['sha256'], maximum=16 * 1024 * 1024)
+        query = packet['native_identity']['platform']['metadata']['package_query']
+        lines = query['stdout'].splitlines()
+        for package in ('libc6:amd64', 'libc6-dev:amd64'):
+            require(query['exit_code'] == 0 and [line for line in lines if line.split('\t')[0] == package]
+                    == [package + '\t2.39-0ubuntu8.8\tinstalled'], 'effect observed libc version')
+        manual = value['manual']
+        fields(manual, 'root manifest_sha256 source_review_sha256 patched_runtime_equivalence_proven', 'effect manual')
+        root = Path(manual['root'])
+        require(root.is_absolute() and str(root) == manual['root'] and root.resolve(strict=True) == root
+                and repo != root and repo not in root.parents
+                and manual['patched_runtime_equivalence_proven'] is False
+                and manual['manifest_sha256'] == SNPRINTF_MANUAL_PINS['manifest']
+                and manual['source_review_sha256'] == SNPRINTF_MANUAL_PINS['review'], 'effect manual binding')
+        _, manifest = _ground_truth_input(root / 'manual-2.39/source-manifest.json', guard,
+                                          manual['manifest_sha256'])
+        _ground_truth_input(root / 'actual-source-review.json', guard, manual['source_review_sha256'])
+        require(manifest['requested_manual_version'] == '2.39' and len(manifest['pages']) == 2,
+                'effect manual version/pages')
+        for row, name in zip(manifest['pages'], ('Formatted-Output-Functions.html', 'Other-Output-Conversions.html')):
+            require(row['path'] == name and row['url'] == 'https://sourceware.org/glibc/manual/2.39/html_node/' + name
+                    and row['sha256'] == SNPRINTF_MANUAL_PINS[name] and row['status'] == 200, 'effect manual page')
+            page_info, _ = _ground_truth_input(root / 'manual-2.39' / name, guard, row['sha256'],
+                                               json_value=False, maximum=128 * 1024)
+            require(page_info['size_bytes'] == row['bytes'], 'effect manual byte count')
+        cases = value['cases']
+        require(type(cases) is list and 1 <= len(cases) <= 32, 'effect case count')
+        seen, outcomes = set(), Counter()
+        for case in cases:
+            fields(case, 'id input expected', 'effect reference case')
+            require(type(case['id']) is str and re.fullmatch(r'[a-z0-9][a-z0-9-]{0,63}', case['id'])
+                    and case['id'] not in seen, 'effect reference case identity')
+            seen.add(case['id'])
+            actual = snprintf_percent_s_effect(case['input'])
+            require(canonical(actual) == canonical(case['expected']), 'effect reference transition mismatch')
+            outcomes[actual['status']] += 1
+        verify_input_identities(guard)
+        return {'record_sha256': info['sha256'], 'selection': value['selection'], 'operation': value['operation'],
+                'reference_cases_checked': len(cases), 'case_outcomes': dict(outcomes),
+                'declaration_evidence_reviewed': True, 'manual_bytes_verified': True,
+                'observed_libc_package_version': '2.39-0ubuntu8.8', 'patched_runtime_equivalence_proven': False,
+                'call_assumptions_source_verified': False, 'additional_quota_examples': 0,
+                **value['qualification']}
+    except (ValueError, OSError, TypeError, KeyError, StopIteration, RecursionError, RuntimeError,
+            subprocess.SubprocessError):
+        raise ValueError('native API effect candidate rejected') from None
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check", "ground-truth-candidate-check", "ground-truth-check", "retained-ground-truth-check", "source-cohort-check", "cohort-native-check", "cohort-ground-truth-check", "platform-recipes-check", "platform-source-labels-check", "native-declarations-check", "native-declaration-candidate-check"))
+    parser.add_argument("command", choices=("historical-check", "limits", "sources-check", "api-check", "readiness", "external-source-check", "stage-gcc-inputs", "license-basis-check", "source-candidate-check", "selection-check", "ground-truth-candidate-check", "ground-truth-check", "retained-ground-truth-check", "source-cohort-check", "cohort-native-check", "cohort-ground-truth-check", "platform-recipes-check", "platform-source-labels-check", "native-declarations-check", "native-declaration-candidate-check", "native-api-effect-check"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--historical-sources", type=Path, default=Path(
         "/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH02-S04-U001/corpus-diagnostic-comparison"))
@@ -3443,8 +3729,11 @@ def main():
     parser.add_argument('--declaration-candidate', help='repository-relative declaration candidate; native-declaration-candidate-check only')
     parser.add_argument('--declaration-review', help='optional absolute independent declaration review path')
     parser.add_argument('--declaration-review-sha256', help='required digest with --declaration-review')
+    parser.add_argument('--api-effect', help='repository-relative reference effect; native-api-effect-check only')
     args = parser.parse_args()
     try:
+        require(args.command == 'native-api-effect-check' or args.api_effect is None,
+                'effect selector is only valid for native-api-effect-check')
         require(args.command == 'native-declaration-candidate-check' or all(item is None for item in
                 (args.declaration_candidate, args.declaration_review, args.declaration_review_sha256)),
                 'declaration candidate selectors are only valid for native-declaration-candidate-check')
@@ -3465,7 +3754,12 @@ def main():
         if args.command == "selection-check":
             require(args.binding is None and args.evidence_root is None and args.external_root is None,
                     "reviewed selection uses its explicit tracked roots")
-        if args.command == 'native-declaration-candidate-check':
+        if args.command == 'native-api-effect-check':
+            require(args.api_effect is not None and args.binding is None and args.evidence_root is None
+                    and args.external_root is None and args.historical_sources == parser.get_default('historical_sources'),
+                    'effect candidate uses its explicit linked record')
+            result = verify_native_api_effect(args.root, args.api_effect)
+        elif args.command == 'native-declaration-candidate-check':
             require(args.declaration_candidate is not None and args.binding is None and args.evidence_root is None
                     and args.external_root is None and args.historical_sources == parser.get_default('historical_sources')
                     and (args.declaration_review is None) == (args.declaration_review_sha256 is None),

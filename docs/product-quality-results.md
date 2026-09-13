@@ -2768,3 +2768,55 @@ Gerçek sabit Python child CLI native yüklemeden önce yanlış config'i reddet
 Actual-be packet digest/producer Git blob bağlı CLI aynı13 BACKEND_FAILED
 sonucunu korudu, capture SHA
 `a918e908d28300bad65429b785d622da3e0ae0ec1ad533aef74e397261e941b9`.
+
+## U003 eklemeli snprintf sabit-%s referans etkisi
+
+2a01ff0 continuation'da gerçek Windows declaration ve Observe jobs, farklı
+runner'larda mevcut OS metadata query timeout'u ile terminal failure oldu;
+inclusion diagnostic'e erişildiği kanıtlanmadı. Aynı head'in normal CI ve Windows
+build/test workflow'ları terminal success olarak gözlendi; identity failure
+bunlarla PASS'e çevrilmez. Manuel workflow/job rerun onayı yok ve rerun yapılmadı.
+Bu açık hosted sonuçlardan bağımsız mevcut U003 format-output transfer
+yükümlülüğünün bir somut primitive'i uygulanıyor; FRONT değişmedi.
+
+Eklemeli `api_effects/c-snprintf-linux-glibc239-v1.json`, özgün c.snprintf Linux
+v2 declaration candidate/review/projection/model bağlarını değiştirmeden kullanır.
+İlgili hosted packet'ta libc6/libc6-dev2.39-0ubuntu8.8 gözlenmişti. GNU glibc2.39
+kılavuzunun yalnız iki izinli sayfası tek edinimde saklandı; gerçek kaynak ve
+kopya ayrı bağımsız PASS aldı. Kalıcı arşiv:
+`/home/tanzer/.local/state/codeskeptic/cwe-restart-evidence/CS3-CH08-S01-U003/native-api-snprintf-manual-glibc239-v1`.
+14 dosya50,888byte; manifest SHA
+`92a45c1716163e7c685c4876aab8c6515458fbf717f4cf2782a807733c90ad56`.
+İki HTML hash'i sırasıyla
+`32f864f7f1b01a5cae74a2ada88af4fc516a2654c3540124563a5ee16fcc5f00` ve
+`0cd33ffff54bf3964563e22e4ac53021e606f65bca5572f2e39a0e03bf640296`;
+actual-source review SHA
+`1746af065c2f66e63268bb24a1eb900205e8834b53ba70576e73fa631d11bd75`.
+Kaynak belge sürüm bildirimi gözlendi; patched runtime eşdeğerliği/native
+yeterlilik iddiası yok. Eski model2.42 reference pin'i yeniden yazılmadı.
+
+19 yeni test exact2a01ff0 source altında62 beklenen missing-feature/subtest
+error ile RED: capture SHA
+`4bb90f13d985a437d8b553d55ea021aa1a371425fdf7e3464382c8678d6bca3d`.
+12 ilk operation testi, full/truncated/zero/one/empty/offset/alias/overlap,
+return belirsizliği/çelişkisi, source generation, validation invalidation ve
+uint64 capacity'ye orantılı olmayan region storage'ı sınar. Altı reader testi
+yanlış gerçek-bağ hash'leri, metadata sürümü, promotion/expected-output
+forgery, CLI selector'ları ve late transitive input mutation negatiflerini
+ekler. Bir mevcut declaration-reader testi enclosing guard paylaşımını sınar.
+Reader testleri synthetic/stubbed kaynaklarla çalışır; gerçek kaynak bağı
+ayrı CLI smoke'tur ve ikisi birbirinin yerine sayılmaz.
+
+İlk reader koşusunda Path value eşitliği yerine Python nesne kimliği assertion'ı
+hatalıydı. Bu fixture düzeltildi; başarısız capture saklandı, ürün RED'i diye
+sunulmadı. Düzeltilmiş29 odaklı test GREEN capture SHA
+`dafcdd088e5569e6d9918685ecb300219a39d792bb86d1a6c6eec4daccb02f74`.
+532-test T1 paketi33.588s GREEN capture SHA
+`6f671ceddaba3d3c1ae0eda1cfe403dcb6a8e2d54da8b18cd470ccbbff17094a`.
+Gerçek hash/ancestor Git/declaration review/manual bağlı CLI altı referans
+örneğinin tamamını doğruladı: dört MODELED_REFERENCE_EFFECT, iki açık
+INCOMPLETE_NOT_SAFE. Capture SHA
+`39824006697fea041b727f434b327e756449897d80c97e71110e2d6b0eb986a1`.
+INCOMPLETE negatifler safe/native/ürün PASS değildir; bütün qualification
+alanları false, quota katkısı sıfırdır. Yeni temiz exact-head bağımsız inceleme
+ayrı gereklidir; tüm U003 acceptance veya global freeze tamamlanmış değildir.
