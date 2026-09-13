@@ -1257,6 +1257,7 @@ def capture_windows_context(args):
 DECLARATION_PLATFORM = {'Linux': 'linux-x86_64', 'Windows': 'windows-x64', 'Darwin': 'macos-arm64'}
 DECLARATION_PRODUCERS = ('scripts/product_profiles.py',)
 POSIX_DECLARATION_PROFILE = 'c17-posix2008/v1'
+WINDOWS_ENTERED_HEADER_MODE = 'windows-entered-headers/v1'
 DECLARATION_MACROS = ('__STRICT_ANSI__', '_POSIX_C_SOURCE', '_POSIX_SOURCE', '_ATFILE_SOURCE',
                       '__USE_POSIX', '__USE_POSIX2', '__USE_ATFILE', '__USE_MISC', '__USE_XOPEN2K8')
 DECLARATION_TYPES = {'Void', 'Bool', 'Char_S', 'Char_U', 'SChar', 'UChar', 'Short', 'UShort',
@@ -1315,6 +1316,152 @@ def declaration_command(compiler, system, metadata, source, dependencies=False):
     if system == 'Darwin':
         argv += ['-isysroot', metadata['sdk_root']]
     return argv + (['-M', '-MT', 'identity-probe'] if dependencies else ['-fsyntax-only']) + [source]
+
+
+def declaration_entered_header_projection(raw, headers, system, input_path):
+    """Project path-only -H records; never interpret diagnostics as paths.
+
+    This does not alter legacy packet validation or classify non-entered
+    dependencies as lookup-only. The caller must bind the observed command,
+    source and environment, capture the complete process, and require exact
+    CIndex equality. LF framing alone cannot detect omitted whole events.
+    No native file is opened and no command is run.
+    """
+    require(type(system) is str and system in ('Linux', 'Darwin', 'Windows'),
+            'entered-header platform')
+    path_type = PureWindowsPath if system == 'Windows' else PurePosixPath
+    flavor = 'windows' if system == 'Windows' else 'posix'
+
+    def path_key(path):
+        require(type(path) is str and 0 < len(path) <= 8192, 'entered-header path shape')
+        try:
+            size = len(path.encode('utf-8'))
+        except UnicodeError as error:
+            raise IdentityError('entered-header path encoding') from error
+        require(size <= 8192 and not any(ord(char) < 32 or 127 <= ord(char) < 160
+                                        or char in '\u2028\u2029' for char in path),
+                'entered-header path characters')
+        value = path_type(path)
+        require(value.is_absolute() and '..' not in value.parts, 'entered-header absolute path')
+        return value
+
+    require(type(raw) is str and 0 < len(raw) <= MAX_OUTPUT, 'entered-header stream shape')
+    try:
+        size = len(raw.encode('utf-8'))
+    except UnicodeError as error:
+        raise IdentityError('entered-header stream encoding') from error
+    require(size <= MAX_OUTPUT and raw.endswith('\n'), 'entered-header complete records')
+    require(type(headers) is list and 1 < len(headers) <= MAX_HEADERS, 'entered-header dependency count')
+    by_path, bindings, total = {}, {}, 0
+    for index, header in enumerate(headers):
+        validate_file(header, flavor)
+        path, resolved = path_key(header['path']), path_key(header['resolved_path'])
+        require(path not in by_path, 'ambiguous entered-header dependency')
+        by_path[path] = index
+        entry = (resolved, header['bytes'], header['sha256'])
+        for key in (path, resolved):
+            require(key not in bindings or bindings[key] == entry, 'entered-header identity conflict')
+            bindings[key] = entry
+        total += header['bytes']
+        require(total <= MAX_HEADER_BYTES, 'entered-header dependency bytes')
+    source_key = path_key(input_path)
+    require(source_key in by_path, 'entered-header source absent from dependencies')
+    source_index = by_path[source_key]
+    events, entered, previous_depth = [], {source_index}, 0
+    # Only physical LF/CRLF terminates a record. splitlines() would invent
+    # trace rows from Unicode separators or diagnostic control characters.
+    lines = raw.split('\n')[:-1]
+    require(len(lines) <= MAX_HEADERS, 'entered-header event count')
+    for line in lines:
+        if line.endswith('\r'):
+            line = line[:-1]
+        match = re.fullmatch(r'(\.{1,256}) (.+)', line)
+        require(match is not None, 'entered-header trace grammar')
+        depth, path = len(match[1]), path_key(match[2])
+        require(depth <= previous_depth + 1, 'entered-header depth discontinuity')
+        require(path in by_path and path != source_key, 'entered-header outside dependency universe')
+        index = by_path[path]
+        events.append({'depth': depth, 'header_index': index})
+        entered.add(index)
+        previous_depth = depth
+    return {'schema': 'codeskeptic-entered-header-projection/v1',
+            'input_header_index': source_index, 'events': events,
+            'entered_header_indices': sorted(entered),
+            'non_entered_dependency_indices': sorted(set(range(len(headers))) - entered)}
+
+
+def declaration_inclusion_mode(mode, system):
+    require(mode is None or (type(mode) is str and mode == WINDOWS_ENTERED_HEADER_MODE and system == 'Windows'),
+            'unsupported declaration inclusion mode/platform')
+    return mode
+
+
+def declaration_header_trace_command(compiler, system, metadata, source):
+    argv = declaration_command(compiler, system, metadata, source)
+    # This separate observation channel never replaces original syntax/CIndex diagnostics.
+    return argv[:-2] + ['-w', '-H'] + argv[-2:]
+
+
+def capture_declaration_header_trace(argv, headers, system, input_path):
+    """Retain raw path-only success, otherwise only failure identity, never error text."""
+    try:
+        result = subprocess.run(argv, env=checked_environment(os.environ), capture_output=True, timeout=30, check=False)
+        stdout, stderr, code = result.stdout, result.stderr, result.returncode
+        if len(stdout) > MAX_OUTPUT or len(stderr) > MAX_OUTPUT:
+            kind = 'OUTPUT_LIMIT'
+        elif code != 0:
+            kind = 'PROCESS_FAILED'
+        else:
+            try:
+                command = {'argv': list(argv), 'exit_code': code,
+                           'stdout': stdout.decode('utf-8'), 'stderr': stderr.decode('utf-8')}
+                validate_command(command)
+                require(command['stdout'] == '', 'entered-header unexpected stdout')
+                projection = declaration_entered_header_projection(command['stderr'], headers, system, input_path)
+                return {'argv': list(argv), 'command': command, 'failure': None, 'projection': projection}
+            except (ValueError, TypeError, KeyError):
+                kind = 'INVALID_RESULT'
+    except subprocess.TimeoutExpired as error:
+        kind, stdout, stderr, code = 'TIMEOUT', error.stdout or b'', error.stderr or b'', None
+    except OSError:
+        kind, stdout, stderr, code = 'START_FAILED', b'', b'', None
+    return {'argv': list(argv), 'command': None, 'projection': None,
+            'failure': {'kind': kind, 'exit_code': code,
+                        **{key: {'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}
+                           for key, raw in (('stdout', stdout), ('stderr', stderr))}}}
+
+
+def validate_declaration_header_trace(value, argv, headers, system, input_path):
+    fields(value, 'argv command failure projection', 'declaration header trace')
+    require(value['argv'] == argv, 'declaration header trace command identity')
+    failure = value['failure']
+    if failure is not None:
+        require(value['command'] is None and value['projection'] is None, 'failed declaration header trace')
+        fields(failure, 'kind exit_code stdout stderr', 'declaration header trace failure')
+        kind, code = failure['kind'], failure['exit_code']
+        require(kind in ('TIMEOUT', 'START_FAILED', 'PROCESS_FAILED', 'OUTPUT_LIMIT', 'INVALID_RESULT')
+                and (code is None or type(code) is int)
+                and (code is None) == (kind in ('TIMEOUT', 'START_FAILED'))
+                and (kind != 'PROCESS_FAILED' or code != 0)
+                and (kind != 'INVALID_RESULT' or code == 0), 'declaration header trace failure outcome')
+        for key in ('stdout', 'stderr'):
+            item = failure[key]
+            fields(item, 'bytes sha256', 'declaration header trace stream')
+            require(type(item['bytes']) is int and item['bytes'] >= 0 and digest(item['sha256'])
+                    and (item['bytes'] != 0 or item['sha256'] == hashlib.sha256(b'').hexdigest()),
+                    'declaration header trace stream identity')
+        require(kind != 'START_FAILED' or all(failure[key]['bytes'] == 0 for key in ('stdout', 'stderr')),
+                'declaration header trace startup streams')
+        require(kind != 'OUTPUT_LIMIT' or any(failure[key]['bytes'] > MAX_OUTPUT for key in ('stdout', 'stderr')),
+                'declaration header trace output limit')
+        return None
+    command = value['command']
+    validate_command(command)
+    require(command['argv'] == argv and command['stdout'] == '', 'declaration header trace observed command')
+    projection = declaration_entered_header_projection(command['stderr'], headers, system, input_path)
+    # Canonical equality also distinguishes forged bool/float indices from integers.
+    require(canonical(value['projection']) == canonical(projection), 'declaration header trace projection mismatch')
+    return projection
 
 
 def declaration_type_key(value):
@@ -1683,9 +1830,12 @@ def validate_declaration_document(value, model, model_sha256):
     """Pure consistency checking. Never opens native paths, loads a library or runs argv."""
     require(type(value) is dict, 'declaration observation object')
     version2 = value.get('schema') == 'codeskeptic-native-declarations/v2'
+    version3 = value.get('schema') == 'codeskeptic-native-declarations/v3'
     fields(value, 'schema native_identity environment producer_files library probe metadata_only '
-           'native_qualified task_ready product_qualified' + (' profile' if version2 else ''), 'declaration observation')
-    require(value['schema'] in ('codeskeptic-native-declarations/v1', 'codeskeptic-native-declarations/v2')
+           'native_qualified task_ready product_qualified' + (' profile' if version2 else '')
+           + (' inclusion_mode' if version3 else ''), 'declaration observation')
+    require(value['schema'] in ('codeskeptic-native-declarations/v1', 'codeskeptic-native-declarations/v2',
+                               'codeskeptic-native-declarations/v3')
             and value['metadata_only'] is True
             and all(value[key] is False for key in ('native_qualified', 'task_ready', 'product_qualified')),
             'declaration observation cannot claim qualification')
@@ -1696,6 +1846,10 @@ def validate_declaration_document(value, model, model_sha256):
     fields(value['producer_files'], ' '.join(DECLARATION_PRODUCERS), 'declaration producers')
     require(all(digest(sha) for sha in value['producer_files'].values()), 'declaration producer digest')
     system = native['platform']['system']
+    mode = None
+    if version3:
+        mode = declaration_inclusion_mode(value['inclusion_mode'], system)
+        require(mode is not None, 'declaration inclusion mode required')
     profile = None
     if version2:
         fields(value['profile'], 'id language feature_macros', 'declaration profile')
@@ -1707,7 +1861,8 @@ def validate_declaration_document(value, model, model_sha256):
     validate_file(value['library'], flavor)
     require(value['library']['path'] == value['library']['resolved_path'], 'physical declaration library')
     probe = value['probe']
-    fields(probe, 'input dependency headers syntax cindex backend_failure' + (' preprocessor' if version2 else ''),
+    fields(probe, 'input dependency headers syntax cindex backend_failure' + (' preprocessor' if version2 else '')
+           + (' header_trace backend_not_run' if version3 else ''),
            'declaration probe')
     validate_file(probe['input'], flavor)
     source = declaration_source(model, system, profile).encode('utf-8')
@@ -1753,6 +1908,13 @@ def validate_declaration_document(value, model, model_sha256):
                          declaration_preprocessor_command(compiler, system, metadata, input_path)) if version2 else [])
     observed = probe['cindex']
     failure = probe['backend_failure']
+    trace_failed = False
+    if version3:
+        trace_failed = validate_declaration_header_trace(probe['header_trace'],
+            declaration_header_trace_command(compiler, system, metadata, input_path), headers, system, input_path) is None
+        require(probe['backend_not_run'] == ('HEADER_TRACE_FAILED' if trace_failed else None),
+                'declaration backend not-run state')
+        require(not trace_failed or (observed is None and failure is None), 'declaration unstarted backend outcome')
     if failure is not None:
         fields(failure, 'kind exit_code stdout stderr', 'declaration backend failure')
         require(observed is None and failure['kind'] in ('TIMEOUT', 'START_FAILED', 'PROCESS_FAILED', 'OUTPUT_LIMIT', 'INVALID_RESULT')
@@ -1763,13 +1925,17 @@ def validate_declaration_document(value, model, model_sha256):
             fields(failure[key], 'bytes sha256', 'declaration backend stream')
             require(type(failure[key]['bytes']) is int and failure[key]['bytes'] >= 0
                     and digest(failure[key]['sha256']), 'declaration backend stream values')
-        issues = ['BACKEND_FAILED'] + (['SYNTAX_FAILED'] if syntax['exit_code'] else [])
+    if failure is not None or trace_failed:
+        issues = (['HEADER_TRACE_FAILED', 'BACKEND_NOT_RUN'] if trace_failed else ['BACKEND_FAILED'])
+        issues += ['SYNTAX_FAILED'] if syntax['exit_code'] else []
         result = {'metadata_only': True, 'syntax_pass': False, 'requests': [
                     {'id': row['id'], 'issues': issues, 'state': 'INCOMPLETE'} for row in declaration_requests(model, system)],
                 'coverage': declaration_coverage(model), 'local_native_bytes_verified': False,
                 'native_qualified': False, 'task_ready': False, 'product_qualified': False}
     else:
-        result = validate_declaration_observation(observed, model, native, probe)
+        result = validate_declaration_observation(observed, model, native, probe, inclusion_mode=mode)
+    if version3:
+        result.update(inclusion_mode=mode, header_trace_pass=not trace_failed, backend_not_run=probe['backend_not_run'])
     if version2:
         result.update(profile_id=profile, visibility_pass=not visibility_issues)
         if visibility_issues:
@@ -1780,7 +1946,7 @@ def validate_declaration_document(value, model, model_sha256):
     return result
 
 
-def validate_declaration_observation(observed, model, native, probe):
+def validate_declaration_observation(observed, model, native, probe, *, inclusion_mode=None):
     """Validate only child-owned output against the separately checked capture inputs."""
     system = native['platform']['system']
     path_type = PureWindowsPath if system == 'Windows' else PurePosixPath
@@ -1790,19 +1956,32 @@ def validate_declaration_observation(observed, model, native, probe):
     require(type(observed['parse_status']) is int and observed['parse_status'] == 0
             and nonempty(observed['library_version']) and len(observed['library_version'].encode('utf-8')) <= 8192,
             'CIndex parser observation')
-    # Preserve callable lookup, the predicate and its short-circuit order. Only
-    # the guard's own rejection is tagged, never an error evaluating its input.
-    inclusion_require = require
-    inclusion_ok = (type(observed['inclusions']) is list and observed['inclusions'] == sorted(set(observed['inclusions']))
-                    and {path_type(path) for path in observed['inclusions']} == set(by_path))
-    try:
-        inclusion_require(inclusion_ok, 'CIndex include closure')
-    except IdentityError as error:
+    mode = declaration_inclusion_mode(inclusion_mode, system)
+    if mode is not None:
+        projection = validate_declaration_header_trace(probe['header_trace'], declaration_header_trace_command(
+            compiler, system, native['platform']['metadata'], input_path), probe['headers'], system, input_path)
+        require(projection is not None, 'CIndex requires successful entered-header trace')
+        expected = {path_type(probe['headers'][index]['path']) for index in projection['entered_header_indices']}
+        # Location/alias checks below still use ALL hashed dependencies. This
+        # distinct guard must not emit the legacy full-dependency annotation.
+        require(type(observed['inclusions']) is list
+                and all(type(path) is str for path in observed['inclusions'])
+                and observed['inclusions'] == sorted(set(observed['inclusions']))
+                and len({path_type(path) for path in observed['inclusions']}) == len(observed['inclusions'])
+                and {path_type(path) for path in observed['inclusions']} == expected, 'CIndex entered-header closure')
+    else:
+        # Preserve legacy callable lookup, predicate and short-circuit order.
+        inclusion_require = require
+        inclusion_ok = (type(observed['inclusions']) is list and observed['inclusions'] == sorted(set(observed['inclusions']))
+                        and {path_type(path) for path in observed['inclusions']} == set(by_path))
         try:
-            error._inclusion_rejection = (_INCLUSION_REJECTION, system, observed['inclusions'], probe['headers'])
-        except Exception:
-            pass
-        raise
+            inclusion_require(inclusion_ok, 'CIndex include closure')
+        except IdentityError as error:
+            try:
+                error._inclusion_rejection = (_INCLUSION_REJECTION, system, observed['inclusions'], probe['headers'])
+            except Exception:
+                pass
+            raise
     diagnostics = observed['diagnostics']
     require(type(diagnostics) is list and len(diagnostics) <= 128, 'CIndex diagnostic count')
     for diagnostic in diagnostics:
@@ -2190,6 +2369,7 @@ def run_declaration_worker(config, validate_result):
 
 def capture_declarations(args):
     profile = declaration_profile(getattr(args, 'declaration_profile', None), platform.system())
+    mode = declaration_inclusion_mode(getattr(args, 'declaration_inclusion_mode', None), platform.system())
     root = args.root.resolve(strict=True)
     environment = case_environment(os.environ, platform.system())
     with selected_case_environment(environment):
@@ -2229,9 +2409,17 @@ def capture_declarations(args):
                 value.update(schema='codeskeptic-native-declarations/v2', profile=profile)
                 value['probe']['preprocessor'] = capture_declaration_preprocessor(
                     declaration_preprocessor_command(compiler, system, native['platform']['metadata'], str(path)))
-            observed, failure = run_declaration_worker(config, lambda observed:
-                validate_declaration_observation(observed, model, native, value['probe']))
-            value['probe'].update(cindex=observed, backend_failure=failure)
+            trace_failed = False
+            if mode is not None:
+                value.update(schema='codeskeptic-native-declarations/v3', inclusion_mode=mode)
+                trace = capture_declaration_header_trace(declaration_header_trace_command(
+                    compiler, system, native['platform']['metadata'], str(path)), headers, system, str(path))
+                trace_failed = trace['failure'] is not None
+                value['probe'].update(header_trace=trace, backend_not_run='HEADER_TRACE_FAILED' if trace_failed else None)
+            if not trace_failed:
+                observed, failure = run_declaration_worker(config, lambda observed:
+                    validate_declaration_observation(observed, model, native, value['probe'], inclusion_mode=mode))
+                value['probe'].update(cindex=observed, backend_failure=failure)
             validate_declaration_document(value, model, model_sha)
             for record in [library, *headers, *[tool['file'] for tool in native['tools'].values()],
                            *[item for probe in native['probes'].values() for item in probe['headers']]]:
@@ -2289,6 +2477,8 @@ def main(argv=None):
     declarations.add_argument('--libclang', type=Path, required=True)
     declarations.add_argument('--declaration-profile', choices=(POSIX_DECLARATION_PROFILE,),
                               help='explicit separate POSIX visibility v2 observation; default preserves legacy v1')
+    declarations.add_argument('--declaration-inclusion-mode', choices=(WINDOWS_ENTERED_HEADER_MODE,),
+                              help='explicit Windows v3 entered-header observation; default preserves legacy v1')
     declarations.add_argument('--output', type=Path, required=True)
     for role in TOOL_ROLES:
         declarations.add_argument('--' + role, type=Path, required=True)

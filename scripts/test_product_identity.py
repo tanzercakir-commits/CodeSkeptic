@@ -1672,13 +1672,15 @@ class DeclarationTests(unittest.TestCase):
 
     @contextmanager
     def mocked_declaration_capture(self, output, worker_stdout, changed=None, after_serialization=None,
-                                   syntax_exit=1, preprocessor_response=None, worker_result=None):
+                                   syntax_exit=1, preprocessor_response=None, worker_result=None,
+                                   fixture=None, trace_response=None):
         """Real capture/writer orchestration; synthetic native I/O, never native execution."""
-        value, sha = self.packet()
+        value, sha = self.packet() if fixture is None else fixture
         native = value['native_identity']
+        system = native['platform']['system']
         root = Path(identity.__file__).resolve().parents[1]
         real_file_identity = identity.file_identity
-        records = {record['path']: record for record in [value['library'], value['probe']['headers'][1],
+        records = {record['path']: record for record in [value['library'], *value['probe']['headers'][1:],
                    *[tool['file'] for tool in native['tools'].values()],
                    *[header for probe in native['probes'].values() for header in probe['headers']]]}
         producer = root / 'scripts/product_profiles.py'
@@ -1702,12 +1704,24 @@ class DeclarationTests(unittest.TestCase):
                 escaped = identity.re.sub(r'(\\*) ', lambda match: match[1] * 2 + '\\ ', argv[-1])
                 escaped = escaped.replace('#', '\\#').replace('$', '$$')
                 return {'argv': argv, 'exit_code': 0,
-                        'stdout': 'identity-probe: ' + escaped + ' /sdk/stdlib.h\n', 'stderr': ''}
+                        'stdout': 'identity-probe: ' + escaped + ' ' +
+                                  ' '.join(h['path'] for h in value['probe']['headers'][1:]) + '\n', 'stderr': ''}
+            emitted['syntax_argv'] = argv[:]
             return {'argv': argv, 'exit_code': syntax_exit, 'stdout': '',
                     'stderr': 'earlier syntax RED' if syntax_exit else ''}
 
         def worker(*args, **kwargs):
             nonlocal worker_finished
+            if '-H' in args[0]:
+                self.assertEqual(args[0], identity.declaration_header_trace_command(
+                    native['tools']['clang'], system, native['platform']['metadata'], args[0][-1]))
+                self.assertEqual(kwargs, {'env': identity.checked_environment(identity.os.environ),
+                                         'capture_output': True, 'timeout': 30, 'check': False})
+                emitted['trace_argv'] = args[0][:]
+                if isinstance(trace_response, BaseException):
+                    raise trace_response
+                return trace_response if trace_response is not None else SimpleNamespace(
+                    returncode=0, stdout=b'', stderr=value['probe']['header_trace']['command']['stderr'].encode())
             if '-dM' in args[0]:
                 self.assertEqual(args[0], identity.declaration_preprocessor_command(
                     native['tools']['clang'], 'Linux', native['platform']['metadata'], args[0][-1]))
@@ -1722,7 +1736,7 @@ class DeclarationTests(unittest.TestCase):
                 emitted['stdout'] = worker_result.stdout
                 return worker_result
             path = emitted['config']['input']['path']
-            emitted['stdout'] = worker_stdout.replace(json.dumps('/probe/declarations.c').encode(), json.dumps(path).encode())
+            emitted['stdout'] = worker_stdout.replace(json.dumps(value['probe']['input']['path']).encode(), json.dumps(path).encode())
             observed = json.loads(emitted['stdout'])
             if (type(observed) is dict and type(observed.get('inclusions')) is list
                     and all(type(item) is str for item in observed['inclusions'])):
@@ -1745,7 +1759,7 @@ class DeclarationTests(unittest.TestCase):
                     ('source_identity', {'return_value': source}),
                     ('native_metadata', {'return_value': native['platform']['metadata']})):
                 stack.enter_context(mock.patch.object(identity, name, **options))
-            stack.enter_context(mock.patch.object(identity.platform, 'system', return_value='Linux'))
+            stack.enter_context(mock.patch.object(identity.platform, 'system', return_value=system))
             stack.enter_context(mock.patch.object(identity.subprocess, 'run', side_effect=worker))
             stack.enter_context(mock.patch.object(identity, 'declaration_backend', side_effect=AssertionError('native load')))
             stack.enter_context(mock.patch('sys.stdout', new_callable=io.StringIO))
@@ -3154,6 +3168,8 @@ class HostedDeclarationWorkflowTests(unittest.TestCase):
         self.assertIn('export MACOSX_DEPLOYMENT_TARGET=14.0', posix)
         self.assertIn("with_name('libclang.dll').resolve(strict=True)", windows)
         self.assertNotIn('--declaration-profile', windows)
+        self.assertIn('--declaration-inclusion-mode windows-entered-headers/v1', windows)
+        self.assertNotIn('--declaration-inclusion-mode', posix)
         self.assertIn('$env:INCLUDE = $declarationIncludes -join', windows)
         self.assertEqual(job.count('scripts/product_identity.py capture-declarations'), 2)
         self.assertEqual(job.count('--libclang '), 2)
@@ -3211,6 +3227,7 @@ class FakeCIndexLibrary:
         self.functions, self.handlers, self.nodes, self.strings = {}, {}, {}, {}
         self.next_string = 1
         self.visits, self.disposed_strings, self.disposed = [], [], []
+        self.parse_calls, self.index_calls = [], []
         self.references, self.canonical, self.definitions = {}, {}, {}
         self.diagnostics = [(2, b'whole TU warning'), (3, b'whole TU error')]
         self.files = {901: b'/fixture/probe.c', 902: b'/fixture/sdk.h'}
@@ -3222,7 +3239,7 @@ class FakeCIndexLibrary:
             'disposeString': self.dispose_string,
             'getCursorSpelling': lambda cursor: self.string(self.nodes[cursor.xdata]['name']),
             'visitChildren': self.visit_children,
-            'createIndex': lambda *args: 222,
+            'createIndex': lambda *args: self.index_calls.append(args) or 222,
             'parseTranslationUnit2FullArgv': self.parse,
             'getTranslationUnitCursor': lambda unit: self.cursor(self.tu),
             'disposeTranslationUnit': lambda unit: self.disposed.append(('unit', unit.value)),
@@ -3312,6 +3329,10 @@ class FakeCIndexLibrary:
         return walk(parent) or self.forced_visit_result
 
     def parse(self, *args):
+        index, source, argv, count, unsaved, unsaved_count, options, output = args
+        self.parse_calls.append({'index': index, 'source': source,
+            'argv': [argv[i].decode('utf-8') for i in range(count)],
+            'unsaved': unsaved, 'unsaved_count': unsaved_count, 'options': options})
         args[-1]._obj.value = 111
         return 0
 
@@ -3557,6 +3578,448 @@ class DeclarationTraversalTests(unittest.TestCase):
         self.assertEqual(library.visits, [(number, 1) for number in nodes])
         self.assertEqual(len(library.disposed_strings), 2)
         self.assertFalse(library.strings)
+
+
+class EnteredHeaderProjectionTests(unittest.TestCase):
+    def fixture(self, system='Linux'):
+        prefix = 'C:/sdk/' if system == 'Windows' else '/sdk/'
+        headers = [{'path': prefix + name, 'resolved_path': prefix + name,
+                    'bytes': 10, 'sha256': str(index + 1) * 64}
+                   for index, name in enumerate(('probe.c', 'wrapper.h', 'query-only.h', 'nested.h'))]
+        return headers, prefix
+
+    def project(self, raw, system='Linux', headers=None):
+        default, prefix = self.fixture(system)
+        return identity.declaration_entered_header_projection(
+            raw, default if headers is None else headers, system, prefix + 'probe.c')
+
+    def test_entered_trace_does_not_drop_unentered_dependency_records(self):
+        headers, prefix = self.fixture()
+        before = copy.deepcopy(headers)
+        value = self.project('. /sdk/wrapper.h\n.. /sdk/nested.h\n. /sdk/wrapper.h\n', headers=headers)
+        self.assertEqual(value, {'schema': 'codeskeptic-entered-header-projection/v1',
+            'input_header_index': 0, 'events': [{'depth': 1, 'header_index': 1},
+                {'depth': 2, 'header_index': 3}, {'depth': 1, 'header_index': 1}],
+            'entered_header_indices': [0, 1, 3], 'non_entered_dependency_indices': [2]})
+        self.assertEqual(headers, before)
+
+    def test_physical_lf_crlf_and_windows_path_equivalence(self):
+        value = self.project('. c:\\SDK\\wrapper.h\r\n.. C:/sdk/nested.h\r\n', 'Windows')
+        self.assertEqual(value['entered_header_indices'], [0, 1, 3])
+        value = self.project('. /sdk/wrapper.h\n', 'Darwin')
+        self.assertEqual(value['non_entered_dependency_indices'], [2, 3])
+
+    def test_malformed_diagnostic_or_incomplete_record_never_projects(self):
+        for raw in ('', '. /sdk/wrapper.h', '\n', '. /sdk/wrapper.h\n\n',
+                    'warning: . /sdk/wrapper.h\n', '. /sdk/wrapper.h\r',
+                    '. /sdk/wrapper.h\nsource text\n', '. /sdk/wrapper.h\x00\n',
+                    '. /sdk/wrapper.h\u2028. /sdk/nested.h\n',
+                    '. /sdk/wrapper.h\v. /sdk/nested.h\n', '.\t/sdk/wrapper.h\n',
+                    '.  /sdk/wrapper.h\n', '. relative.h\n', '. /sdk/../sdk/wrapper.h\n'):
+            with self.subTest(raw=repr(raw)), self.assertRaises(ValueError):
+                self.project(raw)
+
+    def test_missing_unexpected_and_main_file_trace_entries_reject(self):
+        for raw in ('. /sdk/unknown.h\n', '. /sdk/probe.c\n', '. /SDK/wrapper.h\n'):
+            with self.subTest(raw=raw), self.assertRaises(ValueError):
+                self.project(raw)
+        headers, _ = self.fixture()
+        for altered in (headers[1:], headers + [copy.deepcopy(headers[1])]):
+            with self.assertRaises(ValueError):
+                self.project('. /sdk/wrapper.h\n', headers=altered)
+        headers, _ = self.fixture('Windows')
+        headers += [{**headers[1], 'path': 'c:/SDK/WRAPPER.h'}]
+        with self.assertRaises(ValueError):
+            self.project('. C:/sdk/wrapper.h\n', 'Windows', headers)
+
+    def test_depth_events_and_bytes_are_bounded(self):
+        for raw in ('.. /sdk/wrapper.h\n', '. /sdk/wrapper.h\n... /sdk/nested.h\n',
+                    '.' * 257 + ' /sdk/wrapper.h\n',
+                    '. /sdk/wrapper.h\n' * (identity.MAX_HEADERS + 1),
+                    'x' * (identity.MAX_OUTPUT + 1)):
+            with self.subTest(size=len(raw)), self.assertRaises(ValueError):
+                self.project(raw)
+
+    def test_invalid_shapes_and_hostile_path_characters_reject(self):
+        for raw in (None, [], {}, 1, True, '\udcff\n'):
+            with self.subTest(raw=repr(raw)), self.assertRaises(ValueError):
+                self.project(raw)
+        for system in ('Unknown', '', None):
+            with self.assertRaises(ValueError):
+                self.project('. /sdk/wrapper.h\n', system)
+        headers, _ = self.fixture()
+        headers[1]['path'] = '/sdk/evil\n.h'
+        with self.assertRaises(ValueError):
+            self.project('. /sdk/wrapper.h\n', headers=headers)
+        headers, _ = self.fixture()
+        headers[1]['bytes'] = True
+        with self.assertRaises(ValueError):
+            self.project('. /sdk/wrapper.h\n', headers=headers)
+
+
+class WindowsEnteredHeaderTests(unittest.TestCase):
+    MODE = 'windows-entered-headers/v1'
+
+    def setUp(self):
+        self.legacy = DeclarationTests()
+        self.legacy.setUp()
+        self.model = self.legacy.model
+
+    def packet(self):
+        value, sha, _ = self.legacy.populated()
+        def windows(item):
+            if type(item) is dict:
+                return {key: windows(child) for key, child in item.items()}
+            if type(item) is list:
+                return [windows(child) for child in item]
+            return 'C:' + item if type(item) is str and item.startswith('/') else item
+        value = windows(value)
+        old = CaseCaptureTests().case_document('Windows')
+        native = value['native_identity'] = old['native_identity']
+        native['source']['api_models_sha256'] = sha
+        value.update(environment=old['environment'], schema='codeskeptic-native-declarations/v3',
+                     inclusion_mode=self.MODE)
+        probe = value['probe']
+        source = identity.declaration_source(self.model, 'Windows').encode()
+        for record in (probe['input'], probe['headers'][0]):
+            record.update(bytes=len(source), sha256=hashlib.sha256(source).hexdigest())
+        probe['headers'].append({'path': 'C:/sdk/non-entered.h', 'resolved_path': 'C:/sdk/non-entered.h',
+                                'bytes': 100, 'sha256': 'e' * 64})
+        compiler, metadata = native['tools']['clang'], native['platform']['metadata']
+        path = probe['input']['path']
+        probe['dependency'].update(argv=identity.declaration_command(compiler, 'Windows', metadata, path, True),
+            stdout='identity-probe: ' + ' '.join(h['path'] for h in probe['headers']) + '\n')
+        probe['syntax']['argv'] = identity.declaration_command(compiler, 'Windows', metadata, path)
+        observed = probe['cindex']
+        populated = next(row for row in observed['requests'] if row['id'] == 'c.getenv')
+        observed['requests'] = [populated if row['id'] == 'c.getenv' else
+            {'id': row['id'], 'symbol': row['symbol'], 'expected_type': None,
+             'variable_location': None, 'targets': []}
+            for row in identity.declaration_requests(self.model, 'Windows')]
+        observed['library_version'] = compiler['version']['stdout']
+        argv = probe['syntax']['argv'][:-2] + ['-w', '-H'] + probe['syntax']['argv'][-2:]
+        raw = '. C:/sdk/stdlib.h\r\n'
+        probe.update(backend_not_run=None, header_trace={'argv': argv,
+            'command': {'argv': argv[:], 'exit_code': 0, 'stdout': '', 'stderr': raw}, 'failure': None,
+            'projection': identity.declaration_entered_header_projection(raw, probe['headers'], 'Windows', path)})
+        return value, sha
+
+    def check(self, value, sha):
+        return identity.validate_declaration_document(value, self.model, sha)
+
+    def test_entered_equality_preserves_full_dependencies_and_pure_reader(self):
+        value, sha = self.packet()
+        original = copy.deepcopy(value)
+        with (mock.patch.object(identity.subprocess, 'run', side_effect=AssertionError('execution')),
+              mock.patch.object(identity, 'file_identity', side_effect=AssertionError('native read')),
+              mock.patch.object(identity, 'declaration_backend', side_effect=AssertionError('native load'))):
+            result = self.check(value, sha)
+        self.assertEqual(value, original)
+        self.assertTrue(result['syntax_pass'] and result['header_trace_pass'])
+        self.assertEqual(result['inclusion_mode'], self.MODE)
+        self.assertIsNone(result['backend_not_run'])
+        self.assertEqual(next(r['issues'] for r in result['requests'] if r['id'] == 'c.getenv'), [])
+        self.assertEqual(result['coverage']['qualified_library_pairs'], 0)
+        self.assertFalse(result['native_qualified'] or result['product_qualified'] or result['task_ready'])
+
+    def test_legacy_packet_still_requires_full_dependency_equality(self):
+        value, sha = self.packet()
+        value['schema'] = 'codeskeptic-native-declarations/v1'
+        del value['inclusion_mode'], value['probe']['header_trace'], value['probe']['backend_not_run']
+        with self.assertRaisesRegex(ValueError, 'CIndex include closure'):
+            self.check(value, sha)
+        value['probe']['cindex']['inclusions'] = sorted(h['path'] for h in value['probe']['headers'])
+        result = self.check(value, sha)
+        self.assertTrue(result['syntax_pass'])
+        self.assertNotIn('header_trace_pass', result)
+
+    def test_versions_modes_and_observation_fields_cannot_be_relabelled(self):
+        for mutation in ('v1', 'v2', 'v4', 'missing-mode', 'mode', 'profile', 'trace', 'extra', 'not-run'):
+            value, sha = self.packet()
+            if mutation.startswith('v'): value['schema'] = 'codeskeptic-native-declarations/' + mutation
+            elif mutation == 'missing-mode': del value['inclusion_mode']
+            elif mutation == 'mode': value['inclusion_mode'] = 'unknown'
+            elif mutation == 'profile': value['profile'] = {'id': 'c17-posix2008/v1'}
+            elif mutation == 'trace': del value['probe']['header_trace']
+            elif mutation == 'not-run': value['probe']['backend_not_run'] = 'HEADER_TRACE_FAILED'
+            else: value['probe']['header_trace']['extra'] = True
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                self.check(value, sha)
+
+    def test_argv_source_environment_and_raw_projection_are_bound(self):
+        for mutation in ('argv', 'observed-argv', 'source', 'environment', 'projection', 'raw', 'stdout', 'exit'):
+            value, sha = self.packet()
+            trace = value['probe']['header_trace']
+            if mutation == 'argv': trace['argv'].insert(1, '-DOTHER=1')
+            elif mutation == 'observed-argv': trace['command']['argv'].insert(1, '-fshow-skipped-includes')
+            elif mutation == 'source': value['probe']['input']['sha256'] = 'a' * 64
+            elif mutation == 'environment': value['environment']['INCLUDE'] = 'C:/elsewhere'
+            elif mutation == 'projection': trace['projection']['entered_header_indices'].append(2)
+            elif mutation == 'raw': trace['command']['stderr'] += 'source snippet\n'
+            elif mutation == 'stdout': trace['command']['stdout'] = 'unexpected'
+            else: trace['command']['exit_code'] = 1
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                self.check(value, sha)
+
+    def test_exact_entered_comparison_rejects_missing_extra_and_full_event_omission(self):
+        for paths in (['C:/probe/declarations.c'], ['C:/sdk/stdlib.h'],
+                      ['C:/probe/declarations.c', 'C:/sdk/non-entered.h', 'C:/sdk/stdlib.h']):
+            value, sha = self.packet()
+            value['probe']['cindex']['inclusions'] = paths
+            with self.subTest(paths=paths), self.assertRaisesRegex(ValueError, 'CIndex entered-header closure') as caught:
+                self.check(value, sha)
+            self.assertFalse(hasattr(caught.exception, '_inclusion_rejection'))
+        value, sha = self.packet()
+        probe = value['probe']
+        probe['cindex']['inclusions'] = sorted(h['path'] for h in probe['headers'])
+        # A whole omitted final event still has legal LF framing. Exact equality rejects it.
+        with self.assertRaisesRegex(ValueError, 'CIndex entered-header closure'):
+            self.check(value, sha)
+
+    def test_header_trace_capture_retains_only_successful_path_text(self):
+        value, _ = self.packet()
+        probe = value['probe']
+        argv, raw = probe['header_trace']['argv'], probe['header_trace']['command']['stderr'].encode()
+        cases = [(SimpleNamespace(returncode=0, stdout=b'', stderr=raw), None),
+                 (SimpleNamespace(returncode=0, stdout=b'', stderr=raw + b'secret-source\n'), 'INVALID_RESULT'),
+                 (SimpleNamespace(returncode=0, stdout=b'', stderr=b'\xff'), 'INVALID_RESULT'),
+                 (SimpleNamespace(returncode=0, stdout=b'secret-source', stderr=raw), 'INVALID_RESULT'),
+                 (SimpleNamespace(returncode=1, stdout=b'', stderr=raw + b'secret-source'), 'PROCESS_FAILED'),
+                 (SimpleNamespace(returncode=0, stdout=b'', stderr=b'x' * (identity.MAX_OUTPUT + 1)), 'OUTPUT_LIMIT'),
+                 (subprocess.TimeoutExpired(argv, 30, output=b'secret-source', stderr=raw), 'TIMEOUT'),
+                 (OSError('secret-source'), 'START_FAILED')]
+        for process, kind in cases:
+            with self.subTest(kind=kind), mock.patch.object(identity.subprocess, 'run') as run:
+                if isinstance(process, BaseException): run.side_effect = process
+                else: run.return_value = process
+                result = identity.capture_declaration_header_trace(argv, probe['headers'], 'Windows', probe['input']['path'])
+            self.assertEqual(run.call_args.args, (argv,))
+            self.assertEqual(run.call_args.kwargs, {'env': identity.checked_environment(identity.os.environ),
+                                                   'capture_output': True, 'timeout': 30, 'check': False})
+            selected = identity.validate_declaration_header_trace(result, argv, probe['headers'], 'Windows', probe['input']['path'])
+            if kind is None:
+                self.assertEqual(result, probe['header_trace'])
+                self.assertEqual(selected, result['projection'])
+            else:
+                self.assertEqual(result['failure']['kind'], kind)
+                self.assertIsNone(result['command'])
+                self.assertIsNone(result['projection'])
+                self.assertIsNone(selected)
+                self.assertNotIn('secret-source', identity.canonical(result))
+
+    def test_trace_failure_requires_explicit_unstarted_backend_and_preserves_syntax_red(self):
+        value, sha = self.packet()
+        probe = value['probe']
+        with mock.patch.object(identity.subprocess, 'run', side_effect=OSError('private')):
+            probe['header_trace'] = identity.capture_declaration_header_trace(
+                probe['header_trace']['argv'], probe['headers'], 'Windows', probe['input']['path'])
+        probe.update(cindex=None, backend_not_run='HEADER_TRACE_FAILED')
+        for code in (0, 1):
+            probe['syntax']['exit_code'] = code
+            result = self.check(value, sha)
+            self.assertFalse(result['syntax_pass'] or result['header_trace_pass'])
+            for row in result['requests']:
+                self.assertEqual(row['issues'], ['HEADER_TRACE_FAILED', 'BACKEND_NOT_RUN'] + (['SYNTAX_FAILED'] if code else []))
+                self.assertEqual(row['state'], 'INCOMPLETE')
+        for mutation in ('not-run', 'observed', 'failure'):
+            changed = copy.deepcopy(value)
+            if mutation == 'not-run': changed['probe']['backend_not_run'] = None
+            elif mutation == 'observed': changed['probe']['cindex'] = self.packet()[0]['probe']['cindex']
+            else: changed['probe']['backend_failure'] = copy.deepcopy(probe['header_trace']['failure'])
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                self.check(changed, sha)
+
+    def test_unsupported_mode_platform_and_profile_stop_before_native_capture(self):
+        for system, mode, profile in (('Linux', self.MODE, None), ('Darwin', self.MODE, None),
+                                      ('Windows', 'unknown', None), ('Windows', self.MODE, 'c17-posix2008/v1')):
+            args = SimpleNamespace(declaration_inclusion_mode=mode, declaration_profile=profile)
+            with (self.subTest(system=system, mode=mode, profile=profile),
+                  mock.patch.object(identity.platform, 'system', return_value=system),
+                  mock.patch.object(identity, 'capture', side_effect=AssertionError('native capture')),
+                  self.assertRaises(ValueError)):
+                identity.capture_declarations(args)
+
+    @contextmanager
+    def writer(self, output, value, sha, **options):
+        """Actual writer with synthetic Windows native I/O on either host path flavor."""
+        native_path = Path
+        aliases = {}
+
+        class ProbePath:
+            def __init__(self, actual, lexical):
+                self.actual, self.lexical = actual, lexical
+                aliases[lexical] = self
+
+            def __str__(self):
+                return self.lexical
+
+            def __truediv__(self, name):
+                return ProbePath(self.actual / name, self.lexical + '/' + name)
+
+            def resolve(self, strict=False):
+                self.actual.resolve(strict=strict)
+                return self
+
+            def is_absolute(self):
+                return True
+
+            def stat(self):
+                return self.actual.stat()
+
+            def open(self, *args, **kwargs):
+                return self.actual.open(*args, **kwargs)
+
+        def paths(path):
+            if isinstance(path, ProbePath):
+                return path
+            if str(path) in aliases:
+                return aliases[str(path)]
+            actual = native_path(path)
+            if actual.name.startswith('codeskeptic-declarations-'):
+                return ProbePath(actual, 'C:/synthetic-probe')
+            return actual
+
+        raw = identity.canonical(value['probe']['cindex']).encode()
+        with mock.patch.object(identity, 'Path', side_effect=paths):
+            with self.legacy.mocked_declaration_capture(output, raw, fixture=(value, sha), **options) as result:
+                yield result
+
+    def test_actual_v3_writer_selects_trace_and_keeps_original_worker_config(self):
+        for syntax_exit, response in ((0, None), (1, None),
+                (1, SimpleNamespace(returncode=1, stdout=b'', stderr=b'private-source\n')),
+                (0, subprocess.TimeoutExpired(['/clang'], 30, output=b'private-source'))):
+            value, sha = self.packet()
+            with self.subTest(syntax_exit=syntax_exit, response=response), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory).resolve() / 'v3.json'
+                with self.writer(output, value, sha, syntax_exit=syntax_exit, trace_response=response) as (argv, stderr, emitted):
+                    status = identity.main(argv + ['--declaration-inclusion-mode', self.MODE])
+                    self.assertEqual(status, 2 if syntax_exit or response is not None else 0, stderr.getvalue())
+                    self.assertEqual(stderr.getvalue(), '')
+                retained = json.loads(output.read_text())
+                probe = retained['probe']
+                result = self.check(retained, sha)
+                self.assertEqual(probe['header_trace']['argv'], emitted['trace_argv'])
+                self.assertEqual(probe['syntax']['argv'], emitted['syntax_argv'])
+                self.assertNotIn('-w', probe['syntax']['argv'])
+                self.assertEqual(probe['syntax']['exit_code'], syntax_exit)
+                self.assertEqual(len(probe['headers']), 3)
+                self.assertNotIn('private-source', output.read_text())
+                if response is None:
+                    self.assertEqual(set(emitted['config']), {'native_identity', 'environment', 'library', 'input'})
+                    self.assertEqual(emitted['config']['input'], probe['input'])
+                    self.assertEqual(probe['header_trace']['projection']['non_entered_dependency_indices'], [2])
+                    self.assertIsNone(probe['backend_failure'])
+                else:
+                    self.assertNotIn('config', emitted)
+                    self.assertIsNone(probe['cindex'])
+                    self.assertIsNone(probe['backend_failure'])
+                    self.assertEqual(probe['backend_not_run'], 'HEADER_TRACE_FAILED')
+                    self.assertFalse(result['syntax_pass'])
+
+    def test_actual_v3_writer_rejects_worker_extra_include_without_legacy_annotation(self):
+        value, sha = self.packet()
+        value['probe']['cindex']['inclusions'].append('C:/sdk/non-entered.h')
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory).resolve() / 'failed.json'
+            with self.writer(output, value, sha, syntax_exit=1) as (argv, stderr, emitted):
+                self.assertEqual(identity.main(argv + ['--declaration-inclusion-mode', self.MODE]), 2)
+                log = stderr.getvalue()
+            retained = json.loads(output.read_text())
+            self.assertEqual(retained['probe']['backend_failure']['kind'], 'INVALID_RESULT')
+            self.assertIsNone(retained['probe']['backend_not_run'])
+            self.assertNotIn('DECLARATION_INCLUSION_DIAGNOSTIC', log)
+            DeclarationResultDiagnosticTests().diagnostic(log, retained['probe']['backend_failure'], 'VALIDATE')
+            self.assertTrue(all(row['issues'] == ['BACKEND_FAILED', 'SYNTAX_FAILED']
+                                for row in self.check(retained, sha)['requests']))
+
+    def test_v3_child_and_cindex_adapter_keep_original_full_argv_and_zero_parse_options(self):
+        value, _ = self.packet()
+        native, probe = value['native_identity'], value['probe']
+        config = {key: value[key] for key in ('native_identity', 'environment', 'library')}
+        config['input'] = probe['input']
+        files = {str(Path(record['path'])): record for record in (probe['input'], value['library'])}
+        with (mock.patch.object(identity.platform, 'system', return_value='Windows'),
+              mock.patch.object(identity, 'case_environment', return_value=value['environment']),
+              mock.patch.object(identity, 'source_identity', return_value=native['source']),
+              mock.patch.object(identity, 'file_identity', side_effect=lambda path: files[str(path)]),
+              mock.patch.object(identity, 'declaration_backend') as backend):
+            backend.return_value.observe.return_value = {'synthetic': True}
+            self.assertEqual(identity.declaration_worker(config), {'synthetic': True})
+            self.assertEqual(backend.return_value.observe.call_args.args[0], probe['syntax']['argv'])
+        library = FakeCIndexLibrary()
+        library.backend().observe(probe['syntax']['argv'], [])
+        self.assertEqual(library.index_calls, [(0, 0)])
+        self.assertEqual(library.parse_calls, [{'index': 222, 'source': None, 'argv': probe['syntax']['argv'],
+                                              'unsaved': None, 'unsaved_count': 0, 'options': 0}])
+
+    def test_forged_trace_failures_and_projection_scalar_types_reject(self):
+        for mutation in ('zero-exit', 'bool-exit', 'negative-bytes', 'empty-hash', 'extra', 'kind',
+                         'oversize', 'startup-stream', 'retained-command', 'retained-projection'):
+            value, sha = self.packet()
+            probe = value['probe']
+            with mock.patch.object(identity.subprocess, 'run', side_effect=subprocess.TimeoutExpired([], 30)):
+                trace = identity.capture_declaration_header_trace(probe['header_trace']['argv'],
+                    probe['headers'], 'Windows', probe['input']['path'])
+            if mutation == 'zero-exit': trace['failure']['exit_code'] = 0
+            elif mutation == 'bool-exit': trace['failure'].update(kind='PROCESS_FAILED', exit_code=True)
+            elif mutation == 'negative-bytes': trace['failure']['stderr']['bytes'] = -1
+            elif mutation == 'empty-hash': trace['failure']['stderr']['sha256'] = 'a' * 64
+            elif mutation == 'extra': trace['failure']['secret'] = 'unexpected'
+            elif mutation == 'kind': trace['failure']['kind'] = 'SUCCESS'
+            elif mutation == 'oversize': trace['failure'].update(kind='OUTPUT_LIMIT', exit_code=0)
+            elif mutation == 'startup-stream':
+                trace['failure'].update(kind='START_FAILED')
+                trace['failure']['stderr'] = {'bytes': 1, 'sha256': 'a' * 64}
+            elif mutation == 'retained-command': trace['command'] = probe['header_trace']['command']
+            else: trace['projection'] = probe['header_trace']['projection']
+            probe.update(header_trace=trace, cindex=None, backend_not_run='HEADER_TRACE_FAILED')
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                self.check(value, sha)
+        for scalar in (False, 0.0):
+            value, sha = self.packet()
+            value['probe']['header_trace']['projection']['input_header_index'] = scalar
+            with self.assertRaisesRegex(ValueError, 'projection mismatch'):
+                self.check(value, sha)
+
+    def test_public_v3_reader_cli_and_unknown_mode_fail_closed(self):
+        root = Path(identity.__file__).resolve().parents[1]
+        value, _ = self.packet()
+        with tempfile.TemporaryDirectory() as directory:
+            packet = Path(directory).resolve() / 'packet.json'
+            packet.write_text(identity.canonical(value), encoding='utf-8')
+            command = [sys.executable, '-B', identity.__file__, 'check-declarations', str(packet), '--root', str(root)]
+            result = subprocess.run(command, capture_output=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(json.loads(result.stdout)['header_trace_pass'])
+            value['probe']['header_trace']['command']['stderr'] += 'private-source\n'
+            packet.write_text(identity.canonical(value), encoding='utf-8')
+            result = subprocess.run(command, capture_output=True, timeout=15)
+            self.assertEqual(result.returncode, 2)
+            self.assertNotIn(b'private-source', result.stderr)
+            args = ['capture-declarations', '--root', str(root), '--source-sha', 'a' * 40,
+                    '--libclang', '/not-loaded', '--output', str(packet.parent / 'not-written.json')]
+            for role in identity.TOOL_ROLES:
+                args += ['--' + role, '/not-executed']
+            with (mock.patch.object(identity, 'capture', side_effect=AssertionError('capture')),
+                  mock.patch('sys.stderr', new_callable=io.StringIO), self.assertRaises(SystemExit) as caught):
+                identity.main(args + ['--declaration-inclusion-mode', 'unknown'])
+            self.assertEqual(caught.exception.code, 2)
+
+    def test_location_checks_keep_full_hashed_universe_and_warnings_remain_visible(self):
+        value, sha = self.packet()
+        probe = value['probe']
+        row = next(r for r in probe['cindex']['requests'] if r['id'] == 'c.getenv')
+        row['targets'][0]['canonical']['location'] = self.legacy.position('C:/sdk/non-entered.h')
+        probe['syntax']['stderr'] = {'bytes': 13, 'sha256': hashlib.sha256(b'prior warning').hexdigest()}
+        probe['cindex']['diagnostics'] = [{'severity': 2, 'bytes': 13, 'sha256': hashlib.sha256(b'prior warning').hexdigest()}]
+        before = copy.deepcopy(value)
+        self.assertTrue(self.check(value, sha)['syntax_pass'])
+        self.assertEqual(value, before)
+        probe['cindex']['diagnostics'][0]['severity'] = 3
+        self.assertFalse(self.check(value, sha)['syntax_pass'])
+        row['targets'][0]['canonical']['location'] = self.legacy.position('C:/unhashed.h')
+        with self.assertRaisesRegex(ValueError, 'outside hashed closure'):
+            self.check(value, sha)
 
 
 if __name__ == '__main__':

@@ -1569,6 +1569,46 @@ class NativeDeclarationReaderTests(unittest.TestCase):
                     profiles.verify_native_declarations(root, packet, hashlib.sha256(raw).hexdigest())
 
 
+    def test_v3_source_bound_reader_rederives_trace_before_checking_exact_producers(self):
+        import product_identity
+        from test_product_identity import WindowsEnteredHeaderTests
+        fixture = WindowsEnteredHeaderTests()
+        fixture.setUp()
+        value, model_sha = fixture.packet()
+        root = Path(__file__).resolve().parents[1]
+        source = value['native_identity']['source']
+        expected = [{'path': path, 'sha256': source[key]} for key, path in product_identity.SOURCE_FILES.items()]
+        expected += [{'path': path, 'sha256': sha} for path, sha in value['producer_files'].items()]
+        selection = {'api_id': 'c.getenv', 'platform': 'windows-x64', 'visibility_profile': None}
+        with tempfile.TemporaryDirectory() as directory:
+            packet = Path(directory).resolve() / 'observed-v3.json'
+            raw = product_identity.canonical(value).encode()
+            packet.write_bytes(raw)
+            with (mock.patch.object(profiles, 'verify_reviewed_files') as reviewed,
+                  mock.patch.object(product_identity, 'declaration_backend', side_effect=AssertionError('load')),
+                  mock.patch.object(product_identity.subprocess, 'run', side_effect=AssertionError('execute'))):
+                result = profiles.verify_native_declarations(root, packet, hashlib.sha256(raw).hexdigest())
+                projection = profiles.native_declaration_projection(value, fixture.model, model_sha, selection)
+            reviewed.assert_called_once_with(root, source['head'], expected, expected_tree=source['tree'])
+            self.assertTrue(result['producer_bytes_verified'] and result['header_trace_pass'])
+            self.assertFalse(result['native_qualified'] or result['task_ready'])
+            self.assertEqual(projection['packet_schema'], 'codeskeptic-native-declarations/v3')
+            self.assertEqual(projection['result']['issues'], [])
+            with mock.patch.object(profiles, 'verify_reviewed_files', side_effect=ValueError('source mismatch')):
+                with self.assertRaisesRegex(ValueError, 'source mismatch'):
+                    profiles.verify_native_declarations(root, packet, hashlib.sha256(raw).hexdigest())
+            with self.assertRaisesRegex(ValueError, 'digest mismatch'):
+                profiles.verify_native_declarations(root, packet, 'a' * 64)
+            # Rehashing the outer packet cannot make a forged inner projection valid.
+            value['probe']['header_trace']['projection']['entered_header_indices'].append(2)
+            raw = product_identity.canonical(value).encode()
+            packet.write_bytes(raw)
+            with mock.patch.object(profiles, 'verify_reviewed_files') as reviewed:
+                with self.assertRaisesRegex(ValueError, 'projection mismatch'):
+                    profiles.verify_native_declarations(root, packet, hashlib.sha256(raw).hexdigest())
+                reviewed.assert_not_called()
+
+
 class NativeDeclarationCandidateTests(unittest.TestCase):
     """Synthetic declaration decisions; no actual native/model admission."""
     QUALIFICATION = ('model_admitted evaluation_frozen native_qualified task_ready product_qualified').split()

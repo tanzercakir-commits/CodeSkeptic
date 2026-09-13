@@ -775,6 +775,51 @@ doğrular. Hiçbiri kayıt içindeki native yolları açmaz, library yüklemez v
 çalıştırmaz. `OBSERVED_UNADJUDICATED` adı native model kabulü değildir; bütün
 native/task/product qualification bayrakları false, qualified coverage sıfır kalır.
 
+### Açık seçilen Windows açılan-başlık gözlemi — ayrı v3
+
+`capture-declarations --declaration-inclusion-mode windows-entered-headers/v1`
+yalnız Windows'ta `codeskeptic-native-declarations/v3` üretir. Bu seçenek POSIX
+görünürlük profilinden ayrıdır; birlikte kullanılamaz. Varsayılan v1 ve açık POSIX
+v2 kaynak/komut/packet anlamları değişmez. Windows declaration workflow'u yeni
+modu açıkça seçer; önceki başarısız packet'ler yeniden etiketlenmez.
+
+Özgün `-M` komutu ve hashli bağımlılık dizisinin tamamı korunur. Ayrı sabit
+`-w -H -fsyntax-only` komutu, aynı compiler/resource/target/input ve seçili
+environment ile açılan header yollarını/depth'lerini gözler. `-w` yalnız bu yeni
+yol gözlem kanalındadır; özgün syntax ve CIndex komutlarına eklenmez. Onların
+uyarı/error/fatal sonuçları ve stream kimlikleri aynen korunur. CIndex'e `-H`
+veya skipped-include seçeneği de verilmez; parse/index seçenekleri değişmez.
+
+Yalnız exit0, boş stdout, bounded UTF-8 ve tamamı fiziksel LF/CRLF ile biten
+depth/absolute-path gramerine uyan başarılı stderr saklanır. Her yol tam hashli
+bağımlılık dizisinde tekil olmalı; Windows eşitliği `PureWindowsPath` kurallarıdır.
+En fazla4096 olay,256 depth,2MiB stream ve8192byte path kabul edilir; bağımlılık
+üst sınırı4096 kayıt/256MiB'dır. Saf okuyucu raw izden olayları, açılan header
+indekslerini ve açılmayan bağımlılık indekslerini yeniden türetir. Sabit main
+input ayrıca beklenen sete katılır; izde main-header olayı kabul edilmez.
+Sonu LF olan eksik bir olay listesi gramerden geçebilir: bütünlük yalnız satır
+sonundan çıkarılmaz; tamamlanan süreç yakalaması ve CIndex'in açılan setle
+**tam eşitliği** ayrıca zorunludur. Keyfi subset kabulü yoktur. Konum/alias
+denetimleri tam bağımlılık evrenini kullanır; açılmayan bir bağımlılık otomatik
+olarak lookup-only diye sınıflandırılmaz veya muaf tutulmaz.
+
+Timeout/start/nonzero/oversize/encoding/gramer hatasında raw trace veya kaynak
+alıntısı dışarı verilmez; yalnız failure türü, exit ve stream byte/hash'leri
+kalır. İz yoksa CIndex worker başlatılmaz: `backend_not_run=HEADER_TRACE_FAILED`,
+`cindex=null`, `backend_failure=null` ve bütün isteklerde HEADER_TRACE_FAILED /
+BACKEND_NOT_RUN / INCOMPLETE kaydı oluşur. Önceki syntax RED ayrıca korunur.
+Başarılı izden sonraki gerçek backend failure ayrı tutulur. Yeni entered-set
+guard'ı eski full-dependency inclusion diagnostic etiketini kullanmaz. Output
+sınırı işlem sonrası sayımdır; hard RSS/streaming/descendant bütçesi değildir.
+
+Packet sürümü/modu, komut, fixed source, environment, tam bağımlılık ve raw/projection
+bağları fail-closed'dur. Source-bound okuyucu exact producer head/tree/blob
+kimliklerini de doğrular. Yeni candidate/review yeni packet/projection hash'ine
+bağlanmalıdır; eski değerlendirme veya failure kaydı yeniden yazılmaz. Sentetik
+writer/reader testleri ve Linux mekanizma gözlemi Windows native qualification
+değildir. Taze Windows gözlemi, bağımsız bildirim/model kabulü ve tüm U003
+global-freeze yükümlülükleri ayrıdır; bütün qualification bayrakları false kalır.
+
 ### Açık seçilen POSIX görünürlük gözlemi — ayrı v2
 
 `capture-declarations --declaration-profile c17-posix2008/v1` yalnız Linux/Darwin

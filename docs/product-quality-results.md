@@ -2840,3 +2840,63 @@ no-write/unchanged-state yolu korunur.30 odaklı test GREEN capture SHA
 Değişen head için yeni bağımsız inceleme gerekir; eski ret kararı geriye dönük
 PASS'e çevrilmez. Yerel referans operator native/corpus/global-freeze kabulü
 vermez ve U003 FRONT kalır.
+
+## U003 Windows açılan-header gözlemi — eklemeli v3
+
+Exact de6f9d1 Windows declaration packet'i yeniden indirildi ve bağımsız
+denetlendi:188 hashli bağımlılığa karşı186 CIndex inclusion gözlendi;13 ve146
+indeksleri eksik, unexpected sıfırdı. Tam worker stdout daha önce atılmıştı;
+eşleme retained diagnostic'e bağlıdır. Eski run34739033719 terminal failure,
+13 BACKEND_FAILED/INCOMPLETE ve qualified coverage0 olarak kalır. Dependency
+ve özgün syntax komutları exit0'dı; summary syntax false backend RED'i içerir.
+Normal Windows build'in ayrı success'i bu declaration sonucunu değiştirmez.
+Genel CI'nın checkpoint runtime-before deadline failure'ı da ayrı açık kalır;
+ne timeout floor'u ne başka task'ın runtime/test kodu bu değişiklikle düzenlenir.
+
+Gerçek LLVM20 resource header byte hash'leri upstream20.1.8 kaynaklarıyla
+eşleşti. `__has_include_next` lookup'ının `-M` bağımlılığına katılıp CIndex
+entered-file listesinde yer almaması, sabit kendi Linux/LLVM22 dört-durum
+deneyinde tekrarlandı. Bu mekanizma exact Windows kayıp içeriğinin yeniden
+oynatılması veya MSVC/UCRT kaynaklarının yeniden okunması değildir. İlk packet,
+kaynak, deney ve bağımsız inceleme53 dosya/1,352,556byte kalıcı arşivdedir:
+`native-declaration-header-lookup-diagnosis-de6f9d1-v1`, manifest SHA
+`f86278f9535ea2cd3b883fc15a4d8eeacafa75597797bd04ade53094756dd6a1`.
+
+Yeni açık Windows modu full dependency dizisini aynen koruyup ayrı path-only
+`-w -H -fsyntax-only` gözlemi toplar; özgün syntax/CIndex argv'si değişmez.
+Saf okuyucu raw trace'ten projection'ı yeniden üretir ve main input dahil
+CIndex entered set ile tam eşitlik ister. Gramer, LF/CRLF, path/depth/event/byte
+sınırları, argv/source/environment/model/producer bağları fail-closed'dur.
+Non-entered bağımlılık otomatik lookup-only muafiyeti değildir. Trace failure'da
+özel error metni atılır, stream kimlikleri korunur ve worker açıkça başlatılmaz.
+Eski v1/v2 closure/diagnostic anlamları, kaynak snapshot'ları ve 50+3 coverage
+yükümlülüğü değişmez. Yeni guard eski inclusion annotation'ını yeniden kullanmaz.
+
+Paket modu öncesi8-test RED capture SHA
+`d97b513e080bf75e6ac375873df61d194867af217eb30a96556f85b4f05d3fc3`;
+Windows workflow seçimi öncesi RED SHA
+`8c0332b106ac937a574d292cbb73b1e4da108b302818e62cd0f6803b74505fdc`.
+İlk GREEN denemelerindeki iki fixture hatası (`os` import adı ve Windows
+platform etiketinin yazımı) ayrı başarısız capture'larda korundu; ürün RED'i
+sayılmadı.120 declaration/legacy/writer/adapter kontrolü GREEN SHA
+`c2fa8e9c699ecaa93f278a2a60cecd51c0cbcdb1a1781a27fa31501cc27fc16f`;
+16 source-bound reader/candidate kontrolü GREEN SHA
+`572e5a08f489bf52d90349fc48ac8b4b94f65bba663e72861229207c4383df1d`.
+554-test T1 paketi34.137s GREEN SHA
+`01b2579c12eeeb0a4474663fb7464266da7f5a7aea2435510befff1dd107b23c`.
+Gerçek Git/declaration/manual bağlı snprintf effect CLI korunuyor: SHA
+`5dbc5ef31a581b9e2b5169f2015bc479c1d4310bea19702ecb6684b1d94831f7`.
+
+Üretim trace capture ve pure trace reader, yedi sabit kendi-kaynak Linux/LLVM22
+kontrolünde ayrıca çalıştı: dört include/lookup durumu, özgün warning,
+gerçek error ve pragma-once tekrarları. Başarılı entered set CIndex'le tam
+eşleşti; warning özgün kanallarda kaldı, error raw trace'e dönüştürülmedi.
+Capture SHA `141eb8cf2d496084734b79e933230ccf65864b0fb53a29a8610ff4223ed46c0a`.
+Bu test Windows v3 packet yakalaması değildir. Sentetik Windows writer/reader
+testleri de native execution veya producer Git blob doğrulaması yerine geçmez.
+
+İlk saf-helper incelemesi yalnız advisory idi; paket entegrasyonu için yeni
+temiz exact-head bağımsız inceleme ve taze gerçek Windows gözlemi ayrıca gerekir.
+Henüz yeni hosted packet/candidate/review veya Windows/native/model/global-freeze
+PASS yoktur. U003 FRONT, >=1020 bağımsız örnek ve bütün API/flow yükümlülükleri
+açıktır; hiçbir POP, main değişikliği veya manuel workflow rerun yapılmadı.

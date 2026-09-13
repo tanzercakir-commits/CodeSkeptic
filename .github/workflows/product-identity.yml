@@ -292,7 +292,7 @@ jobs:
             }
           }
           $env:INCLUDE = $declarationIncludes -join ';'
-          # One explicit DLL beside the selected installed driver; default v1 on Windows.
+          # Same physical DLL/driver; explicit v3 separates entered headers from full dependencies.
           $declarationLibclang = & $declarationPython -I -B -c "import sys; from pathlib import Path; print(Path(sys.argv[1]).resolve(strict=True).with_name('libclang.dll').resolve(strict=True))" $declarationClang
           if ($LASTEXITCODE -ne 0) { throw 'Selected installed libclang is unavailable' }
           & $declarationPython -B scripts/product_identity.py capture-declarations `
@@ -300,6 +300,7 @@ jobs:
             --cc "$declarationCl" --cxx "$declarationCl" `
             --clang "$declarationClang" --clangxx "$declarationClangxx" `
             --libclang "$declarationLibclang" `
+            --declaration-inclusion-mode windows-entered-headers/v1 `
             --output "$env:RUNNER_TEMP/codeskeptic-native-declarations.json"
           if ($LASTEXITCODE -ne 0) { throw 'Declaration observation failed; retained RED is not qualification' }
           & $declarationPython -B scripts/product_identity.py check-declarations `
