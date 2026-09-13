@@ -3571,9 +3571,12 @@ def snprintf_percent_s_effect(value):
             return result
         dst_id, offset = destination['object'], destination['offset']
         if not successful:
+            if relation == 'SAME_OBJECT':
+                # With no exact write extent, overlapping-access preconditions
+                # are not established. An incomplete result cannot nevertheless
+                # guarantee that unrelated memory facts survive this call.
+                return unresolved('SAME_OBJECT_ERROR_EFFECT_NOT_MODELED')
             result['formatted_output_write']['state'] = 'MAY_WRITE'
-            # Same-object possible mutation invalidates its source facts too;
-            # it does not promise well-defined overlap or termination.
             invalidate({dst_id})
             return result
         copied = min(length, capacity - 1)

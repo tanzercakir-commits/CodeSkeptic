@@ -2016,6 +2016,28 @@ class SnprintfEffectTests(unittest.TestCase):
                 self.assertEqual(result['validations'], [])
                 self.assertEqual(result['formatted_output_write']['state'], 'UNRESOLVED')
 
+    def test_same_object_error_cannot_preserve_unrelated_memory_guarantees(self):
+        for returned in (-1, None):
+            for capacity in (0, 8):
+                value = self.fixture()
+                value['source'].update(object='dst', version=7)
+                value.update(alias_relation='SAME_OBJECT', returned=returned, capacity=capacity)
+                with self.subTest(returned=returned, capacity=capacity):
+                    result = self.effect(value)
+                    self.assertEqual(result['status'], 'INCOMPLETE_NOT_SAFE')
+                    if capacity:
+                        self.assertTrue(result['effects_outside_state_unknown'])
+                        self.assertIn('SAME_OBJECT_ERROR_EFFECT_NOT_MODELED', result['reasons'])
+                        self.assertEqual(result['formatted_output_write']['state'], 'UNRESOLVED')
+                        self.assertEqual(result['validations'], [])
+                        self.assertEqual(result['invalidated_validations'],
+                                         ['checked-dst-alias', 'checked-source'])
+                    else:
+                        self.assertFalse(result['effects_outside_state_unknown'])
+                        self.assertEqual(result['formatted_output_write']['state'], 'NONE')
+                        self.assertEqual(result['validations'], value['validations'])
+                        self.assertEqual(result['objects'], value['objects'])
+
     def test_unsupported_percent_n_at_zero_does_not_erase_argument_side_effects(self):
         for format_value in ('%n', '%s%n', '%.*s', None):
             value = self.fixture()

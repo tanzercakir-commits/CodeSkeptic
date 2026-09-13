@@ -952,6 +952,11 @@ operation'ın destek sınırıdır, tek başına kanıtlanmış taşma değildir
 Pozitif capacity'de negative/unknown return için kesin mutation/termination
 uydurulmaz; destination fact'leri konservatif bilinmez olur. Bu kılavuzlardan
 detaylı restrict veya error-path runtime davranışı çıkarıldığı iddia edilmez.
+Özellikle SAME_OBJECT ve positive capacity ile negative/unknown return,
+kesin write extent olmadığından bu ilk operation'da ayrıca destek dışıdır:
+outside-state uncertainty görünürdür ve mevcut bütün validation'lar düşürülür.
+INCOMPLETE durumu, kanıtlanmamış unrelated-memory garantisini koruma izni değildir.
+Diğer precondition'lar sağlandığında capacity=0 no-write yolu ayrı kalır.
 
 Input en çok8 object, object başına32 origin interval, interval başına8 origin,
 32 validation ve512 karakter format içerir. Byte/offset/capacity uint64,

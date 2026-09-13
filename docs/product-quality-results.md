@@ -2820,3 +2820,23 @@ INCOMPLETE_NOT_SAFE. Capture SHA
 INCOMPLETE negatifler safe/native/ürün PASS değildir; bütün qualification
 alanları false, quota katkısı sıfırdır. Yeni temiz exact-head bağımsız inceleme
 ayrı gereklidir; tüm U003 acceptance veya global freeze tamamlanmış değildir.
+
+Bağımsız exact9688a38 incelemesi532 test/CLI/queue ve2,500 byte-level pozitif
+karşılaştırma geçmesine rağmen BLOCKED_IMPLEMENTATION verdi: pozitif capacity,
+SAME_OBJECT ve negative/unknown return yolu overlap denetiminden önce dönüp
+unrelated validation'ları koruyordu. INCOMPLETE demek bu bellek garantisini
+kanıtlamaz. İlk bulgu ve önceki GREEN sonuçları değişmeden saklandı; ilk commit
+PASS veya upstream yayını sayılmadı. Bulgu envelope SHA
+`9bcca83655319d8c94d831419a5d61b26b5efea77a89a800db742636095aa115`.
+
+Yeni test eski9688a38 implementasyonunda iki subcase ile RED:
+`4df17fe29bf86e68d9c6925c7510e1c5c5b6de6ce730b52b6c9fd28d0a530806`.
+Dar düzeltme aynı-object error-effect yolunu açık destek dışı bırakıp
+outside-state uncertainty ile bütün validation'ları düşürür; sıfır capacity
+no-write/unchanged-state yolu korunur.30 odaklı test GREEN capture SHA
+`2f2771a4136533491b2d3c82d9e7ab4b06d7a0d1f0df9a876e4befec6d3b4ab6`.
+533-test T1 paketi32.918s GREEN capture SHA
+`a17ca6a332dafb137d94dbd27ef28e51a64af139f547c48bbdceb41aff3130da`.
+Değişen head için yeni bağımsız inceleme gerekir; eski ret kararı geriye dönük
+PASS'e çevrilmez. Yerel referans operator native/corpus/global-freeze kabulü
+vermez ve U003 FRONT kalır.
