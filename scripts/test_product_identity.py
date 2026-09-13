@@ -1678,6 +1678,7 @@ class DeclarationTests(unittest.TestCase):
         value, sha = self.packet() if fixture is None else fixture
         native = value['native_identity']
         system = native['platform']['system']
+        path_type = PureWindowsPath if system == 'Windows' else PurePosixPath
         root = Path(identity.__file__).resolve().parents[1]
         real_file_identity = identity.file_identity
         records = {record['path']: record for record in [value['library'], *value['probe']['headers'][1:],
@@ -1686,14 +1687,18 @@ class DeclarationTests(unittest.TestCase):
         producer = root / 'scripts/product_profiles.py'
         records[str(producer)] = {'path': str(producer), 'resolved_path': str(producer), 'bytes': 8,
                                  'sha256': hashlib.sha256(b'producer').hexdigest()}
+        # Native Windows Path changes slash spelling; normalize only lookup keys,
+        # never the retained identity records or their original lexical bytes.
+        records = {path_type(path): record for path, record in records.items()}
         worker_finished = False
         emitted = {}
 
         def file_identity(path, **kwargs):
-            if str(path) not in records:
+            key = path_type(str(path))
+            if key not in records:
                 return real_file_identity(path, **kwargs)
-            result = copy.deepcopy(records[str(path)])
-            if worker_finished and changed == str(path):
+            result = copy.deepcopy(records[key])
+            if worker_finished and changed is not None and path_type(changed) == key:
                 result['sha256'] = 'f' * 64
             return result
 
@@ -3915,6 +3920,35 @@ class WindowsEnteredHeaderTests(unittest.TestCase):
                     self.assertIsNone(probe['backend_failure'])
                     self.assertEqual(probe['backend_not_run'], 'HEADER_TRACE_FAILED')
                     self.assertFalse(result['syntax_pass'])
+
+    def test_writer_mock_resolves_windows_lexical_names_without_native_fixture_io(self):
+        value, _ = self.packet()
+        native = value['native_identity']
+        fixture_paths = {PureWindowsPath(record['path']) for record in
+            [value['library'], *value['probe']['headers'][1:],
+             *[tool['file'] for tool in native['tools'].values()],
+             *[h for probe in native['probes'].values() for h in probe['headers']]]}
+        host_path, real_file, misses = Path, identity.file_identity, []
+
+        def windows_path(path):
+            # Only known synthetic file identities change flavor. Real repository
+            # and temporary-file operations retain the running host's Path type.
+            if PureWindowsPath(str(path)) in fixture_paths:
+                return PureWindowsPath(path)
+            return host_path(path)
+
+        def guard_native_fixture(path, **kwargs):
+            if PureWindowsPath(str(path)) in fixture_paths:
+                misses.append(str(path))
+                raise FileNotFoundError('unmocked Windows native fixture path')
+            return real_file(path, **kwargs)
+
+        result = unittest.TestResult()
+        with (mock.patch.object(sys.modules[__name__], 'Path', side_effect=windows_path),
+              mock.patch.object(identity, 'file_identity', side_effect=guard_native_fixture)):
+            type(self)('test_actual_v3_writer_selects_trace_and_keeps_original_worker_config').run(result)
+        self.assertTrue(result.wasSuccessful(), result.failures + result.errors)
+        self.assertEqual(misses, [])
 
     def test_actual_v3_writer_rejects_worker_extra_include_without_legacy_annotation(self):
         value, sha = self.packet()

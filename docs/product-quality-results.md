@@ -2900,3 +2900,25 @@ temiz exact-head bağımsız inceleme ve taze gerçek Windows gözlemi ayrıca g
 Henüz yeni hosted packet/candidate/review veya Windows/native/model/global-freeze
 PASS yoktur. U003 FRONT, >=1020 bağımsız örnek ve bütün API/flow yükümlülükleri
 açıktır; hiçbir POP, main değişikliği veya manuel workflow rerun yapılmadı.
+
+Bağımsız exact4cf2133 incelemesi554 Linux testi ve34 ek kontrol geçmesine
+rağmen NOT_APPROVED verdi: sentetik Windows writer fixture'ı mock kayıtlarını
+literal slash'li string anahtarlarla arıyordu; gerçek Windows Path ters-slash
+normalizasyonunda eşleme kaçıp var olmayan fixture dosyası okunmaya çalışılıyordu.
+Bu hosted testleri collection öncesinde durdurabileceğinden material bulgudur;
+ilk commit gönderilmedi. Verifier'ın salt lexical-path reproducer'ı eski temiz
+commit'te dört alt-vakayla RED: SHA
+`35cd6bc135983570284f534f3c1f417bc35b7e81671696de5dcff308d65f36b0`.
+Repo'ya eklenen dar regresyon da eski helper ile RED: SHA
+`4ff2608f197dfbd29bdfd14aab8c8c3ad4ce7f8f6640c9269501b7c81ce687bc`.
+
+Düzeltme yalnız test-helper lookup anahtarlarını seçili path flavor'ına
+normalize eder; retained packet'in lexical path/hash byte'ları ve üretim kodu
+değişmez. Yeni regresyon bilinen sentetik Windows kimliklerinde PureWindowsPath
+normalizasyonunu host'tan bağımsız uygular ve native fixture I/O'yu yasaklar;
+gerçek repo/temp yolları host Path türünde kalır. Aynı exact reproducer GREEN
+SHA `2099653ed501f5299436b605ef756e832e0f984873ebd0c8270b0b967e34166e`.
+Dar/legacy testler GREEN capture SHA
+`76c773ff58ab3fe7ce7921d603d15dac67eb241ceaebfe70fe21be2fb3daaf55`.
+Bu simulated path testi gerçek Windows çalışması değildir; ilk NOT_APPROVED
+kararı korunur ve düzeltilen yeni head ayrıca bağımsız denetlenmelidir.
