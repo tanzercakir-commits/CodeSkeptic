@@ -2647,3 +2647,64 @@ yerelde skip yok; capture SHA
 Gerçek5a Windows packet'inin saf `check-declarations` CLI'si exit0 verdi,
 13 BACKEND_FAILED sonucunu korudu; metadata geçerliliği native PASS değildir:
 `59cc4d08729c04b150a3922dc8dd120ac28d70cc1376a9f40e8026630c7e5de9`.
+
+### Exact-250 Windows RED ve parent sonuç-ret tanısı
+
+250c01f producer'ın run34731828949/attempt1 sonucu terminal failure'dır;
+altı job terminaldir. Windows declaration job103655905367,
+artifact10309831434 gerçek ZIP/packet ve tam log baytlarıyla yeniden bağlandı.
+54.935-byte ZIP SHA
+`a49c0c96cf653525fbc952feee3bab4eadd5be873e5980d9f9534ed1422efc64`;
+323.738-byte packet SHA
+`43f5a5ec638e47503d2f02e7f1d366120d0a34767c6fd424cbb5aec91241487c`.
+33 dosyalık `native-declaration-worker-packet-250c01f-v1` paketinin manifest SHA'sı
+`878e46d6bcd0c225f6ada6820ae94bf3d2fa2000dfe9960fbe3aa8f1eae1c8b8`.
+Gerçek20 acquisition dosyası ve kalıcı kopyası ayrı bağımsız denetimden geçti;
+bu yalnız kanıt/kopya bütünlüğü PASS'idir, native veya power-loss garantisi değildir.
+
+Backend `INVALID_RESULT/exit0`, stdout230.099 byte ve boş stderr kaydeder.
+Özgün çocuk stdout'u tutulmadığı için hash'i tam ret aşamasını veya nedenini
+göstermez. Exact250 kaynağında ret decode/parse/validate/canonical UTF-8
+serialization-boyut sınırındadır; `TIMEOUT` veya `PROCESS_FAILED` değildir.
+Günlükteki tek eski child marker ayrı mock testinden gelir. Raw syntax/dependency
+exit0, syntax stderr11.119 byte ve188 header kaydı backend kabulü değildir.
+13 istek hâlâ BACKEND_FAILED/INCOMPLETE; cindex null, yeterlilik alanları false.
+Eski5a child-bound RED'i değişmez. D24 önceki log/catalog gözlemiydi; actual
+packet veya terminal run kanıtı içermediği anlamı geriye dönük değiştirilmedi.
+
+Aynı run'ın Linux Observe job'u GCC staging download-1 sırasında reddetti;
+native-case packet üretmedi. Korunmuş log ve exact kaynak opener.open sınırını
+gösterir, HTTP/transport nedenini göstermez. Buradaki Windows parent tanısı
+Linux indirme hatasını düzeltmez veya yeniden sınıflandırmaz.
+
+Prospective değişiklik yalnız sonraki INVALID_RESULT retlerini parent'ın
+beş sabit aşamasıyla ayırır. Child metni echo edilmez; kaynak ipuçları sekiz
+context/64 toplam frame/24 allowlisted token, satır1024 ASCII byte ile sınırlıdır.
+Tanı çıkarma/serialization/yazma asıl failure hesaplandıktan sonra ayrıdır;
+başarısız tanı orijinal kind/exit/stream hash'lerini değiştirmez. Packet şeması,
+validator kabulü, timeout, tek deneme, corpus/model ve kalite kapıları korunur.
+
+İlk test-first beş-aşama RED capture SHA
+`52f2de6802d19f769e2786f1425cc08328de2246ac606afc98b3dd7ea1aae494`.
+Genişletilen testlerde bir fixture çağrı hatası düzeltildi; son13 yeni regresyon
+exact250 kaynak blob'u altında tekrar RED verdi (native reproducer değildir):
+`33aee398f4c7ef371122f721f449f908123bccca6a196bb4092bf012d9b30680`.
+69 declaration/child-parent diagnostic/v1-v2 writer testi GREEN:
+`d20e869b754e69d0827f7a44fbf055c14c0c6690175427cb8f6b0f7bba9a0d54`.
+Selective diagnostic serialization ve write hataları, özel/bozuk girdiler,
+context-cycle/izinli-olmayan uzun traceback, exact byte sınırı, korunmuş syntax
+RED ve fatal source/header drift sınandı. Linux writer fixture'ları Windows'ta
+açık skip'tir; platform-bağımsız parent testleri native kanıt yerine geçmez.
+
+Gerçek sabit Python child CLI'si yanlış config'i native yüklemeden önce reddetti;
+eski CHILD_REPORTED davranışı korundu, capture SHA
+`6bcf48ded28d05a544bf01804409e681844a25e08837e9ff5ba9c4ac9b0cf2ad`.
+Actual250 packet saf CLI'si aynı13 BACKEND_FAILED sonucuyla exit0 verdi:
+`700c058b790149dbf6b89f6078609c9669dee2ea1bfe2849d8a288463303e82f`.
+Bu metadata okuma PASS'idir; Windows tamiri/native kabulü değildir. Yeni temiz
+exact-head implementation için bağımsız inceleme ve taze hosted gözlem ayrıca
+gerekir; U003/global freeze/model/product kabulü açıktır, POP yoktur.
+
+T1 identity/profiles/quality/completion-plan toplam501 test32.736s GREEN,
+yerelde skip yok; capture SHA
+`ce478f7057ea5ddea385082e57023d6e92ad1cadb1659ab4d595498d4592743f`.

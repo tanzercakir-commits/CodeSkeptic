@@ -1783,8 +1783,9 @@ class DeclarationTests(unittest.TestCase):
                     return stdout.replace(marker, b'"library_version":"' + encoded + b'"')
                 with self.mocked_declaration_capture(output, raw, after_serialization=inject) as (argv, stderr, emitted):
                     self.assertEqual(identity.main(argv), 2)
-                    self.assertEqual(stderr.getvalue(), '')
+                    diagnostic_log = stderr.getvalue()
                 retained = json.loads(output.read_text())
+                DeclarationResultDiagnosticTests().diagnostic(diagnostic_log, retained['probe']['backend_failure'], 'VALIDATE')
                 self.assertIsNone(retained['probe']['cindex'])
                 self.assertEqual(retained['probe']['backend_failure']['kind'], 'INVALID_RESULT')
                 self.assertEqual(retained['probe']['backend_failure']['stdout'],
@@ -1805,9 +1806,10 @@ class DeclarationTests(unittest.TestCase):
                 output = Path(directory).resolve() / 'failed.json'
                 with self.mocked_declaration_capture(output, raw) as (argv, stderr, emitted):
                     self.assertEqual(identity.main(argv), 2)
-                    self.assertEqual(stderr.getvalue(), '')
+                    diagnostic_log = stderr.getvalue()
                 retained = json.loads(output.read_text())
                 failure = retained['probe']['backend_failure']
+                DeclarationResultDiagnosticTests().diagnostic(diagnostic_log, failure, 'VALIDATE')
                 self.assertEqual(failure['kind'], 'INVALID_RESULT')
                 self.assertEqual(failure['exit_code'], 0)
                 self.assertEqual(failure['stdout'], {'bytes': len(emitted['stdout']),
@@ -1833,7 +1835,11 @@ class DeclarationTests(unittest.TestCase):
                 self.assertFalse(output.exists())
                 with self.mocked_declaration_capture(output, b'{}', changed) as (argv, stderr, emitted):
                     self.assertEqual(identity.main(argv), 2)
-                    self.assertTrue(stderr.getvalue().startswith('IDENTITY_INVALID '))
+                    lines = stderr.getvalue().splitlines()
+                    self.assertEqual(len(lines), 3)
+                    self.assertTrue(lines[0].startswith('DECLARATION_RESULT_DIAGNOSTIC '))
+                    self.assertTrue(lines[1].startswith('IDENTITY_INVALID '))
+                    self.assertEqual(lines[2], 'DECLARATION_FAILURE_KIND INVALID')
                 self.assertFalse(output.exists())
 
     def test_capture_exception_keeps_fixed_failure_kind_without_private_text(self):
@@ -2034,7 +2040,12 @@ class DeclarationWorkerDiagnosticTests(unittest.TestCase):
                 callback.assert_not_called()
                 self.assertEqual(failure['kind'], kind)
                 self.assertIsNone(observed)
-                self.assertEqual(log, '')
+                self.assertNotIn(self.LOG, log)
+                if kind == 'INVALID_RESULT':
+                    DeclarationResultDiagnosticTests().diagnostic(log, failure,
+                        'NONEMPTY_STDERR' if result.stderr else 'PARSE')
+                else:
+                    self.assertEqual(log, '')
         observed, failure, log, callback = self.run_worker(SimpleNamespace(returncode=0, stdout=b'{}', stderr=b''))
         callback.assert_called_once_with({})
         self.assertEqual((observed, failure, log), ({}, None, ''))
@@ -2128,6 +2139,275 @@ class DeclarationWorkerDiagnosticTests(unittest.TestCase):
                     self.assertIn(self.LOG, stderr.getvalue())
                     self.assertIn('IDENTITY_INVALID ', stderr.getvalue())
                 self.assertFalse(output.exists())
+
+
+class DeclarationResultDiagnosticTests(unittest.TestCase):
+    LOG = 'DECLARATION_RESULT_DIAGNOSTIC '
+
+    def run_result(self, stdout=b'{}', stderr=b'', code=0, validator=None):
+        result = SimpleNamespace(returncode=code, stdout=stdout, stderr=stderr)
+        output = io.StringIO()
+        callback = validator if validator is not None else mock.Mock()
+        with ExitStack() as stack:
+            execute = stack.enter_context(mock.patch.object(identity.subprocess, 'run', return_value=result))
+            stack.enter_context(mock.patch.object(identity.sys, 'stderr', output))
+            observed, failure = identity.run_declaration_worker({}, callback)
+        execute.assert_called_once()
+        self.assertEqual(execute.call_args.args, ([sys.executable, '-B',
+            str(Path(identity.__file__).resolve()), '_declaration-worker'],))
+        self.assertEqual(execute.call_args.kwargs, {'input': b'{}\n',
+            'env': identity.checked_environment(identity.os.environ), 'capture_output': True,
+            'timeout': 30, 'check': False})
+        self.assertEqual(execute.call_args.kwargs['timeout'], 30)
+        return observed, failure, output.getvalue(), callback
+
+    def diagnostic(self, log, failure, phase):
+        self.assertTrue(log.startswith(self.LOG), 'missing parent result diagnostic')
+        self.assertEqual(len(log.splitlines()), 1)
+        self.assertTrue(log.isascii())
+        self.assertLessEqual(len(log), 1024)
+        value = json.loads(log[len(self.LOG):])
+        self.assertEqual(set(value), {'schema', 'origin', 'phase', 'checks', 'parent_failure'})
+        self.assertEqual(value['schema'], 'codeskeptic-declaration-result-diagnostic/v1')
+        self.assertEqual(value['origin'], 'PARENT_REPORTED')
+        self.assertEqual(value['phase'], phase)
+        self.assertEqual(value['parent_failure'], failure)
+        self.assertLessEqual(len(value['checks']), 24)
+        for check in value['checks']:
+            self.assertRegex(check, r'^(identity|profile):[1-9][0-9]{0,5}$')
+        return value
+
+    def test_decode_parse_validate_and_serialization_rejections_are_distinct(self):
+        for phase in ('DECODE', 'PARSE', 'VALIDATE', 'SERIALIZE'):
+            with self.subTest(phase=phase):
+                callback = mock.Mock()
+                stdout = b'\xff' if phase == 'DECODE' else b'PRIVATE_SENTINEL' if phase == 'PARSE' else b'{}'
+                if phase == 'VALIDATE':
+                    callback.side_effect = lambda _: identity.require(False, 'PRIVATE_SENTINEL /private/path')
+                if phase == 'SERIALIZE':
+                    def cyclic(value):
+                        value['PRIVATE_SENTINEL'] = value
+                    callback.side_effect = cyclic
+                observed, failure, log, _ = self.run_result(stdout=stdout, validator=callback)
+                self.assertIsNone(observed)
+                self.assertEqual(failure, {'kind': 'INVALID_RESULT', 'exit_code': 0,
+                    'stdout': {'bytes': len(stdout), 'sha256': hashlib.sha256(stdout).hexdigest()},
+                    'stderr': {'bytes': 0, 'sha256': hashlib.sha256(b'').hexdigest()}})
+                value = self.diagnostic(log, failure, phase)
+                self.assertTrue(value['checks'])
+                self.assertNotIn('PRIVATE_SENTINEL', log)
+                self.assertNotIn('/private/path', log)
+                if phase in ('DECODE', 'PARSE'):
+                    callback.assert_not_called()
+                else:
+                    callback.assert_called_once()
+
+    def test_nonempty_stderr_has_no_exception_hints_or_raw_content(self):
+        observed, failure, log, callback = self.run_result(stdout=b'{}', stderr=b'PRIVATE_SENTINEL\x1b[31m')
+        self.assertIsNone(observed)
+        callback.assert_not_called()
+        value = self.diagnostic(log, failure, 'NONEMPTY_STDERR')
+        self.assertEqual(value['checks'], [])
+        self.assertNotIn('PRIVATE_SENTINEL', log)
+        self.assertNotIn('\\u001b', log)
+
+    def test_duplicate_json_and_surrogate_serialization_keep_existing_rejection(self):
+        for raw, phase in ((b'{"a":1,"a":2}', 'PARSE'), (b'"\\udcff"', 'SERIALIZE')):
+            with self.subTest(phase=phase):
+                observed, failure, log, _ = self.run_result(stdout=raw)
+                self.assertIsNone(observed)
+                self.diagnostic(log, failure, phase)
+
+    def test_serialization_size_guard_is_reported_without_relaxation(self):
+        def expand(value):
+            value['payload'] = 'x' * identity.MAX_OUTPUT
+        observed, failure, log, _ = self.run_result(validator=expand)
+        self.assertIsNone(observed)
+        self.diagnostic(log, failure, 'SERIALIZE')
+
+    def test_source_hint_is_allowlisted_bounded_and_never_echoes_forgery(self):
+        for hint, expected in (([], []),
+            (['identity:1', 'profile:999999'], ['identity:1', 'profile:999999']),
+            (['identity:999999'] * 24, ['identity:999999'] * 24),
+            (['identity:1'] * 25, []), (['identity:0'], []), (['identity:1000000'], []),
+            (['private:2'], []), (['identity:2\nPRIVATE_SENTINEL'], []),
+            ('PRIVATE_SENTINEL', []), (['é' * 1100], []), ([None], []), (None, [])):
+            with self.subTest(hint=repr(hint)[:60]), mock.patch.object(
+                    identity, 'declaration_result_checks', return_value=hint, create=True):
+                _, failure, log, _ = self.run_result(stdout=b'bad JSON')
+                self.assertEqual(self.diagnostic(log, failure, 'PARSE')['checks'], expected)
+                self.assertNotIn('PRIVATE_SENTINEL', log)
+
+    def test_source_hint_or_log_failure_cannot_relabel_original_result(self):
+        expected = {'kind': 'INVALID_RESULT', 'exit_code': 0,
+            'stdout': {'bytes': 3, 'sha256': hashlib.sha256(b'bad').hexdigest()},
+            'stderr': {'bytes': 0, 'sha256': hashlib.sha256(b'').hexdigest()}}
+        for error in (OSError('PRIVATE_SENTINEL'), ValueError('PRIVATE_SENTINEL'),
+                      TypeError('PRIVATE_SENTINEL'), RuntimeError('PRIVATE_SENTINEL')):
+            with self.subTest(error=type(error).__name__), \
+                    mock.patch.object(identity, 'declaration_result_checks', side_effect=error, create=True):
+                observed, failure, log, _ = self.run_result(stdout=b'bad')
+                self.assertIsNone(observed)
+                self.assertEqual(failure, expected)
+                self.assertNotIn('PRIVATE_SENTINEL', log)
+        for error in (OSError('PRIVATE_SENTINEL'), ValueError('PRIVATE_SENTINEL')):
+            broken = mock.Mock()
+            broken.write.side_effect = error
+            with mock.patch.object(identity.subprocess, 'run', return_value=SimpleNamespace(
+                    returncode=0, stdout=b'bad', stderr=b'')) as execute, \
+                    mock.patch.object(identity.sys, 'stderr', broken):
+                observed, failure = identity.run_declaration_worker({}, mock.Mock())
+            execute.assert_called_once()
+            broken.write.assert_called()
+            self.assertIsNone(observed)
+            self.assertEqual(failure, expected)
+
+    def test_diagnostic_serialization_failure_does_not_erase_original_streams(self):
+        original = identity.canonical
+        for error in (OSError('PRIVATE_SENTINEL'), ValueError('PRIVATE_SENTINEL'),
+                      TypeError('PRIVATE_SENTINEL'), RuntimeError('PRIVATE_SENTINEL')):
+            serialized = []
+            def canonical(value):
+                if type(value) is dict and value.get('schema') == 'codeskeptic-declaration-result-diagnostic/v1':
+                    serialized.append(value)
+                    raise error
+                return original(value)
+            with self.subTest(error=type(error).__name__), mock.patch.object(identity, 'canonical', side_effect=canonical):
+                observed, failure, log, _ = self.run_result(stdout=b'PRIVATE_SENTINEL')
+            self.assertEqual(len(serialized), 1)
+            self.assertIsNone(observed)
+            self.assertEqual(serialized[0]['parent_failure'], failure)
+            self.assertEqual(failure['kind'], 'INVALID_RESULT')
+            self.assertEqual(failure['stdout'], {'bytes': 16, 'sha256': hashlib.sha256(b'PRIVATE_SENTINEL').hexdigest()})
+            self.assertEqual(log, '')
+
+    def test_actual_traceback_traversal_has_context_frame_and_hint_limits(self):
+        inspected = []
+        class Frame:
+            def __init__(self, filename, line, following=None):
+                self.filename, self.tb_lineno, self.tb_next = filename, line, following
+            @property
+            def tb_frame(self):
+                inspected.append(self.tb_lineno)
+                return SimpleNamespace(f_code=SimpleNamespace(co_filename=self.filename))
+        def frames(count, filename, following=None):
+            for line in reversed(range(1, count + 1)):
+                following = Frame(filename, line, following)
+            return following
+        def error(traceback, context=None):
+            return SimpleNamespace(__traceback__=traceback, __context__=context)
+        own = identity.__file__
+        profile = str(Path(own).with_name('product_profiles.py'))
+        self.assertEqual(identity.declaration_result_checks(error(Frame(profile, 999999))), ['profile:999999'])
+        for line in (0, -1, 1000000, True, '12'):
+            self.assertEqual(identity.declaration_result_checks(error(Frame(own, line))), [])
+        self.assertEqual(identity.declaration_result_checks(error(Frame(own + '.PRIVATE_SENTINEL', 1))), [])
+        inspected.clear()
+        self.assertEqual(identity.declaration_result_checks(error(frames(25, own))),
+                         ['identity:' + str(line) for line in range(1, 25)])
+        self.assertEqual(len(inspected), 24)
+        for ineligible, expected in ((63, ['identity:7']), (64, []), (1000, [])):
+            inspected.clear()
+            self.assertEqual(identity.declaration_result_checks(error(
+                frames(ineligible, 'PRIVATE_SENTINEL', Frame(own, 7)))), expected)
+            self.assertEqual(len(inspected), 64)
+        context = None
+        for line in reversed(range(1, 10)):
+            context = error(Frame(own, line), context)
+        self.assertEqual(identity.declaration_result_checks(context), ['identity:' + str(line) for line in range(1, 9)])
+        context.__context__ = context
+        self.assertEqual(identity.declaration_result_checks(context), ['identity:1'])
+        frame = Frame('PRIVATE_SENTINEL', 1)
+        frame.tb_next = frame
+        inspected.clear()
+        self.assertEqual(identity.declaration_result_checks(error(frame)), [])
+        self.assertEqual(len(inspected), 64)
+        context = None
+        for _ in range(8):
+            context = error(frames(10, 'PRIVATE_SENTINEL'), context)
+        inspected.clear()
+        self.assertEqual(identity.declaration_result_checks(context), [])
+        self.assertEqual(len(inspected), 64)
+
+    def test_exact_serialized_byte_boundary_and_one_byte_over(self):
+        for extra in (0, 1):
+            def expand(value):
+                value['payload'] = 'x' * (64 - len(identity.canonical({'payload': ''}).encode()) + extra)
+            with self.subTest(extra=extra), mock.patch.object(identity, 'MAX_OUTPUT', 64):
+                observed, failure, log, _ = self.run_result(validator=expand)
+            if extra:
+                self.assertIsNone(observed)
+                self.diagnostic(log, failure, 'SERIALIZE')
+            else:
+                self.assertIsNone(failure)
+                self.assertEqual(len(identity.canonical(observed).encode()), 64)
+                self.assertEqual(log, '')
+
+    def test_stderr_and_output_limit_precedence_do_not_trust_child_markers(self):
+        child = DeclarationWorkerDiagnosticTests().child_stderr()
+        _, failure, log, callback = self.run_result(stdout=b'\xff', stderr=child)
+        self.assertEqual(self.diagnostic(log, failure, 'NONEMPTY_STDERR')['checks'], [])
+        callback.assert_not_called()
+        self.assertNotIn('CHILD_REPORTED', log)
+        for code in (0, 2):
+            _, failure, log, callback = self.run_result(stderr=b'x' * (identity.MAX_OUTPUT + 1), code=code)
+            self.assertEqual(failure['kind'], 'OUTPUT_LIMIT')
+            self.assertEqual(log, '')
+            callback.assert_not_called()
+
+    @unittest.skipIf(sys.platform == 'win32', 'Synthetic Linux writer fixture requires POSIX paths, not native Windows evidence.')
+    def test_parent_diagnostic_preserves_actual_writer_packet_and_syntax_red(self):
+        fixture = DeclarationTests()
+        fixture.setUp()
+        cases = ((b'\xff', b'', 'DECODE'), (b'PRIVATE_SENTINEL', b'', 'PARSE'),
+                 (b'{}', b'', 'VALIDATE'), (b'{}', b'PRIVATE_SENTINEL', 'NONEMPTY_STDERR'))
+        for syntax_exit in (0, 1):
+            for stdout, stderr, phase in cases:
+                with self.subTest(syntax_exit=syntax_exit, phase=phase), tempfile.TemporaryDirectory() as directory:
+                    output = Path(directory).resolve() / 'failed.json'
+                    worker = SimpleNamespace(returncode=0, stdout=stdout, stderr=stderr)
+                    with fixture.mocked_declaration_capture(output, b'', syntax_exit=syntax_exit,
+                            worker_result=worker) as (argv, log, emitted):
+                        self.assertEqual(identity.main(argv), 2)
+                        raw_log = log.getvalue()
+                    retained = json.loads(output.read_bytes())
+                    self.diagnostic(raw_log, retained['probe']['backend_failure'], phase)
+                    self.assertNotIn('diagnostic', retained)
+                    self.assertEqual(set(retained['probe']), {'input', 'dependency', 'headers', 'syntax', 'cindex', 'backend_failure'})
+                    self.assertIsNone(retained['probe']['cindex'])
+                    self.assertEqual(retained['probe']['syntax']['exit_code'], syntax_exit)
+                    self.assertEqual(retained['probe']['syntax']['stderr']['sha256'],
+                        hashlib.sha256(b'earlier syntax RED' if syntax_exit else b'').hexdigest())
+                    summary = fixture.summary(retained, identity.declaration_model(Path(identity.__file__).resolve().parents[1])[1])
+                    self.assertTrue(all(row['issues'] == ['BACKEND_FAILED'] + (['SYNTAX_FAILED'] if syntax_exit else [])
+                                        for row in summary['requests']))
+                    self.assertTrue(all(summary[key] is False for key in ('syntax_pass', 'native_qualified', 'task_ready', 'product_qualified')))
+                    self.assertNotIn('PRIVATE_SENTINEL', raw_log + output.read_text())
+
+    def test_success_other_failure_classes_and_child_marker_stay_separate(self):
+        observed, failure, log, callback = self.run_result(stdout=b'{"good":true}')
+        self.assertEqual(observed, {'good': True})
+        self.assertIsNone(failure)
+        self.assertEqual(log, '')
+        callback.assert_called_once()
+        _, failure, log, callback = self.run_result(stdout=b'{}', code=2)
+        self.assertEqual(failure['kind'], 'PROCESS_FAILED')
+        self.assertTrue(log.startswith('DECLARATION_WORKER_DIAGNOSTIC '))
+        self.assertNotIn(self.LOG, log)
+        callback.assert_not_called()
+        _, failure, log, callback = self.run_result(stdout=b'x' * (identity.MAX_OUTPUT + 1))
+        self.assertEqual(failure['kind'], 'OUTPUT_LIMIT')
+        self.assertEqual(log, '')
+        callback.assert_not_called()
+
+    def test_existing_outer_oserror_and_uncaught_validator_errors_are_unchanged(self):
+        _, failure, log, _ = self.run_result(validator=mock.Mock(side_effect=OSError('PRIVATE_SENTINEL')))
+        self.assertEqual(failure, {'kind': 'START_FAILED', 'exit_code': None,
+            'stdout': {'bytes': 0, 'sha256': hashlib.sha256(b'').hexdigest()},
+            'stderr': {'bytes': 0, 'sha256': hashlib.sha256(b'').hexdigest()}})
+        self.assertEqual(log, '')
+        with self.assertRaises(RuntimeError):
+            self.run_result(validator=mock.Mock(side_effect=RuntimeError('PRIVATE_SENTINEL')))
 
 
 class PosixDeclarationProfileTests(unittest.TestCase):
@@ -2426,7 +2706,7 @@ class PosixDeclarationProfileTests(unittest.TestCase):
                 with self.legacy.mocked_declaration_capture(output, worker_raw, syntax_exit=syntax_exit,
                         preprocessor_response=preprocess_failure) as (argv, stderr, emitted):
                     self.assertEqual(identity.main(argv + ['--declaration-profile', self.PROFILE]), 2 if syntax_exit else 0)
-                    self.assertEqual(stderr.getvalue(), '')
+                    diagnostic_log = stderr.getvalue()
                 retained = json.loads(output.read_text())
                 self.assertEqual(retained['schema'], 'codeskeptic-native-declarations/v2')
                 self.assertEqual(emitted['config']['profile'], retained['profile'])
@@ -2435,6 +2715,9 @@ class PosixDeclarationProfileTests(unittest.TestCase):
                 self.assertEqual(self.check(retained, sha)['visibility_pass'], preprocess_failure is None)
                 if worker_raw == b'{}':
                     self.assertEqual(retained['probe']['backend_failure']['kind'], 'INVALID_RESULT')
+                    DeclarationResultDiagnosticTests().diagnostic(diagnostic_log, retained['probe']['backend_failure'], 'VALIDATE')
+                else:
+                    self.assertEqual(diagnostic_log, '')
 
     def test_public_cli_rejects_windows_and_unknown_profile_before_execution(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -2483,11 +2766,17 @@ class PosixDeclarationProfileTests(unittest.TestCase):
                 with self.legacy.mocked_declaration_capture(output, raw, changed=changed,
                         after_serialization=inject) as (argv, stderr, emitted):
                     self.assertEqual(identity.main(argv + ['--declaration-profile', self.PROFILE]), 2)
-                    self.assertEqual(bool(stderr.getvalue()), changed is not None)
+                    diagnostic_log = stderr.getvalue()
                 if changed is not None:
                     self.assertFalse(output.exists())
+                    lines = diagnostic_log.splitlines()
+                    self.assertEqual(len(lines), 3)
+                    self.assertTrue(lines[0].startswith('DECLARATION_RESULT_DIAGNOSTIC '))
+                    self.assertTrue(lines[1].startswith('IDENTITY_INVALID '))
+                    self.assertEqual(lines[2], 'DECLARATION_FAILURE_KIND INVALID')
                 else:
                     retained = json.loads(output.read_text())
+                    DeclarationResultDiagnosticTests().diagnostic(diagnostic_log, retained['probe']['backend_failure'], 'VALIDATE')
                     self.assertEqual(retained['probe']['backend_failure']['kind'], 'INVALID_RESULT')
                     self.assertEqual(retained['probe']['syntax']['exit_code'], 1)
                     self.assertFalse(self.check(retained, sha)['syntax_pass'])

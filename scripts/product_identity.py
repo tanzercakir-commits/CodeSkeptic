@@ -2002,11 +2002,30 @@ def declaration_worker_diagnostic(stderr, failure):
     return value
 
 
+def declaration_result_checks(error):
+    """Parent-only hints: eight contexts, 64 total frames, at most 24 checks."""
+    allowed = {__file__: 'identity', str(Path(__file__).with_name('product_profiles.py')): 'profile'}
+    seen, checks, remaining = set(), [], 64
+    while error is not None and id(error) not in seen and len(seen) < 8 and remaining and len(checks) < 24:
+        seen.add(id(error))
+        frame = error.__traceback__
+        while frame is not None and remaining and len(checks) < 24:
+            remaining -= 1
+            module = allowed.get(frame.tb_frame.f_code.co_filename)
+            line = frame.tb_lineno
+            if module and type(line) is int and 0 < line < 1000000:
+                checks.append(module + ':' + str(line))
+            frame = frame.tb_next
+        error = error.__context__
+    return checks
+
+
 def run_declaration_worker(config, validate_result):
     """Retain a later extraction failure without discarding earlier syntax RED."""
     from product_profiles import parse_json
     command = [sys.executable, '-B', str(Path(__file__).resolve()), '_declaration-worker']
     failure = None
+    result_phase, result_error = None, None
     try:
         run_ = subprocess.run(command, input=canonical(config).encode('utf-8'),
                               env=checked_environment(os.environ), capture_output=True, timeout=30, check=False)
@@ -2017,14 +2036,21 @@ def run_declaration_worker(config, validate_result):
             failure = 'PROCESS_FAILED'
         elif stderr:
             failure = 'INVALID_RESULT'
+            result_phase = 'NONEMPTY_STDERR'
         else:
             try:
-                observed = parse_json(stdout.decode('utf-8'))
+                result_phase = 'DECODE'
+                decoded = stdout.decode('utf-8')
+                result_phase = 'PARSE'
+                observed = parse_json(decoded)
+                result_phase = 'VALIDATE'
                 validate_result(observed)
+                result_phase = 'SERIALIZE'
                 require(len(canonical(observed).encode('utf-8')) <= MAX_OUTPUT, 'declaration result serialization bound')
                 return observed, None
-            except (ValueError, TypeError, KeyError, RecursionError):
+            except (ValueError, TypeError, KeyError, RecursionError) as error:
                 failure = 'INVALID_RESULT'
+                result_error = error
     except subprocess.TimeoutExpired as error:
         failure, stdout, stderr, code = 'TIMEOUT', error.stdout or b'', error.stderr or b'', None
     except OSError:
@@ -2039,6 +2065,27 @@ def run_declaration_worker(config, validate_result):
             print('DECLARATION_WORKER_DIAGNOSTIC ' + canonical(declaration_worker_diagnostic(stderr, retained_failure)),
                   end='', file=sys.stderr)
         except (OSError, ValueError):
+            pass
+    elif failure == 'INVALID_RESULT':
+        # Extract/serialize/write only after retaining the original failure and
+        # outside the subprocess OSError handler. Optional diagnostics must not
+        # relabel the RED, erase its streams, or echo exception/child content.
+        try:
+            checks = declaration_result_checks(result_error)
+            if not (type(checks) is list and len(checks) <= 24 and all(
+                    type(check) is str and len(check) <= 15 and re.fullmatch(
+                        r'(identity|profile):[1-9][0-9]{0,5}', check) for check in checks)):
+                checks = []
+            require(result_phase in ('NONEMPTY_STDERR', 'DECODE', 'PARSE', 'VALIDATE', 'SERIALIZE'),
+                    'declaration result diagnostic phase')
+            diagnostic = {'schema': 'codeskeptic-declaration-result-diagnostic/v1',
+                          'origin': 'PARENT_REPORTED', 'phase': result_phase,
+                          'checks': checks, 'parent_failure': retained_failure}
+            line = 'DECLARATION_RESULT_DIAGNOSTIC ' + canonical(diagnostic)
+            if line.isascii() and len(line) <= 1024:
+                print(line, end='', file=sys.stderr)
+        except Exception:
+            # Deliberately only the optional diagnostic, not result validation.
             pass
     return None, retained_failure
 

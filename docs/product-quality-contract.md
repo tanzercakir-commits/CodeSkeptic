@@ -703,6 +703,32 @@ başarısızlığı asıl process failure'ı değiştirmez ve packet'i iptal etm
 best-effort'tur. Komut, environment, tek deneme ve30s timeout aynı kalır. Geçmişte
 yalnız hash'i saklanan stderr geri çıkarılamaz veya bu yeni tanıyla yorumlanamaz.
 
+Çocuk exit0 ile dönüp sonucu reddedildiğinde ayrı parent-only
+`DECLARATION_RESULT_DIAGNOSTIC` satırı üretilir. Şema
+`codeskeptic-declaration-result-diagnostic/v1`, köken `PARENT_REPORTED`;
+aşama yalnız `NONEMPTY_STDERR`, `DECODE`, `PARSE`, `VALIDATE` veya `SERIALIZE`
+olabilir. Aşama, ilgili kontrolün hemen öncesinde parent tarafından atanır;
+çocuk metninden veya exception mesajından çıkarılmaz. `SERIALIZE` canonical
+JSON, UTF-8 encoding ve son boyut kontrolünü kapsar; validator içindeki UTF-8
+reddi ise `VALIDATE` kalır. Bu tanı exception türünü veya native aşamayı kanıtlamaz.
+
+Parent'ın ayrı kaynak-ipucu toplayıcısı en fazla sekiz farklı context, izinli
+olmayanlar dahil toplam64 traceback frame ve24 token inceler/saklar. Yalnız
+exact identity/profile modül yolları ve pozitif en fazla altı basamaklı satır
+numaraları kullanılır; tam traceback, özel metin ve dosya yolu yazılmaz.
+Kesilmiş ipuçları bütün ret zincirini açıklama iddiası taşımaz. İpuçları ayrıca
+tam liste/ASCII token gramerinden geçer; bozuk liste boşalır. Bütün tek satır,
+marker ve LF dahil en fazla1024 ASCII byte'tır; `NONEMPTY_STDERR` ipuçları boştur.
+
+Özgün `INVALID_RESULT` kind/exit/stream boyutları ve hash'leri önce hesaplanır.
+İpucu toplama, diagnostic serialization ve log yazma ayrı best-effort sınırda,
+subprocess OSError yakalayıcısının dışında yapılır; buradaki exception asıl
+RED'i `START_FAILED` yapamaz, stream'lerini silemez veya packet'i iptal edemez.
+Var olan sonuç kabulü, yakalanan exception sınıfları, komut/ortam/tek deneme,
+30s timeout, output sınırı ve packet şemaları değişmez. Success ve diğer failure
+sınıfları yeni marker üretmez; eski child diagnostic şeması aynen korunur.
+Geçmişte yalnız hash'i saklanan stdout'un ret aşaması geriye dönük belirlenemez.
+
 `check-declarations` saf metadata denetimidir; `native-declarations-check` ayrıca
 packet digest'ini, seçili model byte'larını ve gerçek producer Git bloblarını
 doğrular. Hiçbiri kayıt içindeki native yolları açmaz, library yüklemez veya argv'yi
